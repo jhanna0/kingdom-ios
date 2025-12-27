@@ -93,7 +93,7 @@ class MapViewModel: ObservableObject {
         errorMessage = nil
         
         Task {
-            loadingStatus = "Unrolling ancient scrolls..."
+            loadingStatus = "Digging through the maps..."
             
             let foundKingdoms = await SampleData.loadRealTowns(around: location, radiusMiles: loadRadiusMiles)
             
@@ -101,22 +101,20 @@ class MapViewModel: ObservableObject {
                 loadingStatus = "The realm lies shrouded in fog..."
                 errorMessage = "The royal mapmakers could not chart these lands. Ensure thy connection to the realm is strong and try again."
                 print("❌ No real towns found!")
+                isLoading = false
             } else {
-                loadingStatus = "Discovered \(foundKingdoms.count) kingdoms!"
-                errorMessage = nil
+                // Set kingdoms immediately
                 kingdoms = foundKingdoms
                 print("✅ Loaded \(foundKingdoms.count) towns")
-                
-                // Adjust map to show all kingdoms
-                adjustMapToShowKingdoms()
                 
                 // Re-check location now that kingdoms are loaded
                 if let currentLocation = userLocation {
                     checkKingdomLocation(currentLocation)
                 }
+                
+                // Done loading
+                isLoading = false
             }
-            
-            isLoading = false
         }
     }
     

@@ -35,7 +35,7 @@ struct KingdomInfoCard: View {
             .padding(.bottom, 4)
             
             if kingdom.isUnclaimed {
-                Text("No ruler - claim it by checking in!")
+                Text("No ruler!")
                     .font(KingdomTheme.Typography.headline())
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             } else {
@@ -120,7 +120,7 @@ struct KingdomInfoCard: View {
                     } else if kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
                         // Can claim!
                         MedievalActionButton(
-                            title: "👑 Claim This Kingdom",
+                            title: "Claim This Kingdom",
                             color: KingdomTheme.Colors.gold,
                             fullWidth: true
                         ) {

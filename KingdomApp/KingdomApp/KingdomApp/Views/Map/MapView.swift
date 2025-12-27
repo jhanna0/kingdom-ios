@@ -5,8 +5,10 @@ struct MapView: View {
     @StateObject private var viewModel = MapViewModel()
     @StateObject private var locationManager = LocationManager()
     @State private var selectedKingdom: Kingdom?
-    @State private var showCurrentKingdom: Bool = true
+    @State private var showCurrentKingdom: Bool = false
     @State private var showMyKingdoms = false
+    @State private var hasShownInitialKingdom = false
+    @State private var mapOpacity: Double = 0.0
     
     var body: some View {
         ZStack {
@@ -20,7 +22,7 @@ struct MapView: View {
                                 red: kingdom.color.rgba.red,
                                 green: kingdom.color.rgba.green,
                                 blue: kingdom.color.rgba.blue,
-                                opacity: kingdom.color.rgba.alpha
+                                opacity: kingdom.color.rgba.alpha * mapOpacity
                             )
                         )
                         .stroke(
@@ -28,7 +30,7 @@ struct MapView: View {
                                 red: kingdom.color.strokeRGBA.red,
                                 green: kingdom.color.strokeRGBA.green,
                                 blue: kingdom.color.strokeRGBA.blue,
-                                opacity: kingdom.color.strokeRGBA.alpha
+                                opacity: kingdom.color.strokeRGBA.alpha * mapOpacity
                             ),
                             style: StrokeStyle(
                                 lineWidth: 2,
@@ -41,6 +43,7 @@ struct MapView: View {
                     // Kingdom marker (castle icon)
                     Annotation(kingdom.name, coordinate: kingdom.territory.center) {
                         KingdomMarker(kingdom: kingdom)
+                            .opacity(mapOpacity)
                             .onTapGesture {
                                 selectedKingdom = kingdom
                                 showCurrentKingdom = false  // Manually selected, disable auto-show
@@ -53,7 +56,6 @@ struct MapView: View {
             }
             .mapStyle(.imagery(elevation: .flat))
             .mapControls {
-                MapUserLocationButton()
                 MapCompass()
                 MapScaleView()
             }
@@ -61,6 +63,8 @@ struct MapView: View {
             // Loading overlay - Medieval style
             if viewModel.isLoading {
                 MedievalLoadingView(status: viewModel.loadingStatus)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.5), value: viewModel.isLoading)
             }
             
             // Error overlay - Medieval style
@@ -146,13 +150,16 @@ struct MapView: View {
                             _ = viewModel.claimKingdom()
                         },
                         onClose: {
-                            selectedKingdom = nil
-                            showCurrentKingdom = false
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                selectedKingdom = nil
+                                showCurrentKingdom = false
+                            }
                         }
                     )
                     .padding()
-                    .transition(.move(edge: .bottom))
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.5), value: showCurrentKingdom)
             }
         }
         .onReceive(locationManager.$currentLocation) { location in
@@ -163,7 +170,29 @@ struct MapView: View {
         .onChange(of: viewModel.currentKingdomInside?.id) { oldValue, newValue in
             // Show card when entering a new kingdom
             if newValue != nil && oldValue != newValue {
-                showCurrentKingdom = true
+                // Add smooth delay for initial presentation
+                if !hasShownInitialKingdom {
+                    hasShownInitialKingdom = true
+                    // Wait for map to fade in, then show sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            showCurrentKingdom = true
+                        }
+                    }
+                } else {
+                    // Subsequent kingdom changes show with animation
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showCurrentKingdom = true
+                    }
+                }
+            }
+        }
+        .onChange(of: viewModel.isLoading) { oldValue, newValue in
+            // When loading completes, fade in the map smoothly
+            if !newValue && oldValue && viewModel.kingdoms.count > 0 {
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    mapOpacity = 1.0
+                }
             }
         }
         .sheet(isPresented: $showMyKingdoms) {
