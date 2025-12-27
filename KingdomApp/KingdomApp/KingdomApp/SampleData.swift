@@ -53,16 +53,23 @@ class SampleData {
                     let placeName: String
                     if let name = item.name, !name.isEmpty {
                         placeName = name
-                    } else if let locality = item.placemark.locality {
-                        placeName = locality
                     } else {
-                        continue
+                        // Using placemark (iOS 26+ has new API but still works)
+                        #if compiler(>=6.0)
+                        #warning("Update to use item.address when iOS 26+ is baseline")
+                        #endif
+                        if let locality = item.placemark.locality {
+                            placeName = locality
+                        } else {
+                            continue
+                        }
                     }
                     
                     // Skip duplicates
                     if seenPlaces.contains(placeName) { continue }
                     seenPlaces.insert(placeName)
                     
+                    // Using placemark.coordinate (iOS 26+ has new API but still works)
                     let coord = item.placemark.coordinate
                     let distance = distanceBetween(center, coord)
                     

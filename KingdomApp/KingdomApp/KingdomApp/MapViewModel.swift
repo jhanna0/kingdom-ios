@@ -213,4 +213,66 @@ class MapViewModel: ObservableObject {
         
         return false
     }
+    
+    // MARK: - Ruler Actions
+    
+    /// Upgrade a building (uses kingdom treasury, not player gold)
+    func upgradeBuilding(kingdom: Kingdom, buildingType: BuildingType, cost: Int) {
+        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
+            print("❌ Kingdom not found")
+            return
+        }
+        
+        // Check if ruler owns this kingdom
+        guard kingdoms[index].rulerId == player.playerId else {
+            print("❌ You don't rule this kingdom")
+            return
+        }
+        
+        // Check if kingdom has enough treasury gold
+        guard kingdoms[index].treasuryGold >= cost else {
+            print("❌ Kingdom treasury insufficient: need \(cost), have \(kingdoms[index].treasuryGold)")
+            return
+        }
+        
+        // Deduct from kingdom treasury
+        kingdoms[index].treasuryGold -= cost
+        
+        // Upgrade the building
+        switch buildingType {
+        case .walls:
+            if kingdoms[index].wallLevel < 5 {
+                kingdoms[index].wallLevel += 1
+                print("🏰 Upgraded walls to level \(kingdoms[index].wallLevel)")
+            }
+        case .vault:
+            if kingdoms[index].vaultLevel < 5 {
+                kingdoms[index].vaultLevel += 1
+                print("🔒 Upgraded vault to level \(kingdoms[index].vaultLevel)")
+            }
+        }
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdom.id {
+            currentKingdomInside = kingdoms[index]
+        }
+    }
+    
+    /// Collect passive income from ruled kingdoms (benefit of ruling)
+    func collectPassiveIncome() {
+        let ruledKingdoms = kingdoms.filter { kingdom in
+            player.fiefsRuled.contains(kingdom.name)
+        }
+        
+        // Each kingdom generates 10 gold per hour to its treasury
+        let hoursPerCollection = 1.0
+        let incomePerKingdom = 10
+        
+        for kingdom in ruledKingdoms {
+            if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+                kingdoms[index].treasuryGold += incomePerKingdom
+                print("💰 \(kingdom.name) generated \(incomePerKingdom) gold")
+            }
+        }
+    }
 }

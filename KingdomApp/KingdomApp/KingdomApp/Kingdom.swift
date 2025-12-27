@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-struct Kingdom: Identifiable, Equatable {
+struct Kingdom: Identifiable, Equatable, Hashable {
     let id: UUID
     let name: String
     var rulerName: String
@@ -17,6 +17,10 @@ struct Kingdom: Identifiable, Equatable {
     
     static func == (lhs: Kingdom, rhs: Kingdom) -> Bool {
         lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
     
     init(name: String, rulerName: String = "Unclaimed", rulerId: String? = nil, territory: Territory, color: KingdomColor) {
@@ -95,10 +99,22 @@ struct Kingdom: Identifiable, Equatable {
     }
 }
 
-struct Territory {
+struct Territory: Hashable {
     let center: CLLocationCoordinate2D
     let radiusMeters: Double
     let boundary: [CLLocationCoordinate2D]
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(center.latitude)
+        hasher.combine(center.longitude)
+        hasher.combine(radiusMeters)
+    }
+    
+    static func == (lhs: Territory, rhs: Territory) -> Bool {
+        lhs.center.latitude == rhs.center.latitude &&
+        lhs.center.longitude == rhs.center.longitude &&
+        lhs.radiusMeters == rhs.radiusMeters
+    }
     
     // Helper to create circular territory
     static func circular(center: CLLocationCoordinate2D, radiusMeters: Double, points: Int = 30) -> Territory {
@@ -159,7 +175,7 @@ struct Territory {
     }
 }
 
-enum KingdomColor: CaseIterable {
+enum KingdomColor: CaseIterable, Hashable {
     // Medieval parchment/war map colors - browns, tans, sepias
     case burntSienna, darkBrown, tan, russet, sepia, umber, ochre, bronze
     

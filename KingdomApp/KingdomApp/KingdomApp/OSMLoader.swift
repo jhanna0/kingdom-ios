@@ -173,7 +173,7 @@ class OSMLoader {
         guard !segments.isEmpty else { return [] }
         
         // Count total points across all segments
-        let totalPoints = segments.reduce(0) { $0 + $1.count }
+        _ = segments.reduce(0) { $0 + $1.count }
         
         if segments.count == 1 {
             return ensureClosed(segments[0])
@@ -181,7 +181,7 @@ class OSMLoader {
         
         // Try to join segments end-to-end
         var result: [CLLocationCoordinate2D] = []
-        var remaining = segments
+        let remaining = segments
         var used = Set<Int>()
         
         // Start with the longest segment
