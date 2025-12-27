@@ -10,7 +10,7 @@ class MapViewModel: ObservableObject {
     @Published var cameraPosition: MapCameraPosition
     @Published var userLocation: CLLocationCoordinate2D?
     @Published var isLoading: Bool = false
-    @Published var loadingStatus: String = "Waiting for location..."
+    @Published var loadingStatus: String = "Awakening the royal cartographers..."
     @Published var errorMessage: String?
     @Published var player: Player
     @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
@@ -89,20 +89,20 @@ class MapViewModel: ObservableObject {
         guard !isLoading else { return }
         
         isLoading = true
-        loadingStatus = "Finding towns near you..."
+        loadingStatus = "Scouts dispatched to survey the realm..."
         errorMessage = nil
         
         Task {
-            loadingStatus = "Querying OpenStreetMap..."
+            loadingStatus = "Unrolling ancient scrolls..."
             
             let foundKingdoms = await SampleData.loadRealTowns(around: location, radiusMiles: loadRadiusMiles)
             
             if foundKingdoms.isEmpty {
-                loadingStatus = "No towns found"
-                errorMessage = "Could not load town boundaries. Please check your internet connection and try again."
+                loadingStatus = "The realm lies shrouded in fog..."
+                errorMessage = "The royal mapmakers could not chart these lands. Ensure thy connection to the realm is strong and try again."
                 print("❌ No real towns found!")
             } else {
-                loadingStatus = "Loaded \(foundKingdoms.count) towns"
+                loadingStatus = "Discovered \(foundKingdoms.count) kingdoms!"
                 errorMessage = nil
                 kingdoms = foundKingdoms
                 print("✅ Loaded \(foundKingdoms.count) towns")
@@ -125,7 +125,7 @@ class MapViewModel: ObservableObject {
         if let location = userLocation {
             loadRealTowns(around: location)
         } else {
-            errorMessage = "Location not available. Please enable location services."
+            errorMessage = "The royal astronomers cannot find you! Grant them permission to track the stars."
         }
     }
     

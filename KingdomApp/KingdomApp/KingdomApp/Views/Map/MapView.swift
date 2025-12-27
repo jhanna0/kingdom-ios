@@ -60,22 +60,7 @@ struct MapView: View {
             
             // Loading overlay - Medieval style
             if viewModel.isLoading {
-                VStack(spacing: KingdomTheme.Spacing.large) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(KingdomTheme.Colors.loadingTint)
-                    
-                    Text(viewModel.loadingStatus)
-                        .font(KingdomTheme.Typography.headline())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Charting the kingdoms...")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                .padding(KingdomTheme.Spacing.xxLarge)
-                .parchmentCard(cornerRadius: KingdomTheme.CornerRadius.xxLarge)
-                .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
+                MedievalLoadingView(status: viewModel.loadingStatus)
             }
             
             // Error overlay - Medieval style
