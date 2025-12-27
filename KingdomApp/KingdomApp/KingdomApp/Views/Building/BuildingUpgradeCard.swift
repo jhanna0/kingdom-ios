@@ -19,21 +19,21 @@ struct BuildingUpgradeCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.2))
+                    .foregroundColor(KingdomTheme.Colors.goldWarm)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
-                        .font(.system(.title3, design: .serif))
+                        .font(KingdomTheme.Typography.title3())
                         .fontWeight(.bold)
-                        .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Level \(currentLevel)/\(maxLevel)")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Spacer()
@@ -41,8 +41,8 @@ struct BuildingUpgradeCard: View {
             
             if !isMaxLevel {
                 Text(benefit)
-                    .font(.system(.caption, design: .serif))
-                    .foregroundColor(Color(red: 0.3, green: 0.15, blue: 0.05))
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                     .padding(.vertical, 4)
                 
                 HStack {
@@ -50,41 +50,29 @@ struct BuildingUpgradeCard: View {
                         Image(systemName: "building.columns.fill")
                             .font(.caption)
                         Text("\(cost)")
-                            .font(.system(.headline, design: .serif))
+                            .font(KingdomTheme.Typography.headline())
                             .fontWeight(.bold)
                         Text("from treasury")
-                            .font(.system(.caption, design: .serif))
+                            .font(KingdomTheme.Typography.caption())
                     }
-                    .foregroundColor(canAfford ? Color(red: 0.4, green: 0.2, blue: 0.1) : .red)
+                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : .red)
                     
                     Spacer()
                     
                     Button(action: onUpgrade) {
                         Text("Upgrade")
-                            .font(.system(.subheadline, design: .serif))
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(canAfford ? Color(red: 0.5, green: 0.3, blue: 0.1) : Color.gray)
-                            .cornerRadius(8)
                     }
+                    .buttonStyle(.medieval(color: canAfford ? KingdomTheme.Colors.buttonPrimary : .gray))
                     .disabled(!canAfford)
                 }
             } else {
                 Text("Maximum level reached")
-                    .font(.system(.caption, design: .serif))
-                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
                     .italic()
             }
         }
         .padding()
-        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
-        )
+        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
     }
 }
-

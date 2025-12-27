@@ -60,74 +60,55 @@ struct MapView: View {
             
             // Loading overlay - Medieval style
             if viewModel.isLoading {
-                VStack(spacing: 16) {
+                VStack(spacing: KingdomTheme.Spacing.large) {
                     ProgressView()
                         .scaleEffect(1.5)
-                        .tint(Color(red: 0.5, green: 0.3, blue: 0.1))
+                        .tint(KingdomTheme.Colors.loadingTint)
                     
                     Text(viewModel.loadingStatus)
-                        .font(.system(.headline, design: .serif))
-                        .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Charting the kingdoms...")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-                .padding(24)
-                .background(Color(red: 0.95, green: 0.87, blue: 0.70))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
-                )
-                .shadow(color: Color.black.opacity(0.4), radius: 10)
+                .padding(KingdomTheme.Spacing.xxLarge)
+                .parchmentCard(cornerRadius: KingdomTheme.CornerRadius.xxLarge)
+                .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
             }
             
             // Error overlay - Medieval style
             if let error = viewModel.errorMessage {
-                VStack(spacing: 16) {
+                VStack(spacing: KingdomTheme.Spacing.large) {
                     Image(systemName: "exclamationmark.shield.fill")
                         .font(.largeTitle)
-                        .foregroundColor(Color(red: 0.7, green: 0.3, blue: 0.1))
+                        .foregroundColor(KingdomTheme.Colors.error)
                     
                     Text("Map Scroll Damaged")
-                        .font(.system(.headline, design: .serif))
-                        .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(error)
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .multilineTextAlignment(.center)
                     
                     Button(action: {
                         viewModel.refreshKingdoms()
                     }) {
                         Label("Repair Map", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(.headline, design: .serif))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(Color(red: 0.5, green: 0.3, blue: 0.1))
-                            .foregroundColor(Color(red: 0.95, green: 0.87, blue: 0.70))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.3, green: 0.2, blue: 0.1), lineWidth: 2)
-                            )
                     }
+                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary))
                 }
-                .padding(24)
-                .background(Color(red: 0.95, green: 0.87, blue: 0.70))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
-                )
-                .shadow(color: Color.black.opacity(0.4), radius: 10)
+                .padding(KingdomTheme.Spacing.xxLarge)
+                .parchmentCard(cornerRadius: KingdomTheme.CornerRadius.xxLarge)
+                .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
             }
             
             // Player HUD - top left
             VStack {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
                     PlayerHUD(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
                     
                     Spacer()
@@ -141,15 +122,20 @@ struct MapView: View {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 14))
                                 Text("\(viewModel.player.fiefsRuled.count)")
-                                    .font(.system(.subheadline, design: .serif))
+                                    .font(KingdomTheme.Typography.subheadline())
                                     .fontWeight(.bold)
                             }
                             .foregroundColor(.white)
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, KingdomTheme.Spacing.medium)
                             .padding(.vertical, 8)
-                            .background(Color(red: 0.5, green: 0.3, blue: 0.1))
-                            .cornerRadius(8)
-                            .shadow(color: Color.black.opacity(0.3), radius: 5, x: 2, y: 3)
+                            .background(KingdomTheme.Colors.buttonPrimary)
+                            .cornerRadius(KingdomTheme.CornerRadius.large)
+                            .shadow(
+                                color: KingdomTheme.Shadows.card.color,
+                                radius: KingdomTheme.Shadows.card.radius,
+                                x: KingdomTheme.Shadows.card.x,
+                                y: KingdomTheme.Shadows.card.y
+                            )
                         }
                     }
                 }
@@ -210,4 +196,3 @@ struct MapView: View {
 #Preview {
     MapView()
 }
-

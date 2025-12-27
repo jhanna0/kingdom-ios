@@ -10,7 +10,7 @@ struct KingdomMarker: View {
             ZStack {
                 // Parchment-style background
                 Circle()
-                    .fill(Color(red: 0.95, green: 0.87, blue: 0.70))  // Old parchment color
+                    .fill(KingdomTheme.Colors.parchment)
                     .frame(width: 44, height: 44)
                     .overlay(
                         Circle()
@@ -20,10 +20,15 @@ struct KingdomMarker: View {
                                     green: kingdom.color.strokeRGBA.green,
                                     blue: kingdom.color.strokeRGBA.blue
                                 ),
-                                lineWidth: 3
+                                lineWidth: KingdomTheme.BorderWidth.thick
                             )
                     )
-                    .shadow(color: Color.black.opacity(0.4), radius: 4, x: 2, y: 2)
+                    .shadow(
+                        color: KingdomTheme.Shadows.card.color,
+                        radius: 4,
+                        x: 2,
+                        y: 2
+                    )
                 
                 Text("🏰")
                     .font(.system(size: 22))
@@ -31,13 +36,13 @@ struct KingdomMarker: View {
             
             // Town name with parchment scroll style
             Text(kingdom.name)
-                .font(.system(size: 11, weight: .bold, design: .serif))  // Serif for medieval feel
-                .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))  // Dark brown ink
+                .font(.system(size: 11, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(red: 0.95, green: 0.87, blue: 0.70))  // Parchment
+                        .fill(KingdomTheme.Colors.parchment)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3)
                                 .stroke(
@@ -46,12 +51,16 @@ struct KingdomMarker: View {
                                         green: kingdom.color.strokeRGBA.green,
                                         blue: kingdom.color.strokeRGBA.blue
                                     ),
-                                    lineWidth: 2
+                                    lineWidth: KingdomTheme.BorderWidth.regular
                                 )
                         )
                 )
-                .shadow(color: Color.black.opacity(0.3), radius: 3, x: 1, y: 2)
+                .shadow(
+                    color: KingdomTheme.Shadows.button.color,
+                    radius: KingdomTheme.Shadows.button.radius,
+                    x: KingdomTheme.Shadows.button.x,
+                    y: KingdomTheme.Shadows.button.y
+                )
         }
     }
 }
-

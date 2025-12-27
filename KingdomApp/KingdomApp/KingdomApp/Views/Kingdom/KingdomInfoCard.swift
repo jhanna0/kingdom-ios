@@ -13,41 +13,41 @@ struct KingdomInfoCard: View {
     @State private var showBuildMenu = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Header with medieval styling
             HStack {
                 Text("🏰 \(kingdom.name)")
-                    .font(.system(.title2, design: .serif))
+                    .font(KingdomTheme.Typography.title2())
                     .fontWeight(.bold)
-                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))  // Dark brown ink
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 Spacer()
                 
                 if kingdom.isUnclaimed {
                     Text("⚠️ Unclaimed")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.7, green: 0.3, blue: 0.1))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.error)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(red: 0.9, green: 0.8, blue: 0.6))
-                        .cornerRadius(4)
+                        .background(KingdomTheme.Colors.parchmentRich)
+                        .cornerRadius(KingdomTheme.CornerRadius.small)
                 }
             }
             .padding(.bottom, 4)
             
             if kingdom.isUnclaimed {
                 Text("No ruler - claim it by checking in!")
-                    .font(.system(.headline, design: .serif))
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                    .font(KingdomTheme.Typography.headline())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             } else {
                 HStack(spacing: 4) {
                     Text("Ruled by \(kingdom.rulerName)")
-                        .font(.system(.headline, design: .serif))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     if kingdom.rulerId == player.playerId {
                         Text("(You)")
-                            .font(.system(.caption, design: .serif))
-                            .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.gold)
                     }
                 }
             }
@@ -63,28 +63,28 @@ struct KingdomInfoCard: View {
                 )
                 .frame(height: 2)
             
-            HStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: KingdomTheme.Spacing.xLarge) {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                     Label("\(kingdom.treasuryGold)g", systemImage: "dollarsign.circle.fill")
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                        .foregroundColor(KingdomTheme.Colors.gold)
                     Label("Walls Lv.\(kingdom.wallLevel)", systemImage: "shield.fill")
-                        .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                     Label("Vault Lv.\(kingdom.vaultLevel)", systemImage: "lock.fill")
-                        .foregroundColor(Color(red: 0.45, green: 0.3, blue: 0.1))
+                        .foregroundColor(KingdomTheme.Colors.goldWarm)
                     Label("\(kingdom.checkedInPlayers) subjects", systemImage: "person.3.fill")
-                        .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.15))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
             }
-            .font(.system(.subheadline, design: .serif))
+            .font(KingdomTheme.Typography.subheadline())
             
             // Check-in/Claim section
             if isPlayerInside {
                 VStack(spacing: 8) {
                     Rectangle()
-                        .fill(Color(red: 0.4, green: 0.3, blue: 0.2))
+                        .fill(KingdomTheme.Colors.divider)
                         .frame(height: 2)
                         .padding(.vertical, 4)
                     
@@ -93,25 +93,25 @@ struct KingdomInfoCard: View {
                         VStack(spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "crown.fill")
-                                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                                    .foregroundColor(KingdomTheme.Colors.gold)
                                 Text("You rule this kingdom")
-                                    .font(.system(.subheadline, design: .serif))
+                                    .font(KingdomTheme.Typography.subheadline())
                                     .fontWeight(.bold)
-                                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                                    .foregroundColor(KingdomTheme.Colors.gold)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(12)
-                            .background(Color(red: 0.95, green: 0.9, blue: 0.75))
-                            .cornerRadius(6)
+                            .padding(KingdomTheme.Spacing.medium)
+                            .background(KingdomTheme.Colors.parchmentHighlight)
+                            .cornerRadius(KingdomTheme.CornerRadius.medium)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.6, green: 0.4, blue: 0.1), lineWidth: 2)
+                                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                                    .stroke(KingdomTheme.Colors.gold, lineWidth: KingdomTheme.BorderWidth.regular)
                             )
                             
                             // Build button
                             MedievalActionButton(
                                 title: "Build Fortifications",
-                                color: Color(red: 0.5, green: 0.3, blue: 0.1),
+                                color: KingdomTheme.Colors.buttonPrimary,
                                 fullWidth: true
                             ) {
                                 showBuildMenu = true
@@ -121,7 +121,7 @@ struct KingdomInfoCard: View {
                         // Can claim!
                         MedievalActionButton(
                             title: "👑 Claim This Kingdom",
-                            color: Color(red: 0.6, green: 0.4, blue: 0.1),
+                            color: KingdomTheme.Colors.gold,
                             fullWidth: true
                         ) {
                             onClaim()
@@ -130,7 +130,7 @@ struct KingdomInfoCard: View {
                         // Need to enter the kingdom
                         MedievalActionButton(
                             title: "⚔️ Enter Kingdom",
-                            color: Color(red: 0.2, green: 0.5, blue: 0.3),
+                            color: KingdomTheme.Colors.buttonSuccess,
                             fullWidth: true
                         ) {
                             onCheckIn()
@@ -139,31 +139,31 @@ struct KingdomInfoCard: View {
                         // Already present but someone else rules it
                         HStack(spacing: 6) {
                             Image(systemName: "figure.walk")
-                                .foregroundColor(Color(red: 0.4, green: 0.3, blue: 0.2))
+                                .foregroundColor(KingdomTheme.Colors.divider)
                             Text("You are here")
-                                .font(.system(.caption, design: .serif))
-                                .foregroundColor(Color(red: 0.4, green: 0.3, blue: 0.2))
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.divider)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(8)
-                        .background(Color(red: 0.9, green: 0.85, blue: 0.7))
-                        .cornerRadius(6)
+                        .background(KingdomTheme.Colors.parchmentMuted)
+                        .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
                 }
             } else {
                 // Not inside this kingdom
                 VStack(spacing: 4) {
                     Rectangle()
-                        .fill(Color(red: 0.4, green: 0.3, blue: 0.2))
+                        .fill(KingdomTheme.Colors.divider)
                         .frame(height: 2)
                         .padding(.vertical, 4)
                     
                     HStack(spacing: 6) {
                         Image(systemName: "location.circle")
-                            .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
                         Text("You must travel here first")
-                            .font(.system(.caption, design: .serif))
-                            .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
                     .padding(8)
                 }
@@ -175,7 +175,7 @@ struct KingdomInfoCard: View {
                     HStack(spacing: 10) {
                         MedievalActionButton(
                             title: "⚔️ Declare War",
-                            color: Color(red: 0.7, green: 0.15, blue: 0.1)
+                            color: KingdomTheme.Colors.buttonDanger
                         ) {
                             // TODO: Implement declare war
                             print("Declare war on \(kingdom.name)")
@@ -183,7 +183,7 @@ struct KingdomInfoCard: View {
                         
                         MedievalActionButton(
                             title: "🤝 Form Alliance",
-                            color: Color(red: 0.2, green: 0.5, blue: 0.3)
+                            color: KingdomTheme.Colors.buttonSuccess
                         ) {
                             // TODO: Implement form alliance
                             print("Form alliance with \(kingdom.name)")
@@ -192,7 +192,7 @@ struct KingdomInfoCard: View {
                     
                     MedievalActionButton(
                         title: "🗡️ Stage Coup",
-                        color: Color(red: 0.3, green: 0.15, blue: 0.4),
+                        color: KingdomTheme.Colors.buttonSpecial,
                         fullWidth: true
                     ) {
                         // TODO: Implement stage coup
@@ -206,37 +206,41 @@ struct KingdomInfoCard: View {
                 HStack {
                     Spacer()
                     Text("✕ Close")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                     Spacer()
                 }
                 .padding(.top, 8)
             }
         }
-        .padding(20)
+        .padding(KingdomTheme.Spacing.xLarge)
         .background(
-            Color(red: 0.95, green: 0.87, blue: 0.70)  // Parchment background
+            KingdomTheme.Colors.parchment
                 .overlay(
                     // Add subtle texture
-                    Color(red: 0.9, green: 0.8, blue: 0.6).opacity(0.1)
+                    KingdomTheme.Colors.parchmentRich.opacity(0.1)
                 )
         )
-        .cornerRadius(8)
+        .cornerRadius(KingdomTheme.CornerRadius.large)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
                 .stroke(
                     Color(
                         red: kingdom.color.strokeRGBA.red,
                         green: kingdom.color.strokeRGBA.green,
                         blue: kingdom.color.strokeRGBA.blue
                     ),
-                    lineWidth: 3
+                    lineWidth: KingdomTheme.BorderWidth.thick
                 )
         )
-        .shadow(color: Color.black.opacity(0.4), radius: 8, x: 2, y: 4)
+        .shadow(
+            color: KingdomTheme.Shadows.cardStrong.color,
+            radius: KingdomTheme.Shadows.cardStrong.radius,
+            x: KingdomTheme.Shadows.cardStrong.x,
+            y: KingdomTheme.Shadows.cardStrong.y
+        )
         .sheet(isPresented: $showBuildMenu) {
             BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)
         }
     }
 }
-

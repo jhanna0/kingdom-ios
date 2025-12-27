@@ -5,18 +5,17 @@ struct BenefitRow: View {
     let text: String
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.2))
+                .foregroundColor(KingdomTheme.Colors.goldWarm)
                 .frame(width: 20)
             
             Text(text)
-                .font(.system(.caption, design: .serif))
-                .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                .font(KingdomTheme.Typography.caption())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Spacer()
         }
     }
 }
-

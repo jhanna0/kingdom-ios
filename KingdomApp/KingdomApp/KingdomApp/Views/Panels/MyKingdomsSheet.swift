@@ -8,29 +8,29 @@ struct MyKingdomsSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.95, green: 0.87, blue: 0.70)
+                KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
                 if player.fiefsRuled.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
                         Image(systemName: "crown")
                             .font(.system(size: 60))
-                            .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.2))
+                            .foregroundColor(KingdomTheme.Colors.goldWarm)
                             .opacity(0.5)
                         
                         Text("No Kingdoms Yet")
-                            .font(.system(.title3, design: .serif))
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                            .font(KingdomTheme.Typography.title3())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("Find unclaimed territories and check in to claim them!")
-                            .font(.system(.body, design: .serif))
-                            .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                            .font(KingdomTheme.Typography.body())
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
                 } else {
                     ScrollView {
-                        VStack(spacing: 16) {
+                        VStack(spacing: KingdomTheme.Spacing.large) {
                             ForEach(viewModel.kingdoms.filter { player.fiefsRuled.contains($0.name) }) { kingdom in
                                 NavigationLink(value: kingdom) {
                                     MyKingdomCard(kingdom: kingdom)
@@ -43,6 +43,9 @@ struct MyKingdomsSheet: View {
             }
             .navigationTitle("My Kingdoms")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .navigationDestination(for: Kingdom.self) { kingdom in
                 KingdomDetailView(
                     kingdom: kingdom,
@@ -55,10 +58,11 @@ struct MyKingdomsSheet: View {
                     Button("Done") {
                         onDismiss()
                     }
-                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.1))
+                    .font(KingdomTheme.Typography.headline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
         }
     }
 }
-

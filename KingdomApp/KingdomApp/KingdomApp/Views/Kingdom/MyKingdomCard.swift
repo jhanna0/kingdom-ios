@@ -5,7 +5,7 @@ struct MyKingdomCard: View {
     let kingdom: Kingdom
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
             // Castle icon with color
             ZStack {
                 Circle()
@@ -26,7 +26,7 @@ struct MyKingdomCard: View {
                                     green: kingdom.color.strokeRGBA.green,
                                     blue: kingdom.color.strokeRGBA.blue
                                 ),
-                                lineWidth: 2
+                                lineWidth: KingdomTheme.BorderWidth.regular
                             )
                     )
                 
@@ -36,33 +36,26 @@ struct MyKingdomCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(kingdom.name)
-                    .font(.system(.headline, design: .serif))
-                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                    .font(KingdomTheme.Typography.headline())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                HStack(spacing: 12) {
+                HStack(spacing: KingdomTheme.Spacing.medium) {
                     Label("\(kingdom.treasuryGold)g", systemImage: "dollarsign.circle.fill")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.gold)
                     
                     Label("\(kingdom.checkedInPlayers)", systemImage: "person.2.fill")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
-                .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                .foregroundColor(KingdomTheme.Colors.inkLight)
         }
         .padding()
-        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
-        )
-        .shadow(color: Color.black.opacity(0.2), radius: 3, x: 1, y: 2)
+        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 }
-

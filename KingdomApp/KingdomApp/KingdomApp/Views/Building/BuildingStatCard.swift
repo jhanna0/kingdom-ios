@@ -11,29 +11,27 @@ struct BuildingStatCard: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 30))
-                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.2))
+                .foregroundColor(KingdomTheme.Colors.goldWarm)
             
             Text(name)
-                .font(.system(.subheadline, design: .serif))
+                .font(KingdomTheme.Typography.subheadline())
                 .fontWeight(.semibold)
-                .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text("Level \(level)/\(maxLevel)")
-                .font(.system(.caption, design: .serif))
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                .font(KingdomTheme.Typography.caption())
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             Text(benefit)
-                .font(.system(.caption2, design: .serif))
-                .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                .font(KingdomTheme.Typography.caption2())
+                .foregroundColor(KingdomTheme.Colors.inkLight)
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 1.5)
+        .parchmentCard(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: KingdomTheme.CornerRadius.xLarge,
+            hasShadow: false
         )
     }
 }
-

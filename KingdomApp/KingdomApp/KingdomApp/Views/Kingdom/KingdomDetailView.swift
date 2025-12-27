@@ -18,69 +18,64 @@ struct KingdomDetailView: View {
     var body: some View {
         ZStack {
             // Parchment background
-            Color(red: 0.95, green: 0.87, blue: 0.70)
+            KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
             ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: KingdomTheme.Spacing.xLarge) {
                         // Kingdom header
-                        VStack(spacing: 12) {
+                        VStack(spacing: KingdomTheme.Spacing.medium) {
                             Image(systemName: "crown.fill")
                                 .font(.system(size: 50))
-                                .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.2))
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
                             
                             Text(kingdom.name)
-                                .font(.system(.largeTitle, design: .serif))
+                                .font(KingdomTheme.Typography.largeTitle())
                                 .fontWeight(.bold)
-                                .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("Ruled by \(kingdom.rulerName)")
-                                .font(.system(.subheadline, design: .serif))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                                .font(KingdomTheme.Typography.subheadline())
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .padding()
                         
                         // Treasury - Kingdom's money
                         VStack(spacing: 8) {
                             Text("Kingdom Treasury")
-                                .font(.system(.caption, design: .serif))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             HStack(spacing: 6) {
                                 Image(systemName: "building.columns.fill")
                                     .font(.title)
-                                    .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.2))
+                                    .foregroundColor(KingdomTheme.Colors.goldLight)
                                 Text("\(kingdom.treasuryGold)")
-                                    .font(.system(.title, design: .serif))
+                                    .font(KingdomTheme.Typography.title())
                                     .fontWeight(.bold)
-                                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                 Text("gold")
-                                    .font(.system(.subheadline, design: .serif))
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                                    .font(KingdomTheme.Typography.subheadline())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             
                             Text("Used for contracts & defenses")
-                                .font(.system(.caption2, design: .serif))
-                                .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                                .font(KingdomTheme.Typography.caption2())
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color(red: 0.92, green: 0.82, blue: 0.65))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
-                        )
+                        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentDark, hasShadow: false)
                         .padding(.horizontal)
                         
                         // Buildings section
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                             Text("Fortifications")
-                                .font(.system(.headline, design: .serif))
-                                .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                .font(KingdomTheme.Typography.headline())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
                                 .padding(.horizontal)
                             
-                            HStack(spacing: 16) {
+                            HStack(spacing: KingdomTheme.Spacing.large) {
                                 BuildingStatCard(
                                     icon: "building.2.fill",
                                     name: "Walls",
@@ -101,45 +96,44 @@ struct KingdomDetailView: View {
                         }
                         
                         // Population
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                             HStack {
                                 Text("Checked In")
-                                    .font(.system(.headline, design: .serif))
-                                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 Spacer()
                                 
                                 Text("\(kingdom.checkedInPlayers) present")
-                                    .font(.system(.subheadline, design: .serif))
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                                    .font(KingdomTheme.Typography.subheadline())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             .padding(.horizontal)
                             
                             // Placeholder for future player list
                             if kingdom.checkedInPlayers == 0 {
                                 Text("No one is present")
-                                    .font(.system(.caption, design: .serif))
-                                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
                                     .italic()
                                     .frame(maxWidth: .infinity)
                                     .padding()
                             }
                         }
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 1)
+                        .padding(.vertical, KingdomTheme.Spacing.medium)
+                        .parchmentCard(
+                            backgroundColor: KingdomTheme.Colors.parchmentLight,
+                            borderWidth: KingdomTheme.BorderWidth.thin,
+                            hasShadow: false
                         )
                         .padding(.horizontal)
                         
                         // Ruler actions
                         if isRuler {
-                            VStack(spacing: 12) {
+                            VStack(spacing: KingdomTheme.Spacing.medium) {
                                 Text("Ruler Powers")
-                                    .font(.system(.headline, design: .serif))
-                                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 Button(action: {
                                     showBuildMenu = true
@@ -149,17 +143,17 @@ struct KingdomDetailView: View {
                                             .font(.title3)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("Build Fortifications")
-                                                .font(.system(.headline, design: .serif))
+                                                .font(KingdomTheme.Typography.headline())
                                             Text("Upgrade walls or vault")
-                                                .font(.system(.caption, design: .serif))
+                                                .font(KingdomTheme.Typography.caption())
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")
                                     }
                                     .foregroundColor(.white)
                                     .padding()
-                                    .background(Color(red: 0.5, green: 0.3, blue: 0.1))
-                                    .cornerRadius(10)
+                                    .background(KingdomTheme.Colors.buttonPrimary)
+                                    .cornerRadius(KingdomTheme.CornerRadius.xLarge)
                                 }
                                 
                                 Button(action: {
@@ -170,29 +164,29 @@ struct KingdomDetailView: View {
                                             .font(.title3)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("Make Decree")
-                                                .font(.system(.headline, design: .serif))
+                                                .font(KingdomTheme.Typography.headline())
                                             Text("Announce to all subjects")
-                                                .font(.system(.caption, design: .serif))
+                                                .font(KingdomTheme.Typography.caption())
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")
                                     }
                                     .foregroundColor(.white)
                                     .padding()
-                                    .background(Color(red: 0.4, green: 0.25, blue: 0.15))
-                                    .cornerRadius(10)
+                                    .background(KingdomTheme.Colors.buttonSecondary)
+                                    .cornerRadius(KingdomTheme.CornerRadius.xLarge)
                                 }
                             }
                             .padding(.horizontal)
-                            .padding(.bottom, 20)
+                            .padding(.bottom, KingdomTheme.Spacing.xLarge)
                         }
                         
                         // Benefits of ruling
                         if isRuler {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Benefits of Ruling")
-                                    .font(.system(.headline, design: .serif))
-                                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 BenefitRow(icon: "bitcoinsign.circle.fill", text: "Passive income: +10 gold/hour")
                                 BenefitRow(icon: "person.2.fill", text: "Tax subjects & demand tribute")
@@ -200,14 +194,13 @@ struct KingdomDetailView: View {
                                 BenefitRow(icon: "crown.fill", text: "Control territory & make decrees")
                             }
                             .padding()
-                            .background(Color(red: 0.90, green: 0.80, blue: 0.60))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 1)
+                            .parchmentCard(
+                                backgroundColor: KingdomTheme.Colors.parchmentRich,
+                                borderWidth: KingdomTheme.BorderWidth.thin,
+                                hasShadow: false
                             )
                             .padding(.horizontal)
-                            .padding(.bottom, 20)
+                            .padding(.bottom, KingdomTheme.Spacing.xLarge)
                         }
                     }
                     .padding(.top)

@@ -8,31 +8,31 @@ struct DecreeInputView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(red: 0.95, green: 0.87, blue: 0.70)
+                KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
-                VStack(spacing: 20) {
+                VStack(spacing: KingdomTheme.Spacing.xLarge) {
                     Text("Royal Decree")
-                        .font(.system(.title2, design: .serif))
+                        .font(KingdomTheme.Typography.title2())
                         .fontWeight(.bold)
-                        .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                         .padding(.top)
                     
                     Text("Announce your will to all subjects of \(kingdom.name)")
-                        .font(.system(.subheadline, design: .serif))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                        .font(KingdomTheme.Typography.subheadline())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     
                     TextEditor(text: $decreeText)
-                        .font(.system(.body, design: .serif))
+                        .font(KingdomTheme.Typography.body())
                         .frame(height: 150)
                         .padding(8)
-                        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-                        .cornerRadius(8)
+                        .background(KingdomTheme.Colors.parchmentLight)
+                        .cornerRadius(KingdomTheme.CornerRadius.large)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                                .stroke(KingdomTheme.Colors.border, lineWidth: KingdomTheme.BorderWidth.thin)
                         )
                         .padding(.horizontal)
                     
@@ -41,13 +41,9 @@ struct DecreeInputView: View {
                         dismiss()
                     }) {
                         Text("Proclaim Decree")
-                            .font(.system(.headline, design: .serif))
-                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(red: 0.5, green: 0.3, blue: 0.1))
-                            .cornerRadius(10)
                     }
+                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
                     .padding(.horizontal)
                     .disabled(decreeText.isEmpty)
                     
@@ -55,16 +51,19 @@ struct DecreeInputView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .font(.system(.body, design: .serif))
-                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.1))
+                    .font(KingdomTheme.Typography.headline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
         }
     }
 }
-

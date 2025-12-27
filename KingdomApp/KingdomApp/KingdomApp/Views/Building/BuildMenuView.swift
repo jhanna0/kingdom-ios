@@ -10,11 +10,11 @@ struct BuildMenuView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(red: 0.95, green: 0.87, blue: 0.70)
+                KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
                         // Walls upgrade
                         BuildingUpgradeCard(
                             icon: "building.2.fill",
@@ -48,13 +48,17 @@ struct BuildMenuView: View {
             }
             .navigationTitle("Build Fortifications")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
-                    .font(.system(.body, design: .serif))
-                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.1))
+                    .font(KingdomTheme.Typography.headline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
         }
@@ -85,4 +89,3 @@ enum BuildingType {
     case walls
     case vault
 }
-
