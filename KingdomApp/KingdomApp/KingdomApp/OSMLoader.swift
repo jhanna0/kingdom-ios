@@ -13,34 +13,18 @@ class OSMLoader {
     
     /// Main entry point - get REAL town boundaries near user
     static func loadRealTownBoundaries(around center: CLLocationCoordinate2D, radiusKm: Double = 30) async -> [Kingdom] {
-        print("🗺️ Loading REAL town boundaries around \(center.latitude), \(center.longitude)")
-        
-        // Strategy 1: Overpass with full geometry
+        // Use Overpass API with full geometry (most reliable)
         if let kingdoms = await tryOverpassWithFullGeometry(center: center, radiusKm: radiusKm), !kingdoms.isEmpty {
-            print("✅ Got \(kingdoms.count) towns with real boundaries from Overpass")
             return kingdoms
         }
         
-        // Strategy 2: Nominatim search
-        if let kingdoms = await tryNominatimSearch(center: center, radiusKm: radiusKm), !kingdoms.isEmpty {
-            print("✅ Got \(kingdoms.count) towns from Nominatim")
-            return kingdoms
-        }
-        
-        // Strategy 3: Nominatim reverse grid
-        if let kingdoms = await tryNominatimReverseGrid(center: center, radiusKm: radiusKm), !kingdoms.isEmpty {
-            print("✅ Got \(kingdoms.count) towns from Nominatim reverse")
-            return kingdoms
-        }
-        
-        print("❌ All strategies failed")
+        print("❌ Failed to load towns")
         return []
     }
     
-    // MARK: - Strategy 1: Overpass with full geometry
+    // MARK: - Overpass with full geometry
     
     private static func tryOverpassWithFullGeometry(center: CLLocationCoordinate2D, radiusKm: Double) async -> [Kingdom]? {
-        print("📡 Strategy 1: Overpass API with full geometry...")
         
         let query = """
         [out:json][timeout:30];
@@ -49,8 +33,6 @@ class OSMLoader {
         """
         
         for endpoint in overpassEndpoints {
-            print("  Trying: \(endpoint.components(separatedBy: "//").last?.components(separatedBy: "/").first ?? endpoint)")
-            
             if let kingdoms = await executeOverpassQuery(query: query, endpoint: endpoint, center: center) {
                 if !kingdoms.isEmpty {
                     return kingdoms
@@ -77,14 +59,12 @@ class OSMLoader {
             let (data, response) = try await URLSession.shared.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("    Status: \(httpResponse.statusCode)")
                 if httpResponse.statusCode != 200 { return nil }
             }
             
             return parseOverpassGeomResponse(data: data, userLocation: center)
             
         } catch {
-            print("    ❌ Error: \(error.localizedDescription)")
             return nil
         }
     }
@@ -96,11 +76,8 @@ class OSMLoader {
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let elements = json["elements"] as? [[String: Any]] else {
-                print("    ❌ Invalid JSON format")
                 return []
             }
-            
-            print("    Found \(elements.count) relations")
             
             for element in elements {
                 guard let type = element["type"] as? String, type == "relation",
@@ -137,10 +114,6 @@ class OSMLoader {
                     }
                 }
                 
-                // Debug: show segment info for problem cases
-                if waySegments.count > 0 && totalRawPoints > 50 {
-                    print("      \(name): \(waySegments.count) segments, \(totalRawPoints) raw points")
-                }
                 
                 // Join segments into a complete boundary
                 let boundary = buildCompleteBoundary(from: waySegments)

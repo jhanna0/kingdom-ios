@@ -1,10 +1,11 @@
 import Foundation
 import CoreLocation
 
-struct Kingdom: Identifiable {
+struct Kingdom: Identifiable, Equatable {
     let id: UUID
     let name: String
-    let rulerName: String
+    var rulerName: String
+    var rulerId: String?  // Player ID of ruler (nil if unclaimed)
     let territory: Territory
     let color: KingdomColor
     
@@ -14,16 +15,83 @@ struct Kingdom: Identifiable {
     var vaultLevel: Int
     var checkedInPlayers: Int
     
-    init(name: String, rulerName: String, territory: Territory, color: KingdomColor) {
+    static func == (lhs: Kingdom, rhs: Kingdom) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    init(name: String, rulerName: String = "Unclaimed", rulerId: String? = nil, territory: Territory, color: KingdomColor) {
         self.id = UUID()
         self.name = name
         self.rulerName = rulerName
+        self.rulerId = rulerId
         self.territory = territory
         self.color = color
         self.treasuryGold = Int.random(in: 100...500)
         self.wallLevel = Int.random(in: 0...3)
         self.vaultLevel = Int.random(in: 0...2)
         self.checkedInPlayers = Int.random(in: 0...5)
+    }
+    
+    /// Check if a point is inside this kingdom's territory
+    func contains(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        // Try polygon check first
+        let polygonResult = isPointInPolygon(coordinate, polygon: territory.boundary)
+        
+        // If polygon check fails but we're close to center, use radius fallback
+        // This helps with boundary accuracy issues from OSM
+        if !polygonResult {
+            let centerLoc = CLLocation(latitude: territory.center.latitude, longitude: territory.center.longitude)
+            let pointLoc = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            let distance = centerLoc.distance(from: pointLoc)
+            
+            if distance <= territory.radiusMeters {
+                return true
+            }
+        }
+        
+        return polygonResult
+    }
+    
+    /// Check if this kingdom is unclaimed
+    var isUnclaimed: Bool {
+        return rulerId == nil
+    }
+    
+    /// Set a new ruler
+    mutating func setRuler(playerId: String, playerName: String) {
+        self.rulerId = playerId
+        self.rulerName = playerName
+    }
+    
+    /// Remove the ruler
+    mutating func removeRuler() {
+        self.rulerId = nil
+        self.rulerName = "Unclaimed"
+    }
+    
+    // Ray casting algorithm for point-in-polygon test
+    private func isPointInPolygon(_ point: CLLocationCoordinate2D, polygon: [CLLocationCoordinate2D]) -> Bool {
+        guard polygon.count >= 3 else { return false }
+        
+        var inside = false
+        var j = polygon.count - 1
+        
+        for i in 0..<polygon.count {
+            let xi = polygon[i].longitude
+            let yi = polygon[i].latitude
+            let xj = polygon[j].longitude
+            let yj = polygon[j].latitude
+            
+            let intersect = ((yi > point.latitude) != (yj > point.latitude))
+                && (point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi)
+            
+            if intersect {
+                inside.toggle()
+            }
+            j = i
+        }
+        
+        return inside
     }
 }
 

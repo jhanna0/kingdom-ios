@@ -5,6 +5,7 @@ struct MapView: View {
     @StateObject private var viewModel = MapViewModel()
     @StateObject private var locationManager = LocationManager()
     @State private var selectedKingdom: Kingdom?
+    @State private var showCurrentKingdom: Bool = true  // Control auto-show of current kingdom
     
     var body: some View {
         ZStack {
@@ -41,6 +42,7 @@ struct MapView: View {
                         KingdomMarker(kingdom: kingdom)
                             .onTapGesture {
                                 selectedKingdom = kingdom
+                                showCurrentKingdom = false  // Manually selected, disable auto-show
                             }
                     }
                 }
@@ -122,17 +124,43 @@ struct MapView: View {
                 .shadow(color: Color.black.opacity(0.4), radius: 10)
             }
             
-            // Kingdom info overlay
-            if let kingdom = selectedKingdom {
+            // Player HUD - top left
+            VStack {
+                HStack {
+                    PlayerHUD(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(.top, 60)  // Below system status bar
+            .padding(.leading)
+            
+            // Kingdom info overlay - show selected OR current kingdom you're inside
+            if let kingdomId = (selectedKingdom?.id ?? (showCurrentKingdom ? viewModel.currentKingdomInside?.id : nil)),
+               let kingdom = viewModel.kingdoms.first(where: { $0.id == kingdomId }) {
                 VStack {
                     Spacer()
-                    KingdomInfoCard(kingdom: kingdom)
-                        .padding()
-                        .transition(.move(edge: .bottom))
+                    KingdomInfoCard(
+                        kingdom: kingdom,
+                        player: viewModel.player,
+                        isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
+                        onCheckIn: {
+                            _ = viewModel.checkIn()
+                        },
+                        onClaim: {
+                            _ = viewModel.claimKingdom()
+                        },
+                        onClose: {
+                            selectedKingdom = nil
+                            showCurrentKingdom = false
+                        }
+                    )
+                    .padding()
+                    .transition(.move(edge: .bottom))
                 }
             }
             
-            // Legend (only show when we have kingdoms)
+            // Legend (only show when we have kingdoms) - moved below player HUD
             if !viewModel.kingdoms.isEmpty && !viewModel.isLoading {
                 VStack {
                     HStack {
@@ -143,16 +171,19 @@ struct MapView: View {
                     }
                     Spacer()
                 }
-                .padding(.top)  // Respect safe area
+                .padding(.top, 140)  // Below player HUD and safe area
                 .padding(.trailing)
             }
-        }
-        .onTapGesture {
-            selectedKingdom = nil
         }
         .onReceive(locationManager.$currentLocation) { location in
             if let location = location {
                 viewModel.updateUserLocation(location)
+            }
+        }
+        .onChange(of: viewModel.currentKingdomInside?.id) { oldValue, newValue in
+            // Show card when entering a new kingdom
+            if newValue != nil && oldValue != newValue {
+                showCurrentKingdom = true
             }
         }
     }
@@ -213,9 +244,112 @@ struct KingdomMarker: View {
     }
 }
 
+// Player HUD - shows player status
+struct PlayerHUD: View {
+    @ObservedObject var player: Player
+    let currentKingdom: Kingdom?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(player.isRuler ? "👑" : "⚔️")
+                    .font(.title3)
+                Text(player.name)
+                    .font(.system(.headline, design: .serif))
+                    .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+            }
+            
+            HStack(spacing: 12) {
+                Label("\(player.gold)g", systemImage: "dollarsign.circle.fill")
+                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                    .font(.system(.subheadline, design: .serif))
+                
+                if player.isRuler {
+                    Label("\(player.fiefsRuled.count)", systemImage: "crown.fill")
+                        .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.1))
+                        .font(.system(.subheadline, design: .serif))
+                }
+            }
+            
+            if let kingdom = currentKingdom {
+                Text("📍 \(kingdom.name)")
+                    .font(.system(.caption, design: .serif))
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+            } else {
+                Text("🗺️ Traveling...")
+                    .font(.system(.caption, design: .serif))
+                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.95, green: 0.87, blue: 0.70))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
+        )
+        .shadow(color: Color.black.opacity(0.3), radius: 5, x: 2, y: 3)
+    }
+}
+
+// Check-in button - appears when inside a kingdom
+struct CheckInButton: View {
+    let kingdom: Kingdom
+    @ObservedObject var player: Player
+    let onCheckIn: () -> Void
+    let onClaim: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Show different button based on state
+            if kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
+                // Can claim this kingdom!
+                MedievalActionButton(
+                    title: "👑 Claim \(kingdom.name)",
+                    color: Color(red: 0.6, green: 0.4, blue: 0.1),
+                    fullWidth: true
+                ) {
+                    onClaim()
+                }
+            } else if !player.isCheckedIn() || player.currentKingdom != kingdom.name {
+                // Need to check in
+                MedievalActionButton(
+                    title: "📍 Check In to \(kingdom.name)",
+                    color: Color(red: 0.2, green: 0.5, blue: 0.3),
+                    fullWidth: true
+                ) {
+                    onCheckIn()
+                }
+            } else {
+                // Already checked in
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Color(red: 0.2, green: 0.5, blue: 0.3))
+                    Text("Checked in to \(kingdom.name)")
+                        .font(.system(.subheadline, design: .serif))
+                        .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                }
+                .padding(12)
+                .background(Color(red: 0.95, green: 0.87, blue: 0.70))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(red: 0.2, green: 0.5, blue: 0.3), lineWidth: 2)
+                )
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
 // Info card when kingdom is selected - Medieval scroll style with actions
 struct KingdomInfoCard: View {
     let kingdom: Kingdom
+    @ObservedObject var player: Player
+    let isPlayerInside: Bool
+    let onCheckIn: () -> Void
+    let onClaim: () -> Void
+    let onClose: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -226,12 +360,36 @@ struct KingdomInfoCard: View {
                     .fontWeight(.bold)
                     .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))  // Dark brown ink
                 Spacer()
+                
+                if kingdom.isUnclaimed {
+                    Text("⚠️ Unclaimed")
+                        .font(.system(.caption, design: .serif))
+                        .foregroundColor(Color(red: 0.7, green: 0.3, blue: 0.1))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(red: 0.9, green: 0.8, blue: 0.6))
+                        .cornerRadius(4)
+                }
             }
             .padding(.bottom, 4)
             
-            Text("Ruled by \(kingdom.rulerName)")
-                .font(.system(.headline, design: .serif))
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+            if kingdom.isUnclaimed {
+                Text("No ruler - claim it by checking in!")
+                    .font(.system(.headline, design: .serif))
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+            } else {
+                HStack(spacing: 4) {
+                    Text("Ruled by \(kingdom.rulerName)")
+                        .font(.system(.headline, design: .serif))
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                    
+                    if kingdom.rulerId == player.playerId {
+                        Text("(You)")
+                            .font(.system(.caption, design: .serif))
+                            .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                    }
+                }
+            }
             
             // Kingdom color divider with medieval style
             Rectangle()
@@ -246,7 +404,7 @@ struct KingdomInfoCard: View {
             
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("\(kingdom.treasuryGold)g", systemImage: "crest.fill")
+                    Label("\(kingdom.treasuryGold)g", systemImage: "dollarsign.circle.fill")
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
                     Label("Walls Lv.\(kingdom.wallLevel)", systemImage: "shield.fill")
                         .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
@@ -261,44 +419,127 @@ struct KingdomInfoCard: View {
             }
             .font(.system(.subheadline, design: .serif))
             
-            // Action buttons - Medieval war council style
-            VStack(spacing: 8) {
-                HStack(spacing: 10) {
-                    MedievalActionButton(
-                        title: "⚔️ Declare War",
-                        color: Color(red: 0.7, green: 0.15, blue: 0.1)
-                    ) {
-                        // TODO: Implement declare war
-                        print("Declare war on \(kingdom.name)")
+            // Check-in/Claim section
+            if isPlayerInside {
+                VStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color(red: 0.4, green: 0.3, blue: 0.2))
+                        .frame(height: 2)
+                        .padding(.vertical, 4)
+                    
+                    if kingdom.rulerId == player.playerId {
+                        // You own this kingdom!
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                            Text("You rule this kingdom")
+                                .font(.system(.subheadline, design: .serif))
+                                .fontWeight(.bold)
+                                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.1))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(12)
+                        .background(Color(red: 0.95, green: 0.9, blue: 0.75))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(red: 0.6, green: 0.4, blue: 0.1), lineWidth: 2)
+                        )
+                    } else if kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
+                        // Can claim!
+                        MedievalActionButton(
+                            title: "👑 Claim This Kingdom",
+                            color: Color(red: 0.6, green: 0.4, blue: 0.1),
+                            fullWidth: true
+                        ) {
+                            onClaim()
+                        }
+                    } else if !player.isCheckedIn() || player.currentKingdom != kingdom.name {
+                        // Need to enter the kingdom
+                        MedievalActionButton(
+                            title: "⚔️ Enter Kingdom",
+                            color: Color(red: 0.2, green: 0.5, blue: 0.3),
+                            fullWidth: true
+                        ) {
+                            onCheckIn()
+                        }
+                    } else {
+                        // Already present but someone else rules it
+                        HStack(spacing: 6) {
+                            Image(systemName: "figure.walk")
+                                .foregroundColor(Color(red: 0.4, green: 0.3, blue: 0.2))
+                            Text("You are here")
+                                .font(.system(.caption, design: .serif))
+                                .foregroundColor(Color(red: 0.4, green: 0.3, blue: 0.2))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(8)
+                        .background(Color(red: 0.9, green: 0.85, blue: 0.7))
+                        .cornerRadius(6)
+                    }
+                }
+            } else {
+                // Not inside this kingdom
+                VStack(spacing: 4) {
+                    Rectangle()
+                        .fill(Color(red: 0.4, green: 0.3, blue: 0.2))
+                        .frame(height: 2)
+                        .padding(.vertical, 4)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.circle")
+                            .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                        Text("You must travel here first")
+                            .font(.system(.caption, design: .serif))
+                            .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                    }
+                    .padding(8)
+                }
+            }
+            
+            // Action buttons - Medieval war council style (only if kingdom has ruler)
+            if !kingdom.isUnclaimed && kingdom.rulerId != player.playerId {
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        MedievalActionButton(
+                            title: "⚔️ Declare War",
+                            color: Color(red: 0.7, green: 0.15, blue: 0.1)
+                        ) {
+                            // TODO: Implement declare war
+                            print("Declare war on \(kingdom.name)")
+                        }
+                        
+                        MedievalActionButton(
+                            title: "🤝 Form Alliance",
+                            color: Color(red: 0.2, green: 0.5, blue: 0.3)
+                        ) {
+                            // TODO: Implement form alliance
+                            print("Form alliance with \(kingdom.name)")
+                        }
                     }
                     
                     MedievalActionButton(
-                        title: "🤝 Form Alliance",
-                        color: Color(red: 0.2, green: 0.5, blue: 0.3)
+                        title: "🗡️ Stage Coup",
+                        color: Color(red: 0.3, green: 0.15, blue: 0.4),
+                        fullWidth: true
                     ) {
-                        // TODO: Implement form alliance
-                        print("Form alliance with \(kingdom.name)")
+                        // TODO: Implement stage coup
+                        print("Stage coup in \(kingdom.name)")
                     }
                 }
-                
-                MedievalActionButton(
-                    title: "🗡️ Stage Coup",
-                    color: Color(red: 0.3, green: 0.15, blue: 0.4),
-                    fullWidth: true
-                ) {
-                    // TODO: Implement stage coup
-                    print("Stage coup in \(kingdom.name)")
-                }
+                .padding(.top, 8)
             }
-            .padding(.top, 8)
             
-            HStack {
-                Text("Tap anywhere to close")
-                    .font(.system(.caption, design: .serif))
-                    .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
-                Spacer()
+            Button(action: onClose) {
+                HStack {
+                    Spacer()
+                    Text("✕ Close")
+                        .font(.system(.caption, design: .serif))
+                        .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.15))
+                    Spacer()
+                }
+                .padding(.top, 8)
             }
-            .padding(.top, 4)
         }
         .padding(20)
         .background(

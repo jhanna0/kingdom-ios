@@ -12,10 +12,18 @@ class MapViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var loadingStatus: String = "Waiting for location..."
     @Published var errorMessage: String?
+    @Published var player: Player
+    @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
+    
+    // Configuration
+    var loadRadiusMiles: Double = 10  // How many miles around user to load cities
     
     private var hasInitializedLocation = false
     
     init() {
+        // Initialize player
+        self.player = Player()
+        
         // Start with default location - will be replaced when user location arrives
         let center = SampleData.defaultCenter
         self.cameraPosition = .region(
@@ -26,12 +34,14 @@ class MapViewModel: ObservableObject {
         )
         
         // NO FAKE DATA - wait for real location and real data
-        print("📱 MapViewModel initialized - waiting for user location")
+        print("📱 MapViewModel initialized")
     }
     
     func updateUserLocation(_ location: CLLocationCoordinate2D) {
         userLocation = location
-        print("📍 User location: \(location.latitude), \(location.longitude)")
+        
+        // Check which kingdom user is inside
+        checkKingdomLocation(location)
         
         // Only initialize once
         if !hasInitializedLocation {
@@ -51,6 +61,29 @@ class MapViewModel: ObservableObject {
         }
     }
     
+    /// Check which kingdom the user is currently inside
+    private func checkKingdomLocation(_ location: CLLocationCoordinate2D) {
+        let previousKingdom = currentKingdomInside
+        
+        // Find which kingdom contains the user's location
+        currentKingdomInside = kingdoms.first { kingdom in
+            kingdom.contains(location)
+        }
+        
+        // Log when entering/leaving kingdoms
+        if let current = currentKingdomInside, previousKingdom?.id != current.id {
+            print("🏰 Entered \(current.name)")
+        } else if previousKingdom != nil && currentKingdomInside == nil {
+            print("🚪 Left \(previousKingdom!.name)")
+        }
+    }
+    
+    private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+        let fromLoc = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLoc = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLoc.distance(from: toLoc)  // Returns meters
+    }
+    
     /// Load real town data - NO FALLBACKS
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
@@ -60,10 +93,9 @@ class MapViewModel: ObservableObject {
         errorMessage = nil
         
         Task {
-            print("🔄 Loading real town boundaries...")
             loadingStatus = "Querying OpenStreetMap..."
             
-            let foundKingdoms = await SampleData.loadRealTowns(around: location)
+            let foundKingdoms = await SampleData.loadRealTowns(around: location, radiusMiles: loadRadiusMiles)
             
             if foundKingdoms.isEmpty {
                 loadingStatus = "No towns found"
@@ -73,10 +105,15 @@ class MapViewModel: ObservableObject {
                 loadingStatus = "Loaded \(foundKingdoms.count) towns"
                 errorMessage = nil
                 kingdoms = foundKingdoms
-                print("✅ Loaded \(foundKingdoms.count) REAL towns with REAL boundaries")
+                print("✅ Loaded \(foundKingdoms.count) towns")
                 
                 // Adjust map to show all kingdoms
                 adjustMapToShowKingdoms()
+                
+                // Re-check location now that kingdoms are loaded
+                if let currentLocation = userLocation {
+                    checkKingdomLocation(currentLocation)
+                }
             }
             
             isLoading = false
@@ -123,5 +160,57 @@ class MapViewModel: ObservableObject {
         )
         
         cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
+    }
+    
+    // MARK: - Check-in & Claiming
+    
+    /// Check in to the current kingdom
+    func checkIn() -> Bool {
+        guard let kingdom = currentKingdomInside,
+              let location = userLocation else {
+            print("❌ Cannot check in - not inside a kingdom")
+            return false
+        }
+        
+        player.checkIn(to: kingdom.name, at: location)
+        
+        // Update kingdom's checked-in count
+        if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+            kingdoms[index].checkedInPlayers += 1
+        }
+        
+        return true
+    }
+    
+    /// Claim the current kingdom (if unclaimed)
+    func claimKingdom() -> Bool {
+        guard let kingdom = currentKingdomInside else {
+            print("❌ Cannot claim - not inside a kingdom")
+            return false
+        }
+        
+        guard kingdom.isUnclaimed else {
+            print("❌ Cannot claim - kingdom already has a ruler")
+            return false
+        }
+        
+        guard player.isCheckedIn() else {
+            print("❌ Cannot claim - must check in first")
+            return false
+        }
+        
+        // Claim it!
+        if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+            kingdoms[index].setRuler(playerId: player.playerId, playerName: player.name)
+            player.claimKingdom(kingdom.name)
+            
+            // Update currentKingdomInside to reflect the change
+            currentKingdomInside = kingdoms[index]
+            
+            print("👑 Claimed \(kingdom.name)")
+            return true
+        }
+        
+        return false
     }
 }

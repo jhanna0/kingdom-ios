@@ -10,24 +10,15 @@ class SampleData {
     
     /// Main entry point - Load REAL towns with REAL boundaries
     /// Returns empty array if no real data can be found - NO FAKE DATA
-    static func loadRealTowns(around center: CLLocationCoordinate2D) async -> [Kingdom] {
-        print("🏙️ Loading REAL towns around user location...")
-        print("📍 Center: \(center.latitude), \(center.longitude)")
+    static func loadRealTowns(around center: CLLocationCoordinate2D, radiusMiles: Double = 10) async -> [Kingdom] {
+        // Convert miles to kilometers
+        let radiusKm = radiusMiles * 1.60934
         
         // Use OSMLoader to get real boundaries
-        let kingdoms = await OSMLoader.loadRealTownBoundaries(around: center, radiusKm: 30)
+        let kingdoms = await OSMLoader.loadRealTownBoundaries(around: center, radiusKm: radiusKm)
         
         if kingdoms.isEmpty {
-            print("❌ NO REAL TOWN DATA FOUND")
-            print("   - Check network connection")
-            print("   - OpenStreetMap APIs may be temporarily unavailable")
-        } else {
-            print("✅ Loaded \(kingdoms.count) REAL towns with REAL boundaries")
-            
-            // Log what we found
-            for kingdom in kingdoms {
-                print("   📍 \(kingdom.name) - \(kingdom.territory.boundary.count) boundary points")
-            }
+            print("❌ No towns found - check network connection")
         }
         
         return kingdoms
