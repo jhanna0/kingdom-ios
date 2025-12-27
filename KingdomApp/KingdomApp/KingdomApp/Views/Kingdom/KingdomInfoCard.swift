@@ -63,22 +63,73 @@ struct KingdomInfoCard: View {
                 )
                 .frame(height: 2)
             
-            HStack(spacing: KingdomTheme.Spacing.xLarge) {
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            // Treasury & Income Section
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                HStack {
                     Label("\(kingdom.treasuryGold)g", systemImage: "dollarsign.circle.fill")
                         .foregroundColor(KingdomTheme.Colors.gold)
+                        .font(KingdomTheme.Typography.headline())
+                    
+                    Spacer()
+                    
+                    // Show pending income if any
+                    if kingdom.pendingIncome > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                .font(.caption)
+                            Text("+\(kingdom.pendingIncome)g ready")
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
+                        .cornerRadius(KingdomTheme.CornerRadius.small)
+                    }
+                }
+                
+                // Income rate display
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .foregroundColor(KingdomTheme.Colors.goldWarm)
+                        .font(.caption2)
+                    Text("\(kingdom.dailyIncome)g/day")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Text("(\(kingdom.hourlyIncome)g/hr)")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
+            }
+            .padding(KingdomTheme.Spacing.medium)
+            .background(KingdomTheme.Colors.parchmentHighlight)
+            .cornerRadius(KingdomTheme.CornerRadius.medium)
+            
+            // Buildings & Stats
+            HStack(spacing: KingdomTheme.Spacing.xLarge) {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                     Label("Walls Lv.\(kingdom.wallLevel)", systemImage: "shield.fill")
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    Label("Vault Lv.\(kingdom.vaultLevel)", systemImage: "lock.fill")
+                        .foregroundColor(KingdomTheme.Colors.goldWarm)
+                }
+                
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    Label("Mine Lv.\(kingdom.mineLevel)", systemImage: "hammer.fill")
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    Label("Market Lv.\(kingdom.marketLevel)", systemImage: "cart.fill")
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                    Label("Vault Lv.\(kingdom.vaultLevel)", systemImage: "lock.fill")
-                        .foregroundColor(KingdomTheme.Colors.goldWarm)
-                    Label("\(kingdom.checkedInPlayers) subjects", systemImage: "person.3.fill")
+                    Label("\(kingdom.checkedInPlayers) present", systemImage: "person.3.fill")
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    Label("\(kingdom.weeklyUniqueCheckIns) weekly", systemImage: "calendar")
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
             }
-            .font(KingdomTheme.Typography.subheadline())
+            .font(KingdomTheme.Typography.caption())
             
             // Check-in/Claim section
             if isPlayerInside {
@@ -107,6 +158,17 @@ struct KingdomInfoCard: View {
                                 RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
                                     .stroke(KingdomTheme.Colors.gold, lineWidth: KingdomTheme.BorderWidth.regular)
                             )
+                            
+                            // Collect income button (if income is pending)
+                            if kingdom.pendingIncome > 0 {
+                                MedievalActionButton(
+                                    title: "💰 Collect \(kingdom.pendingIncome)g Income",
+                                    color: KingdomTheme.Colors.buttonSuccess,
+                                    fullWidth: true
+                                ) {
+                                    viewModel.collectKingdomIncome(for: kingdom)
+                                }
+                            }
                             
                             // Build button
                             MedievalActionButton(
@@ -241,6 +303,12 @@ struct KingdomInfoCard: View {
         )
         .sheet(isPresented: $showBuildMenu) {
             BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)
+        }
+        .onAppear {
+            // Auto-collect income when viewing kingdom (if player is ruler)
+            if kingdom.rulerId == player.playerId {
+                viewModel.autoCollectIncomeForKingdom(kingdom)
+            }
         }
     }
 }

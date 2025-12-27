@@ -248,6 +248,16 @@ class MapViewModel: ObservableObject {
                 kingdoms[index].vaultLevel += 1
                 print("🔒 Upgraded vault to level \(kingdoms[index].vaultLevel)")
             }
+        case .mine:
+            if kingdoms[index].mineLevel < 5 {
+                kingdoms[index].mineLevel += 1
+                print("⛏️ Upgraded mine to level \(kingdoms[index].mineLevel) (+income)")
+            }
+        case .market:
+            if kingdoms[index].marketLevel < 5 {
+                kingdoms[index].marketLevel += 1
+                print("🏪 Upgraded market to level \(kingdoms[index].marketLevel) (+income)")
+            }
         }
         
         // Update currentKingdomInside if it's the same kingdom
@@ -256,21 +266,48 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Collect passive income from ruled kingdoms (benefit of ruling)
-    func collectPassiveIncome() {
+    /// Collect passive income for all kingdoms (goes to city treasury)
+    /// This should be called periodically (e.g., when app opens, when viewing kingdom)
+    func collectKingdomIncome(for kingdom: Kingdom) {
+        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
+            return
+        }
+        
+        // Collect income into the kingdom's treasury
+        let incomeEarned = kingdoms[index].pendingIncome
+        if incomeEarned > 0 {
+            kingdoms[index].collectIncome()
+            print("💰 \(kingdom.name) collected \(incomeEarned) gold (now: \(kingdoms[index].treasuryGold)g)")
+            
+            // Update currentKingdomInside if it's the same kingdom
+            if currentKingdomInside?.id == kingdom.id {
+                currentKingdomInside = kingdoms[index]
+            }
+        }
+    }
+    
+    /// Collect income for all kingdoms the player rules
+    func collectAllRuledKingdomsIncome() {
         let ruledKingdoms = kingdoms.filter { kingdom in
             player.fiefsRuled.contains(kingdom.name)
         }
         
-        // Each kingdom generates 10 gold per hour to its treasury
-        let hoursPerCollection = 1.0
-        let incomePerKingdom = 10
-        
+        var totalCollected = 0
         for kingdom in ruledKingdoms {
-            if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-                kingdoms[index].treasuryGold += incomePerKingdom
-                print("💰 \(kingdom.name) generated \(incomePerKingdom) gold")
-            }
+            let pendingIncome = kingdom.pendingIncome
+            collectKingdomIncome(for: kingdom)
+            totalCollected += pendingIncome
+        }
+        
+        if totalCollected > 0 {
+            print("👑 Collected \(totalCollected) gold across \(ruledKingdoms.count) kingdoms")
+        }
+    }
+    
+    /// Auto-collect income when viewing a kingdom (convenience)
+    func autoCollectIncomeForKingdom(_ kingdom: Kingdom) {
+        if kingdom.hasIncomeToCollect {
+            collectKingdomIncome(for: kingdom)
         }
     }
 }

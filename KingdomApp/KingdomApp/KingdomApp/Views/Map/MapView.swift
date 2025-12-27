@@ -7,6 +7,7 @@ struct MapView: View {
     @State private var selectedKingdom: Kingdom?
     @State private var showCurrentKingdom: Bool = false
     @State private var showMyKingdoms = false
+    @State private var showContracts = false
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
     
@@ -102,22 +103,22 @@ struct MapView: View {
                     
                     Spacer()
                     
-                    // My Kingdoms button
-                    if viewModel.player.isRuler {
+                    VStack(spacing: KingdomTheme.Spacing.small) {
+                        // Contracts button
                         Button(action: {
-                            showMyKingdoms = true
+                            showContracts = true
                         }) {
                             HStack(spacing: 6) {
-                                Image(systemName: "crown.fill")
+                                Image(systemName: "doc.text.fill")
                                     .font(.system(size: 14))
-                                Text("\(viewModel.player.fiefsRuled.count)")
+                                Text("Contracts")
                                     .font(KingdomTheme.Typography.subheadline())
                                     .fontWeight(.bold)
                             }
                             .foregroundColor(.white)
                             .padding(.horizontal, KingdomTheme.Spacing.medium)
                             .padding(.vertical, 8)
-                            .background(KingdomTheme.Colors.buttonPrimary)
+                            .background(KingdomTheme.Colors.buttonWarning)
                             .cornerRadius(KingdomTheme.CornerRadius.large)
                             .shadow(
                                 color: KingdomTheme.Shadows.card.color,
@@ -125,6 +126,32 @@ struct MapView: View {
                                 x: KingdomTheme.Shadows.card.x,
                                 y: KingdomTheme.Shadows.card.y
                             )
+                        }
+                        
+                        // My Kingdoms button
+                        if viewModel.player.isRuler {
+                            Button(action: {
+                                showMyKingdoms = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "crown.fill")
+                                        .font(.system(size: 14))
+                                    Text("\(viewModel.player.fiefsRuled.count)")
+                                        .font(KingdomTheme.Typography.subheadline())
+                                        .fontWeight(.bold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, KingdomTheme.Spacing.medium)
+                                .padding(.vertical, 8)
+                                .background(KingdomTheme.Colors.buttonPrimary)
+                                .cornerRadius(KingdomTheme.CornerRadius.large)
+                                .shadow(
+                                    color: KingdomTheme.Shadows.card.color,
+                                    radius: KingdomTheme.Shadows.card.radius,
+                                    x: KingdomTheme.Shadows.card.x,
+                                    y: KingdomTheme.Shadows.card.y
+                                )
+                            }
                         }
                     }
                 }
@@ -203,6 +230,9 @@ struct MapView: View {
                     showMyKingdoms = false
                 }
             )
+        }
+        .sheet(isPresented: $showContracts) {
+            ContractsListView()
         }
     }
 }

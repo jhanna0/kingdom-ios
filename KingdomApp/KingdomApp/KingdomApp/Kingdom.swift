@@ -1,6 +1,23 @@
 import Foundation
 import CoreLocation
 
+// Income record for tracking city revenue
+struct IncomeRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let amount: Int
+    let timestamp: Date
+    let hourlyRate: Int
+    let dailyRate: Int
+    
+    init(amount: Int, hourlyRate: Int, dailyRate: Int) {
+        self.id = UUID()
+        self.amount = amount
+        self.timestamp = Date()
+        self.hourlyRate = hourlyRate
+        self.dailyRate = dailyRate
+    }
+}
+
 struct Kingdom: Identifiable, Equatable, Hashable {
     let id: UUID
     let name: String
@@ -14,6 +31,16 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var wallLevel: Int
     var vaultLevel: Int
     var checkedInPlayers: Int
+    
+    // Economic buildings (generate passive income)
+    var mineLevel: Int
+    var marketLevel: Int
+    
+    // Income tracking
+    var lastIncomeCollection: Date
+    var weeklyUniqueCheckIns: Int  // Track unique players who checked in this week
+    var totalIncomeCollected: Int  // Lifetime income collected
+    var incomeHistory: [IncomeRecord]  // Recent income collections
     
     static func == (lhs: Kingdom, rhs: Kingdom) -> Bool {
         lhs.id == rhs.id
@@ -34,6 +61,12 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.wallLevel = Int.random(in: 0...3)
         self.vaultLevel = Int.random(in: 0...2)
         self.checkedInPlayers = Int.random(in: 0...5)
+        self.mineLevel = Int.random(in: 0...2)
+        self.marketLevel = Int.random(in: 0...2)
+        self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
+        self.weeklyUniqueCheckIns = Int.random(in: 0...10)
+        self.totalIncomeCollected = 0
+        self.incomeHistory = []
     }
     
     /// Check if a point is inside this kingdom's territory
@@ -71,6 +104,91 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     mutating func removeRuler() {
         self.rulerId = nil
         self.rulerName = "Unclaimed"
+    }
+    
+    // MARK: - Economy & Income
+    
+    /// Calculate daily income based on city activity and buildings
+    var dailyIncome: Int {
+        // Base income - every city generates something
+        let baseIncome = 30
+        
+        // Population bonus - active cities are more valuable
+        // Each unique player who checked in this week adds 5 gold/day
+        let populationBonus = weeklyUniqueCheckIns * 5
+        
+        // Building bonuses
+        let mineBonus: Int = {
+            switch mineLevel {
+            case 1: return 10
+            case 2: return 25
+            case 3: return 50
+            case 4: return 80
+            case 5: return 120
+            default: return 0
+            }
+        }()
+        
+        let marketBonus: Int = {
+            switch marketLevel {
+            case 1: return 15
+            case 2: return 35
+            case 3: return 65
+            case 4: return 100
+            case 5: return 150
+            default: return 0
+            }
+        }()
+        
+        return baseIncome + populationBonus + mineBonus + marketBonus
+    }
+    
+    /// Calculate hourly income (for real-time display)
+    var hourlyIncome: Int {
+        return dailyIncome / 24
+    }
+    
+    /// Collect income since last collection
+    mutating func collectIncome() {
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastIncomeCollection)
+        let hoursElapsed = elapsed / 3600.0
+        
+        // Calculate income earned
+        let incomeEarned = Int(Double(hourlyIncome) * hoursElapsed)
+        
+        // Add to treasury
+        treasuryGold += incomeEarned
+        
+        // Track total income
+        totalIncomeCollected += incomeEarned
+        
+        // Record in history (keep last 20 records)
+        let record = IncomeRecord(
+            amount: incomeEarned,
+            hourlyRate: hourlyIncome,
+            dailyRate: dailyIncome
+        )
+        incomeHistory.insert(record, at: 0)
+        if incomeHistory.count > 20 {
+            incomeHistory = Array(incomeHistory.prefix(20))
+        }
+        
+        // Update last collection time
+        lastIncomeCollection = now
+    }
+    
+    /// Check if income is available to collect
+    var hasIncomeToCollect: Bool {
+        let elapsed = Date().timeIntervalSince(lastIncomeCollection)
+        return elapsed >= 3600 // At least 1 hour has passed
+    }
+    
+    /// Get income ready to collect (without actually collecting)
+    var pendingIncome: Int {
+        let elapsed = Date().timeIntervalSince(lastIncomeCollection)
+        let hoursElapsed = elapsed / 3600.0
+        return Int(Double(hourlyIncome) * hoursElapsed)
     }
     
     // Ray casting algorithm for point-in-polygon test
