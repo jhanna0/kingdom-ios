@@ -177,67 +177,54 @@ class MapViewModel: ObservableObject {
         return fromLoc.distance(from: toLoc)  // Returns meters
     }
     
-    /// Load real town data - with caching support and state preservation
-    /// TODO: Replace with backend API - GET /kingdoms?lat=X&lon=Y&radius=Z
+    /// Load real town data from backend API
+    /// Backend handles caching and ensures all clients get consistent city boundaries
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
         
         isLoading = true
-        loadingStatus = "Scouts dispatched to survey the realm..."
+        loadingStatus = "Consulting the kingdom cartographers..."
         errorMessage = nil
         
         Task {
-            // Try loading from cache first
-            if let cachedKingdoms = MapCache.shared.loadKingdoms(forLocation: location, radius: loadRadiusMiles) {
-                loadingStatus = "Reading from the royal archives..."
+            // Fetch directly from backend API (no local cache)
+            print("🌐 Fetching cities from backend API...")
+            
+            do {
+                // Fetch cities from backend API (which handles OSM fetching and DB caching)
+                let foundKingdoms = try await apiService.fetchCities(
+                    lat: location.latitude,
+                    lon: location.longitude,
+                    radiusKm: loadRadiusMiles * 1.60934  // Convert miles to km
+                )
                 
-                // Merge with existing kingdoms to preserve state changes
-                let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: cachedKingdoms)
-                kingdoms = mergedKingdoms
-                
-                // Sync player's fiefsRuled with kingdoms they rule
-                syncPlayerKingdoms()
-                
-                print("✅ Loaded \(cachedKingdoms.count) towns from cache")
-                
-                // Re-check location now that kingdoms are loaded
-                if let currentLocation = userLocation {
-                    checkKingdomLocation(currentLocation)
+                if foundKingdoms.isEmpty {
+                    loadingStatus = "The realm lies shrouded in fog..."
+                    errorMessage = "No cities found in this area."
+                    print("❌ No towns found from API")
+                    isLoading = false
+                } else {
+                    // Merge with existing kingdoms to preserve state changes
+                    let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: foundKingdoms)
+                    kingdoms = mergedKingdoms
+                    
+                    // Sync player's fiefsRuled with kingdoms they rule
+                    syncPlayerKingdoms()
+                    
+                    print("✅ Loaded \(foundKingdoms.count) towns from backend API")
+                    
+                    // Re-check location now that kingdoms are loaded
+                    if let currentLocation = userLocation {
+                        checkKingdomLocation(currentLocation)
+                    }
+                    
+                    // Done loading
+                    isLoading = false
                 }
-                
-                isLoading = false
-                return
-            }
-            
-            // Cache miss - load from network
-            loadingStatus = "Digging through the maps..."
-            
-            let foundKingdoms = await SampleData.loadRealTowns(around: location, radiusMiles: loadRadiusMiles)
-            
-            if foundKingdoms.isEmpty {
-                loadingStatus = "The realm lies shrouded in fog..."
-                errorMessage = "The royal mapmakers could not chart these lands. Ensure thy connection to the realm is strong and try again."
-                print("❌ No real towns found!")
-                isLoading = false
-            } else {
-                // Cache the loaded kingdoms
-                MapCache.shared.saveKingdoms(foundKingdoms, forLocation: location, radius: loadRadiusMiles)
-                
-                // Merge with existing kingdoms to preserve state changes
-                let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: foundKingdoms)
-                kingdoms = mergedKingdoms
-                
-                // Sync player's fiefsRuled with kingdoms they rule
-                syncPlayerKingdoms()
-                
-                print("✅ Loaded \(foundKingdoms.count) towns")
-                
-                // Re-check location now that kingdoms are loaded
-                if let currentLocation = userLocation {
-                    checkKingdomLocation(currentLocation)
-                }
-                
-                // Done loading
+            } catch {
+                loadingStatus = "The royal cartographers have failed..."
+                errorMessage = "API Error: \(error.localizedDescription)"
+                print("❌ Failed to fetch cities from API: \(error.localizedDescription)")
                 isLoading = false
             }
         }

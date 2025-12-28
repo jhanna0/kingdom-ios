@@ -293,6 +293,86 @@ class KingdomAPIService: ObservableObject {
         return try decoder.decode(CheckInResponse.self, from: data)
     }
     
+    // MARK: - City Boundaries API
+    
+    struct CityBoundaryResponse: Codable {
+        let osm_id: String
+        let name: String
+        let admin_level: Int
+        let center_lat: Double
+        let center_lon: Double
+        let boundary: [[Double]]  // Array of [lat, lon] pairs
+        let radius_meters: Double
+        let cached: Bool
+    }
+    
+    /// Fetch city boundaries from backend API
+    /// This replaces direct OSM calls - backend handles caching and consistency
+    func fetchCities(lat: Double, lon: Double, radiusKm: Double = 30.0) async throws -> [Kingdom] {
+        print("🌐 Fetching cities from API: lat=\(lat), lon=\(lon), radius=\(radiusKm)km")
+        
+        // Build URL with query parameters
+        var components = URLComponents(string: "\(baseURL)/cities")!
+        components.queryItems = [
+            URLQueryItem(name: "lat", value: String(lat)),
+            URLQueryItem(name: "lon", value: String(lon)),
+            URLQueryItem(name: "radius", value: String(radiusKm))
+        ]
+        
+        guard let url = components.url else {
+            throw APIError.invalidURL
+        }
+        
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.serverError("Invalid response")
+        }
+        
+        if httpResponse.statusCode == 404 {
+            print("❌ No cities found in this area")
+            return []
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.serverError("Failed to fetch cities (HTTP \(httpResponse.statusCode))")
+        }
+        
+        let decoder = JSONDecoder()
+        let cityResponses = try decoder.decode([CityBoundaryResponse].self, from: data)
+        
+        print("✅ Received \(cityResponses.count) cities from API (\(cityResponses.filter { $0.cached }.count) cached)")
+        
+        // Convert to Kingdom objects
+        let colors = KingdomColor.allCases
+        let kingdoms = cityResponses.enumerated().map { index, city in
+            // Convert boundary coordinates
+            let boundary = city.boundary.map { coord in
+                CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
+            }
+            
+            let center = CLLocationCoordinate2D(latitude: city.center_lat, longitude: city.center_lon)
+            
+            let territory = Territory(
+                center: center,
+                radiusMeters: city.radius_meters,
+                boundary: boundary
+            )
+            
+            let color = colors[index % colors.count]
+            
+            return Kingdom(
+                name: city.name,
+                rulerName: SampleData.generateRandomRulerName(),
+                territory: territory,
+                color: color
+            )
+        }
+        
+        print("✅ Converted to \(kingdoms.count) Kingdom objects")
+        return kingdoms
+    }
+    
     // MARK: - Sync Helpers
     
     /// Sync local player to server

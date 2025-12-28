@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: kingdom-db
+    environment:
+      POSTGRES_DB: kingdom
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - kingdom_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d kingdom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kingdom-network
+
+  # FastAPI Application
+  api:
+    image: python:3.11-slim
+    container_name: kingdom-api
+    working_dir: /app
+    command: >
+      bash -c "pip install --no-cache-dir -r requirements.txt &&
+               uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./api:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://admin:admin@db:5432/kingdom
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - kingdom-network
+
+volumes:
+  kingdom_db_data:
+    driver: local
+
+networks:
+  kingdom-network:
+    driver: bridge
+
+

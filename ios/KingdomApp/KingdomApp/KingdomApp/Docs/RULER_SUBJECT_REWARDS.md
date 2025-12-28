@@ -62,3 +62,4 @@ Share = (playerMerit / totalMerit) × rewardPool
 - Higher rep = more rewards + more power
 - Fair taxation = loyalty, exploitation = rebellion risk
 
+

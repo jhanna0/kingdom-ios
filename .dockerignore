@@ -1,0 +1,30 @@
+# Ignore iOS app
+ios/
+
+# Ignore docs
+docs/
+
+# Ignore existing Python game code
+python/
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignore environment
+.env
+.venv
+env/
+venv/
+
+# Ignore database data
+kingdom_db_data/
+
+
