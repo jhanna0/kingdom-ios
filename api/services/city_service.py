@@ -135,49 +135,18 @@ async def get_cities_near_location(
     """
     print(f"🔍 City lookup request: lat={lat}, lon={lon}, radius={radius}km")
     
-    # STEP 1: Check database for cities we already have nearby
-    print(f"💾 Checking database for cached cities...")
-    nearby_cached = _get_nearby_cached_cities(db, lat, lon, radius)
-    
-    # If we have 15+ cached cities, just use those (SUPER FAST!)
-    if len(nearby_cached) >= 15:
-        print(f"✅ Found {len(nearby_cached)} cached cities - NO OSM CALL NEEDED!")
-        
-        # Update access stats
-        for city, _ in nearby_cached[:35]:
-            city.access_count += 1
-            city.last_accessed = datetime.utcnow()
-        db.commit()
-        
-        # Get or create kingdoms for all cities
-        cities_list = [city for city, _ in nearby_cached[:35]]
-        kingdoms_map = _get_or_create_kingdoms_for_cities(db, cities_list)
-        
-        return [
-            CityBoundaryResponse(
-                osm_id=city.osm_id,
-                name=city.name,
-                admin_level=city.admin_level,
-                center_lat=city.center_lat,
-                center_lon=city.center_lon,
-                boundary=city.boundary_geojson["coordinates"],
-                radius_meters=city.radius_meters,
-                cached=True,
-                kingdom=kingdoms_map.get(city.osm_id)
-            )
-            for city in cities_list
-        ]
-    
-    # STEP 2: Not enough cached - do FAST query to get city IDs
+    # STEP 1: ALWAYS get the complete list of city IDs from OSM (FAST - no boundaries!)
+    # This tells us what cities SHOULD be in this area
     print(f"🌐 Fetching city IDs from OSM (fast query)...")
     city_ids = await fetch_nearby_city_ids(lat, lon, radius)
     
     if not city_ids:
-        print("⚠️ Fast query failed, falling back to full fetch...")
-        # Fallback to old method that gets everything at once
-        return await _fetch_cities_fallback(db, lat, lon, radius)
+        print("⚠️ OSM query returned no cities")
+        return []
     
-    # STEP 3: Process city IDs - fetch boundaries only for cities we don't have
+    # STEP 2: For each city ID, check if we have it cached
+    # Only fetch boundaries for cities we DON'T have
+    # This way: OSM tells us WHAT cities exist (fast), cache tells us WHICH boundaries we have
     return await _process_city_ids(db, city_ids)
 
 
