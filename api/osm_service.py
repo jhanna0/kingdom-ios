@@ -68,62 +68,82 @@ async def find_user_city_fast(lat: float, lon: float) -> Optional[Dict]:
 
 async def fetch_nearby_city_ids(lat: float, lon: float, radius_km: float = 30) -> List[Dict]:
     """
-    FAST query to get just city IDs and centers (no geometry).
-    Use this to find what cities exist nearby, then fetch boundaries separately.
+    FAST query to find cities that border the user's current city.
+    
+    Strategy: OSM cities share boundary ways with their neighbors.
+    1. Find user's city (is_in = fast point lookup)
+    2. Get boundary ways of that city
+    3. Find other cities that use those same ways = NEIGHBORS
+    
+    This is O(1) lookups, not O(n) distance calculations.
     """
+    
+    # Query finds neighbors by shared boundary ways
     query = f"""
-    [out:json][timeout:15];
-    relation["boundary"="administrative"]["admin_level"="8"]["name"](around:{int(radius_km * 1000)},{lat},{lon});
+    [out:json][timeout:10];
+    
+    // Step 1: What city is the user in?
+    is_in({lat},{lon})->.a;
+    relation(pivot.a)["boundary"="administrative"]["admin_level"="8"]->.current;
+    
+    // Step 2: Get the ways that form this city's boundary
+    way(r.current)->.boundary_ways;
+    
+    // Step 3: Find ALL cities that share these boundary ways (= neighbors)
+    relation(bw.boundary_ways)["boundary"="administrative"]["admin_level"="8"]["name"];
+    
+    // Output with center points
     out center;
     """
     
-    print(f"🌐 Fast lookup: City IDs near user (radius: {radius_km}km)")
+    print(f"🌐 Finding neighboring cities for ({lat:.4f}, {lon:.4f})")
     
     for endpoint in OVERPASS_ENDPOINTS:
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
                     endpoint,
                     data={"data": query},
                     headers={"User-Agent": "KingdomApp/1.0"}
                 )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    elements = data.get("elements", [])
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                elements = data.get("elements", [])
+                
+                cities = []
+                for element in elements:
+                    tags = element.get("tags", {})
+                    center = element.get("center", {})
                     
-                    cities = []
-                    for element in elements:
-                        tags = element.get("tags", {})
-                        center = element.get("center", {})
-                        
-                        if not tags.get("name") or not center:
-                            continue
-                        
-                        distance = _distance_between(
-                            lat, lon,
-                            center.get("lat"), center.get("lon")
-                        )
-                        
-                        cities.append({
-                            "osm_id": str(element.get("id")),
-                            "name": tags.get("name"),
-                            "center_lat": center.get("lat"),
-                            "center_lon": center.get("lon"),
-                            "admin_level": int(tags.get("admin_level", 8)),
-                            "distance": distance,
-                            "osm_tags": tags
-                        })
+                    if not tags.get("name") or not center:
+                        continue
                     
-                    cities.sort(key=lambda c: c["distance"])
-                    print(f"    ✅ Found {len(cities)} cities from {endpoint}")
-                    return cities[:50]  # Top 50 closest
+                    distance = _distance_between(
+                        lat, lon,
+                        center.get("lat"), center.get("lon")
+                    )
                     
+                    cities.append({
+                        "osm_id": str(element.get("id")),
+                        "name": tags.get("name"),
+                        "center_lat": center.get("lat"),
+                        "center_lon": center.get("lon"),
+                        "admin_level": int(tags.get("admin_level", 8)),
+                        "distance": distance,
+                        "osm_tags": tags
+                    })
+                
+                cities.sort(key=lambda c: c["distance"])
+                print(f"    ✅ Found {len(cities)} neighboring cities from {endpoint}")
+                return cities[:50]
+                
         except Exception as e:
-            print(f"    ⚠️ Failed on {endpoint}: {e}")
-            await asyncio.sleep(0.3)
+            print(f"    ⚠️ {endpoint}: {e}")
     
-    print("    ❌ Could not fetch city list")
+    print("    ❌ Could not fetch neighboring cities")
     return []
 
 
@@ -206,6 +226,7 @@ async def fetch_cities_from_osm(
     """
     Fetch city boundaries from OpenStreetMap Overpass API
     Returns list of city dictionaries with name, boundaries, etc.
+    Uses bbox instead of around: for much faster queries.
     
     Admin levels:
     - 8: Cities (most accurate, fewest results - FAST)
@@ -214,10 +235,19 @@ async def fetch_cities_from_osm(
     """
     print(f"🌍 Fetching cities from OSM: lat={lat}, lon={lon}, radius={radius_km}km, admin_levels={admin_levels}")
     
-    # Build Overpass query - KEEP out geom for accuracy!
+    # Calculate bounding box (MUCH faster than around:)
+    lat_delta = radius_km / 111.0
+    lon_delta = radius_km / (111.0 * max(0.1, math.cos(math.radians(lat))))
+    
+    south = lat - lat_delta
+    north = lat + lat_delta
+    west = lon - lon_delta
+    east = lon + lon_delta
+    
+    # Build Overpass query with bbox - KEEP out geom for accuracy!
     query = f"""
-    [out:json][timeout:30];
-    relation["boundary"="administrative"]["admin_level"~"^({admin_levels})$"]["name"](around:{int(radius_km * 1000)},{lat},{lon});
+    [out:json][timeout:15][bbox:{south},{west},{north},{east}];
+    relation["boundary"="administrative"]["admin_level"~"^({admin_levels})$"]["name"];
     out geom;
     """
     
