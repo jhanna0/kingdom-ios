@@ -24,7 +24,7 @@ class PropertyItem(BaseModel):
     type: str  # house, shop, personal_mine
     kingdom_id: str
     kingdom_name: str
-    owner_id: str
+    owner_id: int
     owner_name: str
     tier: int = 1
     purchased_at: Optional[datetime] = None

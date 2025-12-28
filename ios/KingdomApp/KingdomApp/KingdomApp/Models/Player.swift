@@ -5,7 +5,7 @@ import Combine
 /// Player model - represents the local player
 class Player: ObservableObject {
     // Identity
-    @Published var playerId: String
+    @Published var playerId: Int  // Backend PostgreSQL auto-generated ID
     @Published var name: String
     
     // Status
@@ -70,7 +70,7 @@ class Player: ObservableObject {
     let checkInRadiusMeters: Double = 100  // Must be within 100m to check in
     let coupCooldownHours: Double = 24
     
-    init(playerId: String = UUID().uuidString, name: String = "Player") {
+    init(playerId: Int = 0, name: String = "Player") {
         self.playerId = playerId
         self.name = name
         
@@ -176,7 +176,7 @@ class Player: ObservableObject {
     }
     
     /// Check if player is eligible for reward distribution
-    func isEligibleForRewards(inKingdom kingdomId: String, rulerId: String?) -> Bool {
+    func isEligibleForRewards(inKingdom kingdomId: String, rulerId: Int?) -> Bool {
         // Must not be the ruler
         guard playerId != rulerId else { return false }
         
@@ -838,7 +838,7 @@ class Player: ObservableObject {
     
     func saveToUserDefaults() {
         let defaults = UserDefaults.standard
-        defaults.set(playerId, forKey: "playerId")
+        defaults.set(playerId, forKey: "playerId")  // Saves as integer
         defaults.set(name, forKey: "playerName")
         defaults.set(isAlive, forKey: "isAlive")
         defaults.set(gold, forKey: "gold")
@@ -896,7 +896,8 @@ class Player: ObservableObject {
     private func loadFromUserDefaults() {
         let defaults = UserDefaults.standard
         
-        if let savedId = defaults.string(forKey: "playerId") {
+        let savedId = defaults.integer(forKey: "playerId")
+        if savedId != 0 {
             playerId = savedId
         }
         if let savedName = defaults.string(forKey: "playerName") {

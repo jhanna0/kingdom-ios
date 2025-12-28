@@ -7,8 +7,7 @@ from typing import List, Optional
 
 class CheckInRequest(BaseModel):
     """Check-in request"""
-    player_id: str
-    kingdom_id: str
+    city_boundary_osm_id: str  # Kingdom OSM ID
     latitude: float
     longitude: float
 

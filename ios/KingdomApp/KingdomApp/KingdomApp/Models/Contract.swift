@@ -21,10 +21,10 @@ struct Contract: Identifiable, Codable, Hashable {
     let rewardPool: Int // Total gold to distribute equally
     
     // Workers: playerIDs signed up (equal pay for all)
-    var workers: Set<String>
+    var workers: Set<Int>  // Player IDs as integers
     
     // Status
-    let createdBy: String // Ruler's player ID
+    let createdBy: Int // Ruler's player ID (PostgreSQL auto-generated)
     let createdAt: Date
     var completedAt: Date?
     var status: ContractStatus
@@ -91,7 +91,7 @@ struct Contract: Identifiable, Codable, Hashable {
     // MARK: - Mutations
     
     /// Add a worker to the contract
-    mutating func addWorker(_ playerId: String) {
+    mutating func addWorker(_ playerId: Int) {
         workers.insert(playerId)
         
         // Start timer if this is the first worker
@@ -102,7 +102,7 @@ struct Contract: Identifiable, Codable, Hashable {
     }
     
     /// Remove a worker from the contract
-    mutating func removeWorker(_ playerId: String) {
+    mutating func removeWorker(_ playerId: Int) {
         workers.remove(playerId)
         
         // If no workers left, reset to open
@@ -128,7 +128,7 @@ struct Contract: Identifiable, Codable, Hashable {
         buildingLevel: Int,
         population: Int,
         rewardPool: Int,
-        createdBy: String
+        createdBy: Int  // PostgreSQL auto-generated integer
     ) -> Contract {
         // Scale time required based on building level and population
         // Higher levels = longer time
@@ -176,8 +176,8 @@ extension Contract {
         baseHoursRequired: 4.0,
         workStartedAt: Date().addingTimeInterval(-7200), // Started 2 hours ago
         rewardPool: 500,
-        workers: ["player1", "player2"],
-        createdBy: "ruler1",
+        workers: [1, 2],  // Integer player IDs
+        createdBy: 1,
         createdAt: Date().addingTimeInterval(-10800),
         completedAt: nil,
         status: .inProgress
@@ -194,8 +194,8 @@ extension Contract {
             baseHoursRequired: 4.0,
             workStartedAt: Date().addingTimeInterval(-7200), // Started 2 hours ago
             rewardPool: 500,
-            workers: ["player1", "player2"],
-            createdBy: "ruler1",
+            workers: [1, 2],
+            createdBy: 1,
             createdAt: Date().addingTimeInterval(-10800),
             completedAt: nil,
             status: .inProgress
@@ -211,7 +211,7 @@ extension Contract {
             workStartedAt: nil,
             rewardPool: 800,
             workers: [],
-            createdBy: "ruler2",
+            createdBy: 2,
             createdAt: Date(),
             completedAt: nil,
             status: .open
@@ -226,8 +226,8 @@ extension Contract {
             baseHoursRequired: 20.0,
             workStartedAt: Date().addingTimeInterval(-50400), // Started 14 hours ago
             rewardPool: 1200,
-            workers: ["player3", "player4", "player5"],
-            createdBy: "ruler1",
+            workers: [3, 4, 5],
+            createdBy: 1,
             createdAt: Date().addingTimeInterval(-54000),
             completedAt: nil,
             status: .inProgress

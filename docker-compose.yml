@@ -36,6 +36,7 @@ services:
     environment:
       DATABASE_URL: postgresql://admin:admin@db:5432/kingdom
       PYTHONUNBUFFERED: 1
+      JWT_SECRET_KEY: "CHANGE-THIS-TO-A-STRONG-SECRET-IN-PRODUCTION-USE-openssl-rand-hex-32"
     depends_on:
       db:
         condition: service_healthy

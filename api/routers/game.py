@@ -65,8 +65,12 @@ def _is_user_in_kingdom(db: Session, lat: float, lon: float, kingdom: Kingdom) -
     return distance <= 5.0  # Within 5km
 
 
-def _get_or_create_user_kingdom(db: Session, user_id: str, kingdom_id: str) -> UserKingdom:
-    """Get or create UserKingdom relationship"""
+def _get_or_create_user_kingdom(db: Session, user_id: int, kingdom_id: str) -> UserKingdom:
+    """
+    Get or create UserKingdom relationship
+    
+    SECURITY: user_id MUST come from authenticated current_user.id, NEVER from request data
+    """
     user_kingdom = db.query(UserKingdom).filter(
         UserKingdom.user_id == user_id,
         UserKingdom.kingdom_id == kingdom_id

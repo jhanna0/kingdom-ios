@@ -1,11 +1,25 @@
 """
 Authentication endpoints - Registration, login, profile management
+
+SECURITY MODEL:
+1. Frontend sends ONLY the JWT token in Authorization header
+2. Backend validates JWT signature (prevents tampering)
+3. Backend extracts apple_user_id from token's 'sub' claim
+4. Backend looks up user in database by apple_user_id (source of truth)
+5. ALL user data comes from database, NEVER from frontend
+
+This ensures:
+- Frontend cannot forge identity (JWT is cryptographically signed)
+- Frontend cannot manipulate user_id or other fields
+- Database is single source of truth for all user data
+- Token contains only stable identifier (apple_user_id), not mutable data
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from db import get_db
+from db.models.user import User
 from models.auth_schemas import (
     AppleSignIn,
     TokenResponse,
@@ -31,23 +45,37 @@ security = HTTPBearer()
 
 
 # ===== Dependency: Get Current User =====
+# CRITICAL: This is the ONLY way to get authenticated user - NEVER bypass this!
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
-    """Dependency to get the current authenticated user"""
-    token = credentials.credentials
-    payload = decode_access_token(token)
+    """
+    Dependency to get the current authenticated user
     
-    user_id = payload.get("sub")
-    if not user_id:
+    SECURITY:
+    1. Extracts JWT token from Authorization header
+    2. Validates JWT signature (ensures token wasn't forged)
+    3. Extracts apple_user_id from token's 'sub' claim
+    4. Looks up user in database (source of truth)
+    5. Returns authenticated User object
+    
+    ALL protected endpoints MUST use this dependency to get user identity.
+    NEVER accept user_id or similar from request body/params - ONLY from this dependency.
+    """
+    token = credentials.credentials
+    payload = decode_access_token(token)  # Validates signature!
+    
+    apple_user_id = payload.get("sub")
+    if not apple_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
     
-    user = get_user_by_id(db, user_id)
+    # Look up user by apple_user_id (stable identifier, survives DB migrations)
+    user = db.query(User).filter(User.apple_user_id == apple_user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,8 +102,8 @@ def apple_signin(apple_data: AppleSignIn, db: Session = Depends(get_db)):
     """
     user = create_user_with_apple(db, apple_data)
     
-    # Generate token
-    access_token = create_access_token(data={"sub": user.id})
+    # Generate token with apple_user_id (stable identifier)
+    access_token = create_access_token(data={"sub": user.apple_user_id})
     
     return TokenResponse(
         access_token=access_token,

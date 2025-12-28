@@ -3,7 +3,6 @@ Authentication service - Handles user auth, JWT tokens, password hashing
 """
 from datetime import datetime, timedelta
 from typing import Optional
-import uuid
 import os
 
 from jose import JWTError, jwt
@@ -19,7 +18,12 @@ from models.auth_schemas import AppleSignIn
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
+# SECURITY: Secret key MUST be set via environment variable in production
+# This key signs all JWT tokens - if compromised, attackers can forge tokens
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-this-in-production")
+if SECRET_KEY == "your-secret-key-change-this-in-production":
+    import warnings
+    warnings.warn("⚠️  SECURITY WARNING: Using default JWT secret key! Set JWT_SECRET_KEY environment variable!")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
@@ -89,10 +93,8 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
                 detail=f"Name '{apple_data.display_name}' is already taken in this city"
             )
     
-    # Create new user
-    user_id = str(uuid.uuid4())
+    # Create new user - PostgreSQL will auto-generate the ID
     user = User(
-        id=user_id,
         email=apple_data.email,
         apple_user_id=apple_data.apple_user_id,
         display_name=apple_data.display_name or "Player",
@@ -100,10 +102,11 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     )
     
     db.add(user)
+    db.flush()  # Flush to get the auto-generated ID
     
     # Create player state with default values
     player_state = PlayerState(
-        user_id=user_id,
+        user_id=user.id,  # Now this is a Postgres-generated integer
         hometown_kingdom_id=apple_data.hometown_kingdom_id,
         gold=100,
         level=1,
@@ -119,14 +122,14 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     return user
 
 
-def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
+def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     """Get user by ID"""
     return db.query(User).filter(User.id == user_id).first()
 
 
 
 
-def update_user_profile(db: Session, user_id: str, updates: dict) -> User:
+def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     """Update user profile"""
     user = get_user_by_id(db, user_id)
     
@@ -177,7 +180,7 @@ def user_to_private_response(user: User) -> dict:
 
 # ===== User Kingdoms =====
 
-def get_user_kingdoms(db: Session, user_id: str) -> dict:
+def get_user_kingdoms(db: Session, user_id: int) -> dict:
     """Get all kingdoms associated with a user"""
     
     user_kingdoms = db.query(UserKingdom).filter(UserKingdom.user_id == user_id).all()
@@ -214,7 +217,7 @@ def get_user_kingdoms(db: Session, user_id: str) -> dict:
     }
 
 
-def add_experience(db: Session, user_id: str, exp_amount: int) -> User:
+def add_experience(db: Session, user_id: int, exp_amount: int) -> User:
     """Add experience to user and handle level ups"""
     user = get_user_by_id(db, user_id)
     
@@ -250,7 +253,7 @@ def add_experience(db: Session, user_id: str, exp_amount: int) -> User:
     return user
 
 
-def add_gold(db: Session, user_id: str, gold_amount: int) -> User:
+def add_gold(db: Session, user_id: int, gold_amount: int) -> User:
     """Add gold to user"""
     user = get_user_by_id(db, user_id)
     
@@ -273,7 +276,7 @@ def add_gold(db: Session, user_id: str, gold_amount: int) -> User:
     return user
 
 
-def spend_gold(db: Session, user_id: str, gold_amount: int) -> User:
+def spend_gold(db: Session, user_id: int, gold_amount: int) -> User:
     """Spend gold (with validation)"""
     user = get_user_by_id(db, user_id)
     

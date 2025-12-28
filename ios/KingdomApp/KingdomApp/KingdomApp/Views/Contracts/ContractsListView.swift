@@ -122,262 +122,12 @@ struct ContractDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.large) {
-                    // Building info
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                        Text(contract.kingdomName)
-                            .font(KingdomTheme.Typography.title2())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Text("\(contract.buildingType) - Level \(contract.buildingLevel)")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
-                    .padding(KingdomTheme.Spacing.large)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    
-                    // Progress section
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Progress")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        HStack {
-                            if let remaining = contract.hoursRemaining {
-                                Text(formatTime(remaining))
-                                .font(KingdomTheme.Typography.title3())
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                            
-                                Text("remaining")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            } else if contract.status == .open {
-                                Text("Waiting for workers")
-                                .font(KingdomTheme.Typography.body())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            } else {
-                                Text("Complete")
-                                    .font(KingdomTheme.Typography.title3())
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            }
-                        }
-                        
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Rectangle()
-                                    .fill(KingdomTheme.Colors.parchmentDark)
-                                    .frame(height: 12)
-                                
-                                Rectangle()
-                                    .fill(KingdomTheme.Colors.gold)
-                                    .frame(width: geometry.size.width * contract.progress, height: 12)
-                            }
-                            .cornerRadius(6)
-                        }
-                        .frame(height: 12)
-                    }
-                    .padding(KingdomTheme.Spacing.large)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .parchmentCard()
-                    
-                    // Rewards section
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Rewards")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundColor(KingdomTheme.Colors.goldLight)
-                            
-                            Text("\(contract.rewardPool)g total pool")
-                                .font(KingdomTheme.Typography.body())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                        }
-                        
-                        if contract.workerCount > 0 {
-                            Text("Currently \(contract.rewardPerWorker)g per worker (\(contract.workerCount) workers)")
-                                .font(KingdomTheme.Typography.caption())
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
-                        } else {
-                            Text("Split equally among all workers when complete")
-                                .font(KingdomTheme.Typography.caption())
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
-                        }
-                    }
-                    .padding(KingdomTheme.Spacing.large)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .parchmentCard()
-                    
-                    // Time estimate
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Time Estimate")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        HStack {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                if contract.workerCount > 0 {
-                                    Text("~\(formatTime(contract.hoursToComplete)) with \(contract.workerCount) workers")
-                                        .font(KingdomTheme.Typography.body())
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                } else {
-                                    Text("~\(formatTime(contract.baseHoursRequired)) with 3 workers")
-                                        .font(KingdomTheme.Typography.body())
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                }
-                                
-                                Text("More workers = faster completion")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                            }
-                        }
-                    }
-                    .padding(KingdomTheme.Spacing.large)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .parchmentCard()
-                    
-                    // Workers list
-                    if !contract.workers.isEmpty {
-                        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                            Text("Workers (\(contract.workerCount))")
-                                .font(KingdomTheme.Typography.headline())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            ForEach(Array(contract.workers.sorted()), id: \.self) { workerId in
-                                    HStack {
-                                    Image(systemName: "person.fill")
-                                        .foregroundColor(workerId == viewModel.player.playerId ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkLight)
-                                    
-                                    Text(workerId == viewModel.player.playerId ? "You" : workerId)
-                                            .font(KingdomTheme.Typography.body())
-                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                        
-                                        Spacer()
-                                        
-                                    Text("\(contract.rewardPerWorker)g")
-                                            .font(KingdomTheme.Typography.caption())
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                    }
-                                    
-                                if workerId != contract.workers.sorted().last {
-                                        Divider()
-                                            .background(KingdomTheme.Colors.divider)
-                                }
-                            }
-                        }
-                        .padding(KingdomTheme.Spacing.large)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .parchmentCard()
-                    }
-                    
-                    // Action buttons
-                    if !contract.isComplete {
-                        VStack(spacing: KingdomTheme.Spacing.medium) {
-                            if canAccept {
-                                // Accept contract button
-                                Button(action: {
-                                    if let kingdom = viewModel.kingdoms.first(where: { $0.activeContract?.id == contract.id }) {
-                                        if viewModel.acceptContract(kingdom: kingdom) {
-                                            successMessage = "Signed up! Contract will complete automatically."
-                                            showSuccessMessage = true
-                                        }
-                                    }
-                                }) {
-                                    HStack {
-                                        Image(systemName: "checkmark.circle.fill")
-                                        Text("Accept Contract")
-                                    }
-                                }
-                                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                                
-                                VStack(spacing: 4) {
-                                    Text("Rewards split equally among all workers")
-                                        .font(KingdomTheme.Typography.caption())
-                                        .foregroundColor(KingdomTheme.Colors.inkLight)
-                                    
-                                    Text("You can only work on one contract at a time")
-                                        .font(KingdomTheme.Typography.caption())
-                                        .foregroundColor(KingdomTheme.Colors.inkLight)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .center)
-                            } else if isPlayerWorking {
-                                // Currently working
-                                VStack(spacing: KingdomTheme.Spacing.medium) {
-                                    HStack {
-                                        Image(systemName: "hammer.fill")
-                                            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                                            .font(.title2)
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("You're working on this contract")
-                                .font(KingdomTheme.Typography.headline())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                                            if let remaining = contract.hoursRemaining {
-                                                Text("~\(formatTime(remaining)) remaining")
-                                .font(KingdomTheme.Typography.body())
-                                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    
-                                    Button(action: {
-                                        if viewModel.leaveContract() {
-                                            successMessage = "Left contract"
-                                            showSuccessMessage = true
-                                        }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "xmark.circle")
-                                            Text("Leave Contract")
-                                        }
-                                    }
-                                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSecondary, fullWidth: true))
-                                }
-                            } else if viewModel.player.activeContractId != nil {
-                                Text("You're already working on another contract")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding()
-                            } else if contract.createdBy == viewModel.player.playerId {
-                                Text("You created this contract - you cannot work on it")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding()
-                            }
-                        }
-                        .padding(KingdomTheme.Spacing.large)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    } else {
-                        // Completed message
-                        VStack(spacing: KingdomTheme.Spacing.medium) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            
-                            Text("Contract Complete!")
-                                .font(KingdomTheme.Typography.headline())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            if isPlayerWorking {
-                                Text("You earned \(contract.rewardPerWorker) gold!")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(KingdomTheme.Spacing.xxLarge)
-                        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    }
+                buildingInfoSection
+                progressSection
+                rewardsSection
+                timeEstimateSection
+                workersListSection
+                actionButtonsSection
             }
             .padding()
         }
@@ -389,6 +139,320 @@ struct ContractDetailView: View {
         } message: {
             Text(successMessage)
         }
+    }
+    
+    // MARK: - View Components
+    
+    private var buildingInfoSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            Text(contract.kingdomName)
+                .font(KingdomTheme.Typography.title2())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Text("\(contract.buildingType) - Level \(contract.buildingLevel)")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+        .padding(KingdomTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Text("Progress")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            progressStatusText
+            progressBar
+        }
+        .padding(KingdomTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .parchmentCard()
+    }
+    
+    private var progressStatusText: some View {
+        HStack {
+            if let remaining = contract.hoursRemaining {
+                Text(formatTime(remaining))
+                    .font(KingdomTheme.Typography.title3())
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("remaining")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            } else if contract.status == .open {
+                Text("Waiting for workers")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            } else {
+                Text("Complete")
+                    .font(KingdomTheme.Typography.title3())
+                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+            }
+        }
+    }
+    
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(KingdomTheme.Colors.parchmentDark)
+                    .frame(height: 12)
+                
+                Rectangle()
+                    .fill(KingdomTheme.Colors.gold)
+                    .frame(width: geometry.size.width * contract.progress, height: 12)
+            }
+            .cornerRadius(6)
+        }
+        .frame(height: 12)
+    }
+    
+    private var rewardsSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Text("Rewards")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            HStack {
+                Image(systemName: "crown.fill")
+                    .foregroundColor(KingdomTheme.Colors.goldLight)
+                
+                Text("\(contract.rewardPool)g total pool")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            rewardsDescription
+        }
+        .padding(KingdomTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .parchmentCard()
+    }
+    
+    private var rewardsDescription: some View {
+        Group {
+            if contract.workerCount > 0 {
+                Text("Currently \(contract.rewardPerWorker)g per worker (\(contract.workerCount) workers)")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+            } else {
+                Text("Split equally among all workers when complete")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+            }
+        }
+    }
+    
+    private var timeEstimateSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Text("Time Estimate")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            HStack {
+                Image(systemName: "clock.fill")
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    timeEstimateText
+                    
+                    Text("More workers = faster completion")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
+            }
+        }
+        .padding(KingdomTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .parchmentCard()
+    }
+    
+    private var timeEstimateText: some View {
+        Group {
+            if contract.workerCount > 0 {
+                Text("~\(formatTime(contract.hoursToComplete)) with \(contract.workerCount) workers")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            } else {
+                Text("~\(formatTime(contract.baseHoursRequired)) with 3 workers")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var workersListSection: some View {
+        if !contract.workers.isEmpty {
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                Text("Workers (\(contract.workerCount))")
+                    .font(KingdomTheme.Typography.headline())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                ForEach(Array(contract.workers.sorted()), id: \.self) { workerId in
+                    workerRow(workerId: workerId)
+                    
+                    if workerId != contract.workers.sorted().last {
+                        Divider()
+                            .background(KingdomTheme.Colors.divider)
+                    }
+                }
+            }
+            .padding(KingdomTheme.Spacing.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .parchmentCard()
+        }
+    }
+    
+    private func workerRow(workerId: Int) -> some View {
+        HStack {
+            Image(systemName: "person.fill")
+                .foregroundColor(workerId == viewModel.player.playerId ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkLight)
+            
+            Text(workerId == viewModel.player.playerId ? "You" : String(workerId))
+                .font(KingdomTheme.Typography.body())
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            Spacer()
+            
+            Text("\(contract.rewardPerWorker)g")
+                .font(KingdomTheme.Typography.caption())
+                .foregroundColor(KingdomTheme.Colors.gold)
+        }
+    }
+    
+    @ViewBuilder
+    private var actionButtonsSection: some View {
+        if !contract.isComplete {
+            VStack(spacing: KingdomTheme.Spacing.medium) {
+                if canAccept {
+                    acceptContractButton
+                    acceptContractInfo
+                } else if isPlayerWorking {
+                    workingOnContractView
+                } else if viewModel.player.activeContractId != nil {
+                    alreadyWorkingMessage
+                } else if contract.createdBy == viewModel.player.playerId {
+                    creatorMessage
+                }
+            }
+            .padding(KingdomTheme.Spacing.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        } else {
+            completedMessage
+        }
+    }
+    
+    private var acceptContractButton: some View {
+        Button(action: {
+            if let kingdom = viewModel.kingdoms.first(where: { $0.activeContract?.id == contract.id }) {
+                if viewModel.acceptContract(kingdom: kingdom) {
+                    successMessage = "Signed up! Contract will complete automatically."
+                    showSuccessMessage = true
+                }
+            }
+        }) {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                Text("Accept Contract")
+            }
+        }
+        .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+    }
+    
+    private var acceptContractInfo: some View {
+        VStack(spacing: 4) {
+            Text("Rewards split equally among all workers")
+                .font(KingdomTheme.Typography.caption())
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+            
+            Text("You can only work on one contract at a time")
+                .font(KingdomTheme.Typography.caption())
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+    
+    private var workingOnContractView: some View {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: "hammer.fill")
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("You're working on this contract")
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    if let remaining = contract.hoursRemaining {
+                        Text("~\(formatTime(remaining)) remaining")
+                            .font(KingdomTheme.Typography.body())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            leaveContractButton
+        }
+    }
+    
+    private var leaveContractButton: some View {
+        Button(action: {
+            if viewModel.leaveContract() {
+                successMessage = "Left contract"
+                showSuccessMessage = true
+            }
+        }) {
+            HStack {
+                Image(systemName: "xmark.circle")
+                Text("Leave Contract")
+            }
+        }
+        .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSecondary, fullWidth: true))
+    }
+    
+    private var alreadyWorkingMessage: some View {
+        Text("You're already working on another contract")
+            .font(KingdomTheme.Typography.body())
+            .foregroundColor(KingdomTheme.Colors.inkMedium)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding()
+    }
+    
+    private var creatorMessage: some View {
+        Text("You created this contract - you cannot work on it")
+            .font(KingdomTheme.Typography.body())
+            .foregroundColor(KingdomTheme.Colors.inkMedium)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding()
+    }
+    
+    private var completedMessage: some View {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+            
+            Text("Contract Complete!")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            if isPlayerWorking {
+                Text("You earned \(contract.rewardPerWorker) gold!")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.gold)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(KingdomTheme.Spacing.xxLarge)
+        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func formatTime(_ hours: Double) -> String {

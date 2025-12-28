@@ -37,14 +37,14 @@ struct DistributionRecord: Identifiable, Codable, Hashable {
 
 struct RecipientRecord: Identifiable, Codable, Hashable {
     let id: UUID
-    let playerId: String
+    let playerId: Int  // PostgreSQL auto-generated integer
     let playerName: String
     let goldReceived: Int
     let meritScore: Int
     let reputation: Int
     let skillTotal: Int
     
-    init(playerId: String, playerName: String, goldReceived: Int, meritScore: Int, reputation: Int, skillTotal: Int) {
+    init(playerId: Int, playerName: String, goldReceived: Int, meritScore: Int, reputation: Int, skillTotal: Int) {
         self.id = UUID()
         self.playerId = playerId
         self.playerName = playerName
@@ -59,7 +59,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     let id: String  // OSM ID - matches city_boundary_osm_id in backend
     let name: String
     var rulerName: String
-    var rulerId: String?  // Player ID of ruler (nil if unclaimed)
+    var rulerId: Int?  // Player ID of ruler (nil if unclaimed) - PostgreSQL auto-generated
     let territory: Territory
     let color: KingdomColor
     
@@ -106,7 +106,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: String? = nil, territory: Territory, color: KingdomColor) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -167,7 +167,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     }
     
     /// Set a new ruler
-    mutating func setRuler(playerId: String, playerName: String) {
+    mutating func setRuler(playerId: Int, playerName: String) {
         self.rulerId = playerId
         self.rulerName = playerName
     }

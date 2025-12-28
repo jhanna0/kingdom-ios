@@ -5,7 +5,7 @@ import Foundation
 struct APIKingdom: Codable {
     let id: String
     let name: String
-    let ruler_id: String?
+    let ruler_id: Int?  // PostgreSQL auto-generated integer
     let ruler_name: String?
     let city_boundary_osm_id: String?
     let population: Int
@@ -27,7 +27,7 @@ struct APIKingdom: Codable {
 struct APIKingdomSimple: Codable {
     let id: String
     let name: String
-    let ruler_id: String?
+    let ruler_id: Int?  // PostgreSQL auto-generated integer
     let location: LocationData?
     let population: Int
     let level: Int
@@ -42,7 +42,7 @@ struct LocationData: Codable {
 
 struct CityKingdomData: Codable {
     let id: String
-    let ruler_id: String?
+    let ruler_id: Int?  // PostgreSQL auto-generated integer
     let ruler_name: String?
     let level: Int
     let population: Int
@@ -64,8 +64,7 @@ struct CityBoundaryResponse: Codable {
 // MARK: - Check-in Models
 
 struct CheckInRequest: Codable {
-    let player_id: String
-    let kingdom_id: String
+    let city_boundary_osm_id: String  // Kingdom OSM ID
     let latitude: Double
     let longitude: Double
 }

@@ -168,7 +168,7 @@ class WorldSimulator: ObservableObject {
 // MARK: - Citizen (NPC)
 
 struct Citizen: Identifiable, Codable, Hashable {
-    let id: String
+    let id: Int  // NPC citizen ID (integer)
     let name: String
     let homeKingdom: String
     var reputation: Int
@@ -201,7 +201,7 @@ struct Citizen: Identifiable, Codable, Hashable {
         let name = (firstNames.randomElement() ?? "Unknown") + (titles.randomElement() ?? "")
         
         return Citizen(
-            id: UUID().uuidString,
+            id: Int.random(in: 10000...99999),  // Random NPC ID (won't conflict with real user IDs starting at 1)
             name: name,
             homeKingdom: kingdom,
             reputation: Int.random(in: 50...300),

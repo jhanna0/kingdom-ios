@@ -92,8 +92,8 @@ class KingdomAPIService: ObservableObject {
     }
     
     /// Check in to a kingdom
-    func checkIn(playerId: String, kingdomId: String, location: CLLocationCoordinate2D) async throws -> CheckInResponse {
-        return try await kingdom.checkIn(playerId: playerId, kingdomId: kingdomId, location: location)
+    func checkIn(kingdomId: String, location: CLLocationCoordinate2D) async throws -> CheckInResponse {
+        return try await kingdom.checkIn(kingdomId: kingdomId, location: location)
     }
 }
 

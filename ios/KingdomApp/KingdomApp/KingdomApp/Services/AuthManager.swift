@@ -215,7 +215,7 @@ struct TokenResponse: Codable {
 }
 
 struct UserData: Codable {
-    let id: String
+    let id: Int  // PostgreSQL auto-generated integer ID
     let display_name: String
     let email: String?
     let hometown_kingdom_id: String?

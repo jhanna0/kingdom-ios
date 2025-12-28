@@ -59,10 +59,49 @@ class MapViewModel: ObservableObject {
         }.store(in: &cancellables)
         
         print("📱 MapViewModel initialized")
+        
+        // IMMEDIATELY sync player ID with backend if authenticated
+        // This prevents the "local UUID vs backend UUID" mismatch bug
+        Task {
+            await syncPlayerIdWithBackend()
+        }
+    }
+    
+    /// Sync player ID with backend user ID (called on init)
+    /// This fixes the bug where local player had different ID than backend user
+    private func syncPlayerIdWithBackend() async {
+        guard apiService.isAuthenticated else {
+            print("⚠️ Not authenticated - using local player ID")
+            return
+        }
+        
+        // Fetch current user from backend
+        do {
+            let request = APIClient.shared.request(endpoint: "/auth/me")
+            let userData: UserData = try await APIClient.shared.execute(request)
+            
+            // Update player with backend ID and name
+            await MainActor.run {
+                player.playerId = userData.id  // Integer from Postgres auto-increment
+                player.name = userData.display_name
+                player.saveToUserDefaults()
+                
+                print("✅ Synced player ID with backend: \(userData.id)")
+                
+                // Re-sync kingdoms after ID update
+                syncPlayerKingdoms()
+            }
+        } catch {
+            print("⚠️ Failed to sync player ID from backend: \(error)")
+        }
     }
     
     /// Sync player's fiefsRuled with kingdoms they actually rule
     /// Fixes bug where UI doesn't show kingdom button even though player is ruler
+    func syncPlayerKingdomsPublic() {
+        syncPlayerKingdoms()
+    }
+    
     private func syncPlayerKingdoms() {
         var updatedFiefs = Set<String>()
         
@@ -315,6 +354,9 @@ class MapViewModel: ObservableObject {
                         // Update currentKingdomInside to reflect the change
                         currentKingdomInside = kingdoms[index]
                         
+                        // Sync player kingdoms to ensure UI updates everywhere
+                        syncPlayerKingdoms()
+                        
                         print("👑 Successfully claimed \(kingdom.name)")
                     }
                 }
@@ -326,6 +368,10 @@ class MapViewModel: ObservableObject {
                         kingdoms[index].setRuler(playerId: player.playerId, playerName: player.name)
                         player.claimKingdom(kingdom.name)
                         currentKingdomInside = kingdoms[index]
+                        
+                        // Sync player kingdoms to ensure UI updates everywhere
+                        syncPlayerKingdoms()
+                        
                         print("⚠️ Claimed locally only - will sync when connection available")
                     }
                 }
@@ -794,7 +840,7 @@ class MapViewModel: ObservableObject {
     }
     
     /// Get estimated reward share for a player in a kingdom
-    func getEstimatedRewardShare(for playerId: String, in kingdomId: String) -> Int {
+    func getEstimatedRewardShare(for playerId: Int, in kingdomId: String) -> Int {
         guard let kingdom = kingdoms.first(where: { $0.id == kingdomId }) else {
             return 0
         }
@@ -806,7 +852,7 @@ class MapViewModel: ObservableObject {
         }
         
         // Calculate player's merit
-        let playerMerit = player.calculateMeritScore(inKingdom: kingdom.id)
+        let _ = player.calculateMeritScore(inKingdom: kingdom.id)  // TODO: Use in multiplayer
         
         // For single-player, player gets 100% if they're the only eligible subject
         // TODO: When multiplayer, calculate based on all subjects
@@ -877,7 +923,6 @@ class MapViewModel: ObservableObject {
             Task {
                 do {
                     let response = try await apiService.checkIn(
-                        playerId: player.playerId,
                         kingdomId: kingdom.id,
                         location: location
                     )

@@ -1,7 +1,7 @@
 """
 Contract model - Building contracts for kingdom infrastructure
 """
-from sqlalchemy import Column, String, Float, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Float, DateTime, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -36,7 +36,7 @@ class Contract(Base):
     workers = Column(JSONB, default=list)
     
     # Status
-    created_by = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    created_by = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     status = Column(String, default="open")  # open, in_progress, completed, cancelled

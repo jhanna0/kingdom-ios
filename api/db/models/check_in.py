@@ -1,7 +1,7 @@
 """
 CheckInHistory model - Track all check-ins
 """
-from sqlalchemy import Column, String, Float, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Float, DateTime, Integer, BigInteger, ForeignKey
 from datetime import datetime
 
 from ..base import Base
@@ -12,7 +12,7 @@ class CheckInHistory(Base):
     __tablename__ = "checkin_history"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     
     # Location verification

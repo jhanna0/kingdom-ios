@@ -49,14 +49,13 @@ class KingdomAPI {
     // MARK: - Check-in
     
     /// Check in to a kingdom
+    /// User is identified from JWT token automatically - no need to send player_id
     func checkIn(
-        playerId: String,
         kingdomId: String,
         location: CLLocationCoordinate2D
     ) async throws -> CheckInResponse {
         let body = CheckInRequest(
-            player_id: playerId,
-            kingdom_id: kingdomId,
+            city_boundary_osm_id: kingdomId,
             latitude: location.latitude,
             longitude: location.longitude
         )

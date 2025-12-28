@@ -28,7 +28,7 @@ class ContractResponse(BaseModel):
     work_started_at: Optional[datetime] = None
     reward_pool: int
     workers: List[str] = []
-    created_by: str
+    created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
     status: str = "open"

@@ -10,7 +10,7 @@ class Kingdom(BaseModel):
     """Basic kingdom response"""
     id: str
     name: str
-    ruler_id: Optional[str] = None
+    ruler_id: Optional[int] = None
     ruler_name: Optional[str] = None
     treasury: int = 0
     population: int = 0
@@ -21,7 +21,7 @@ class KingdomState(BaseModel):
     """Complete kingdom state"""
     id: str
     name: str
-    ruler_id: Optional[str] = None
+    ruler_id: Optional[int] = None
     ruler_name: Optional[str] = None
     
     # Location
@@ -59,7 +59,7 @@ class KingdomState(BaseModel):
 
 class KingdomUpdate(BaseModel):
     """Partial update for kingdom"""
-    ruler_id: Optional[str] = None
+    ruler_id: Optional[int] = None
     ruler_name: Optional[str] = None
     treasury: Optional[int] = None
     population: Optional[int] = None

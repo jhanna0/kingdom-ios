@@ -1,7 +1,7 @@
 """
 Property model - Player-owned properties
 """
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, DateTime, Integer, BigInteger, ForeignKey
 from datetime import datetime
 
 from ..base import Base
@@ -17,7 +17,7 @@ class Property(Base):
     type = Column(String, nullable=False)  # house, shop, personal_mine
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     kingdom_name = Column(String, nullable=False)
-    owner_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    owner_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     owner_name = Column(String, nullable=False)
     
     tier = Column(Integer, default=1)  # 1-5

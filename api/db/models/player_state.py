@@ -1,7 +1,7 @@
 """
 PlayerState model - All game state separate from auth/account
 """
-from sqlalchemy import Column, String, Float, DateTime, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, String, Float, DateTime, Integer, BigInteger, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
@@ -17,7 +17,7 @@ class PlayerState(Base):
     
     # Primary key and user reference
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), unique=True, nullable=False, index=True)
     
     # Kingdom & Territory
     hometown_kingdom_id = Column(String, nullable=True, index=True)

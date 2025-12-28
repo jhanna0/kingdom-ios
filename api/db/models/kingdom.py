@@ -1,7 +1,7 @@
 """
 Kingdom model - City/territory game state
 """
-from sqlalchemy import Column, String, Float, Text, DateTime, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, String, Float, Text, DateTime, Integer, BigInteger, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -17,7 +17,7 @@ class Kingdom(Base):
     name = Column(String, nullable=False, index=True)
     
     # Current ruler (nullable - kingdoms can be unclaimed)
-    ruler_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    ruler_id = Column(BigInteger, ForeignKey("users.id"), nullable=True, index=True)
     
     # Reference to the city boundary
     city_boundary_osm_id = Column(String, nullable=True)
@@ -83,7 +83,7 @@ class UserKingdom(Base):
     __tablename__ = "user_kingdoms"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     
     # Relationship type

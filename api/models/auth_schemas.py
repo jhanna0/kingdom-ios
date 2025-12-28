@@ -28,7 +28,7 @@ class TokenResponse(BaseModel):
 
 class UserProfile(BaseModel):
     """Public user profile"""
-    id: str
+    id: int
     display_name: str
     avatar_url: Optional[str] = None
     level: int
@@ -44,7 +44,7 @@ class UserProfile(BaseModel):
 
 class UserPrivate(BaseModel):
     """Private user data (only shown to the user themselves)"""
-    id: str
+    id: int
     email: Optional[str] = None
     display_name: str
     avatar_url: Optional[str] = None
@@ -119,7 +119,7 @@ class UserKingdomsList(BaseModel):
 
 class UserStats(BaseModel):
     """Detailed user statistics"""
-    user_id: str
+    user_id: int
     display_name: str
     
     # Combat & Territory
@@ -145,7 +145,7 @@ class UserStats(BaseModel):
 class LeaderboardEntry(BaseModel):
     """Single leaderboard entry"""
     rank: int
-    user_id: str
+    user_id: int
     display_name: str
     avatar_url: Optional[str] = None
     score: int  # Could be reputation, kingdoms, gold, etc.

@@ -6,15 +6,15 @@ import CoreLocation
 /// Represents an active coup event with 2-hour voting period
 struct CoupEvent: Identifiable, Codable {
     let id: UUID
-    let initiatorId: String
+    let initiatorId: Int  // PostgreSQL auto-generated integer
     let initiatorName: String
     let targetKingdomId: String
     let targetKingdomName: String
     let startTime: Date
     let votingEndTime: Date  // 2 hours after start
     
-    var attackers: [String] = []  // Player IDs who joined attackers
-    var defenders: [String] = []  // Player IDs who joined defenders
+    var attackers: [Int] = []  // Player IDs who joined attackers (integers)
+    var defenders: [Int] = []  // Player IDs who joined defenders (integers)
     
     var isVotingOpen: Bool {
         return Date() < votingEndTime
@@ -23,7 +23,7 @@ struct CoupEvent: Identifiable, Codable {
     var isResolved: Bool = false
     var attackerVictory: Bool?  // nil = not resolved yet
     
-    init(initiatorId: String, initiatorName: String, targetKingdomId: String, targetKingdomName: String) {
+    init(initiatorId: Int, initiatorName: String, targetKingdomId: String, targetKingdomName: String) {
         self.id = UUID()
         self.initiatorId = initiatorId
         self.initiatorName = initiatorName
@@ -53,20 +53,20 @@ struct InvasionEvent: Identifiable, Codable {
     let id: UUID
     let attackingKingdomId: String
     let attackingKingdomName: String
-    let attackingRulerId: String
+    let attackingRulerId: Int  // PostgreSQL auto-generated integer
     let attackingRulerName: String
     let targetKingdomId: String
     let targetKingdomName: String
     
     // Phase 1: Recruitment (players must be checked in to TARGET kingdom)
     let recruitmentStartTime: Date
-    var signups: [String] = []  // Players who signed up (paid 100g, CHECKED IN to target)
+    var signups: [Int] = []  // Players who signed up (paid 100g, CHECKED IN to target) - integers
     var isLaunched: Bool = false
     
     // Phase 2: Battle (after launch)
     var launchTime: Date?
     var rallyEndTime: Date?  // 2 hours after launch
-    var defenders: [String] = []  // Defenders who joined
+    var defenders: [Int] = []  // Defenders who joined (integers)
     
     var isResolved: Bool = false
     var attackerVictory: Bool?
@@ -76,7 +76,7 @@ struct InvasionEvent: Identifiable, Codable {
     
     init(attackingKingdomId: String, 
          attackingKingdomName: String,
-         attackingRulerId: String,
+         attackingRulerId: Int,
          attackingRulerName: String,
          targetKingdomId: String,
          targetKingdomName: String) {
@@ -133,7 +133,7 @@ class CombatResolver {
     /// Resolve a coup battle
     static func resolveCoup(
         coup: CoupEvent,
-        players: [String: Player],  // All players by ID
+        players: [Int: Player],  // All players by ID (integers)
         kingdom: Kingdom
     ) -> CoupResult {
         
@@ -172,7 +172,7 @@ class CombatResolver {
     /// Resolve an invasion battle
     static func resolveInvasion(
         invasion: InvasionEvent,
-        players: [String: Player],
+        players: [Int: Player],  // All players by ID (integers)
         targetKingdom: Kingdom
     ) -> InvasionResult {
         
@@ -224,11 +224,11 @@ struct CoupResult {
     let attackerVictory: Bool
     let attackerStrength: Int
     let defenderStrength: Int
-    let attackers: [String]  // All will be punished if they lose
-    let defenders: [String]  // All will be rewarded if they win
-    let newRulerId: String?  // Coup initiator if victory
+    let attackers: [Int]  // All will be punished if they lose (integers)
+    let defenders: [Int]  // All will be rewarded if they win (integers)
+    let newRulerId: Int?  // Coup initiator if victory (PostgreSQL integer)
     let newRulerName: String?
-    let oldRulerId: String?  // For determining escape chance
+    let oldRulerId: Int?  // For determining escape chance (PostgreSQL integer)
     
     /// Calculate old ruler's chance to flee (based on defender support)
     func getFleeChance() -> Double {
@@ -278,9 +278,9 @@ struct InvasionResult {
     let attackerVictory: Bool
     let attackerStrength: Int
     let defenderStrength: Int
-    let attackers: [String]
-    let defenders: [String]
-    let newRulerId: String?  // Attacking ruler if victory
+    let attackers: [Int]  // Integers
+    let defenders: [Int]  // Integers
+    let newRulerId: Int?  // Attacking ruler if victory (PostgreSQL integer)
     let lootPerAttacker: Int
     let wallDamage: Int  // How many wall levels destroyed
     let productionDamage: Bool  // Whether mine/forge were damaged

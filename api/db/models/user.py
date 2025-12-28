@@ -1,7 +1,7 @@
 """
 User model - Authentication and account data ONLY
 """
-from sqlalchemy import Column, String, DateTime, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, Boolean, BigInteger, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -16,8 +16,8 @@ class User(Base):
     """
     __tablename__ = "users"
     
-    # Primary key
-    id = Column(String, primary_key=True)  # UUID
+    # Primary key - PostgreSQL auto-incrementing integer
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     
     # Authentication - OAuth providers
     apple_user_id = Column(String, unique=True, nullable=False, index=True)
