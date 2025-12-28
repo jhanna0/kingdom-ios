@@ -7,8 +7,6 @@ struct APIKingdom: Codable {
     let name: String
     let ruler_id: String?
     let ruler_name: String?
-    let latitude: Double?
-    let longitude: Double?
     let city_boundary_osm_id: String?
     let population: Int
     let level: Int

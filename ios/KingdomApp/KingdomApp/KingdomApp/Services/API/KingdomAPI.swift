@@ -20,17 +20,16 @@ class KingdomAPI {
     }
     
     /// Create a new kingdom (user becomes ruler)
+    /// Coordinates are stored in the CityBoundary, not duplicated in Kingdom
     func createKingdom(
         name: String,
-        osmId: String,
-        latitude: Double,
-        longitude: Double
+        osmId: String
     ) async throws -> APIKingdom {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
         
-        let endpoint = "/kingdoms?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name)&city_boundary_osm_id=\(osmId)&latitude=\(latitude)&longitude=\(longitude)"
+        let endpoint = "/kingdoms?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name)&city_boundary_osm_id=\(osmId)"
         let request = client.request(endpoint: endpoint, method: "POST")
         return try await client.execute(request)
     }

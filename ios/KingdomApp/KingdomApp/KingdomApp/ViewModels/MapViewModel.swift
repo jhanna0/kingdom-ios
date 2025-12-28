@@ -284,18 +284,11 @@ class MapViewModel: ObservableObject {
             return false
         }
         
-        // Get user location for the API call
-        guard let location = userLocation else {
-            print("❌ Cannot claim - location unavailable")
-            return false
-        }
-        
-        // Call backend API to claim/create kingdom
+        // Claim kingdom via API
         Task {
             do {
                 let kingdomAPI = KingdomAPI()
                 
-                // Kingdom ID IS the OSM ID - they match!
                 guard let osmId = kingdom.territory.osmId else {
                     print("❌ Cannot claim - kingdom has no OSM ID")
                     return
@@ -306,17 +299,15 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
+                // Conquer the kingdom (kingdoms already exist from /cities call)
                 let apiKingdom = try await kingdomAPI.createKingdom(
                     name: kingdom.name,
-                    osmId: osmId,
-                    latitude: location.latitude,
-                    longitude: location.longitude
+                    osmId: osmId
                 )
                 
                 // Update local state with the server response
                 await MainActor.run {
                     if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-                        // Update with server data
                         kingdoms[index].rulerId = apiKingdom.ruler_id
                         kingdoms[index].rulerName = player.name
                         player.claimKingdom(kingdom.name)
@@ -324,11 +315,11 @@ class MapViewModel: ObservableObject {
                         // Update currentKingdomInside to reflect the change
                         currentKingdomInside = kingdoms[index]
                         
-                        print("👑 Successfully claimed \(kingdom.name) (persisted to server)")
+                        print("👑 Successfully claimed \(kingdom.name)")
                     }
                 }
             } catch {
-                print("❌ Failed to claim kingdom on server: \(error.localizedDescription)")
+                print("❌ Failed to claim kingdom: \(error.localizedDescription)")
                 // Still update local state as fallback for offline mode
                 await MainActor.run {
                     if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {

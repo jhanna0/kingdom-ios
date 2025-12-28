@@ -118,15 +118,16 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
 def create_kingdom(
     name: str,
     city_boundary_osm_id: str,
-    latitude: float,
-    longitude: float,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
+    DEPRECATED: Use /checkin instead - it auto-creates kingdoms
+    
     Create a new kingdom
     
     User automatically becomes the ruler of the new kingdom
+    Coordinates are stored in the CityBoundary, not duplicated here
     """
     # Check if kingdom with this OSM ID already exists
     existing = db.query(Kingdom).filter(
@@ -144,8 +145,6 @@ def create_kingdom(
         id=city_boundary_osm_id,  # Use OSM ID so map cities match kingdoms!
         name=name,
         city_boundary_osm_id=city_boundary_osm_id,
-        latitude=latitude,
-        longitude=longitude,
         ruler_id=current_user.id,
         population=1,
         level=1,
@@ -193,8 +192,8 @@ def check_in(
     Enforces cooldown to prevent spam
     """
     
-    # Get kingdom
-    kingdom = db.query(Kingdom).filter(Kingdom.id == request.kingdom_id).first()
+    # Get kingdom - should already exist from /cities call
+    kingdom = db.query(Kingdom).filter(Kingdom.id == request.city_boundary_osm_id).first()
     
     if not kingdom:
         raise HTTPException(

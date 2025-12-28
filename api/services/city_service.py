@@ -31,13 +31,34 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     return R * c
 
 
-def _get_kingdoms_for_cities(db: Session, osm_ids: List[str]) -> dict:
+def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) -> dict:
     """
-    Batch fetch kingdoms for multiple OSM IDs.
+    Get or create kingdoms for cities.
+    Creates unclaimed kingdoms for any cities that don't have one yet.
     Returns dict of osm_id -> KingdomData
     """
+    osm_ids = [city.osm_id for city in cities]
     kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
+    existing_kingdom_ids = {k.id for k in kingdoms}
     
+    # Create kingdoms for cities that don't have one
+    for city in cities:
+        if city.osm_id not in existing_kingdom_ids:
+            new_kingdom = Kingdom(
+                id=city.osm_id,  # Kingdom ID = OSM ID
+                name=city.name,
+                city_boundary_osm_id=city.osm_id,
+                ruler_id=None,  # Unclaimed
+                population=0,
+                level=1,
+                treasury_gold=0
+            )
+            db.add(new_kingdom)
+            kingdoms.append(new_kingdom)
+    
+    db.commit()
+    
+    # Build result map
     result = {}
     for kingdom in kingdoms:
         # Get ruler name if there's a ruler
@@ -128,9 +149,9 @@ async def get_cities_near_location(
             city.last_accessed = datetime.utcnow()
         db.commit()
         
-        # Batch fetch kingdoms for all cities
-        osm_ids = [city.osm_id for city, _ in nearby_cached[:35]]
-        kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+        # Get or create kingdoms for all cities
+        cities_list = [city for city, _ in nearby_cached[:35]]
+        kingdoms_map = _get_or_create_kingdoms_for_cities(db, cities_list)
         
         return [
             CityBoundaryResponse(
@@ -144,7 +165,7 @@ async def get_cities_near_location(
                 cached=True,
                 kingdom=kingdoms_map.get(city.osm_id)
             )
-            for city, _ in nearby_cached[:35]
+            for city in cities_list
         ]
     
     # STEP 2: Not enough cached - do FAST query to get city IDs
@@ -200,9 +221,8 @@ async def _fetch_cities_fallback(
     
     db.commit()
     
-    # Batch fetch kingdoms for all cities
-    osm_ids = [city.osm_id for city in result_cities]
-    kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+    # Get or create kingdoms for all cities
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities)
     
     return [
         CityBoundaryResponse(
@@ -289,9 +309,8 @@ async def _process_city_ids(
     
     print(f"✅ Returning {len(result_cities)} cities ({cached_count} cached, {new_count} newly fetched)")
     
-    # Batch fetch kingdoms for all cities
-    osm_ids = [city.osm_id for city in result_cities]
-    kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+    # Get or create kingdoms for all cities
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities)
     
     return [
         CityBoundaryResponse(
@@ -321,8 +340,8 @@ def get_city_by_id(db: Session, osm_id: str) -> CityBoundaryResponse:
     city.last_accessed = datetime.utcnow()
     db.commit()
     
-    # Get kingdom data
-    kingdoms_map = _get_kingdoms_for_cities(db, [osm_id])
+    # Get or create kingdom data
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, [city])
     
     return CityBoundaryResponse(
         osm_id=city.osm_id,
