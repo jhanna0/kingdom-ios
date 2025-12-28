@@ -26,7 +26,7 @@ class MapViewModel: ObservableObject {
     @Published var showActivityFeed: Bool = false
     
     // API Service - connects to backend server
-    @Published var apiService = KingdomAPIService()
+    var apiService = KingdomAPIService.shared
     
     // Configuration
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
@@ -813,15 +813,16 @@ class MapViewModel: ObservableObject {
     }
     
     /// Sync kingdom to backend API
+    /// Note: Kingdoms are server-authoritative and updated through specific actions
+    /// (check-in, conquest, contracts, etc.) rather than direct state sync
     func syncKingdomToAPI(_ kingdom: Kingdom) {
-        Task {
-            do {
-                try await apiService.syncKingdom(kingdom)
-                print("✅ Kingdom synced to API: \(kingdom.name)")
-            } catch {
-                print("⚠️ Failed to sync kingdom to API: \(error.localizedDescription)")
-            }
-        }
+        // Kingdom state is managed by the server through specific actions:
+        // - Check-ins update population and activity
+        // - Conquests change rulers
+        // - Contracts upgrade buildings
+        // - Economy system handles treasury
+        // No direct client-to-server kingdom state sync needed
+        print("ℹ️ Kingdom state is server-authoritative: \(kingdom.name)")
     }
     
     /// Check-in with API integration

@@ -617,12 +617,224 @@ class Player: ObservableObject {
         return fromLoc.distance(from: toLoc)  // Returns meters
     }
     
-    // MARK: - Persistence
-    // TODO: Replace all UserDefaults persistence with backend API
-    // - POST /players (create account)
-    // - GET /players/:id (load player data)
-    // - PATCH /players/:id (update player data)
-    // For now, using local UserDefaults to maintain state between sessions
+    // MARK: - API Sync
+    
+    /// Convert player state to dictionary for API sync
+    func toAPIState() -> [String: Any] {
+        var state: [String: Any] = [:]
+        
+        // Core Stats
+        state["gold"] = gold
+        state["level"] = level
+        state["experience"] = experience
+        state["skill_points"] = skillPoints
+        
+        // Combat Stats
+        state["attack_power"] = attackPower
+        state["defense_power"] = defensePower
+        state["leadership"] = leadership
+        state["building_skill"] = buildingSkill
+        
+        // Debuffs
+        state["attack_debuff"] = attackDebuff
+        if let expires = debuffExpires {
+            state["debuff_expires_at"] = ISO8601DateFormatter().string(from: expires)
+        }
+        
+        // Reputation
+        state["reputation"] = reputation
+        state["kingdom_reputation"] = kingdomReputation
+        
+        // Territory
+        state["current_kingdom_id"] = currentKingdom
+        state["home_kingdom_id"] = homeKingdomId
+        state["origin_kingdom_id"] = originKingdomId
+        state["fiefs_ruled"] = Array(fiefsRuled)
+        state["is_ruler"] = isRuler
+        
+        // Check-in
+        state["check_in_history"] = checkInHistory
+        if let lastCheckIn = lastCheckIn {
+            state["last_check_in"] = ISO8601DateFormatter().string(from: lastCheckIn)
+        }
+        if let location = lastCheckInLocation {
+            state["last_check_in_lat"] = location.latitude
+            state["last_check_in_lon"] = location.longitude
+        }
+        if let lastDaily = lastDailyCheckIn {
+            state["last_daily_check_in"] = ISO8601DateFormatter().string(from: lastDaily)
+        }
+        
+        // Activity
+        state["coups_won"] = coupsWon
+        state["coups_failed"] = coupsFailed
+        state["times_executed"] = timesExecuted
+        state["executions_ordered"] = executionsOrdered
+        if let lastCoup = lastCoupAttempt {
+            state["last_coup_attempt"] = ISO8601DateFormatter().string(from: lastCoup)
+        }
+        
+        // Contract & Work
+        state["active_contract_id"] = activeContractId
+        state["contracts_completed"] = contractsCompleted
+        state["total_work_contributed"] = totalWorkContributed
+        
+        // Rewards
+        state["total_rewards_received"] = totalRewardsReceived
+        if let lastReward = lastRewardReceived {
+            state["last_reward_received"] = ISO8601DateFormatter().string(from: lastReward)
+        }
+        state["last_reward_amount"] = lastRewardAmount
+        
+        // Status
+        state["is_alive"] = isAlive
+        
+        return state
+    }
+    
+    /// Update player from API state
+    func updateFromAPIState(_ apiState: APIPlayerState) {
+        // Core Stats
+        gold = apiState.gold
+        level = apiState.level
+        experience = apiState.experience
+        skillPoints = apiState.skill_points
+        
+        // Combat Stats
+        attackPower = apiState.attack_power
+        defensePower = apiState.defense_power
+        leadership = apiState.leadership
+        buildingSkill = apiState.building_skill
+        
+        // Debuffs
+        attackDebuff = apiState.attack_debuff
+        if let expiresStr = apiState.debuff_expires_at {
+            debuffExpires = ISO8601DateFormatter().date(from: expiresStr)
+        }
+        
+        // Reputation
+        reputation = apiState.reputation
+        kingdomReputation = apiState.kingdom_reputation ?? [:]
+        
+        // Territory
+        currentKingdom = apiState.current_kingdom_id
+        homeKingdomId = apiState.home_kingdom_id
+        originKingdomId = apiState.origin_kingdom_id
+        fiefsRuled = Set(apiState.fiefs_ruled ?? [])
+        isRuler = apiState.is_ruler
+        
+        // Check-in
+        checkInHistory = apiState.check_in_history ?? [:]
+        if let lastCheckInStr = apiState.last_check_in {
+            lastCheckIn = ISO8601DateFormatter().date(from: lastCheckInStr)
+        }
+        if let lat = apiState.last_check_in_lat, let lon = apiState.last_check_in_lon {
+            lastCheckInLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        if let lastDailyStr = apiState.last_daily_check_in {
+            lastDailyCheckIn = ISO8601DateFormatter().date(from: lastDailyStr)
+        }
+        
+        // Activity
+        coupsWon = apiState.coups_won
+        coupsFailed = apiState.coups_failed
+        timesExecuted = apiState.times_executed
+        executionsOrdered = apiState.executions_ordered
+        if let lastCoupStr = apiState.last_coup_attempt {
+            lastCoupAttempt = ISO8601DateFormatter().date(from: lastCoupStr)
+        }
+        
+        // Contract & Work
+        activeContractId = apiState.active_contract_id
+        contractsCompleted = apiState.contracts_completed
+        totalWorkContributed = apiState.total_work_contributed
+        
+        // Rewards
+        totalRewardsReceived = apiState.total_rewards_received
+        if let lastRewardStr = apiState.last_reward_received {
+            lastRewardReceived = ISO8601DateFormatter().date(from: lastRewardStr)
+        }
+        lastRewardAmount = apiState.last_reward_amount
+        
+        // Status
+        isAlive = apiState.is_alive
+        
+        // Also save locally as backup
+        saveToUserDefaults()
+        
+        print("✅ Player state updated from API")
+    }
+    
+    /// Sync player state with API
+    func syncWithAPI() async {
+        let api = KingdomAPIService.shared
+        guard api.isAuthenticated else {
+            print("⚠️ Cannot sync - not authenticated")
+            return
+        }
+        
+        do {
+            let response = try await api.player.syncState(toAPIState())
+            
+            await MainActor.run {
+                self.updateFromAPIState(response.player_state)
+            }
+            
+            print("✅ Player synced with server")
+        } catch {
+            print("❌ Failed to sync player: \(error)")
+        }
+    }
+    
+    /// Load player state from API
+    func loadFromAPI() async {
+        let api = KingdomAPIService.shared
+        guard api.isAuthenticated else {
+            print("⚠️ Cannot load from API - not authenticated")
+            return
+        }
+        
+        do {
+            let apiState = try await api.player.loadState()
+            
+            await MainActor.run {
+                self.updateFromAPIState(apiState)
+            }
+            
+            print("✅ Player loaded from API")
+        } catch {
+            print("❌ Failed to load player from API: \(error)")
+            // Fall back to local data
+            loadFromUserDefaults()
+        }
+    }
+    
+    /// Save player state to API
+    func saveToAPI() async {
+        let api = KingdomAPIService.shared
+        guard api.isAuthenticated else {
+            print("⚠️ Cannot save to API - not authenticated")
+            // Still save locally
+            saveToUserDefaults()
+            return
+        }
+        
+        do {
+            let updatedState = try await api.player.saveState(toAPIState())
+            
+            await MainActor.run {
+                self.updateFromAPIState(updatedState)
+            }
+            
+            print("✅ Player saved to API")
+        } catch {
+            print("❌ Failed to save player to API: \(error)")
+            // Still save locally as backup
+            saveToUserDefaults()
+        }
+    }
+    
+    // MARK: - Local Persistence (Backup/Offline)
     
     func saveToUserDefaults() {
         let defaults = UserDefaults.standard

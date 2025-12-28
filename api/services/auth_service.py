@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from database import User, UserKingdom
+from db import User, UserKingdom, PlayerState
 from models.auth_schemas import AppleSignIn
 
 
@@ -90,11 +90,20 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
             )
     
     # Create new user
+    user_id = str(uuid.uuid4())
     user = User(
-        id=str(uuid.uuid4()),
+        id=user_id,
         email=apple_data.email,
         apple_user_id=apple_data.apple_user_id,
         display_name=apple_data.display_name or "Player",
+        hometown_kingdom_id=apple_data.hometown_kingdom_id,
+    )
+    
+    db.add(user)
+    
+    # Create player state with default values
+    player_state = PlayerState(
+        user_id=user_id,
         hometown_kingdom_id=apple_data.hometown_kingdom_id,
         gold=100,
         level=1,
@@ -103,7 +112,7 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
         honor=100,
     )
     
-    db.add(user)
+    db.add(player_state)
     db.commit()
     db.refresh(user)
     
@@ -141,20 +150,23 @@ def update_user_profile(db: Session, user_id: str, updates: dict) -> User:
 
 def user_to_private_response(user: User) -> dict:
     """Convert User model to UserPrivate response"""
+    # Get player state if it exists
+    player_state = user.player_state
+    
     return {
         "id": user.id,
         "email": user.email,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
         "hometown_kingdom_id": user.hometown_kingdom_id,
-        "gold": user.gold,
-        "level": user.level,
-        "experience": user.experience,
-        "reputation": user.reputation,
-        "honor": user.honor,
-        "total_checkins": user.total_checkins,
-        "total_conquests": user.total_conquests,
-        "kingdoms_ruled": user.kingdoms_ruled,
+        "gold": player_state.gold if player_state else 0,
+        "level": player_state.level if player_state else 1,
+        "experience": player_state.experience if player_state else 0,
+        "reputation": player_state.reputation if player_state else 0,
+        "honor": player_state.honor if player_state else 100,
+        "total_checkins": player_state.total_checkins if player_state else 0,
+        "total_conquests": player_state.total_conquests if player_state else 0,
+        "kingdoms_ruled": player_state.kingdoms_ruled if player_state else 0,
         "is_premium": user.is_premium,
         "premium_expires_at": user.premium_expires_at,
         "is_verified": user.is_verified,
@@ -212,18 +224,25 @@ def add_experience(db: Session, user_id: str, exp_amount: int) -> User:
             detail="User not found"
         )
     
-    user.experience += exp_amount
+    # Get or create player state
+    state = user.player_state
+    if not state:
+        state = PlayerState(user_id=user.id, hometown_kingdom_id=user.hometown_kingdom_id)
+        db.add(state)
+        db.flush()
+    
+    state.experience += exp_amount
     
     # Simple level up formula: 100 exp per level
-    required_exp = user.level * 100
+    required_exp = state.level * 100
     
-    while user.experience >= required_exp:
-        user.level += 1
-        user.experience -= required_exp
-        required_exp = user.level * 100
+    while state.experience >= required_exp:
+        state.level += 1
+        state.experience -= required_exp
+        required_exp = state.level * 100
         
         # Give rewards on level up
-        user.gold += 50 * user.level
+        state.gold += 50 * state.level
     
     db.commit()
     db.refresh(user)
@@ -241,7 +260,13 @@ def add_gold(db: Session, user_id: str, gold_amount: int) -> User:
             detail="User not found"
         )
     
-    user.gold += gold_amount
+    # Get or create player state
+    state = user.player_state
+    if not state:
+        state = PlayerState(user_id=user.id, hometown_kingdom_id=user.hometown_kingdom_id)
+        db.add(state)
+    
+    state.gold += gold_amount
     db.commit()
     db.refresh(user)
     
@@ -258,13 +283,21 @@ def spend_gold(db: Session, user_id: str, gold_amount: int) -> User:
             detail="User not found"
         )
     
-    if user.gold < gold_amount:
+    # Get or create player state
+    state = user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Player state not initialized"
+        )
+    
+    if state.gold < gold_amount:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Insufficient gold"
         )
     
-    user.gold -= gold_amount
+    state.gold -= gold_amount
     db.commit()
     db.refresh(user)
     

@@ -3,7 +3,7 @@ import CoreLocation
 
 /// Debug view for testing API connectivity and endpoints
 struct APIDebugView: View {
-    @StateObject private var api = KingdomAPIService()
+    @ObservedObject private var api = KingdomAPIService.shared
     @State private var statusMessage: String = "Not tested"
     @State private var showingDetails = false
     
@@ -35,60 +35,71 @@ struct APIDebugView: View {
                             .font(.caption)
                             .foregroundColor(.red)
                     }
+                    
+                    HStack {
+                        Text("Authenticated:")
+                        Spacer()
+                        Text(api.isAuthenticated ? "Yes" : "No")
+                            .foregroundColor(api.isAuthenticated ? .green : .orange)
+                    }
                 }
                 
                 // Test Actions
                 Section("Test Actions") {
-                    Button("Create Test Player") {
+                    Button("Load Player State") {
                         Task {
                             do {
-                                let player = try await api.createPlayer(
-                                    id: UUID().uuidString,
-                                    name: "Test Player \(Int.random(in: 1...999))",
-                                    gold: 100,
-                                    level: 1
-                                )
-                                statusMessage = "✅ Created player: \(player.name)"
+                                let state = try await api.player.loadState()
+                                statusMessage = "✅ Loaded player: \(state.display_name) (Lvl \(state.level), \(state.gold)g)"
                             } catch {
                                 statusMessage = "❌ Error: \(error.localizedDescription)"
                             }
                         }
                     }
                     
-                    Button("List All Players") {
+                    Button("List Kingdoms") {
                         Task {
                             do {
-                                let players = try await api.listPlayers()
-                                statusMessage = "✅ Found \(players.count) players"
-                                print("Players:", players)
-                            } catch {
-                                statusMessage = "❌ Error: \(error.localizedDescription)"
-                            }
-                        }
-                    }
-                    
-                    Button("Create Test Kingdom") {
-                        Task {
-                            do {
-                                let kingdom = try await api.createKingdom(
-                                    id: UUID().uuidString,
-                                    name: "Test Kingdom",
-                                    rulerId: "test-ruler",
-                                    location: .init(latitude: 37.7749, longitude: -122.4194)
-                                )
-                                statusMessage = "✅ Created kingdom: \(kingdom.name)"
-                            } catch {
-                                statusMessage = "❌ Error: \(error.localizedDescription)"
-                            }
-                        }
-                    }
-                    
-                    Button("List All Kingdoms") {
-                        Task {
-                            do {
-                                let kingdoms = try await api.listKingdoms()
+                                let kingdoms = try await api.kingdom.listKingdoms()
                                 statusMessage = "✅ Found \(kingdoms.count) kingdoms"
                                 print("Kingdoms:", kingdoms)
+                            } catch {
+                                statusMessage = "❌ Error: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                    
+                    Button("Get My Kingdoms") {
+                        Task {
+                            do {
+                                let kingdoms = try await api.kingdom.getMyKingdoms()
+                                statusMessage = "✅ Ruling \(kingdoms.count) kingdoms"
+                            } catch {
+                                statusMessage = "❌ Error: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                    
+                    Button("Fetch Nearby Cities") {
+                        Task {
+                            do {
+                                let cities = try await api.city.fetchCities(
+                                    lat: 37.7749,
+                                    lon: -122.4194,
+                                    radiusKm: 30
+                                )
+                                statusMessage = "✅ Found \(cities.count) cities"
+                            } catch {
+                                statusMessage = "❌ Error: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                    
+                    Button("Get Leaderboard") {
+                        Task {
+                            do {
+                                let leaderboard = try await api.kingdom.getLeaderboard()
+                                statusMessage = "✅ Leaderboard: \(leaderboard.leaderboard.count) entries"
                             } catch {
                                 statusMessage = "❌ Error: \(error.localizedDescription)"
                             }
@@ -106,12 +117,12 @@ struct APIDebugView: View {
                 // API Info
                 Section("API Info") {
                     Button("View API Docs in Browser") {
-                        if let url = URL(string: "http://192.168.1.13:8000/docs") {
+                        if let url = URL(string: "\(AppConfig.apiBaseURL)/docs") {
                             UIApplication.shared.open(url)
                         }
                     }
                     
-                    Text("Base URL: http://192.168.1.13:8000")
+                    Text("Base URL: \(AppConfig.apiBaseURL)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

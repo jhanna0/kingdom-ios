@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 from typing import List
 import uuid
 
-from database import get_db, User, Kingdom, UserKingdom, CheckInHistory
-from models.schemas import CheckInRequest, CheckInResponse, CheckInRewards
+from db import get_db, User, PlayerState, Kingdom, UserKingdom, CheckInHistory
+from schemas import CheckInRequest, CheckInResponse, CheckInRewards
 from routers.auth import get_current_user
 
 
@@ -16,6 +16,20 @@ router = APIRouter(tags=["game"])
 
 
 # ===== Helper Functions =====
+
+def _get_or_create_player_state(db: Session, user: User) -> PlayerState:
+    """Get or create player state for user"""
+    if not user.player_state:
+        player_state = PlayerState(
+            user_id=user.id,
+            hometown_kingdom_id=user.hometown_kingdom_id
+        )
+        db.add(player_state)
+        db.commit()
+        db.refresh(player_state)
+        return player_state
+    return user.player_state
+
 
 def _is_user_in_kingdom(lat: float, lon: float, kingdom: Kingdom) -> bool:
     """
@@ -147,8 +161,9 @@ def create_kingdom(
     db.add(user_kingdom)
     
     # Update user stats
-    current_user.kingdoms_ruled += 1
-    current_user.total_conquests += 1
+    state = _get_or_create_player_state(db, current_user)
+    state.kingdoms_ruled += 1
+    state.total_conquests += 1
     
     db.commit()
     
@@ -215,17 +230,18 @@ def check_in(
     gold_reward = base_gold * kingdom.level
     xp_reward = base_xp * kingdom.level
     
-    # Update user
-    current_user.gold += gold_reward
-    current_user.experience += xp_reward
-    current_user.total_checkins += 1
+    # Update user state
+    state = _get_or_create_player_state(db, current_user)
+    state.gold += gold_reward
+    state.experience += xp_reward
+    state.total_checkins += 1
     
     # Level up check
-    required_exp = current_user.level * 100
-    if current_user.experience >= required_exp:
-        current_user.level += 1
-        current_user.experience -= required_exp
-        current_user.gold += 50 * current_user.level
+    required_exp = state.level * 100
+    if state.experience >= required_exp:
+        state.level += 1
+        state.experience -= required_exp
+        state.gold += 50 * state.level
     
     # Update user-kingdom
     user_kingdom.checkins_count += 1
@@ -305,9 +321,12 @@ def conquer_kingdom(
             detail="You must be within the kingdom boundaries to conquer it"
         )
     
+    # Get player state
+    state = _get_or_create_player_state(db, current_user)
+    
     # Check level requirement
     min_level = kingdom.level
-    if current_user.level < min_level:
+    if state.level < min_level:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"You need to be at least level {min_level} to conquer this kingdom"
@@ -315,7 +334,7 @@ def conquer_kingdom(
     
     # Check gold cost
     conquest_cost = kingdom.level * 100
-    if current_user.gold < conquest_cost:
+    if state.gold < conquest_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Conquest requires {conquest_cost} gold"
@@ -328,8 +347,9 @@ def conquer_kingdom(
     if old_ruler_id:
         old_ruler = db.query(User).filter(User.id == old_ruler_id).first()
         if old_ruler:
-            old_ruler.kingdoms_ruled -= 1
-            old_ruler.reputation -= 10  # Lose reputation for losing kingdom
+            old_ruler_state = _get_or_create_player_state(db, old_ruler)
+            old_ruler_state.kingdoms_ruled -= 1
+            old_ruler_state.reputation -= 10  # Lose reputation for losing kingdom
         
         # Update old ruler's user_kingdom record
         old_user_kingdom = db.query(UserKingdom).filter(
@@ -347,12 +367,12 @@ def conquer_kingdom(
     kingdom.ruler_id = current_user.id
     kingdom.last_activity = datetime.utcnow()
     
-    # Update new ruler
-    current_user.gold -= conquest_cost
-    current_user.kingdoms_ruled += 1
-    current_user.total_conquests += 1
-    current_user.reputation += 20
-    current_user.experience += 100 * kingdom.level
+    # Update new ruler state
+    state.gold -= conquest_cost
+    state.kingdoms_ruled += 1
+    state.total_conquests += 1
+    state.reputation += 20
+    state.experience += 100 * kingdom.level
     
     # Update user-kingdom relationship
     user_kingdom.is_ruler = True
@@ -441,15 +461,21 @@ def get_leaderboard(
     
     leaderboard = []
     for rank, user in enumerate(users, start=1):
-        score = getattr(user, category if category != "kingdoms" else "kingdoms_ruled")
+        # Get player state for score and level
+        user_state = user.player_state
+        if category == "kingdoms":
+            score = user_state.kingdoms_ruled if user_state else 0
+        else:
+            score = getattr(user_state, category, 0) if user_state else 0
+        
         leaderboard.append({
             "rank": rank,
             "user_id": user.id,
-            "username": user.username,
+            "username": getattr(user, 'username', user.display_name),
             "display_name": user.display_name,
             "avatar_url": user.avatar_url,
             "score": score,
-            "level": user.level
+            "level": user_state.level if user_state else 1
         })
     
     return {

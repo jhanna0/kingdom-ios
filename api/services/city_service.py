@@ -7,8 +7,8 @@ from datetime import datetime
 import math
 import asyncio
 
-from database import CityBoundary
-from models.schemas import CityBoundaryResponse
+from db import CityBoundary
+from schemas import CityBoundaryResponse
 from osm_service import (
     fetch_nearby_city_ids,
     fetch_city_boundary_by_id,

@@ -1,0 +1,358 @@
+"""
+Contract endpoints - Building contracts for kingdoms
+"""
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.orm import Session
+from datetime import datetime
+from typing import List, Optional
+import uuid
+import math
+
+from db import get_db, User, PlayerState, Kingdom, Contract
+from schemas import ContractCreate, ContractResponse
+from routers.auth import get_current_user
+
+
+router = APIRouter(prefix="/contracts", tags=["contracts"])
+
+
+def calculate_base_hours(building_type: str, building_level: int, population: int) -> float:
+    """Calculate base hours required based on building type, level, and population"""
+    # Base time with 3 ideal workers:
+    # Level 1: 2 hours, Level 2: 4 hours, etc.
+    base_hours = 2.0 * math.pow(2.0, building_level - 1)
+    
+    # Population multiplier: +33% time per 10 people
+    population_multiplier = 1.0 + (population / 30.0)
+    
+    return base_hours * population_multiplier
+
+
+def contract_to_response(contract: Contract) -> ContractResponse:
+    """Convert Contract model to response schema"""
+    return ContractResponse(
+        id=contract.id,
+        kingdom_id=contract.kingdom_id,
+        kingdom_name=contract.kingdom_name,
+        building_type=contract.building_type,
+        building_level=contract.building_level,
+        base_population=contract.base_population,
+        base_hours_required=contract.base_hours_required,
+        work_started_at=contract.work_started_at,
+        reward_pool=contract.reward_pool,
+        workers=contract.workers or [],
+        created_by=contract.created_by,
+        created_at=contract.created_at,
+        completed_at=contract.completed_at,
+        status=contract.status
+    )
+
+
+# ===== Contract CRUD =====
+
+@router.get("", response_model=List[ContractResponse])
+def list_contracts(
+    kingdom_id: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """List contracts, optionally filtered by kingdom or status"""
+    query = db.query(Contract)
+    
+    if kingdom_id:
+        query = query.filter(Contract.kingdom_id == kingdom_id)
+    
+    if status:
+        query = query.filter(Contract.status == status)
+    
+    contracts = query.order_by(Contract.created_at.desc()).offset(skip).limit(limit).all()
+    return [contract_to_response(c) for c in contracts]
+
+
+@router.get("/my", response_model=List[ContractResponse])
+def get_my_contracts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get contracts where current user is a worker"""
+    contracts = db.query(Contract).filter(
+        Contract.workers.contains([current_user.id]),
+        Contract.status.in_(["open", "in_progress"])
+    ).all()
+    
+    return [contract_to_response(c) for c in contracts]
+
+
+@router.get("/{contract_id}", response_model=ContractResponse)
+def get_contract(contract_id: str, db: Session = Depends(get_db)):
+    """Get contract by ID"""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found"
+        )
+    
+    return contract_to_response(contract)
+
+
+@router.post("", response_model=ContractResponse, status_code=status.HTTP_201_CREATED)
+def create_contract(
+    data: ContractCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new contract (ruler only)"""
+    # Verify user is the ruler of this kingdom
+    kingdom = db.query(Kingdom).filter(Kingdom.id == data.kingdom_id).first()
+    
+    if not kingdom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kingdom not found"
+        )
+    
+    if kingdom.ruler_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the ruler can create contracts"
+        )
+    
+    # Calculate base hours required
+    base_hours = calculate_base_hours(
+        data.building_type,
+        data.building_level,
+        data.base_population
+    )
+    
+    contract = Contract(
+        id=str(uuid.uuid4()),
+        kingdom_id=data.kingdom_id,
+        kingdom_name=data.kingdom_name,
+        building_type=data.building_type,
+        building_level=data.building_level,
+        base_population=data.base_population,
+        base_hours_required=base_hours,
+        reward_pool=data.reward_pool,
+        workers=[],
+        created_by=current_user.id,
+        status="open"
+    )
+    
+    db.add(contract)
+    db.commit()
+    db.refresh(contract)
+    
+    return contract_to_response(contract)
+
+
+# ===== Contract Actions =====
+
+@router.post("/{contract_id}/join")
+def join_contract(
+    contract_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Join a contract as a worker"""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found"
+        )
+    
+    if contract.status not in ["open", "in_progress"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract is not accepting workers"
+        )
+    
+    workers = contract.workers or []
+    
+    if current_user.id in workers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Already joined this contract"
+        )
+    
+    workers.append(current_user.id)
+    contract.workers = workers
+    
+    # Start work timer if first worker
+    if contract.work_started_at is None:
+        contract.work_started_at = datetime.utcnow()
+        contract.status = "in_progress"
+    
+    # Update user's active contract in player state
+    state = current_user.player_state
+    if not state:
+        state = PlayerState(user_id=current_user.id, hometown_kingdom_id=current_user.hometown_kingdom_id)
+        db.add(state)
+    state.active_contract_id = contract_id
+    
+    db.commit()
+    db.refresh(contract)
+    
+    return {
+        "success": True,
+        "message": f"Joined contract for {contract.building_type}",
+        "contract": contract_to_response(contract)
+    }
+
+
+@router.post("/{contract_id}/leave")
+def leave_contract(
+    contract_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Leave a contract"""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found"
+        )
+    
+    workers = contract.workers or []
+    
+    if current_user.id not in workers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not a worker on this contract"
+        )
+    
+    workers.remove(current_user.id)
+    contract.workers = workers
+    
+    # If no workers left, reset timer
+    if len(workers) == 0:
+        contract.work_started_at = None
+        contract.status = "open"
+    
+    # Clear user's active contract in player state
+    state = current_user.player_state
+    if state and state.active_contract_id == contract_id:
+        state.active_contract_id = None
+    
+    db.commit()
+    
+    return {"success": True, "message": "Left contract"}
+
+
+@router.post("/{contract_id}/complete")
+def complete_contract(
+    contract_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Complete a contract (auto-triggered when ready)"""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found"
+        )
+    
+    if contract.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract is not in progress"
+        )
+    
+    # Check if enough time has passed
+    if contract.work_started_at:
+        worker_count = len(contract.workers or [])
+        ideal_workers = 3.0
+        worker_multiplier = ideal_workers / max(worker_count, 1)
+        hours_needed = contract.base_hours_required * worker_multiplier
+        
+        elapsed = (datetime.utcnow() - contract.work_started_at).total_seconds() / 3600.0
+        
+        if elapsed < hours_needed:
+            remaining = hours_needed - elapsed
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Contract not ready. {remaining:.1f} hours remaining."
+            )
+    
+    # Complete the contract
+    contract.status = "completed"
+    contract.completed_at = datetime.utcnow()
+    
+    # Distribute rewards
+    workers = contract.workers or []
+    reward_per_worker = contract.reward_pool // max(len(workers), 1)
+    
+    for worker_id in workers:
+        worker = db.query(User).filter(User.id == worker_id).first()
+        if worker:
+            worker.gold += reward_per_worker
+            worker.contracts_completed += 1
+            worker.active_contract_id = None
+            worker.reputation += 10  # Rep for completing contract
+    
+    # Upgrade the building
+    kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+    if kingdom:
+        building_attr = f"{contract.building_type.lower()}_level"
+        if hasattr(kingdom, building_attr):
+            current_level = getattr(kingdom, building_attr, 0)
+            setattr(kingdom, building_attr, current_level + 1)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Contract completed! {contract.building_type} upgraded.",
+        "rewards_distributed": contract.reward_pool,
+        "workers_paid": len(workers)
+    }
+
+
+@router.post("/{contract_id}/cancel")
+def cancel_contract(
+    contract_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel a contract (ruler only)"""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found"
+        )
+    
+    if contract.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the creator can cancel this contract"
+        )
+    
+    if contract.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel completed contract"
+        )
+    
+    contract.status = "cancelled"
+    
+    # Clear active contract for all workers
+    for worker_id in (contract.workers or []):
+        worker = db.query(User).filter(User.id == worker_id).first()
+        if worker and worker.active_contract_id == contract_id:
+            worker.active_contract_id = None
+    
+    db.commit()
+    
+    return {"success": True, "message": "Contract cancelled"}
+

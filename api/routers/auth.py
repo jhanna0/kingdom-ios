@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from database import get_db
+from db import get_db
 from models.auth_schemas import (
     AppleSignIn,
     TokenResponse,
@@ -153,19 +153,20 @@ def get_my_kingdoms(
 def get_my_stats(current_user = Depends(get_current_user)):
     """Get detailed statistics for current user"""
     
+    state = current_user.player_state
     return UserStats(
         user_id=current_user.id,
         username=current_user.display_name,  # Use display_name as username
         display_name=current_user.display_name,
-        total_conquests=current_user.total_conquests,
-        kingdoms_ruled=current_user.kingdoms_ruled,
-        current_kingdoms_count=current_user.kingdoms_ruled,  # TODO: Calculate actual current count
-        total_checkins=current_user.total_checkins,
-        gold=current_user.gold,
-        reputation=current_user.reputation,
-        honor=current_user.honor,
-        level=current_user.level,
-        experience=current_user.experience,
+        total_conquests=state.total_conquests if state else 0,
+        kingdoms_ruled=state.kingdoms_ruled if state else 0,
+        current_kingdoms_count=state.kingdoms_ruled if state else 0,
+        total_checkins=state.total_checkins if state else 0,
+        gold=state.gold if state else 0,
+        reputation=state.reputation if state else 0,
+        honor=state.honor if state else 100,
+        level=state.level if state else 1,
+        experience=state.experience if state else 0,
     )
 
 

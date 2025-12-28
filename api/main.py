@@ -4,8 +4,8 @@ Kingdom Game API - Main application setup
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db
-from routers import cities, game, auth
+from db import init_db
+from routers import cities, game, auth, player, contracts
 
 
 # Create FastAPI app
@@ -24,6 +24,8 @@ async def startup_event():
     print("🔐 Authentication: /auth/apple-signin")
     print("📍 City boundaries: /cities")
     print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
+    print("👤 Player state: /player/state, /player/sync")
+    print("📜 Contracts: /contracts")
 
 
 # Enable CORS so iOS app can connect
@@ -40,6 +42,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(cities.router)
 app.include_router(game.router)
+app.include_router(player.router)
+app.include_router(contracts.router)
 
 
 # Health check
@@ -57,10 +61,9 @@ def root():
 def test_database():
     """Test database connectivity"""
     try:
-        from database import get_db
+        from db import get_db, CityBoundary
         db = next(get_db())
         # Try a simple query
-        from database import CityBoundary
         count = db.query(CityBoundary).count()
         return {
             "status": "connected",

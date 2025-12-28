@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
 
-from database import get_db
-from models.schemas import CityBoundaryResponse
+from db import get_db
+from schemas import CityBoundaryResponse
 from services import city_service
 
 
