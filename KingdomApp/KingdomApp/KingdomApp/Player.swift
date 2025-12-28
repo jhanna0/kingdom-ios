@@ -420,6 +420,11 @@ class Player: ObservableObject {
     }
     
     // MARK: - Persistence
+    // TODO: Replace all UserDefaults persistence with backend API
+    // - POST /players (create account)
+    // - GET /players/:id (load player data)
+    // - PATCH /players/:id (update player data)
+    // For now, using local UserDefaults to maintain state between sessions
     
     func saveToUserDefaults() {
         let defaults = UserDefaults.standard

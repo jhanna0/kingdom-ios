@@ -4,6 +4,7 @@ import MapKit
 class GeoJSONLoader {
     
     /// Load municipalities/towns from GeoJSON URL (ADM2 level from geoBoundaries)
+    /// Caches the GeoJSON data to avoid re-downloading
     static func loadMunicipalitiesFromURL(urlString: String) async -> [Kingdom] {
         print("🌐 Fetching GeoJSON from: \(urlString)")
         
@@ -12,6 +13,22 @@ class GeoJSONLoader {
             return []
         }
         
+        // Try loading from cache first
+        if let cachedData = MapCache.shared.loadGeoJSON(forURL: urlString) {
+            print("📦 Using cached GeoJSON (\(cachedData.count) bytes)")
+            
+            do {
+                let decoder = MKGeoJSONDecoder()
+                let geoJSONObjects = try decoder.decode(cachedData)
+                print("✅ Decoded \(geoJSONObjects.count) GeoJSON objects from cache")
+                return parseGeoJSON(geoJSONObjects)
+            } catch {
+                print("❌ Error decoding cached GeoJSON: \(error)")
+                // Fall through to network fetch
+            }
+        }
+        
+        // Cache miss or decode error - fetch from network
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
@@ -20,6 +37,9 @@ class GeoJSONLoader {
             }
             
             print("📦 Downloaded \(data.count) bytes")
+            
+            // Cache the raw data
+            MapCache.shared.saveGeoJSON(data, forURL: urlString)
             
             let decoder = MKGeoJSONDecoder()
             let geoJSONObjects = try decoder.decode(data)

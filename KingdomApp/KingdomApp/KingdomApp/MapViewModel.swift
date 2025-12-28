@@ -6,7 +6,13 @@ import CoreLocation
 
 @MainActor
 class MapViewModel: ObservableObject {
-    @Published var kingdoms: [Kingdom] = []
+    @Published var kingdoms: [Kingdom] = [] {
+        didSet {
+            // Auto-save kingdoms whenever they change
+            // TODO: Replace with backend sync in the future
+            saveKingdomsToStorage()
+        }
+    }
     @Published var cameraPosition: MapCameraPosition
     @Published var userLocation: CLLocationCoordinate2D?
     @Published var isLoading: Bool = false
@@ -19,9 +25,10 @@ class MapViewModel: ObservableObject {
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
     
     private var hasInitializedLocation = false
+    private var hasLoadedPersistedKingdoms = false
     
     init() {
-        // Initialize player
+        // Initialize player (loads from UserDefaults automatically)
         self.player = Player()
         
         // Start with default location - will be replaced when user location arrives
@@ -33,8 +40,44 @@ class MapViewModel: ObservableObject {
             )
         )
         
-        // NO FAKE DATA - wait for real location and real data
+        // Load persisted kingdoms (if any)
+        loadPersistedKingdoms()
+        
         print("📱 MapViewModel initialized")
+    }
+    
+    /// Load kingdoms from persistent storage
+    /// TODO: Replace with backend API call - GET /kingdoms
+    private func loadPersistedKingdoms() {
+        guard !hasLoadedPersistedKingdoms else { return }
+        hasLoadedPersistedKingdoms = true
+        
+        if let savedKingdoms = KingdomPersistence.shared.loadKingdoms() {
+            // Temporarily disable auto-save during load
+            let tempKingdoms = savedKingdoms
+            kingdoms = []  // Clear first
+            
+            // Set kingdoms without triggering didSet
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.kingdoms = tempKingdoms
+                
+                // Re-check current location after loading kingdoms
+                if let location = self.userLocation {
+                    self.checkKingdomLocation(location)
+                }
+                
+                print("✅ Restored \(tempKingdoms.count) kingdoms from storage")
+            }
+        }
+    }
+    
+    /// Save kingdoms to persistent storage
+    /// TODO: Replace with backend API sync
+    private func saveKingdomsToStorage() {
+        // Only save if we have kingdoms and have finished initial load
+        guard !kingdoms.isEmpty && hasLoadedPersistedKingdoms else { return }
+        KingdomPersistence.shared.saveKingdoms(kingdoms)
     }
     
     func updateUserLocation(_ location: CLLocationCoordinate2D) {
@@ -87,7 +130,8 @@ class MapViewModel: ObservableObject {
         return fromLoc.distance(from: toLoc)  // Returns meters
     }
     
-    /// Load real town data - NO FALLBACKS
+    /// Load real town data - with caching support and state preservation
+    /// TODO: Replace with backend API - GET /kingdoms?lat=X&lon=Y&radius=Z
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
         
@@ -96,6 +140,26 @@ class MapViewModel: ObservableObject {
         errorMessage = nil
         
         Task {
+            // Try loading from cache first
+            if let cachedKingdoms = MapCache.shared.loadKingdoms(forLocation: location, radius: loadRadiusMiles) {
+                loadingStatus = "Reading from the royal archives..."
+                
+                // Merge with existing kingdoms to preserve state changes
+                let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: cachedKingdoms)
+                kingdoms = mergedKingdoms
+                
+                print("✅ Loaded \(cachedKingdoms.count) towns from cache")
+                
+                // Re-check location now that kingdoms are loaded
+                if let currentLocation = userLocation {
+                    checkKingdomLocation(currentLocation)
+                }
+                
+                isLoading = false
+                return
+            }
+            
+            // Cache miss - load from network
             loadingStatus = "Digging through the maps..."
             
             let foundKingdoms = await SampleData.loadRealTowns(around: location, radiusMiles: loadRadiusMiles)
@@ -106,8 +170,13 @@ class MapViewModel: ObservableObject {
                 print("❌ No real towns found!")
                 isLoading = false
             } else {
-                // Set kingdoms immediately
-                kingdoms = foundKingdoms
+                // Cache the loaded kingdoms
+                MapCache.shared.saveKingdoms(foundKingdoms, forLocation: location, radius: loadRadiusMiles)
+                
+                // Merge with existing kingdoms to preserve state changes
+                let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: foundKingdoms)
+                kingdoms = mergedKingdoms
+                
                 print("✅ Loaded \(foundKingdoms.count) towns")
                 
                 // Re-check location now that kingdoms are loaded
@@ -119,6 +188,26 @@ class MapViewModel: ObservableObject {
                 isLoading = false
             }
         }
+    }
+    
+    /// Merge new kingdoms with existing ones, preserving state of existing kingdoms
+    /// This is crucial to maintain upgrades, rulers, contracts, etc.
+    /// TODO: Backend will handle this via proper sync/merge logic
+    private func mergeKingdoms(existing: [Kingdom], new: [Kingdom]) -> [Kingdom] {
+        var result: [Kingdom] = []
+        
+        for newKingdom in new {
+            // Check if we already have this kingdom (by name, since GeoJSON doesn't have IDs)
+            if let existingKingdom = existing.first(where: { $0.name == newKingdom.name }) {
+                // Keep the existing kingdom (preserves all state)
+                result.append(existingKingdom)
+            } else {
+                // New kingdom - add it
+                result.append(newKingdom)
+            }
+        }
+        
+        return result
     }
     
     /// Refresh kingdoms - try again with real data
