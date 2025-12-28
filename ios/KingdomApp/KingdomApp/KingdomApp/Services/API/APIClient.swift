@@ -12,15 +12,7 @@ class APIClient: ObservableObject {
     private let session: URLSession
     
     // MARK: - Auth State
-    @Published var authToken: String? {
-        didSet {
-            if let token = authToken {
-                UserDefaults.standard.set(token, forKey: "authToken")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "authToken")
-            }
-        }
-    }
+    @Published var authToken: String?
     
     var isAuthenticated: Bool {
         return authToken != nil
@@ -41,8 +33,8 @@ class APIClient: ObservableObject {
         config.timeoutIntervalForResource = 30
         self.session = URLSession(configuration: config)
         
-        // Load saved auth token
-        self.authToken = UserDefaults.standard.string(forKey: "authToken")
+        // Auth token will be set by AuthManager - this is the single source of truth
+        self.authToken = nil
     }
     
     // MARK: - Request Building
@@ -54,6 +46,9 @@ class APIClient: ObservableObject {
         
         if let token = authToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("🔐 APIClient: Adding auth header for \(method) \(endpoint)")
+        } else {
+            print("⚠️ APIClient: No auth token for \(method) \(endpoint)")
         }
         
         return request
@@ -155,10 +150,12 @@ class APIClient: ObservableObject {
     
     func setAuthToken(_ token: String) {
         authToken = token
+        print("🔐 APIClient: Auth token set (length: \(token.count))")
     }
     
     func clearAuth() {
         authToken = nil
+        print("🔓 APIClient: Auth token cleared")
     }
 }
 

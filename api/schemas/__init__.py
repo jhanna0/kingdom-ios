@@ -28,6 +28,7 @@ from .common import (
     CheckInRewards,
     CheckInResponse,
     CityBoundaryResponse,
+    KingdomData,
 )
 
 __all__ = [
@@ -54,5 +55,6 @@ __all__ = [
     "CheckInRewards",
     "CheckInResponse",
     "CityBoundaryResponse",
+    "KingdomData",
 ]
 

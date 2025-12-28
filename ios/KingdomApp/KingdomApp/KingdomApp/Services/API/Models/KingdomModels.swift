@@ -42,6 +42,15 @@ struct LocationData: Codable {
 
 // MARK: - City Boundary Models
 
+struct CityKingdomData: Codable {
+    let id: String
+    let ruler_id: String?
+    let ruler_name: String?
+    let level: Int
+    let population: Int
+    let treasury_gold: Int
+}
+
 struct CityBoundaryResponse: Codable {
     let osm_id: String
     let name: String
@@ -51,6 +60,7 @@ struct CityBoundaryResponse: Codable {
     let boundary: [[Double]]  // Array of [lat, lon] pairs
     let radius_meters: Double
     let cached: Bool
+    let kingdom: CityKingdomData?  // NULL if unclaimed
 }
 
 // MARK: - Check-in Models

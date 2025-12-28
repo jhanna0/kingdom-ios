@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List
 import uuid
 
-from db import get_db, User, PlayerState, Kingdom, UserKingdom, CheckInHistory
+from db import get_db, User, PlayerState, Kingdom, UserKingdom, CheckInHistory, CityBoundary
 from schemas import CheckInRequest, CheckInResponse, CheckInRewards
 from routers.auth import get_current_user
 
@@ -31,21 +31,29 @@ def _get_or_create_player_state(db: Session, user: User) -> PlayerState:
     return user.player_state
 
 
-def _is_user_in_kingdom(lat: float, lon: float, kingdom: Kingdom) -> bool:
+def _is_user_in_kingdom(db: Session, lat: float, lon: float, kingdom: Kingdom) -> bool:
     """
     Check if user's location is within kingdom boundaries
     TODO: Implement actual boundary checking using city_boundary_osm_id
     For now, just check if they're within 5km of kingdom center
     """
-    if not kingdom.latitude or not kingdom.longitude:
-        return True  # Allow check-in if kingdom has no coordinates set
+    if not kingdom.city_boundary_osm_id:
+        return True  # Allow check-in if kingdom has no boundary set
     
-    # Simple distance check (Haversine would be better)
+    # Fetch city boundary to get center coordinates
+    city_boundary = db.query(CityBoundary).filter(
+        CityBoundary.osm_id == kingdom.city_boundary_osm_id
+    ).first()
+    
+    if not city_boundary:
+        return True  # Allow check-in if boundary data not found
+    
+    # Simple distance check using Haversine formula
     import math
     R = 6371  # Earth's radius in km
     
     lat1, lon1 = math.radians(lat), math.radians(lon)
-    lat2, lon2 = math.radians(kingdom.latitude), math.radians(kingdom.longitude)
+    lat2, lon2 = math.radians(city_boundary.center_lat), math.radians(city_boundary.center_lon)
     
     dlat = lat2 - lat1
     dlon = lon2 - lon1
@@ -131,9 +139,9 @@ def create_kingdom(
             detail="Kingdom already exists for this location"
         )
     
-    # Create kingdom
+    # Create kingdom - USE OSM ID as the kingdom ID for consistency with map
     kingdom = Kingdom(
-        id=str(uuid.uuid4()),
+        id=city_boundary_osm_id,  # Use OSM ID so map cities match kingdoms!
         name=name,
         city_boundary_osm_id=city_boundary_osm_id,
         latitude=latitude,
@@ -195,7 +203,7 @@ def check_in(
         )
     
     # Verify user is actually inside kingdom boundaries
-    if not _is_user_in_kingdom(request.latitude, request.longitude, kingdom):
+    if not _is_user_in_kingdom(db, request.latitude, request.longitude, kingdom):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You are not within the kingdom boundaries"
@@ -315,7 +323,7 @@ def conquer_kingdom(
         )
     
     # Verify location
-    if not _is_user_in_kingdom(latitude, longitude, kingdom):
+    if not _is_user_in_kingdom(db, latitude, longitude, kingdom):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You must be within the kingdom boundaries to conquer it"

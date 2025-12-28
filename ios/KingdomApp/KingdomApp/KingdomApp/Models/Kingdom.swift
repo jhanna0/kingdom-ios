@@ -56,7 +56,7 @@ struct RecipientRecord: Identifiable, Codable, Hashable {
 }
 
 struct Kingdom: Identifiable, Equatable, Hashable {
-    let id: UUID
+    let id: String  // OSM ID - matches city_boundary_osm_id in backend
     let name: String
     var rulerName: String
     var rulerId: String?  // Player ID of ruler (nil if unclaimed)
@@ -106,8 +106,13 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init(name: String, rulerName: String = "Unclaimed", rulerId: String? = nil, territory: Territory, color: KingdomColor) {
-        self.id = UUID()
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: String? = nil, territory: Territory, color: KingdomColor) {
+        // Use OSM ID as Kingdom ID to match backend
+        guard let osmId = territory.osmId else {
+            print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
+            return nil
+        }
+        self.id = osmId
         self.name = name
         self.rulerName = rulerName
         self.rulerId = rulerId
@@ -362,6 +367,7 @@ struct Territory: Hashable {
     let center: CLLocationCoordinate2D
     let radiusMeters: Double
     let boundary: [CLLocationCoordinate2D]
+    let osmId: String?  // OpenStreetMap relation ID
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(center.latitude)
@@ -376,7 +382,7 @@ struct Territory: Hashable {
     }
     
     // Helper to create circular territory
-    static func circular(center: CLLocationCoordinate2D, radiusMeters: Double, points: Int = 30) -> Territory {
+    static func circular(center: CLLocationCoordinate2D, radiusMeters: Double, points: Int = 30, osmId: String? = nil) -> Territory {
         let boundary = (0..<points).map { i -> CLLocationCoordinate2D in
             let angle = Double(i) * 2 * .pi / Double(points)
             
@@ -390,11 +396,11 @@ struct Territory: Hashable {
             )
         }
         
-        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary)
+        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary, osmId: osmId)
     }
     
     // Helper to create hexagonal territory (more game-like)
-    static func hexagonal(center: CLLocationCoordinate2D, radiusMeters: Double) -> Territory {
+    static func hexagonal(center: CLLocationCoordinate2D, radiusMeters: Double, osmId: String? = nil) -> Territory {
         let points = 6
         let boundary = (0..<points).map { i -> CLLocationCoordinate2D in
             let angle = Double(i) * .pi / 3.0 // 60 degrees per side
@@ -408,11 +414,11 @@ struct Territory: Hashable {
             )
         }
         
-        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary)
+        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary, osmId: osmId)
     }
     
     // Helper to create irregular shape (more realistic for towns)
-    static func irregularShape(center: CLLocationCoordinate2D, radiusMeters: Double) -> Territory {
+    static func irregularShape(center: CLLocationCoordinate2D, radiusMeters: Double, osmId: String? = nil) -> Territory {
         let points = 12
         let boundary = (0..<points).map { i -> CLLocationCoordinate2D in
             let angle = Double(i) * 2 * .pi / Double(points)
@@ -430,7 +436,7 @@ struct Territory: Hashable {
             )
         }
         
-        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary)
+        return Territory(center: center, radiusMeters: radiusMeters, boundary: boundary, osmId: osmId)
     }
 }
 

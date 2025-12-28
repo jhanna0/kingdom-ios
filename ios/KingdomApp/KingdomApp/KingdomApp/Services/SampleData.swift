@@ -81,18 +81,20 @@ class SampleData {
                         let territoryCenter = calculateCenter(boundary)
                         let radius = calculateRadius(center: territoryCenter, boundary: boundary)
                         
-                        let territory = Territory(center: territoryCenter, radiusMeters: radius, boundary: boundary)
+                        // Generate fake OSM ID for MapKit fallback data
+                        let fakeOsmId = "mapkit_\(abs(placeName.hashValue))"
+                        let territory = Territory(center: territoryCenter, radiusMeters: radius, boundary: boundary, osmId: fakeOsmId)
                         let color = colors[kingdoms.count % colors.count]
                         
-                        let kingdom = Kingdom(
+                        if let kingdom = Kingdom(
                             name: placeName,
                             rulerName: generateRandomRulerName(),
                             territory: territory,
                             color: color
-                        )
-                        
-                        kingdoms.append(kingdom)
-                        print("🏰 \(placeName) - \(boundary.count) boundary points")
+                        ) {
+                            kingdoms.append(kingdom)
+                            print("🏰 \(placeName) - \(boundary.count) boundary points")
+                        }
                         
                         if kingdoms.count >= 15 { break }
                     }

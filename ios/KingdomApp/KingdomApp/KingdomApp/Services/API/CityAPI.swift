@@ -34,7 +34,7 @@ class CityAPI {
         let cityResponses = try await fetchCities(lat: lat, lon: lon, radiusKm: radiusKm)
         
         let colors = KingdomColor.allCases
-        let kingdoms = cityResponses.enumerated().map { index, city in
+        let kingdoms = cityResponses.enumerated().compactMap { index, city in
             // Convert boundary coordinates
             let boundary = city.boundary.map { coord in
                 CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
@@ -45,14 +45,20 @@ class CityAPI {
             let territory = Territory(
                 center: center,
                 radiusMeters: city.radius_meters,
-                boundary: boundary
+                boundary: boundary,
+                osmId: city.osm_id
             )
             
             let color = colors[index % colors.count]
             
+            // Use kingdom data from backend if available
+            let rulerName = city.kingdom?.ruler_name ?? "Unclaimed"
+            let rulerId = city.kingdom?.ruler_id
+            
             return Kingdom(
                 name: city.name,
-                rulerName: SampleData.generateRandomRulerName(),
+                rulerName: rulerName,
+                rulerId: rulerId,
                 territory: territory,
                 color: color
             )

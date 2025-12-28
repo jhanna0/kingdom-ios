@@ -87,6 +87,16 @@ class OSMLoader {
                     continue
                 }
                 
+                // Extract OSM ID if available
+                let osmId: String?
+                if let id = element["id"] as? Int64 {
+                    osmId = "relation/\(id)"
+                } else if let id = element["id"] as? Int {
+                    osmId = "relation/\(id)"
+                } else {
+                    osmId = nil
+                }
+                
                 // Collect ALL coordinate segments from outer ways
                 var waySegments: [[CLLocationCoordinate2D]] = []
                 var totalRawPoints = 0
@@ -139,18 +149,18 @@ class OSMLoader {
                 let visualCenter = calculatePolygonCentroid(simplified)
                 let radius = calculateRadius(center: visualCenter, boundary: simplified)
                 
-                let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified)
+                let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified, osmId: osmId)
                 let color = colors[kingdoms.count % colors.count]
                 
-                let kingdom = Kingdom(
+                if let kingdom = Kingdom(
                     name: name,
                     rulerName: generateRulerName(for: name),
                     territory: territory,
                     color: color
-                )
-                
-                kingdoms.append(kingdom)
-                print("    🏰 \(name) - \(simplified.count) points, \(Int(distance/1000))km away")
+                ) {
+                    kingdoms.append(kingdom)
+                    print("    🏰 \(name) - \(simplified.count) points, \(Int(distance/1000))km away")
+                }
             }
             
         } catch {
@@ -350,6 +360,18 @@ class OSMLoader {
                 if seenPlaces.contains(name) { continue }
                 seenPlaces.insert(name)
                 
+                // Extract OSM ID from Nominatim response
+                let osmId: String?
+                if let osmType = place["osm_type"] as? String,
+                   let osmIdNum = place["osm_id"] as? Int64 {
+                    osmId = "\(osmType)/\(osmIdNum)"
+                } else if let osmType = place["osm_type"] as? String,
+                          let osmIdNum = place["osm_id"] as? Int {
+                    osmId = "\(osmType)/\(osmIdNum)"
+                } else {
+                    osmId = nil
+                }
+                
                 guard let boundary = parseGeoJSON(place["geojson"]), boundary.count >= 10 else { continue }
                 
                 let placeCenter = CLLocationCoordinate2D(latitude: lat, longitude: lon)
@@ -360,11 +382,13 @@ class OSMLoader {
                 let visualCenter = calculatePolygonCentroid(simplified)
                 let radius = calculateRadius(center: visualCenter, boundary: simplified)
                 
-                let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified)
+                let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified, osmId: osmId)
                 let color = colors[kingdoms.count % colors.count]
                 
-                kingdoms.append(Kingdom(name: name, rulerName: generateRulerName(for: name), territory: territory, color: color))
-                print("    🏰 \(name) - \(simplified.count) points")
+                if let kingdom = Kingdom(name: name, rulerName: generateRulerName(for: name), territory: territory, color: color) {
+                    kingdoms.append(kingdom)
+                    print("    🏰 \(name) - \(simplified.count) points")
+                }
             }
             
         } catch {
@@ -418,6 +442,18 @@ class OSMLoader {
                     guard let name = placeName, !seenPlaces.contains(name) else { continue }
                     seenPlaces.insert(name)
                     
+                    // Extract OSM ID from Nominatim response
+                    let osmId: String?
+                    if let osmType = json["osm_type"] as? String,
+                       let osmIdNum = json["osm_id"] as? Int64 {
+                        osmId = "\(osmType)/\(osmIdNum)"
+                    } else if let osmType = json["osm_type"] as? String,
+                              let osmIdNum = json["osm_id"] as? Int {
+                        osmId = "\(osmType)/\(osmIdNum)"
+                    } else {
+                        osmId = nil
+                    }
+                    
                     guard let boundary = parseGeoJSON(json["geojson"]), boundary.count >= 10 else { continue }
                     
                     let placeCenter = calculateCenter(boundary)
@@ -428,11 +464,13 @@ class OSMLoader {
                     let visualCenter = calculatePolygonCentroid(simplified)
                     let radius = calculateRadius(center: visualCenter, boundary: simplified)
                     
-                    let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified)
+                    let territory = Territory(center: visualCenter, radiusMeters: radius, boundary: simplified, osmId: osmId)
                     let color = colors[kingdoms.count % colors.count]
                     
-                    kingdoms.append(Kingdom(name: name, rulerName: generateRulerName(for: name), territory: territory, color: color))
-                    print("    🏰 \(name) - \(simplified.count) points")
+                    if let kingdom = Kingdom(name: name, rulerName: generateRulerName(for: name), territory: territory, color: color) {
+                        kingdoms.append(kingdom)
+                        print("    🏰 \(name) - \(simplified.count) points")
+                    }
                     
                     try? await Task.sleep(nanoseconds: 1_100_000_000)
                     

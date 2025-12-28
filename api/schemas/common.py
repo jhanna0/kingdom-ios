@@ -2,7 +2,7 @@
 Common/shared schemas
 """
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class CheckInRequest(BaseModel):
@@ -26,6 +26,16 @@ class CheckInResponse(BaseModel):
     rewards: CheckInRewards
 
 
+class KingdomData(BaseModel):
+    """Kingdom data attached to a city"""
+    id: str
+    ruler_id: Optional[str] = None
+    ruler_name: Optional[str] = None
+    level: int
+    population: int
+    treasury_gold: int
+
+
 class CityBoundaryResponse(BaseModel):
     """City boundary from OSM"""
     osm_id: str
@@ -36,4 +46,5 @@ class CityBoundaryResponse(BaseModel):
     boundary: List[List[float]]  # Array of [lat, lon] pairs
     radius_meters: float
     cached: bool
+    kingdom: Optional[KingdomData] = None  # NULL if unclaimed
 

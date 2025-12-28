@@ -10,7 +10,7 @@ class AuthManager: ObservableObject {
     @Published var currentUser: UserData?
     @Published var errorMessage: String?
     
-    private let baseURL = AppConfig.apiBaseURL
+    private let apiClient = APIClient.shared
     
     init() {
         Task { @MainActor in
@@ -23,20 +23,20 @@ class AuthManager: ObservableObject {
     @MainActor
     func signInWithApple(userID: String, email: String?, name: String?) async {
         do {
-            let body: [String: Any?] = [
-                "apple_user_id": userID,
-                "email": email,
-                "display_name": name ?? "User"
-            ]
+            struct AppleSignInRequest: Encodable {
+                let apple_user_id: String
+                let email: String?
+                let display_name: String
+            }
             
-            let data = try JSONSerialization.data(withJSONObject: body.compactMapValues { $0 })
-            var request = URLRequest(url: URL(string: "\(baseURL)/auth/apple-signin")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = data
+            let body = AppleSignInRequest(
+                apple_user_id: userID,
+                email: email,
+                display_name: name ?? "User"
+            )
             
-            let (responseData, _) = try await URLSession.shared.data(for: request)
-            let token = try JSONDecoder().decode(TokenResponse.self, from: responseData)
+            let request = try apiClient.request(endpoint: "/auth/apple-signin", method: "POST", body: body)
+            let token: TokenResponse = try await apiClient.execute(request)
             
             authToken = token.access_token
             saveToken(token.access_token)
@@ -58,21 +58,22 @@ class AuthManager: ObservableObject {
     @MainActor
     func register(email: String, username: String, password: String, displayName: String) async {
         do {
-            let body: [String: String] = [
-                "email": email,
-                "username": username,
-                "password": password,
-                "display_name": displayName
-            ]
+            struct RegisterRequest: Encodable {
+                let email: String
+                let username: String
+                let password: String
+                let display_name: String
+            }
             
-            let data = try JSONEncoder().encode(body)
-            var request = URLRequest(url: URL(string: "\(baseURL)/auth/register")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = data
+            let body = RegisterRequest(
+                email: email,
+                username: username,
+                password: password,
+                display_name: displayName
+            )
             
-            let (responseData, _) = try await URLSession.shared.data(for: request)
-            let token = try JSONDecoder().decode(TokenResponse.self, from: responseData)
+            let request = try apiClient.request(endpoint: "/auth/register", method: "POST", body: body)
+            let token: TokenResponse = try await apiClient.execute(request)
             
             authToken = token.access_token
             saveToken(token.access_token)
@@ -86,19 +87,18 @@ class AuthManager: ObservableObject {
     @MainActor
     func login(identifier: String, password: String) async {
         do {
-            let body: [String: String] = [
-                "identifier": identifier,
-                "password": password
-            ]
+            struct LoginRequest: Encodable {
+                let identifier: String
+                let password: String
+            }
             
-            let data = try JSONEncoder().encode(body)
-            var request = URLRequest(url: URL(string: "\(baseURL)/auth/login")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = data
+            let body = LoginRequest(
+                identifier: identifier,
+                password: password
+            )
             
-            let (responseData, _) = try await URLSession.shared.data(for: request)
-            let token = try JSONDecoder().decode(TokenResponse.self, from: responseData)
+            let request = try apiClient.request(endpoint: "/auth/login", method: "POST", body: body)
+            let token: TokenResponse = try await apiClient.execute(request)
             
             authToken = token.access_token
             saveToken(token.access_token)
@@ -122,23 +122,21 @@ class AuthManager: ObservableObject {
     
     @MainActor
     func completeOnboarding(displayName: String, hometownKingdomId: String?) async {
-        guard let token = authToken else { return }
+        guard authToken != nil else { return }
         
         do {
-            let body: [String: Any?] = [
-                "display_name": displayName,
-                "hometown_kingdom_id": hometownKingdomId
-            ]
+            struct OnboardingRequest: Encodable {
+                let display_name: String
+                let hometown_kingdom_id: String?
+            }
             
-            let data = try JSONSerialization.data(withJSONObject: body.compactMapValues { $0 })
-            var request = URLRequest(url: URL(string: "\(baseURL)/auth/me")!)
-            request.httpMethod = "PATCH"
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = data
+            let body = OnboardingRequest(
+                display_name: displayName,
+                hometown_kingdom_id: hometownKingdomId
+            )
             
-            let (responseData, _) = try await URLSession.shared.data(for: request)
-            currentUser = try JSONDecoder().decode(UserData.self, from: responseData)
+            let request = try apiClient.request(endpoint: "/auth/me", method: "PATCH", body: body)
+            currentUser = try await apiClient.execute(request)
             
             needsOnboarding = false
             isAuthenticated = true
@@ -151,14 +149,11 @@ class AuthManager: ObservableObject {
     
     @MainActor
     func fetchUserProfile() async {
-        guard let token = authToken else { return }
+        guard authToken != nil else { return }
         
         do {
-            var request = URLRequest(url: URL(string: "\(baseURL)/auth/me")!)
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            
-            let (data, _) = try await URLSession.shared.data(for: request)
-            currentUser = try JSONDecoder().decode(UserData.self, from: data)
+            let request = apiClient.request(endpoint: "/auth/me")
+            currentUser = try await apiClient.execute(request)
         } catch {
             print("Failed to fetch user: \(error)")
             logout()
@@ -168,21 +163,36 @@ class AuthManager: ObservableObject {
     // MARK: - Token Storage
     
     private func saveToken(_ token: String) {
+        print("🔐 AuthManager: Saving token to Keychain")
         KeychainHelper.save(token: token)
+        // Centralized: APIClient is the single source of truth for auth
+        apiClient.setAuthToken(token)
+        print("✅ AuthManager: Token saved and set in APIClient")
     }
     
     private func loadToken() -> String? {
-        return KeychainHelper.load()
+        let token = KeychainHelper.load()
+        if token != nil {
+            print("🔐 AuthManager: Token loaded from Keychain")
+        } else {
+            print("⚠️ AuthManager: No token found in Keychain")
+        }
+        return token
     }
     
     private func deleteToken() {
+        print("🔓 AuthManager: Deleting token from Keychain")
         KeychainHelper.delete()
+        // Centralized: Clear from APIClient
+        apiClient.clearAuth()
     }
     
     @MainActor
     private func checkSavedAuth() async {
         if let token = loadToken() {
             authToken = token
+            // Centralized: Set token in APIClient for all API calls
+            apiClient.setAuthToken(token)
             await fetchUserProfile()
             if currentUser != nil {
                 // Check if user needs onboarding

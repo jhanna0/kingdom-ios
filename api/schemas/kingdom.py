@@ -25,8 +25,6 @@ class KingdomState(BaseModel):
     ruler_name: Optional[str] = None
     
     # Location
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
     city_boundary_osm_id: Optional[str] = None
     
     # Game state

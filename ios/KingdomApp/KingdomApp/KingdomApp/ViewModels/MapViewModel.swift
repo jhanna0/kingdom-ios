@@ -284,19 +284,64 @@ class MapViewModel: ObservableObject {
             return false
         }
         
-        // Claim it!
-        if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-            kingdoms[index].setRuler(playerId: player.playerId, playerName: player.name)
-            player.claimKingdom(kingdom.name)
-            
-            // Update currentKingdomInside to reflect the change
-            currentKingdomInside = kingdoms[index]
-            
-            print("👑 Claimed \(kingdom.name)")
-            return true
+        // Get user location for the API call
+        guard let location = userLocation else {
+            print("❌ Cannot claim - location unavailable")
+            return false
         }
         
-        return false
+        // Call backend API to claim/create kingdom
+        Task {
+            do {
+                let kingdomAPI = KingdomAPI()
+                
+                // Kingdom ID IS the OSM ID - they match!
+                guard let osmId = kingdom.territory.osmId else {
+                    print("❌ Cannot claim - kingdom has no OSM ID")
+                    return
+                }
+                
+                guard osmId == kingdom.id else {
+                    print("❌ Kingdom ID mismatch! id=\(kingdom.id), osmId=\(osmId)")
+                    return
+                }
+                
+                let apiKingdom = try await kingdomAPI.createKingdom(
+                    name: kingdom.name,
+                    osmId: osmId,
+                    latitude: location.latitude,
+                    longitude: location.longitude
+                )
+                
+                // Update local state with the server response
+                await MainActor.run {
+                    if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+                        // Update with server data
+                        kingdoms[index].rulerId = apiKingdom.ruler_id
+                        kingdoms[index].rulerName = player.name
+                        player.claimKingdom(kingdom.name)
+                        
+                        // Update currentKingdomInside to reflect the change
+                        currentKingdomInside = kingdoms[index]
+                        
+                        print("👑 Successfully claimed \(kingdom.name) (persisted to server)")
+                    }
+                }
+            } catch {
+                print("❌ Failed to claim kingdom on server: \(error.localizedDescription)")
+                // Still update local state as fallback for offline mode
+                await MainActor.run {
+                    if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+                        kingdoms[index].setRuler(playerId: player.playerId, playerName: player.name)
+                        player.claimKingdom(kingdom.name)
+                        currentKingdomInside = kingdoms[index]
+                        print("⚠️ Claimed locally only - will sync when connection available")
+                    }
+                }
+            }
+        }
+        
+        return true
     }
     
     // MARK: - Ruler Actions
@@ -447,7 +492,7 @@ class MapViewModel: ObservableObject {
         
         // Create the contract
         let contract = Contract.create(
-            kingdomId: kingdom.id.uuidString,
+            kingdomId: kingdom.id,
             kingdomName: kingdom.name,
             buildingType: buildingTypeStr,
             buildingLevel: nextLevel,
@@ -651,7 +696,7 @@ class MapViewModel: ObservableObject {
     
     /// Distribute rewards to eligible subjects in a kingdom (ruler action)
     /// Returns the distribution record or nil if failed
-    func distributeSubjectRewards(for kingdomId: UUID) -> DistributionRecord? {
+    func distributeSubjectRewards(for kingdomId: String) -> DistributionRecord? {
         guard let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
             print("❌ Kingdom not found")
             return nil
@@ -684,8 +729,8 @@ class MapViewModel: ObservableObject {
         var eligibleSubjects: [(player: Player, merit: Int)] = []
         
         // Check if current player is eligible
-        if player.isEligibleForRewards(inKingdom: kingdom.id.uuidString, rulerId: kingdom.rulerId) {
-            let merit = player.calculateMeritScore(inKingdom: kingdom.id.uuidString)
+        if player.isEligibleForRewards(inKingdom: kingdom.id, rulerId: kingdom.rulerId) {
+            let merit = player.calculateMeritScore(inKingdom: kingdom.id)
             if merit > 0 {
                 eligibleSubjects.append((player, merit))
             }
@@ -717,7 +762,7 @@ class MapViewModel: ObservableObject {
             // TODO: When multiplayer, send rewards to other players
             
             // Create receipt record
-            let rep = subject.getKingdomReputation(kingdom.id.uuidString)
+            let rep = subject.getKingdomReputation(kingdom.id)
             let skillTotal = subject.attackPower + subject.defensePower + subject.leadership + subject.buildingSkill
             
             let record = RecipientRecord(
@@ -758,19 +803,19 @@ class MapViewModel: ObservableObject {
     }
     
     /// Get estimated reward share for a player in a kingdom
-    func getEstimatedRewardShare(for playerId: String, in kingdomId: UUID) -> Int {
+    func getEstimatedRewardShare(for playerId: String, in kingdomId: String) -> Int {
         guard let kingdom = kingdoms.first(where: { $0.id == kingdomId }) else {
             return 0
         }
         
         // Check if player is eligible
         guard player.playerId == playerId else { return 0 }
-        guard player.isEligibleForRewards(inKingdom: kingdom.id.uuidString, rulerId: kingdom.rulerId) else {
+        guard player.isEligibleForRewards(inKingdom: kingdom.id, rulerId: kingdom.rulerId) else {
             return 0
         }
         
         // Calculate player's merit
-        let playerMerit = player.calculateMeritScore(inKingdom: kingdom.id.uuidString)
+        let playerMerit = player.calculateMeritScore(inKingdom: kingdom.id)
         
         // For single-player, player gets 100% if they're the only eligible subject
         // TODO: When multiplayer, calculate based on all subjects
@@ -783,7 +828,7 @@ class MapViewModel: ObservableObject {
     }
     
     /// Set the subject reward rate for a kingdom (ruler only)
-    func setSubjectRewardRate(_ rate: Int, for kingdomId: UUID) {
+    func setSubjectRewardRate(_ rate: Int, for kingdomId: String) {
         guard let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
             return
         }
@@ -842,7 +887,7 @@ class MapViewModel: ObservableObject {
                 do {
                     let response = try await apiService.checkIn(
                         playerId: player.playerId,
-                        kingdomId: kingdom.id.uuidString,
+                        kingdomId: kingdom.id,
                         location: location
                     )
                     

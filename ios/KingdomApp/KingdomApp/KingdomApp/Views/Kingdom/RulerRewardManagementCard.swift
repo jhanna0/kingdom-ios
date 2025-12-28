@@ -87,7 +87,7 @@ struct RulerRewardManagementCard: View {
                     
                     // In single-player, show if player is eligible
                     let playerEligible = viewModel.player.isEligibleForRewards(
-                        inKingdom: kingdom.id.uuidString,
+                        inKingdom: kingdom.id,
                         rulerId: kingdom.rulerId
                     )
                     

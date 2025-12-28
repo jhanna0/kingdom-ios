@@ -27,7 +27,7 @@ struct SubjectRewardCard: View {
             }
             
             // Check eligibility
-            let isEligible = player.isEligibleForRewards(inKingdom: kingdom.id.uuidString, rulerId: kingdom.rulerId)
+            let isEligible = player.isEligibleForRewards(inKingdom: kingdom.id, rulerId: kingdom.rulerId)
             
             if !isEligible {
                 ineligibleView
@@ -50,7 +50,7 @@ struct SubjectRewardCard: View {
                 .font(KingdomTheme.Typography.headline())
                 .foregroundColor(.red)
             
-            let rep = player.getKingdomReputation(kingdom.id.uuidString)
+            let rep = player.getKingdomReputation(kingdom.id)
             
             if player.playerId == kingdom.rulerId {
                 Text("Rulers manage treasury directly")
@@ -72,8 +72,8 @@ struct SubjectRewardCard: View {
     private var eligibleView: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Merit Score Breakdown
-            let merit = player.calculateMeritScore(inKingdom: kingdom.id.uuidString)
-            let rep = player.getKingdomReputation(kingdom.id.uuidString)
+            let merit = player.calculateMeritScore(inKingdom: kingdom.id)
+            let rep = player.getKingdomReputation(kingdom.id)
             let skillTotal = player.attackPower + player.defensePower + player.leadership + player.buildingSkill
             let repPoints = rep
             let skillPoints = Int(Double(skillTotal) * 0.5)

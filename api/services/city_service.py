@@ -7,8 +7,8 @@ from datetime import datetime
 import math
 import asyncio
 
-from db import CityBoundary
-from schemas import CityBoundaryResponse
+from db import CityBoundary, Kingdom, User
+from schemas import CityBoundaryResponse, KingdomData
 from osm_service import (
     fetch_nearby_city_ids,
     fetch_city_boundary_by_id,
@@ -29,6 +29,34 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return R * c
+
+
+def _get_kingdoms_for_cities(db: Session, osm_ids: List[str]) -> dict:
+    """
+    Batch fetch kingdoms for multiple OSM IDs.
+    Returns dict of osm_id -> KingdomData
+    """
+    kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
+    
+    result = {}
+    for kingdom in kingdoms:
+        # Get ruler name if there's a ruler
+        ruler_name = None
+        if kingdom.ruler_id:
+            ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
+            if ruler:
+                ruler_name = ruler.display_name
+        
+        result[kingdom.id] = KingdomData(
+            id=kingdom.id,
+            ruler_id=kingdom.ruler_id,
+            ruler_name=ruler_name,
+            level=kingdom.level,
+            population=kingdom.population,
+            treasury_gold=kingdom.treasury_gold
+        )
+    
+    return result
 
 
 def _get_nearby_cached_cities(
@@ -100,6 +128,10 @@ async def get_cities_near_location(
             city.last_accessed = datetime.utcnow()
         db.commit()
         
+        # Batch fetch kingdoms for all cities
+        osm_ids = [city.osm_id for city, _ in nearby_cached[:35]]
+        kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+        
         return [
             CityBoundaryResponse(
                 osm_id=city.osm_id,
@@ -109,7 +141,8 @@ async def get_cities_near_location(
                 center_lon=city.center_lon,
                 boundary=city.boundary_geojson["coordinates"],
                 radius_meters=city.radius_meters,
-                cached=True
+                cached=True,
+                kingdom=kingdoms_map.get(city.osm_id)
             )
             for city, _ in nearby_cached[:35]
         ]
@@ -167,6 +200,10 @@ async def _fetch_cities_fallback(
     
     db.commit()
     
+    # Batch fetch kingdoms for all cities
+    osm_ids = [city.osm_id for city in result_cities]
+    kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+    
     return [
         CityBoundaryResponse(
             osm_id=city.osm_id,
@@ -176,7 +213,8 @@ async def _fetch_cities_fallback(
             center_lon=city.center_lon,
             boundary=city.boundary_geojson["coordinates"],
             radius_meters=city.radius_meters,
-            cached=(city.access_count > 1)
+            cached=(city.access_count > 1),
+            kingdom=kingdoms_map.get(city.osm_id)
         )
         for city in result_cities
     ]
@@ -251,6 +289,10 @@ async def _process_city_ids(
     
     print(f"✅ Returning {len(result_cities)} cities ({cached_count} cached, {new_count} newly fetched)")
     
+    # Batch fetch kingdoms for all cities
+    osm_ids = [city.osm_id for city in result_cities]
+    kingdoms_map = _get_kingdoms_for_cities(db, osm_ids)
+    
     return [
         CityBoundaryResponse(
             osm_id=city.osm_id,
@@ -260,7 +302,8 @@ async def _process_city_ids(
             center_lon=city.center_lon,
             boundary=city.boundary_geojson["coordinates"],
             radius_meters=city.radius_meters,
-            cached=(city.access_count > 1)
+            cached=(city.access_count > 1),
+            kingdom=kingdoms_map.get(city.osm_id)
         )
         for city in result_cities
     ]
@@ -278,6 +321,9 @@ def get_city_by_id(db: Session, osm_id: str) -> CityBoundaryResponse:
     city.last_accessed = datetime.utcnow()
     db.commit()
     
+    # Get kingdom data
+    kingdoms_map = _get_kingdoms_for_cities(db, [osm_id])
+    
     return CityBoundaryResponse(
         osm_id=city.osm_id,
         name=city.name,
@@ -286,7 +332,8 @@ def get_city_by_id(db: Session, osm_id: str) -> CityBoundaryResponse:
         center_lon=city.center_lon,
         boundary=city.boundary_geojson["coordinates"],
         radius_meters=city.radius_meters,
-        cached=True
+        cached=True,
+        kingdom=kingdoms_map.get(osm_id)
     )
 
 

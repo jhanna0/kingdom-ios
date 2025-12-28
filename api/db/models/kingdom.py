@@ -18,14 +18,9 @@ class Kingdom(Base):
     
     # Current ruler (nullable - kingdoms can be unclaimed)
     ruler_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
-    ruler_name = Column(String, nullable=True)
     
     # Reference to the city boundary
     city_boundary_osm_id = Column(String, nullable=True)
-    
-    # Location
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
     
     # Game state
     population = Column(Integer, default=0)
