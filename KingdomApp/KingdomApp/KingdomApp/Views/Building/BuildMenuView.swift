@@ -34,13 +34,8 @@ struct BuildMenuView: View {
                             name: "Gold Mine",
                             currentLevel: kingdom.mineLevel,
                             maxLevel: 5,
-                            directCost: calculateMineCost(kingdom.mineLevel + 1),
                             benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
-                            kingdomTreasury: kingdom.treasuryGold,
                             hasActiveContract: kingdom.activeContract?.buildingType == "Mine",
-                            onDirectUpgrade: {
-                                upgradeMine()
-                            },
                             onCreateContract: {
                                 selectedBuildingType = .mine
                             }
@@ -52,13 +47,8 @@ struct BuildMenuView: View {
                             name: "Market",
                             currentLevel: kingdom.marketLevel,
                             maxLevel: 5,
-                            directCost: calculateMarketCost(kingdom.marketLevel + 1),
                             benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
-                            kingdomTreasury: kingdom.treasuryGold,
                             hasActiveContract: kingdom.activeContract?.buildingType == "Market",
-                            onDirectUpgrade: {
-                                upgradeMarket()
-                            },
                             onCreateContract: {
                                 selectedBuildingType = .market
                             }
@@ -84,13 +74,8 @@ struct BuildMenuView: View {
                             name: "Walls",
                             currentLevel: kingdom.wallLevel,
                             maxLevel: 5,
-                            directCost: calculateWallsCost(kingdom.wallLevel + 1),
                             benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
-                            kingdomTreasury: kingdom.treasuryGold,
                             hasActiveContract: kingdom.activeContract?.buildingType == "Walls",
-                            onDirectUpgrade: {
-                                upgradeWalls()
-                            },
                             onCreateContract: {
                                 selectedBuildingType = .walls
                             }
@@ -102,13 +87,8 @@ struct BuildMenuView: View {
                             name: "Vault",
                             currentLevel: kingdom.vaultLevel,
                             maxLevel: 5,
-                            directCost: calculateVaultCost(kingdom.vaultLevel + 1),
                             benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
-                            kingdomTreasury: kingdom.treasuryGold,
                             hasActiveContract: kingdom.activeContract?.buildingType == "Vault",
-                            onDirectUpgrade: {
-                                upgradeVault()
-                            },
                             onCreateContract: {
                                 selectedBuildingType = .vault
                             }
@@ -129,23 +109,6 @@ struct BuildMenuView: View {
                     viewModel: viewModel
                 )
             }
-    }
-    
-    // Cost calculations
-    private func calculateMineCost(_ level: Int) -> Int {
-        return Int(Double(150) * pow(1.6, Double(level - 1)))
-    }
-    
-    private func calculateMarketCost(_ level: Int) -> Int {
-        return Int(Double(200) * pow(1.6, Double(level - 1)))
-    }
-    
-    private func calculateWallsCost(_ level: Int) -> Int {
-        return Int(Double(200) * pow(1.5, Double(level - 1)))
-    }
-    
-    private func calculateVaultCost(_ level: Int) -> Int {
-        return Int(Double(250) * pow(1.5, Double(level - 1)))
     }
     
     // Income benefit descriptions
@@ -175,31 +138,6 @@ struct BuildMenuView: View {
             }
         }()
         return "+\(income)g/day from trade activity"
-    }
-    
-    // Upgrade actions
-    private func upgradeMine() {
-        let cost = calculateMineCost(kingdom.mineLevel + 1)
-        viewModel.upgradeBuilding(kingdom: kingdom, buildingType: .mine, cost: cost)
-        dismiss()
-    }
-    
-    private func upgradeMarket() {
-        let cost = calculateMarketCost(kingdom.marketLevel + 1)
-        viewModel.upgradeBuilding(kingdom: kingdom, buildingType: .market, cost: cost)
-        dismiss()
-    }
-    
-    private func upgradeWalls() {
-        let cost = calculateWallsCost(kingdom.wallLevel + 1)
-        viewModel.upgradeBuilding(kingdom: kingdom, buildingType: .walls, cost: cost)
-        dismiss()
-    }
-    
-    private func upgradeVault() {
-        let cost = calculateVaultCost(kingdom.vaultLevel + 1)
-        viewModel.upgradeBuilding(kingdom: kingdom, buildingType: .vault, cost: cost)
-        dismiss()
     }
 }
 

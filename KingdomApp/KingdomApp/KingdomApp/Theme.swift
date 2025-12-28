@@ -200,6 +200,29 @@ struct MedievalButtonStyle: ButtonStyle {
     }
 }
 
+/// Medieval button style without shadow - for use inside cards
+struct MedievalSubtleButtonStyle: ButtonStyle {
+    var color: Color = KingdomTheme.Colors.buttonPrimary
+    var fullWidth: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(KingdomTheme.Typography.subheadline())
+            .fontWeight(.semibold)
+            .foregroundColor(KingdomTheme.Colors.parchment)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.vertical, KingdomTheme.Spacing.medium)
+            .background(configuration.isPressed ? color.opacity(0.8) : color)
+            .cornerRadius(KingdomTheme.CornerRadius.medium)
+            .overlay(
+                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                    .stroke(color.opacity(0.5), lineWidth: KingdomTheme.BorderWidth.regular)
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+    }
+}
+
 /// Toolbar/Navigation button style - clean text style for navigation bars
 struct ToolbarButtonStyle: ButtonStyle {
     var color: Color = KingdomTheme.Colors.buttonPrimary
@@ -254,6 +277,15 @@ extension ButtonStyle where Self == MedievalButtonStyle {
     
     static func medieval(color: Color, fullWidth: Bool = false) -> MedievalButtonStyle {
         MedievalButtonStyle(color: color, fullWidth: fullWidth)
+    }
+}
+
+extension ButtonStyle where Self == MedievalSubtleButtonStyle {
+    static var medievalSubtle: MedievalSubtleButtonStyle { MedievalSubtleButtonStyle() }
+    static var medievalSubtleFullWidth: MedievalSubtleButtonStyle { MedievalSubtleButtonStyle(fullWidth: true) }
+    
+    static func medievalSubtle(color: Color, fullWidth: Bool = false) -> MedievalSubtleButtonStyle {
+        MedievalSubtleButtonStyle(color: color, fullWidth: fullWidth)
     }
 }
 
