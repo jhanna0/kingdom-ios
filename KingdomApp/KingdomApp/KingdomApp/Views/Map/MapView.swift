@@ -96,39 +96,61 @@ struct MapView: View {
                 .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
             }
             
-            // Player HUD - top left
+            // Clean top HUD
             VStack {
-                HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
-                    PlayerHUD(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
-                    
-                    Spacer()
-                    
-                    VStack(spacing: KingdomTheme.Spacing.small) {
-                        // Contracts button
-                        Button(action: {
-                            showContracts = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.text.fill")
-                                    .font(.system(size: 14))
-                                Text("Contracts")
-                                    .font(KingdomTheme.Typography.subheadline())
-                                    .fontWeight(.bold)
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, KingdomTheme.Spacing.medium)
-                            .padding(.vertical, 8)
-                            .background(KingdomTheme.Colors.buttonWarning)
-                            .cornerRadius(KingdomTheme.CornerRadius.large)
-                            .shadow(
-                                color: KingdomTheme.Shadows.card.color,
-                                radius: KingdomTheme.Shadows.card.radius,
-                                x: KingdomTheme.Shadows.card.x,
-                                y: KingdomTheme.Shadows.card.y
-                            )
+                VStack(spacing: 8) {
+                    // Top row - player and location
+                    HStack(spacing: 10) {
+                        // Player badge
+                        HStack(spacing: 6) {
+                            Text(viewModel.player.isRuler ? "👑" : "⚔️")
+                                .font(.system(size: 16))
+                            Text(viewModel.player.name)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
-                        // My Kingdoms button
+                        Spacer()
+                        
+                        // Location badge
+                        HStack(spacing: 4) {
+                            if let kingdom = viewModel.currentKingdomInside {
+                                Text("📍")
+                                    .font(.system(size: 12))
+                                Text(kingdom.name)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .lineLimit(1)
+                            } else {
+                                Text("🗺️")
+                                    .font(.system(size: 12))
+                                Text("Traveling")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                            }
+                        }
+                    }
+                    
+                    // Divider
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.inkLight.opacity(0.2))
+                        .frame(height: 1)
+                    
+                    // Bottom row - actions
+                    HStack(spacing: 12) {
+                        // Gold
+                        HStack(spacing: 4) {
+                            Image(systemName: "dollarsign.circle.fill")
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(.system(size: 16))
+                            Text("\(viewModel.player.gold)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                        
+                        Spacer()
+                        
+                        // My Kingdoms
                         if viewModel.player.isRuler {
                             Button(action: {
                                 showMyKingdoms = true
@@ -137,28 +159,46 @@ struct MapView: View {
                                     Image(systemName: "crown.fill")
                                         .font(.system(size: 14))
                                     Text("\(viewModel.player.fiefsRuled.count)")
-                                        .font(KingdomTheme.Typography.subheadline())
-                                        .fontWeight(.bold)
+                                        .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundColor(.white)
-                                .padding(.horizontal, KingdomTheme.Spacing.medium)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
                                 .background(KingdomTheme.Colors.buttonPrimary)
-                                .cornerRadius(KingdomTheme.CornerRadius.large)
-                                .shadow(
-                                    color: KingdomTheme.Shadows.card.color,
-                                    radius: KingdomTheme.Shadows.card.radius,
-                                    x: KingdomTheme.Shadows.card.x,
-                                    y: KingdomTheme.Shadows.card.y
-                                )
+                                .cornerRadius(8)
                             }
+                        }
+                        
+                        // Contracts
+                        Button(action: {
+                            showContracts = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.text.fill")
+                                    .font(.system(size: 14))
+                                Text("Contracts")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(KingdomTheme.Colors.buttonWarning)
+                            .cornerRadius(8)
                         }
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 2)
+                )
+                .padding(.horizontal, 12)
+                
                 Spacer()
             }
             .padding(.top, 60)
-            .padding(.horizontal)
             
             // Bottom sheet for kingdom details
             if let kingdomId = (selectedKingdom?.id ?? (showCurrentKingdom ? viewModel.currentKingdomInside?.id : nil)),
