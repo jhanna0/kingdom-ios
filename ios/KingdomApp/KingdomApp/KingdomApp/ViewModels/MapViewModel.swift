@@ -8,10 +8,6 @@ import CoreLocation
 class MapViewModel: ObservableObject {
     @Published var kingdoms: [Kingdom] = [] {
         didSet {
-            // Auto-save kingdoms whenever they change
-            // TODO: Replace with backend sync in the future
-            saveKingdomsToStorage()
-            
             // Populate kingdoms with NPC citizens
             worldSimulator.populateKingdoms(kingdoms)
         }
@@ -36,7 +32,6 @@ class MapViewModel: ObservableObject {
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
     
     private var hasInitializedLocation = false
-    private var hasLoadedPersistedKingdoms = false
     private var cancellables = Set<AnyCancellable>()
     
     init() {
@@ -63,47 +58,7 @@ class MapViewModel: ObservableObject {
             self?.objectWillChange.send()
         }.store(in: &cancellables)
         
-        // Load persisted kingdoms (if any)
-        loadPersistedKingdoms()
-        
         print("📱 MapViewModel initialized")
-    }
-    
-    /// Load kingdoms from persistent storage
-    /// TODO: Replace with backend API call - GET /kingdoms
-    private func loadPersistedKingdoms() {
-        guard !hasLoadedPersistedKingdoms else { return }
-        hasLoadedPersistedKingdoms = true
-        
-        if let savedKingdoms = KingdomPersistence.shared.loadKingdoms() {
-            // Temporarily disable auto-save during load
-            let tempKingdoms = savedKingdoms
-            kingdoms = []  // Clear first
-            
-            // Set kingdoms without triggering didSet
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.kingdoms = tempKingdoms
-                
-                // Sync player's fiefsRuled with kingdoms they actually rule
-                self.syncPlayerKingdoms()
-                
-                // Re-check current location after loading kingdoms
-                if let location = self.userLocation {
-                    self.checkKingdomLocation(location)
-                }
-                
-                print("✅ Restored \(tempKingdoms.count) kingdoms from storage")
-            }
-        }
-    }
-    
-    /// Save kingdoms to persistent storage
-    /// TODO: Replace with backend API sync
-    private func saveKingdomsToStorage() {
-        // Only save if we have kingdoms and have finished initial load
-        guard !kingdoms.isEmpty && hasLoadedPersistedKingdoms else { return }
-        KingdomPersistence.shared.saveKingdoms(kingdoms)
     }
     
     /// Sync player's fiefsRuled with kingdoms they actually rule
