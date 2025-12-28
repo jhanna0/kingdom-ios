@@ -43,6 +43,9 @@ class MapViewModel: ObservableObject {
         // Check which kingdom user is inside
         checkKingdomLocation(location)
         
+        // Check and complete any ready contracts
+        checkAndCompleteContracts()
+        
         // Only initialize once
         if !hasInitializedLocation {
             hasInitializedLocation = true
@@ -308,6 +311,243 @@ class MapViewModel: ObservableObject {
     func autoCollectIncomeForKingdom(_ kingdom: Kingdom) {
         if kingdom.hasIncomeToCollect {
             collectKingdomIncome(for: kingdom)
+        }
+    }
+    
+    // MARK: - Contract System
+    
+    /// Create a new contract for building upgrade
+    func createContract(kingdom: Kingdom, buildingType: BuildingType, rewardPool: Int) -> Bool {
+        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
+            print("❌ Kingdom not found")
+            return false
+        }
+        
+        // Check if ruler owns this kingdom
+        guard kingdoms[index].rulerId == player.playerId else {
+            print("❌ You don't rule this kingdom")
+            return false
+        }
+        
+        // Check if there's already an active contract
+        if kingdoms[index].activeContract != nil {
+            print("❌ Kingdom already has an active contract")
+            return false
+        }
+        
+        // Get building type string and next level
+        let (buildingTypeStr, currentLevel) = getBuildingInfo(kingdom: kingdoms[index], buildingType: buildingType)
+        
+        // Check if building can be upgraded
+        if currentLevel >= 5 {
+            print("❌ Building already at max level")
+            return false
+        }
+        
+        let nextLevel = currentLevel + 1
+        
+        // Check if kingdom has enough treasury gold for reward pool
+        guard kingdoms[index].treasuryGold >= rewardPool else {
+            print("❌ Kingdom treasury insufficient: need \(rewardPool), have \(kingdoms[index].treasuryGold)")
+            return false
+        }
+        
+        // Deduct from kingdom treasury
+        kingdoms[index].treasuryGold -= rewardPool
+        
+        // Create the contract
+        let contract = Contract.create(
+            kingdomId: kingdom.id.uuidString,
+            kingdomName: kingdom.name,
+            buildingType: buildingTypeStr,
+            buildingLevel: nextLevel,
+            population: kingdoms[index].checkedInPlayers,
+            rewardPool: rewardPool,
+            createdBy: player.playerId
+        )
+        
+        kingdoms[index].activeContract = contract
+        
+        print("📜 Contract created: \(buildingTypeStr) level \(nextLevel) - ~\(String(format: "%.1f", contract.baseHoursRequired))h with 3 workers")
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdom.id {
+            currentKingdomInside = kingdoms[index]
+        }
+        
+        return true
+    }
+    
+    /// Accept a contract and start working
+    func acceptContract(kingdom: Kingdom) -> Bool {
+        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
+            print("❌ Kingdom not found")
+            return false
+        }
+        
+        guard var contract = kingdoms[index].activeContract else {
+            print("❌ No active contract in this kingdom")
+            return false
+        }
+        
+        // Check if contract is already complete
+        if contract.isComplete {
+            print("❌ Contract already complete")
+            return false
+        }
+        
+        // Check if player already working on a different contract
+        if let activeId = player.activeContractId, activeId != contract.id {
+            print("❌ Already working on another contract")
+            return false
+        }
+        
+        // Check if player is already working on this contract
+        if contract.workers.contains(player.playerId) {
+            print("❌ Already working on this contract")
+            return false
+        }
+        
+        // Can't work on your own contract
+        if contract.createdBy == player.playerId {
+            print("❌ Cannot work on your own contract")
+            return false
+        }
+        
+        // Accept the contract - this starts/updates the timer
+        contract.addWorker(player.playerId)
+        kingdoms[index].activeContract = contract
+        player.activeContractId = contract.id
+        player.saveToUserDefaults()
+        
+        let timeEstimate = contract.hoursToComplete
+        print("✅ Accepted contract: \(contract.buildingType) level \(contract.buildingLevel) (~\(String(format: "%.1f", timeEstimate))h)")
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdom.id {
+            currentKingdomInside = kingdoms[index]
+        }
+        
+        return true
+    }
+    
+    /// Stop working on a contract
+    func leaveContract() -> Bool {
+        guard let contractId = player.activeContractId else {
+            print("❌ Not working on any contract")
+            return false
+        }
+        
+        // Find the kingdom with this contract
+        guard let kingdomIndex = kingdoms.firstIndex(where: { $0.activeContract?.id == contractId }) else {
+            print("❌ Contract not found")
+            return false
+        }
+        
+        guard var contract = kingdoms[kingdomIndex].activeContract else {
+            return false
+        }
+        
+        contract.removeWorker(player.playerId)
+        kingdoms[kingdomIndex].activeContract = contract
+        player.activeContractId = nil
+        player.saveToUserDefaults()
+        
+        print("🚪 Left contract")
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdoms[kingdomIndex].id {
+            currentKingdomInside = kingdoms[kingdomIndex]
+        }
+        
+        return true
+    }
+    
+    /// Check all contracts and auto-complete any that are ready
+    func checkAndCompleteContracts() {
+        for (index, kingdom) in kingdoms.enumerated() {
+            guard let contract = kingdom.activeContract else { continue }
+            
+            // Skip if not ready
+            guard contract.isReadyToComplete else { continue }
+            
+            // Complete the contract
+            completeContract(kingdomIndex: index)
+        }
+    }
+    
+    /// Complete a contract and distribute rewards
+    private func completeContract(kingdomIndex: Int) {
+        guard var contract = kingdoms[kingdomIndex].activeContract else { return }
+        
+        let buildingType = contract.buildingType
+        let level = contract.buildingLevel
+        let rewardPerWorker = contract.rewardPerWorker
+        
+        // Mark as complete
+        contract.complete()
+        
+        // Upgrade the building
+        switch buildingType.lowercased() {
+        case "walls":
+            kingdoms[kingdomIndex].wallLevel = level
+        case "vault":
+            kingdoms[kingdomIndex].vaultLevel = level
+        case "mine":
+            kingdoms[kingdomIndex].mineLevel = level
+        case "market":
+            kingdoms[kingdomIndex].marketLevel = level
+        default:
+            break
+        }
+        
+        // Distribute rewards equally to all workers
+        for workerId in contract.workers {
+            if workerId == player.playerId {
+                player.gold += rewardPerWorker
+                player.contractsCompleted += 1
+                player.activeContractId = nil
+                player.saveToUserDefaults()
+                print("💰 Contract complete! Earned \(rewardPerWorker) gold")
+            }
+            // TODO: When multiplayer, distribute to other players
+        }
+        
+        // Clear the contract
+        kingdoms[kingdomIndex].activeContract = nil
+        
+        print("🎉 \(buildingType) upgraded to level \(level)!")
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdoms[kingdomIndex].id {
+            currentKingdomInside = kingdoms[kingdomIndex]
+        }
+    }
+    
+    /// Get all available contracts
+    func getAvailableContracts() -> [Contract] {
+        return kingdoms.compactMap { $0.activeContract }
+            .filter { !$0.isComplete }
+    }
+    
+    /// Get player's active contract
+    func getPlayerActiveContract() -> Contract? {
+        guard let contractId = player.activeContractId else { return nil }
+        return kingdoms.compactMap { $0.activeContract }
+            .first { $0.id == contractId }
+    }
+    
+    // Helper to get building info
+    private func getBuildingInfo(kingdom: Kingdom, buildingType: BuildingType) -> (String, Int) {
+        switch buildingType {
+        case .walls:
+            return ("Walls", kingdom.wallLevel)
+        case .vault:
+            return ("Vault", kingdom.vaultLevel)
+        case .mine:
+            return ("Mine", kingdom.mineLevel)
+        case .market:
+            return ("Market", kingdom.marketLevel)
         }
     }
 }

@@ -272,7 +272,7 @@ struct MapView: View {
             )
         }
         .sheet(isPresented: $showContracts) {
-            ContractsListView()
+            ContractsListView(viewModel: viewModel)
         }
     }
 }

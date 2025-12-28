@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ContractCard: View {
     let contract: Contract
+    var isPlayerWorking: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -34,7 +35,7 @@ struct ContractCard: View {
                     
                     Spacer()
                     
-                    Text("\(contract.workCompleted) / \(contract.totalWorkRequired)")
+                    Text("\(Int(contract.progress * 100))%")
                         .font(KingdomTheme.Typography.caption())
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
@@ -54,21 +55,84 @@ struct ContractCard: View {
                 .frame(height: 8)
             }
             
+            // Status badges
+            HStack(spacing: KingdomTheme.Spacing.small) {
+                if isPlayerWorking {
+                    HStack(spacing: 4) {
+                        Image(systemName: "hammer.fill")
+                            .font(.caption2)
+                        Text("Working")
+                            .font(KingdomTheme.Typography.caption2())
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(KingdomTheme.Colors.buttonPrimary)
+                    .cornerRadius(4)
+                }
+                
+                if contract.workerCount > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                        Text("\(contract.workerCount) workers")
+                            .font(KingdomTheme.Typography.caption2())
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(4)
+                }
+                
+                // Time remaining
+                if let hoursRemaining = contract.hoursRemaining {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.caption2)
+                        Text(formatTime(hoursRemaining))
+                            .font(KingdomTheme.Typography.caption2())
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(KingdomTheme.Colors.parchmentLight)
+                    .cornerRadius(4)
+                }
+                
+                Spacer()
+            }
+            
             // Reward info
             HStack {
-                Label("\(contract.rewardPool)g", systemImage: "crown.fill")
+                Label("\(contract.rewardPool)g total", systemImage: "crown.fill")
                     .font(KingdomTheme.Typography.body())
                     .foregroundColor(KingdomTheme.Colors.gold)
                 
                 Spacer()
                 
-                Label("\(contract.contributors.count)", systemImage: "person.2.fill")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                if contract.workerCount > 0 {
+                    Text("\(contract.rewardPerWorker)g per worker")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
             }
         }
         .padding(KingdomTheme.Spacing.large)
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private func formatTime(_ hours: Double) -> String {
+        if hours < 1 {
+            let minutes = Int(hours * 60)
+            return "\(minutes)m"
+        } else if hours < 24 {
+            return String(format: "%.1fh", hours)
+        } else {
+            let days = Int(hours / 24)
+            let remainingHours = Int(hours.truncatingRemainder(dividingBy: 24))
+            return "\(days)d \(remainingHours)h"
+        }
     }
 }
 
@@ -81,7 +145,7 @@ struct StatusBadge: View {
         case .open: return KingdomTheme.Colors.buttonSuccess
         case .inProgress: return KingdomTheme.Colors.buttonWarning
         case .completed: return KingdomTheme.Colors.gold
-        case .expired: return KingdomTheme.Colors.inkLight
+        case .cancelled: return KingdomTheme.Colors.inkLight
         }
     }
     
@@ -90,7 +154,7 @@ struct StatusBadge: View {
         case .open: return "Open"
         case .inProgress: return "In Progress"
         case .completed: return "Completed"
-        case .expired: return "Expired"
+        case .cancelled: return "Cancelled"
         }
     }
     

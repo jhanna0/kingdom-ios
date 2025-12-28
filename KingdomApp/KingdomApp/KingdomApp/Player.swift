@@ -21,6 +21,11 @@ class Player: ObservableObject {
     @Published var fiefsRuled: Set<String> = []  // Kingdom names this player rules
     @Published var isRuler: Bool = false
     
+    // Work & Contracts
+    @Published var activeContractId: String?  // Contract player is currently working on
+    @Published var contractsCompleted: Int = 0
+    @Published var totalWorkContributed: Int = 0
+    
     // Stats
     @Published var coupsWon: Int = 0
     @Published var coupsFailed: Int = 0
@@ -132,7 +137,7 @@ class Player: ObservableObject {
     
     // MARK: - Persistence
     
-    private func saveToUserDefaults() {
+    func saveToUserDefaults() {
         let defaults = UserDefaults.standard
         defaults.set(playerId, forKey: "playerId")
         defaults.set(name, forKey: "playerName")
@@ -142,6 +147,9 @@ class Player: ObservableObject {
         defaults.set(lastCheckIn, forKey: "lastCheckIn")
         defaults.set(Array(fiefsRuled), forKey: "fiefsRuled")
         defaults.set(isRuler, forKey: "isRuler")
+        defaults.set(activeContractId, forKey: "activeContractId")
+        defaults.set(contractsCompleted, forKey: "contractsCompleted")
+        defaults.set(totalWorkContributed, forKey: "totalWorkContributed")
         defaults.set(coupsWon, forKey: "coupsWon")
         defaults.set(coupsFailed, forKey: "coupsFailed")
         defaults.set(timesExecuted, forKey: "timesExecuted")
@@ -195,6 +203,9 @@ class Player: ObservableObject {
         }
         
         isRuler = defaults.bool(forKey: "isRuler")
+        activeContractId = defaults.string(forKey: "activeContractId")
+        contractsCompleted = defaults.integer(forKey: "contractsCompleted")
+        totalWorkContributed = defaults.integer(forKey: "totalWorkContributed")
         coupsWon = defaults.integer(forKey: "coupsWon")
         coupsFailed = defaults.integer(forKey: "coupsFailed")
         timesExecuted = defaults.integer(forKey: "timesExecuted")

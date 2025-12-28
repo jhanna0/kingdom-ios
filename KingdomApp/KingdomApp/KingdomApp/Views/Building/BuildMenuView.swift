@@ -6,6 +6,8 @@ struct BuildMenuView: View {
     @ObservedObject var player: Player
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
+    @State private var showContractSheet = false
+    @State private var selectedBuildingType: BuildingType?
     
     var body: some View {
         NavigationView {
@@ -29,30 +31,40 @@ struct BuildMenuView: View {
                         .padding(.horizontal)
                         
                         // Mine upgrade
-                        BuildingUpgradeCard(
+                        BuildingUpgradeCardWithContract(
                             icon: "hammer.fill",
                             name: "Gold Mine",
                             currentLevel: kingdom.mineLevel,
                             maxLevel: 5,
-                            cost: calculateMineCost(kingdom.mineLevel + 1),
+                            directCost: calculateMineCost(kingdom.mineLevel + 1),
                             benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
                             kingdomTreasury: kingdom.treasuryGold,
-                            onUpgrade: {
+                            hasActiveContract: kingdom.activeContract?.buildingType == "Mine",
+                            onDirectUpgrade: {
                                 upgradeMine()
+                            },
+                            onCreateContract: {
+                                selectedBuildingType = .mine
+                                showContractSheet = true
                             }
                         )
                         
                         // Market upgrade
-                        BuildingUpgradeCard(
+                        BuildingUpgradeCardWithContract(
                             icon: "cart.fill",
                             name: "Market",
                             currentLevel: kingdom.marketLevel,
                             maxLevel: 5,
-                            cost: calculateMarketCost(kingdom.marketLevel + 1),
+                            directCost: calculateMarketCost(kingdom.marketLevel + 1),
                             benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
                             kingdomTreasury: kingdom.treasuryGold,
-                            onUpgrade: {
+                            hasActiveContract: kingdom.activeContract?.buildingType == "Market",
+                            onDirectUpgrade: {
                                 upgradeMarket()
+                            },
+                            onCreateContract: {
+                                selectedBuildingType = .market
+                                showContractSheet = true
                             }
                         )
                         
@@ -71,30 +83,40 @@ struct BuildMenuView: View {
                         .padding(.top)
                         
                         // Walls upgrade
-                        BuildingUpgradeCard(
+                        BuildingUpgradeCardWithContract(
                             icon: "building.2.fill",
                             name: "Walls",
                             currentLevel: kingdom.wallLevel,
                             maxLevel: 5,
-                            cost: calculateWallsCost(kingdom.wallLevel + 1),
+                            directCost: calculateWallsCost(kingdom.wallLevel + 1),
                             benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
                             kingdomTreasury: kingdom.treasuryGold,
-                            onUpgrade: {
+                            hasActiveContract: kingdom.activeContract?.buildingType == "Walls",
+                            onDirectUpgrade: {
                                 upgradeWalls()
+                            },
+                            onCreateContract: {
+                                selectedBuildingType = .walls
+                                showContractSheet = true
                             }
                         )
                         
                         // Vault upgrade
-                        BuildingUpgradeCard(
+                        BuildingUpgradeCardWithContract(
                             icon: "lock.shield.fill",
                             name: "Vault",
                             currentLevel: kingdom.vaultLevel,
                             maxLevel: 5,
-                            cost: calculateVaultCost(kingdom.vaultLevel + 1),
+                            directCost: calculateVaultCost(kingdom.vaultLevel + 1),
                             benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
                             kingdomTreasury: kingdom.treasuryGold,
-                            onUpgrade: {
+                            hasActiveContract: kingdom.activeContract?.buildingType == "Vault",
+                            onDirectUpgrade: {
                                 upgradeVault()
+                            },
+                            onCreateContract: {
+                                selectedBuildingType = .vault
+                                showContractSheet = true
                             }
                         )
                     }
@@ -114,6 +136,19 @@ struct BuildMenuView: View {
                     .font(KingdomTheme.Typography.headline())
                     .fontWeight(.semibold)
                     .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                }
+            }
+            .sheet(isPresented: $showContractSheet) {
+                if let buildingType = selectedBuildingType {
+                    ContractCreationSheet(
+                        kingdom: kingdom,
+                        buildingType: buildingType,
+                        viewModel: viewModel,
+                        onDismiss: {
+                            showContractSheet = false
+                            dismiss()  // Also dismiss the build menu
+                        }
+                    )
                 }
             }
         }

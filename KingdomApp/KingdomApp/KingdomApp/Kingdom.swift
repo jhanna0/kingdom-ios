@@ -36,6 +36,9 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var mineLevel: Int
     var marketLevel: Int
     
+    // Active contract
+    var activeContract: Contract?
+    
     // Income tracking
     var lastIncomeCollection: Date
     var weeklyUniqueCheckIns: Int  // Track unique players who checked in this week
@@ -67,6 +70,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.weeklyUniqueCheckIns = Int.random(in: 0...10)
         self.totalIncomeCollected = 0
         self.incomeHistory = []
+        self.activeContract = nil
     }
     
     /// Check if a point is inside this kingdom's territory
