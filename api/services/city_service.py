@@ -2,8 +2,8 @@
 City service - Business logic for city boundary lookups
 """
 from sqlalchemy.orm import Session
-from typing import List, Tuple
-from datetime import datetime
+from typing import List, Tuple, Optional
+from datetime import datetime, timedelta
 import math
 import asyncio
 
@@ -14,6 +14,11 @@ from osm_service import (
     fetch_city_boundary_by_id,
     fetch_cities_from_osm
 )
+
+# In-memory cache for OSM city ID lookups
+# This prevents redundant Overpass API calls when scrolling the map
+_city_ids_cache: dict = {}
+_CACHE_DURATION_SECONDS = 300  # 5 minutes
 
 
 def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -29,6 +34,50 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return R * c
+
+
+def _get_cache_key(lat: float, lon: float, radius: float) -> str:
+    """
+    Generate cache key for city ID lookups.
+    Rounds coordinates to reduce cache fragmentation while maintaining accuracy.
+    ~111m precision is fine for city-scale caching.
+    """
+    # Round to 3 decimal places (~111m precision)
+    # This means slightly different coordinates use the same cache
+    lat_rounded = round(lat, 3)
+    lon_rounded = round(lon, 3)
+    radius_rounded = round(radius, 1)
+    return f"{lat_rounded},{lon_rounded},{radius_rounded}"
+
+
+def _get_cached_city_ids(lat: float, lon: float, radius: float) -> Optional[List[dict]]:
+    """Get cached city IDs if available and not expired"""
+    cache_key = _get_cache_key(lat, lon, radius)
+    
+    if cache_key in _city_ids_cache:
+        cached_data = _city_ids_cache[cache_key]
+        cache_time = cached_data["timestamp"]
+        
+        # Check if cache is still valid
+        if datetime.utcnow() - cache_time < timedelta(seconds=_CACHE_DURATION_SECONDS):
+            print(f"   ⚡ Using cached city IDs (age: {int((datetime.utcnow() - cache_time).total_seconds())}s)")
+            return cached_data["city_ids"]
+        else:
+            # Cache expired, remove it
+            del _city_ids_cache[cache_key]
+            print(f"   🕐 Cache expired, will fetch fresh data")
+    
+    return None
+
+
+def _cache_city_ids(lat: float, lon: float, radius: float, city_ids: List[dict]):
+    """Cache city IDs for future lookups"""
+    cache_key = _get_cache_key(lat, lon, radius)
+    _city_ids_cache[cache_key] = {
+        "city_ids": city_ids,
+        "timestamp": datetime.utcnow()
+    }
+    print(f"   💾 Cached {len(city_ids)} city IDs for future lookups")
 
 
 def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) -> dict:
@@ -123,30 +172,35 @@ async def get_cities_near_location(
     radius: float = 30.0
 ) -> List[CityBoundaryResponse]:
     """
-    SMART city boundary lookup with accurate boundaries.
+    SMART city boundary lookup with accurate boundaries + in-memory caching.
     
     Strategy:
-    1. Check database for cached cities in this area (FAST - no OSM call!)
-    2. If not enough cached, do FAST OSM query to get city IDs/centers
-    3. For missing cities, fetch ACCURATE boundaries one-by-one
-    4. Cache everything for next time
+    1. Check in-memory cache for city IDs (INSTANT!)
+    2. If not cached, query OSM for city IDs (9-11 seconds but now cached)
+    3. For each city ID, check database for cached boundaries
+    4. Only fetch boundaries for cities we DON'T have
     
-    This keeps boundaries accurate while being much faster on repeat visits!
+    This makes map scrolling INSTANT after the first load!
     """
     print(f"🔍 City lookup request: lat={lat}, lon={lon}, radius={radius}km")
     
-    # STEP 1: ALWAYS get the complete list of city IDs from OSM (FAST - no boundaries!)
-    # This tells us what cities SHOULD be in this area
-    print(f"🌐 Fetching city IDs from OSM (fast query)...")
-    city_ids = await fetch_nearby_city_ids(lat, lon, radius)
+    # STEP 1: Check in-memory cache for city IDs (INSTANT!)
+    city_ids = _get_cached_city_ids(lat, lon, radius)
     
     if not city_ids:
-        print("⚠️ OSM query returned no cities")
-        return []
+        # STEP 2: Cache miss - fetch from OSM (9-11 seconds but only once per 5 minutes)
+        print(f"🌐 Fetching city IDs from OSM (fast query)...")
+        city_ids = await fetch_nearby_city_ids(lat, lon, radius)
+        
+        if not city_ids:
+            print("⚠️ OSM query returned no cities")
+            return []
+        
+        # Cache the result for future requests
+        _cache_city_ids(lat, lon, radius, city_ids)
     
-    # STEP 2: For each city ID, check if we have it cached
+    # STEP 3: For each city ID, check if we have it cached in DB
     # Only fetch boundaries for cities we DON'T have
-    # This way: OSM tells us WHAT cities exist (fast), cache tells us WHICH boundaries we have
     return await _process_city_ids(db, city_ids)
 
 
