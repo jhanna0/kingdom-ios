@@ -7,9 +7,7 @@ import Combine
 class KingdomAPIService: ObservableObject {
     // MARK: - Configuration
     
-    // TODO: Replace with your Mac's IP address from terminal
-    // Run: ipconfig getifaddr en0
-    private let baseURL = "http://192.168.1.13:8000"
+    private let baseURL = AppConfig.apiBaseURL
     
     private let session: URLSession
     

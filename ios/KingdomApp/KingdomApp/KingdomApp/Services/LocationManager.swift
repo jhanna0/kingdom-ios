@@ -13,8 +13,16 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         
-        // Request location permissions on init
-        requestPermissions()
+        // Check current authorization status
+        authorizationStatus = locationManager.authorizationStatus
+        
+        // If already authorized, start updating location
+        if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+            locationManager.startUpdatingLocation()
+        } else if authorizationStatus == .notDetermined {
+            // Request location permissions on init
+            requestPermissions()
+        }
     }
     
     func requestPermissions() {
@@ -41,10 +49,13 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
-        // Only update if this is the first location or significantly different
-        if currentLocation == nil {
-            currentLocation = location.coordinate
-            // Stop updating after getting first location (save battery and prevent constant updates)
+        // Update current location
+        currentLocation = location.coordinate
+        
+        // For onboarding, we want to get an accurate location, so keep updating for a bit
+        // In production, you might want to stop after getting accurate enough location
+        if let currentLoc = currentLocation, 
+           location.horizontalAccuracy <= 100 { // Stop when we have decent accuracy
             locationManager.stopUpdatingLocation()
         }
     }

@@ -9,9 +9,20 @@ import SwiftUI
 
 @main
 struct KingdomAppApp: App {
+    @StateObject private var authManager = AuthManager()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authManager.isAuthenticated {
+                ContentView()
+                    .environmentObject(authManager)
+            } else if authManager.needsOnboarding {
+                OnboardingView()
+                    .environmentObject(authManager)
+            } else {
+                AuthView()
+                    .environmentObject(authManager)
+            }
         }
     }
 }

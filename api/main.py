@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
-from routers import cities, game
+from routers import cities, game, auth
 
 
 # Create FastAPI app
@@ -21,8 +21,9 @@ app = FastAPI(
 async def startup_event():
     init_db()
     print("🚀 Kingdom API started")
+    print("🔐 Authentication: /auth/apple-signin")
     print("📍 City boundaries: /cities")
-    print("🎮 Game endpoints: /players, /kingdoms, /checkin")
+    print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
 
 
 # Enable CORS so iOS app can connect
@@ -36,6 +37,7 @@ app.add_middleware(
 
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(cities.router)
 app.include_router(game.router)
 
