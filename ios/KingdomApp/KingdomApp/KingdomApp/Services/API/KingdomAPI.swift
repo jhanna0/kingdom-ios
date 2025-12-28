@@ -20,6 +20,7 @@ class KingdomAPI {
     }
     
     /// Create a new kingdom (user becomes ruler)
+    /// DEPRECATED: Use claimKingdom instead
     /// Coordinates are stored in the CityBoundary, not duplicated in Kingdom
     func createKingdom(
         name: String,
@@ -30,6 +31,21 @@ class KingdomAPI {
         }
         
         let endpoint = "/kingdoms?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name)&city_boundary_osm_id=\(osmId)"
+        let request = client.request(endpoint: endpoint, method: "POST")
+        return try await client.execute(request)
+    }
+    
+    /// Claim an unclaimed kingdom
+    func claimKingdom(
+        kingdomId: String,
+        latitude: Double,
+        longitude: Double
+    ) async throws -> ConquestResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let endpoint = "/kingdoms/\(kingdomId)/claim?latitude=\(latitude)&longitude=\(longitude)"
         let request = client.request(endpoint: endpoint, method: "POST")
         return try await client.execute(request)
     }

@@ -338,7 +338,7 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Conquer the kingdom (kingdoms already exist from /cities call)
+                // Claim the kingdom (kingdoms already exist from /cities call)
                 let apiKingdom = try await kingdomAPI.createKingdom(
                     name: kingdom.name,
                     osmId: osmId

@@ -139,10 +139,36 @@ def create_kingdom(
     ).first()
     
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Kingdom already exists for this location"
-        )
+        # If kingdom exists but is unclaimed, claim it
+        if existing.ruler_id is None:
+            existing.ruler_id = current_user.id
+            existing.last_activity = datetime.utcnow()
+            
+            # Create user-kingdom relationship
+            user_kingdom = UserKingdom(
+                user_id=current_user.id,
+                kingdom_id=existing.id,
+                is_ruler=True,
+                is_subject=False,
+                became_ruler_at=datetime.utcnow(),
+                times_conquered=1
+            )
+            db.add(user_kingdom)
+            
+            # Update user stats
+            state = _get_or_create_player_state(db, current_user)
+            state.kingdoms_ruled += 1
+            state.total_conquests += 1
+            
+            db.commit()
+            db.refresh(existing)
+            
+            return existing
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Kingdom already claimed by another player"
+            )
     
     # Create kingdom - USE OSM ID as the kingdom ID for consistency with map
     kingdom = Kingdom(

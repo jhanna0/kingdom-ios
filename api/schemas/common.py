@@ -28,7 +28,7 @@ class CheckInResponse(BaseModel):
 class KingdomData(BaseModel):
     """Kingdom data attached to a city"""
     id: str
-    ruler_id: Optional[str] = None
+    ruler_id: Optional[int] = None  # PostgreSQL integer user ID
     ruler_name: Optional[str] = None
     level: int
     population: int
