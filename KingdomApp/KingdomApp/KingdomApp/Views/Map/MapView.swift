@@ -8,6 +8,7 @@ struct MapView: View {
     @State private var showCurrentKingdom: Bool = false
     @State private var showMyKingdoms = false
     @State private var showContracts = false
+    @State private var showCharacterSheet = false
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
     
@@ -138,14 +139,31 @@ struct MapView: View {
                     
                     // Bottom row - actions
                     HStack(spacing: 12) {
-                        // Gold
-                        HStack(spacing: 4) {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                                .font(.system(size: 16))
-                            Text("\(viewModel.player.gold)")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        // Character button (shows level + gold)
+                        Button(action: {
+                            showCharacterSheet = true
+                        }) {
+                            HStack(spacing: 6) {
+                                // Level badge
+                                ZStack {
+                                    Circle()
+                                        .fill(KingdomTheme.Colors.gold)
+                                        .frame(width: 24, height: 24)
+                                    Text("\(viewModel.player.level)")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                // Gold
+                                HStack(spacing: 2) {
+                                    Image(systemName: "dollarsign.circle.fill")
+                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                        .font(.system(size: 14))
+                                    Text("\(viewModel.player.gold)")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                }
+                            }
                         }
                         
                         Spacer()
@@ -273,6 +291,9 @@ struct MapView: View {
         }
         .sheet(isPresented: $showContracts) {
             ContractsListView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showCharacterSheet) {
+            CharacterSheetView(player: viewModel.player)
         }
     }
 }
