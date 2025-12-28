@@ -15,21 +15,23 @@ struct CitizensPreview: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
-                Text("👥 Citizens")
-                    .font(KingdomTheme.Typography.subheadline())
+                Text("Citizens")
+                    .font(KingdomTheme.Typography.headline())
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    Text("\(onlineCitizens.count)/\(citizens.count)")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                if !citizens.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(KingdomTheme.Colors.buttonSuccess)
+                            .frame(width: 8, height: 8)
+                        Text("\(onlineCitizens.count) online")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
             }
             
@@ -39,32 +41,58 @@ struct CitizensPreview: View {
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                     .italic()
             } else {
-                // Show first 3 citizens
-                ForEach(citizens.prefix(3)) { citizen in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(citizen.isOnline ? Color.green : Color.gray.opacity(0.4))
-                            .frame(width: 6, height: 6)
-                        Text(citizen.name)
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Spacer()
-                        Text("⚔️\(citizen.attackPower) 🛡️\(citizen.defensePower)")
-                            .font(.system(size: 10))
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                VStack(spacing: KingdomTheme.Spacing.small) {
+                    // Show first 3 citizens
+                    ForEach(citizens.prefix(3)) { citizen in
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
+                            Circle()
+                                .fill(citizen.isOnline ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.divider)
+                                .frame(width: 8, height: 8)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(citizen.name)
+                                    .font(KingdomTheme.Typography.subheadline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                
+                                HStack(spacing: KingdomTheme.Spacing.small) {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "sword.fill")
+                                            .font(.system(size: 9))
+                                        Text("\(citizen.attackPower)")
+                                            .font(KingdomTheme.Typography.caption2())
+                                    }
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                                    
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "shield.fill")
+                                            .font(.system(size: 9))
+                                        Text("\(citizen.defensePower)")
+                                            .font(KingdomTheme.Typography.caption2())
+                                    }
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                                }
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
                     }
-                }
-                
-                if citizens.count > 3 {
-                    Text("+ \(citizens.count - 3) more citizens")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    
+                    if citizens.count > 3 {
+                        Text("+ \(citizens.count - 3) more citizens")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                            .padding(.top, 2)
+                    }
                 }
             }
         }
-        .padding(KingdomTheme.Spacing.small)
-        .background(KingdomTheme.Colors.parchmentMuted)
-        .cornerRadius(KingdomTheme.CornerRadius.small)
+        .padding(KingdomTheme.Spacing.medium)
+        .parchmentCard(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: KingdomTheme.CornerRadius.large,
+            hasShadow: false
+        )
     }
 }
 

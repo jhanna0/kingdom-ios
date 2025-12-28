@@ -6,64 +6,53 @@ struct DecreeInputView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                KingdomTheme.Colors.parchment
-                    .ignoresSafeArea()
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            VStack(spacing: KingdomTheme.Spacing.xLarge) {
+                Text("Royal Decree")
+                    .font(KingdomTheme.Typography.title2())
+                    .fontWeight(.bold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.top)
                 
-                VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                    Text("Royal Decree")
-                        .font(KingdomTheme.Typography.title2())
-                        .fontWeight(.bold)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .padding(.top)
-                    
-                    Text("Announce your will to all subjects of \(kingdom.name)")
-                        .font(KingdomTheme.Typography.subheadline())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    TextEditor(text: $decreeText)
-                        .font(KingdomTheme.Typography.body())
-                        .frame(height: 150)
-                        .padding(8)
-                        .background(KingdomTheme.Colors.parchmentLight)
-                        .cornerRadius(KingdomTheme.CornerRadius.large)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                                .stroke(KingdomTheme.Colors.border, lineWidth: KingdomTheme.BorderWidth.thin)
-                        )
-                        .padding(.horizontal)
-                    
-                    Button(action: {
-                        // TODO: Send decree
-                        dismiss()
-                    }) {
-                        Text("Proclaim Decree")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
+                Text("Announce your will to all subjects of \(kingdom.name)")
+                    .font(KingdomTheme.Typography.subheadline())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .multilineTextAlignment(.center)
                     .padding(.horizontal)
-                    .disabled(decreeText.isEmpty)
-                    
-                    Spacer()
+                
+                TextEditor(text: $decreeText)
+                    .font(KingdomTheme.Typography.body())
+                    .frame(height: 150)
+                    .padding(8)
+                    .background(KingdomTheme.Colors.parchmentLight)
+                    .cornerRadius(KingdomTheme.CornerRadius.large)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                            .stroke(KingdomTheme.Colors.border, lineWidth: KingdomTheme.BorderWidth.thin)
+                    )
+                    .padding(.horizontal)
+                
+                Button(action: {
+                    // TODO: Send decree
+                    dismiss()
+                }) {
+                    Text("Proclaim Decree")
+                        .frame(maxWidth: .infinity)
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.semibold)
-                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                }
+                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
+                .padding(.horizontal)
+                .disabled(decreeText.isEmpty)
+                
+                Spacer()
             }
         }
+        .navigationTitle("Make Decree")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }

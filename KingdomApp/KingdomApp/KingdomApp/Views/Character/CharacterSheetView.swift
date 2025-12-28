@@ -7,33 +7,36 @@ struct CharacterSheetView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header with level and XP
-                    levelCard
-                    
-                    // Reputation section
-                    reputationCard
-                    
-                    // Combat stats section
-                    combatStatsCard
-                    
-                    // Training section
-                    trainingCard
-                }
-                .padding()
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header with level and XP
+                levelCard
+                
+                // Reputation section
+                reputationCard
+                
+                // Combat stats section
+                combatStatsCard
+                
+                // Training section
+                trainingCard
             }
-            .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-            .navigationTitle("Character Sheet")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            .padding()
+        }
+        .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
+        .navigationTitle("Character Sheet")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
+                .font(KingdomTheme.Typography.headline())
+                .fontWeight(.semibold)
+                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
             }
         }
     }
@@ -185,7 +188,7 @@ struct CharacterSheetView: View {
     
     private var combatStatsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Combat Stats")
+            Text("Combat & Skills")
                 .font(.headline)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
@@ -212,6 +215,15 @@ struct CharacterSheetView: View {
                 name: "Leadership",
                 value: player.leadership,
                 description: "Bonus to vote weight"
+            )
+            
+            Divider()
+            
+            statRow(
+                icon: "🏗️",
+                name: "Building Skill",
+                value: player.buildingSkill,
+                description: "\(Int(player.getBuildingCostDiscount() * 100))% cost reduction"
             )
         }
         .padding()
@@ -314,6 +326,19 @@ struct CharacterSheetView: View {
                 }
             }
             
+            // Train Building
+            trainingButton(
+                icon: "🏗️",
+                name: "Train Building",
+                cost: player.getBuildingTrainingCost(),
+                currentValue: player.buildingSkill,
+                canAfford: player.gold >= player.getBuildingTrainingCost()
+            ) {
+                if player.trainBuilding() {
+                    // Success feedback
+                }
+            }
+            
             if player.skillPoints > 0 {
                 Divider()
                 
@@ -326,10 +351,15 @@ struct CharacterSheetView: View {
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                     
-                    HStack(spacing: 12) {
-                        skillPointButton(icon: "⚔️", stat: .attack)
-                        skillPointButton(icon: "🛡️", stat: .defense)
-                        skillPointButton(icon: "👑", stat: .leadership)
+                    VStack(spacing: 8) {
+                        HStack(spacing: 12) {
+                            skillPointButton(icon: "⚔️", stat: .attack)
+                            skillPointButton(icon: "🛡️", stat: .defense)
+                        }
+                        HStack(spacing: 12) {
+                            skillPointButton(icon: "👑", stat: .leadership)
+                            skillPointButton(icon: "🏗️", stat: .building)
+                        }
                     }
                 }
             }
@@ -517,6 +547,7 @@ struct CharacterSheetView_Previews: PreviewProvider {
             p.attackPower = 3
             p.defensePower = 4
             p.leadership = 2
+            p.buildingSkill = 5
             p.skillPoints = 2
             return p
         }())

@@ -8,9 +8,8 @@ struct KingdomInfoCard: View {
     let isPlayerInside: Bool
     let onCheckIn: () -> Void
     let onClaim: () -> Void
+    let onViewKingdom: () -> Void
     let onClose: () -> Void
-    
-    @State private var showBuildMenu = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -131,6 +130,91 @@ struct KingdomInfoCard: View {
             }
             .font(KingdomTheme.Typography.caption())
             
+            // Active Contract Section
+            if let contract = kingdom.activeContract {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    HStack {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        Text("Active Contract")
+                            .font(KingdomTheme.Typography.subheadline())
+                            .fontWeight(.bold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        Spacer()
+                        if contract.isComplete {
+                            Text("✓ Complete")
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
+                                .cornerRadius(KingdomTheme.CornerRadius.small)
+                        } else {
+                            Text("⏳ In Progress")
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                                .cornerRadius(KingdomTheme.CornerRadius.small)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("🏗️ \(contract.buildingType) Level \(contract.buildingLevel)")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        HStack(spacing: 8) {
+                            Label("\(contract.workers.count) workers", systemImage: "person.2.fill")
+                                .font(KingdomTheme.Typography.caption2())
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                            
+                            Label("\(contract.rewardPerWorker)g reward", systemImage: "dollarsign.circle")
+                                .font(KingdomTheme.Typography.caption2())
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                        
+                        // Progress bar
+                        if !contract.isComplete {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text("Progress")
+                                        .font(KingdomTheme.Typography.caption2())
+                                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                                    Spacer()
+                                    Text(String(format: "%.0f%%", contract.progress * 100))
+                                        .font(KingdomTheme.Typography.caption2())
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                }
+                                
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle()
+                                            .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+                                            .frame(height: 4)
+                                            .cornerRadius(2)
+                                        
+                                        Rectangle()
+                                            .fill(KingdomTheme.Colors.buttonWarning)
+                                            .frame(width: geometry.size.width * contract.progress, height: 4)
+                                            .cornerRadius(2)
+                                    }
+                                }
+                                .frame(height: 4)
+                            }
+                        }
+                    }
+                }
+                .padding(KingdomTheme.Spacing.medium)
+                .background(KingdomTheme.Colors.parchmentLight)
+                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                        .stroke(KingdomTheme.Colors.buttonWarning.opacity(0.3), lineWidth: 1)
+                )
+            }
+            
             // Citizens section - shows NPCs in this kingdom
             CitizensPreview(
                 kingdomName: kingdom.name,
@@ -176,13 +260,13 @@ struct KingdomInfoCard: View {
                                 }
                             }
                             
-                            // Build button
+                            // View Kingdom Details button
                             MedievalActionButton(
-                                title: "Build Fortifications",
+                                title: "View Kingdom Details",
                                 color: KingdomTheme.Colors.buttonPrimary,
                                 fullWidth: true
                             ) {
-                                showBuildMenu = true
+                                onViewKingdom()
                             }
                         }
                     } else if kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
@@ -307,9 +391,6 @@ struct KingdomInfoCard: View {
             x: KingdomTheme.Shadows.cardStrong.x,
             y: KingdomTheme.Shadows.cardStrong.y
         )
-        .sheet(isPresented: $showBuildMenu) {
-            BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)
-        }
         .onAppear {
             // Auto-collect income when viewing kingdom (if player is ruler)
             if kingdom.rulerId == player.playerId {

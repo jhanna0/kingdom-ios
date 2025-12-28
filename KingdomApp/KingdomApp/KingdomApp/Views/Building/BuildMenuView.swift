@@ -6,16 +6,14 @@ struct BuildMenuView: View {
     @ObservedObject var player: Player
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var showContractSheet = false
     @State private var selectedBuildingType: BuildingType?
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                KingdomTheme.Colors.parchment
-                    .ignoresSafeArea()
-                
-                ScrollView {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            ScrollView {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         // Economic Buildings Section
                         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
@@ -45,7 +43,6 @@ struct BuildMenuView: View {
                             },
                             onCreateContract: {
                                 selectedBuildingType = .mine
-                                showContractSheet = true
                             }
                         )
                         
@@ -64,7 +61,6 @@ struct BuildMenuView: View {
                             },
                             onCreateContract: {
                                 selectedBuildingType = .market
-                                showContractSheet = true
                             }
                         )
                         
@@ -97,7 +93,6 @@ struct BuildMenuView: View {
                             },
                             onCreateContract: {
                                 selectedBuildingType = .walls
-                                showContractSheet = true
                             }
                         )
                         
@@ -116,42 +111,24 @@ struct BuildMenuView: View {
                             },
                             onCreateContract: {
                                 selectedBuildingType = .vault
-                                showContractSheet = true
                             }
                         )
                     }
                     .padding()
                 }
             }
-            .navigationTitle("Build Fortifications")
+            .navigationTitle("Manage Buildings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.semibold)
-                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                }
+            .navigationDestination(item: $selectedBuildingType) { buildingType in
+                ContractCreationView(
+                    kingdom: kingdom,
+                    buildingType: buildingType,
+                    viewModel: viewModel
+                )
             }
-            .sheet(isPresented: $showContractSheet) {
-                if let buildingType = selectedBuildingType {
-                    ContractCreationSheet(
-                        kingdom: kingdom,
-                        buildingType: buildingType,
-                        viewModel: viewModel,
-                        onDismiss: {
-                            showContractSheet = false
-                            dismiss()  // Also dismiss the build menu
-                        }
-                    )
-                }
-            }
-        }
     }
     
     // Cost calculations

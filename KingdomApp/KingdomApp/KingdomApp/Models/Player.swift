@@ -47,6 +47,7 @@ class Player: ObservableObject {
     @Published var attackPower: Int = 1         // Coup offensive power
     @Published var defensePower: Int = 1        // Defend against coups
     @Published var leadership: Int = 1          // Vote weight multiplier
+    @Published var buildingSkill: Int = 1       // Building efficiency & cost reduction
     
     // Kingdom-specific reputation
     @Published var kingdomReputation: [String: Int] = [:]  // kingdomId -> rep
@@ -224,6 +225,16 @@ class Player: ObservableObject {
         return true
     }
     
+    /// Train building skill
+    func trainBuilding() -> Bool {
+        let cost = getTrainingCost(for: buildingSkill)
+        guard spendGold(cost) else { return false }
+        
+        buildingSkill += 1
+        saveToUserDefaults()
+        return true
+    }
+    
     /// Use skill point to increase stat
     func useSkillPoint(on stat: SkillStat) -> Bool {
         guard skillPoints > 0 else { return false }
@@ -237,6 +248,8 @@ class Player: ObservableObject {
             defensePower += 1
         case .leadership:
             leadership += 1
+        case .building:
+            buildingSkill += 1
         }
         
         saveToUserDefaults()
@@ -244,7 +257,7 @@ class Player: ObservableObject {
     }
     
     enum SkillStat {
-        case attack, defense, leadership
+        case attack, defense, leadership, building
     }
     
     /// Get training cost (increases with stat level)
@@ -267,6 +280,22 @@ class Player: ObservableObject {
     
     func getLeadershipTrainingCost() -> Int {
         return getTrainingCost(for: leadership)
+    }
+    
+    func getBuildingTrainingCost() -> Int {
+        return getTrainingCost(for: buildingSkill)
+    }
+    
+    /// Get building cost discount (percentage)
+    /// Each level of building skill reduces costs by 2%
+    func getBuildingCostDiscount() -> Double {
+        return Double(buildingSkill - 1) * 0.02  // Level 1 = 0%, Level 10 = 18%
+    }
+    
+    /// Calculate discounted building cost
+    func getDiscountedBuildingCost(_ baseCost: Int) -> Int {
+        let discount = getBuildingCostDiscount()
+        return Int(Double(baseCost) * (1.0 - discount))
     }
     
     // MARK: - Rewards System (Gold + Reputation ONLY)
@@ -586,6 +615,7 @@ class Player: ObservableObject {
         defaults.set(attackPower, forKey: "attackPower")
         defaults.set(defensePower, forKey: "defensePower")
         defaults.set(leadership, forKey: "leadership")
+        defaults.set(buildingSkill, forKey: "buildingSkill")
         
         // Kingdom reputation (stored as JSON)
         if let jsonData = try? JSONEncoder().encode(kingdomReputation) {
@@ -674,6 +704,8 @@ class Player: ObservableObject {
         if defensePower == 0 { defensePower = 1 }
         leadership = defaults.integer(forKey: "leadership")
         if leadership == 0 { leadership = 1 }
+        buildingSkill = defaults.integer(forKey: "buildingSkill")
+        if buildingSkill == 0 { buildingSkill = 1 }
         
         // Kingdom reputation
         if let jsonData = defaults.data(forKey: "kingdomReputation"),

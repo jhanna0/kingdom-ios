@@ -4,12 +4,12 @@ import MapKit
 struct MapView: View {
     @StateObject private var viewModel = MapViewModel()
     @StateObject private var locationManager = LocationManager()
-    @State private var selectedKingdom: Kingdom?
-    @State private var showCurrentKingdom: Bool = false
+    @State private var kingdomForInfoSheet: Kingdom?
     @State private var showMyKingdoms = false
     @State private var showContracts = false
     @State private var showCharacterSheet = false
     @State private var showActivityFeed = false
+    @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
     
@@ -48,8 +48,7 @@ struct MapView: View {
                         KingdomMarker(kingdom: kingdom)
                             .opacity(mapOpacity)
                             .onTapGesture {
-                                selectedKingdom = kingdom
-                                showCurrentKingdom = false  // Manually selected, disable auto-show
+                                kingdomForInfoSheet = kingdom
                             }
                     }
                 }
@@ -223,58 +222,25 @@ struct MapView: View {
                 Spacer()
             }
             .padding(.top, 60)
-            
-            // Bottom sheet for kingdom details
-            if let kingdomId = (selectedKingdom?.id ?? (showCurrentKingdom ? viewModel.currentKingdomInside?.id : nil)),
-               let kingdom = viewModel.kingdoms.first(where: { $0.id == kingdomId }) {
-                VStack {
-                    Spacer()
-                    KingdomInfoCard(
-                        kingdom: kingdom,
-                        player: viewModel.player,
-                        viewModel: viewModel,
-                        isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
-                        onCheckIn: {
-                            _ = viewModel.checkIn()
-                        },
-                        onClaim: {
-                            _ = viewModel.claimKingdom()
-                        },
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedKingdom = nil
-                                showCurrentKingdom = false
-                            }
-                        }
-                    )
-                    .padding()
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.5), value: showCurrentKingdom)
-            }
         }
         .onReceive(locationManager.$currentLocation) { location in
             if let location = location {
                 viewModel.updateUserLocation(location)
             }
         }
-        .onChange(of: viewModel.currentKingdomInside?.id) { oldValue, newValue in
+        .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
             // Show card when entering a new kingdom
-            if newValue != nil && oldValue != newValue {
+            if let kingdom = newValue, oldValue?.id != newValue?.id {
                 // Add smooth delay for initial presentation
                 if !hasShownInitialKingdom {
                     hasShownInitialKingdom = true
                     // Wait for map to fade in, then show sheet
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            showCurrentKingdom = true
-                        }
+                        kingdomForInfoSheet = kingdom
                     }
                 } else {
-                    // Subsequent kingdom changes show with animation
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        showCurrentKingdom = true
-                    }
+                    // Subsequent kingdom changes show immediately
+                    kingdomForInfoSheet = kingdom
                 }
             }
         }
@@ -299,13 +265,49 @@ struct MapView: View {
             ContractsListView(viewModel: viewModel)
         }
         .sheet(isPresented: $showCharacterSheet) {
-            CharacterSheetView(player: viewModel.player)
+            NavigationStack {
+                CharacterSheetView(player: viewModel.player)
+            }
+        }
+        .sheet(item: $kingdomForInfoSheet) { kingdom in
+            KingdomInfoSheetView(
+                kingdom: kingdom,
+                player: viewModel.player,
+                viewModel: viewModel,
+                isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
+                onViewKingdom: {
+                    kingdomForInfoSheet = nil
+                    kingdomToShow = kingdom
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showActivityFeed) {
             WorldActivityFeed(
                 worldSimulator: viewModel.worldSimulator,
                 isPresented: $showActivityFeed
             )
+        }
+        .sheet(item: $kingdomToShow) { kingdom in
+            NavigationStack {
+                KingdomDetailView(
+                    kingdom: kingdom,
+                    player: viewModel.player,
+                    viewModel: viewModel
+                )
+                .navigationTitle(kingdom.name)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            kingdomToShow = nil
+                        }
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.semibold)
+                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                    }
+                }
+            }
         }
     }
 }

@@ -82,6 +82,9 @@ class MapViewModel: ObservableObject {
                 guard let self = self else { return }
                 self.kingdoms = tempKingdoms
                 
+                // Sync player's fiefsRuled with kingdoms they actually rule
+                self.syncPlayerKingdoms()
+                
                 // Re-check current location after loading kingdoms
                 if let location = self.userLocation {
                     self.checkKingdomLocation(location)
@@ -98,6 +101,27 @@ class MapViewModel: ObservableObject {
         // Only save if we have kingdoms and have finished initial load
         guard !kingdoms.isEmpty && hasLoadedPersistedKingdoms else { return }
         KingdomPersistence.shared.saveKingdoms(kingdoms)
+    }
+    
+    /// Sync player's fiefsRuled with kingdoms they actually rule
+    /// Fixes bug where UI doesn't show kingdom button even though player is ruler
+    private func syncPlayerKingdoms() {
+        var updatedFiefs = Set<String>()
+        
+        for kingdom in kingdoms {
+            if kingdom.rulerId == player.playerId {
+                updatedFiefs.insert(kingdom.name)
+            }
+        }
+        
+        // Update player's fiefsRuled to match reality
+        player.fiefsRuled = updatedFiefs
+        player.isRuler = !updatedFiefs.isEmpty
+        player.saveToUserDefaults()
+        
+        if !updatedFiefs.isEmpty {
+            print("🔄 Synced player kingdoms: \(updatedFiefs.joined(separator: ", "))")
+        }
     }
     
     func updateUserLocation(_ location: CLLocationCoordinate2D) {
@@ -168,6 +192,9 @@ class MapViewModel: ObservableObject {
                 let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: cachedKingdoms)
                 kingdoms = mergedKingdoms
                 
+                // Sync player's fiefsRuled with kingdoms they rule
+                syncPlayerKingdoms()
+                
                 print("✅ Loaded \(cachedKingdoms.count) towns from cache")
                 
                 // Re-check location now that kingdoms are loaded
@@ -196,6 +223,9 @@ class MapViewModel: ObservableObject {
                 // Merge with existing kingdoms to preserve state changes
                 let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: foundKingdoms)
                 kingdoms = mergedKingdoms
+                
+                // Sync player's fiefsRuled with kingdoms they rule
+                syncPlayerKingdoms()
                 
                 print("✅ Loaded \(foundKingdoms.count) towns")
                 
