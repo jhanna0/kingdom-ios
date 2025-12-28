@@ -9,6 +9,7 @@ struct MapView: View {
     @State private var showContracts = false
     @State private var showCharacterSheet = false
     @State private var showActivityFeed = false
+    @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
@@ -148,70 +149,78 @@ struct MapView: View {
                         .frame(height: 1)
                     
                     // Bottom row - actions
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         // Character button (shows level + gold)
                         Button(action: {
                             showCharacterSheet = true
                         }) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 4) {
                                 // Level badge
                                 ZStack {
                                     Circle()
                                         .fill(KingdomTheme.Colors.gold)
-                                        .frame(width: 24, height: 24)
+                                        .frame(width: 22, height: 22)
                                     Text("\(viewModel.player.level)")
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(.white)
                                 }
                                 
                                 // Gold
-                                HStack(spacing: 2) {
-                                    Image(systemName: "dollarsign.circle.fill")
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                        .font(.system(size: 14))
-                                    Text("\(viewModel.player.gold)")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                }
+                                Text("\(viewModel.player.gold)")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(KingdomTheme.Colors.gold)
                             }
                         }
                         
                         Spacer()
                         
-                        // My Kingdoms (always show if player has kingdoms)
+                        // My Kingdoms (icon only, always show if player has kingdoms)
                         if viewModel.player.isRuler || !viewModel.player.fiefsRuled.isEmpty {
                             Button(action: {
                                 showMyKingdoms = true
                             }) {
-                                HStack(spacing: 6) {
+                                ZStack(alignment: .topTrailing) {
                                     Image(systemName: "crown.fill")
-                                        .font(.system(size: 14))
-                                    Text("\(viewModel.player.fiefsRuled.count)")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white)
+                                        .frame(width: 32, height: 32)
+                                        .background(KingdomTheme.Colors.buttonPrimary)
+                                        .cornerRadius(6)
+                                    
+                                    if viewModel.player.fiefsRuled.count > 0 {
+                                        Text("\(viewModel.player.fiefsRuled.count)")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(3)
+                                            .background(Circle().fill(Color.red))
+                                            .offset(x: 4, y: -4)
+                                    }
                                 }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(KingdomTheme.Colors.buttonPrimary)
-                                .cornerRadius(8)
                             }
                         }
                         
-                        // Contracts
+                        // Contracts (icon only)
                         Button(action: {
                             showContracts = true
                         }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.text.fill")
-                                    .font(.system(size: 14))
-                                Text("Contracts")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(KingdomTheme.Colors.buttonWarning)
-                            .cornerRadius(8)
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(KingdomTheme.Colors.buttonWarning)
+                                .cornerRadius(6)
+                        }
+                        
+                        // Properties (icon only)
+                        Button(action: {
+                            showProperties = true
+                        }) {
+                            Image(systemName: "house.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(KingdomTheme.Colors.buttonSuccess)
+                                .cornerRadius(6)
                         }
                         
                         // World Activity Feed
@@ -273,6 +282,9 @@ struct MapView: View {
         }
         .sheet(isPresented: $showContracts) {
             ContractsListView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showProperties) {
+            MyPropertiesView(player: viewModel.player)
         }
         .sheet(isPresented: $showCharacterSheet) {
             NavigationStack {
