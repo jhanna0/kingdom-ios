@@ -29,6 +29,9 @@ class MapViewModel: ObservableObject {
     @Published var worldSimulator = WorldSimulator.shared
     @Published var showActivityFeed: Bool = false
     
+    // API Service - connects to backend server
+    @Published var apiService = KingdomAPIService()
+    
     // Configuration
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
     
@@ -699,6 +702,231 @@ class MapViewModel: ObservableObject {
             return ("Mine", kingdom.mineLevel)
         case .market:
             return ("Market", kingdom.marketLevel)
+        }
+    }
+    
+    // MARK: - Subject Reward Distribution System
+    
+    /// Distribute rewards to eligible subjects in a kingdom (ruler action)
+    /// Returns the distribution record or nil if failed
+    func distributeSubjectRewards(for kingdomId: UUID) -> DistributionRecord? {
+        guard let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
+            print("❌ Kingdom not found")
+            return nil
+        }
+        
+        var kingdom = kingdoms[kingdomIndex]
+        
+        // Check cooldown (23 hours minimum between distributions)
+        guard kingdom.canDistributeRewards else {
+            print("❌ Distribution on cooldown")
+            return nil
+        }
+        
+        // Calculate reward pool
+        let rewardPool = kingdom.pendingRewardPool
+        
+        guard rewardPool > 0 else {
+            print("❌ No rewards to distribute (0g pool)")
+            return nil
+        }
+        
+        // Check treasury has enough
+        guard kingdom.treasuryGold >= rewardPool else {
+            print("❌ Insufficient treasury funds")
+            return nil
+        }
+        
+        // Get all eligible subjects
+        // In single-player, this is just the player if they're a subject
+        var eligibleSubjects: [(player: Player, merit: Int)] = []
+        
+        // Check if current player is eligible
+        if player.isEligibleForRewards(inKingdom: kingdom.id.uuidString, rulerId: kingdom.rulerId) {
+            let merit = player.calculateMeritScore(inKingdom: kingdom.id.uuidString)
+            if merit > 0 {
+                eligibleSubjects.append((player, merit))
+            }
+        }
+        
+        // TODO: When multiplayer, fetch all players in this kingdom and check eligibility
+        
+        guard !eligibleSubjects.isEmpty else {
+            print("ℹ️ No eligible subjects for distribution")
+            // Still update timestamp so ruler can try again tomorrow
+            kingdom.lastRewardDistribution = Date()
+            kingdoms[kingdomIndex] = kingdom
+            return nil
+        }
+        
+        // Calculate total merit
+        let totalMerit = eligibleSubjects.reduce(0) { $0 + $1.merit }
+        
+        // Calculate and distribute shares
+        var recipients: [RecipientRecord] = []
+        
+        for (subject, merit) in eligibleSubjects {
+            let share = Int(Double(rewardPool) * Double(merit) / Double(totalMerit))
+            
+            // Give reward to subject
+            if subject.playerId == player.playerId {
+                player.receiveReward(share)
+            }
+            // TODO: When multiplayer, send rewards to other players
+            
+            // Create receipt record
+            let rep = subject.getKingdomReputation(kingdom.id.uuidString)
+            let skillTotal = subject.attackPower + subject.defensePower + subject.leadership + subject.buildingSkill
+            
+            let record = RecipientRecord(
+                playerId: subject.playerId,
+                playerName: subject.name,
+                goldReceived: share,
+                meritScore: merit,
+                reputation: rep,
+                skillTotal: skillTotal
+            )
+            recipients.append(record)
+            
+            print("💎 \(subject.name) received \(share)g (merit: \(merit)/\(totalMerit))")
+        }
+        
+        // Deduct from treasury
+        kingdom.treasuryGold -= rewardPool
+        kingdom.totalRewardsDistributed += rewardPool
+        
+        // Create distribution record
+        let distribution = DistributionRecord(totalPool: rewardPool, recipients: recipients)
+        kingdom.distributionHistory.insert(distribution, at: 0)
+        
+        // Keep only last 30 distributions
+        if kingdom.distributionHistory.count > 30 {
+            kingdom.distributionHistory = Array(kingdom.distributionHistory.prefix(30))
+        }
+        
+        // Update last distribution time
+        kingdom.lastRewardDistribution = Date()
+        
+        // Save changes
+        kingdoms[kingdomIndex] = kingdom
+        
+        print("✅ Distributed \(rewardPool)g to \(recipients.count) subjects")
+        
+        return distribution
+    }
+    
+    /// Get estimated reward share for a player in a kingdom
+    func getEstimatedRewardShare(for playerId: String, in kingdomId: UUID) -> Int {
+        guard let kingdom = kingdoms.first(where: { $0.id == kingdomId }) else {
+            return 0
+        }
+        
+        // Check if player is eligible
+        guard player.playerId == playerId else { return 0 }
+        guard player.isEligibleForRewards(inKingdom: kingdom.id.uuidString, rulerId: kingdom.rulerId) else {
+            return 0
+        }
+        
+        // Calculate player's merit
+        let playerMerit = player.calculateMeritScore(inKingdom: kingdom.id.uuidString)
+        
+        // For single-player, player gets 100% if they're the only eligible subject
+        // TODO: When multiplayer, calculate based on all subjects
+        
+        let rewardPool = kingdom.dailyRewardPool
+        
+        // For now, estimate 100% since single-player
+        // In multiplayer, this would be: playerMerit / totalMeritOfAllEligible * rewardPool
+        return rewardPool
+    }
+    
+    /// Set the subject reward rate for a kingdom (ruler only)
+    func setSubjectRewardRate(_ rate: Int, for kingdomId: UUID) {
+        guard let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
+            return
+        }
+        
+        // Check if player is ruler
+        guard kingdoms[kingdomIndex].rulerId == player.playerId else {
+            print("❌ Only ruler can set reward rate")
+            return
+        }
+        
+        kingdoms[kingdomIndex].setSubjectRewardRate(rate)
+        print("✅ Set reward rate to \(rate)%")
+    }
+    
+    // MARK: - API Sync Methods
+    
+    /// Sync player data to backend API
+    func syncPlayerToAPI() {
+        Task {
+            do {
+                try await apiService.syncPlayer(player)
+                print("✅ Player synced to API")
+            } catch {
+                print("⚠️ Failed to sync player to API: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Sync kingdom to backend API
+    func syncKingdomToAPI(_ kingdom: Kingdom) {
+        Task {
+            do {
+                try await apiService.syncKingdom(kingdom)
+                print("✅ Kingdom synced to API: \(kingdom.name)")
+            } catch {
+                print("⚠️ Failed to sync kingdom to API: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Check-in with API integration
+    func checkInWithAPI() {
+        guard let kingdom = currentKingdomInside,
+              let location = userLocation else {
+            print("❌ Cannot check in - not inside a kingdom")
+            return
+        }
+        
+        // Do local check-in first
+        let success = checkIn()
+        
+        if success {
+            // Sync to API
+            Task {
+                do {
+                    let response = try await apiService.checkIn(
+                        playerId: player.playerId,
+                        kingdomId: kingdom.id.uuidString,
+                        location: location
+                    )
+                    
+                    print("✅ API check-in: \(response.message)")
+                    print("💰 Rewards: \(response.rewards.gold)g, \(response.rewards.experience) XP")
+                    
+                    // Update player with API rewards
+                    player.addGold(response.rewards.gold)
+                    player.addExperience(response.rewards.experience)
+                    
+                } catch {
+                    print("⚠️ API check-in failed: \(error.localizedDescription)")
+                    // Local check-in still succeeded, so this is just a warning
+                }
+            }
+        }
+    }
+    
+    /// Test API connectivity
+    func testAPIConnection() {
+        Task {
+            let isConnected = await apiService.testConnection()
+            if isConnected {
+                print("✅ API connection successful")
+            } else {
+                print("❌ API connection failed")
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ struct MapView: View {
     @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
+    @State private var showAPIDebug = false
     
     var body: some View {
         ZStack {
@@ -129,6 +130,15 @@ struct MapView: View {
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
                             }
+                        }
+                        
+                        // API Status Indicator
+                        Button {
+                            showAPIDebug = true
+                        } label: {
+                            Circle()
+                                .fill(viewModel.apiService.isConnected ? Color.green : Color.gray.opacity(0.4))
+                                .frame(width: 8, height: 8)
                         }
                     }
                     
@@ -308,6 +318,9 @@ struct MapView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showAPIDebug) {
+            APIDebugView()
         }
     }
 }

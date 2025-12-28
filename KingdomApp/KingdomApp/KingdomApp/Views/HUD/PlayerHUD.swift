@@ -4,6 +4,8 @@ import SwiftUI
 struct PlayerHUD: View {
     @ObservedObject var player: Player
     let currentKingdom: Kingdom?
+    @ObservedObject var apiService: KingdomAPIService
+    @State private var showingAPIDebug = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
@@ -13,6 +15,18 @@ struct PlayerHUD: View {
                 Text(player.name)
                     .font(KingdomTheme.Typography.headline())
                     .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                // API Status Indicator
+                Button {
+                    showingAPIDebug = true
+                } label: {
+                    Circle()
+                        .fill(apiService.isConnected ? Color.green : Color.gray)
+                        .frame(width: 8, height: 8)
+                }
+                .buttonStyle(.plain)
             }
             
             HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -39,5 +53,8 @@ struct PlayerHUD: View {
         }
         .padding(KingdomTheme.Spacing.medium)
         .parchmentCard()
+        .sheet(isPresented: $showingAPIDebug) {
+            APIDebugView()
+        }
     }
 }

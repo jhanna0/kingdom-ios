@@ -52,6 +52,11 @@ class Player: ObservableObject {
     // Kingdom-specific reputation
     @Published var kingdomReputation: [String: Int] = [:]  // kingdomId -> rep
     
+    // Reward distribution tracking
+    @Published var totalRewardsReceived: Int = 0  // Lifetime subject rewards
+    @Published var lastRewardReceived: Date?
+    @Published var lastRewardAmount: Int = 0
+    
     // Cooldowns
     @Published var lastCoupAttempt: Date?
     @Published var lastDailyCheckIn: Date?      // For daily bonuses
@@ -152,6 +157,49 @@ class Player: ObservableObject {
     func getVoteWeight(inKingdom kingdomId: String) -> Int {
         let tier = getKingdomTier(kingdomId)
         return tier.voteWeight + leadership
+    }
+    
+    // MARK: - Merit Score & Reward Distribution
+    
+    /// Calculate merit score for reward distribution
+    /// Formula: (reputation × 1.0) + (skillTotal × 0.5)
+    /// Reputation weighted 2× more than skills
+    func calculateMeritScore(inKingdom kingdomId: String) -> Int {
+        let rep = getKingdomReputation(kingdomId)
+        let skillTotal = attackPower + defensePower + leadership + buildingSkill
+        
+        // Reputation counts 1.0×, skills count 0.5×
+        let reputationPoints = Double(rep) * 1.0
+        let skillPoints = Double(skillTotal) * 0.5
+        
+        return Int(reputationPoints + skillPoints)
+    }
+    
+    /// Check if player is eligible for reward distribution
+    func isEligibleForRewards(inKingdom kingdomId: String, rulerId: String?) -> Bool {
+        // Must not be the ruler
+        guard playerId != rulerId else { return false }
+        
+        // Must have checked in within last 7 days
+        guard let lastCheckIn = lastCheckIn else { return false }
+        let daysSinceCheckIn = Date().timeIntervalSince(lastCheckIn) / 86400
+        guard daysSinceCheckIn < 7 else { return false }
+        
+        // Must have at least 50 reputation (Resident tier)
+        let rep = getKingdomReputation(kingdomId)
+        guard rep >= 50 else { return false }
+        
+        return true
+    }
+    
+    /// Receive reward distribution
+    func receiveReward(_ amount: Int) {
+        addGold(amount)
+        totalRewardsReceived += amount
+        lastRewardReceived = Date()
+        lastRewardAmount = amount
+        
+        print("💎 Received reward: \(amount)g")
     }
     
     // MARK: - Experience & Leveling
@@ -622,6 +670,11 @@ class Player: ObservableObject {
             defaults.set(jsonData, forKey: "kingdomReputation")
         }
         
+        // Reward tracking
+        defaults.set(totalRewardsReceived, forKey: "totalRewardsReceived")
+        defaults.set(lastRewardReceived, forKey: "lastRewardReceived")
+        defaults.set(lastRewardAmount, forKey: "lastRewardAmount")
+        
         if let location = lastCheckInLocation {
             defaults.set(location.latitude, forKey: "lastCheckInLat")
             defaults.set(location.longitude, forKey: "lastCheckInLon")
@@ -712,6 +765,11 @@ class Player: ObservableObject {
            let decoded = try? JSONDecoder().decode([String: Int].self, from: jsonData) {
             kingdomReputation = decoded
         }
+        
+        // Reward tracking
+        totalRewardsReceived = defaults.integer(forKey: "totalRewardsReceived")
+        lastRewardReceived = defaults.object(forKey: "lastRewardReceived") as? Date
+        lastRewardAmount = defaults.integer(forKey: "lastRewardAmount")
     }
     
     /// Reset player data (for testing/debugging)

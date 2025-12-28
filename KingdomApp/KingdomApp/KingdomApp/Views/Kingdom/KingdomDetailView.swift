@@ -133,6 +133,23 @@ struct KingdomDetailView: View {
                 )
                 .padding(.horizontal)
                 
+                // Reward Distribution System
+                if isRuler {
+                    // Show ruler management card
+                    RulerRewardManagementCard(
+                        kingdom: Binding(
+                            get: { kingdom },
+                            set: { _ in }
+                        ),
+                        viewModel: viewModel
+                    )
+                    .padding(.horizontal)
+                } else {
+                    // Show subject reward card
+                    SubjectRewardCard(kingdom: kingdom, player: player)
+                        .padding(.horizontal)
+                }
+                
                         // Ruler actions
                         if isRuler {
                             VStack(spacing: KingdomTheme.Spacing.medium) {
