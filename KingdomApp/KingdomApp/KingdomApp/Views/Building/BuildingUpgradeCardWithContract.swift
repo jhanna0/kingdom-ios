@@ -130,3 +130,4 @@ struct BuildingUpgradeCardWithContract: View {
     }
 }
 
+

@@ -17,6 +17,11 @@ class Player: ObservableObject {
     @Published var lastCheckIn: Date?
     @Published var lastCheckInLocation: CLLocationCoordinate2D?
     
+    // Player History & Home
+    @Published var homeKingdomId: String?   // Where they spend most time
+    @Published var originKingdomId: String? // Where they started (first 300+ rep)
+    @Published var checkInHistory: [String: Int] = [:]  // kingdomId -> total check-ins
+    
     // Power & Territory
     @Published var fiefsRuled: Set<String> = []  // Kingdom names this player rules
     @Published var isRuler: Bool = false
@@ -49,6 +54,10 @@ class Player: ObservableObject {
     // Cooldowns
     @Published var lastCoupAttempt: Date?
     @Published var lastDailyCheckIn: Date?      // For daily bonuses
+    
+    // Temporary debuffs (from failed battles)
+    @Published var attackDebuff: Int = 0        // Temporary attack reduction
+    @Published var debuffExpires: Date?         // When the debuff ends
     
     // Game configuration
     let checkInValidHours: Double = 4  // Check-ins expire after 4 hours
@@ -116,7 +125,13 @@ class Player: ObservableObject {
         // Kingdom-specific reputation
         if let kingdomId = kingdomId {
             let current = kingdomReputation[kingdomId] ?? 0
-            kingdomReputation[kingdomId] = current + amount
+            let newRep = current + amount
+            kingdomReputation[kingdomId] = newRep
+            
+            // Track origin kingdom (first time hitting 300+ rep)
+            if originKingdomId == nil && newRep >= 300 {
+                originKingdomId = kingdomId
+            }
         }
         
         saveToUserDefaults()
@@ -346,7 +361,33 @@ class Player: ObservableObject {
         currentKingdom = kingdom
         lastCheckIn = Date()
         lastCheckInLocation = location
+        
+        // Track check-in history
+        let currentCount = checkInHistory[kingdom] ?? 0
+        checkInHistory[kingdom] = currentCount + 1
+        
+        // Update home kingdom (where they check in most)
+        updateHomeKingdom()
+        
         saveToUserDefaults()
+    }
+    
+    /// Update home kingdom based on check-in frequency
+    private func updateHomeKingdom() {
+        if let mostFrequent = checkInHistory.max(by: { $0.value < $1.value }) {
+            homeKingdomId = mostFrequent.key
+        }
+    }
+    
+    /// Get player's "true" kingdom (home)
+    func getTrueKingdom() -> String? {
+        // 1. If they rule a kingdom, that's their kingdom
+        if let ruledKingdom = fiefsRuled.first {
+            return ruledKingdom
+        }
+        
+        // 2. Otherwise, their home kingdom (most check-ins)
+        return homeKingdomId
     }
     
     /// Check if player can check in to a location (within range)
@@ -395,6 +436,86 @@ class Player: ObservableObject {
         saveToUserDefaults()
     }
     
+    // MARK: - Combat Debuffs
+    
+    /// Get effective attack power (including debuffs)
+    func getEffectiveAttackPower() -> Int {
+        clearExpiredDebuffs()
+        return max(1, attackPower - attackDebuff)
+    }
+    
+    /// Apply wound debuff from failed invasion
+    func applyWoundDebuff(attackLoss: Int, durationHours: Double) {
+        attackDebuff = attackLoss
+        debuffExpires = Date().addingTimeInterval(durationHours * 3600)
+        saveToUserDefaults()
+    }
+    
+    /// Clear debuffs if they've expired
+    func clearExpiredDebuffs() {
+        guard let expires = debuffExpires else { return }
+        
+        if Date() >= expires {
+            attackDebuff = 0
+            debuffExpires = nil
+            saveToUserDefaults()
+        }
+    }
+    
+    /// Check if player is currently debuffed
+    func isDebuffed() -> Bool {
+        clearExpiredDebuffs()
+        return attackDebuff > 0
+    }
+    
+    /// Apply harsh penalties from failed coup (EXECUTED)
+    func applyCoupFailurePenalty(seizedBy ruler: Player) {
+        // 1. Lose ALL gold (executed)
+        let goldLost = gold
+        gold = 0
+        ruler.addGold(goldLost)
+        
+        // 2. Major reputation loss
+        reputation -= 100
+        if let kingdom = currentKingdom {
+            let currentRep = kingdomReputation[kingdom] ?? 0
+            kingdomReputation[kingdom] = currentRep - 100
+        }
+        
+        // 3. Lose ALL combat stats (EXECUTED)
+        attackPower = 1
+        defensePower = 1
+        leadership = 1
+        
+        // 4. Mark as traitor (badge)
+        // TODO: Add badge system
+        
+        saveToUserDefaults()
+    }
+    
+    /// Apply catastrophic penalty for overthrown ruler who failed to flee
+    func applyOverthrownRulerPenalty() {
+        // LOSE EVERYTHING
+        gold = 0
+        
+        // Massive reputation hit
+        reputation -= 200
+        if let kingdom = currentKingdom {
+            kingdomReputation[kingdom] = 0  // Reset to 0 in this kingdom
+        }
+        
+        // Severe stat loss
+        attackPower = max(1, attackPower - 5)
+        defensePower = max(1, defensePower - 5)
+        leadership = max(1, leadership - 5)
+        
+        // Lose ruler status
+        fiefsRuled.removeAll()
+        isRuler = false
+        
+        saveToUserDefaults()
+    }
+    
     // MARK: - Economy
     
     /// Add gold to player
@@ -434,6 +555,13 @@ class Player: ObservableObject {
         defaults.set(gold, forKey: "gold")
         defaults.set(currentKingdom, forKey: "currentKingdom")
         defaults.set(lastCheckIn, forKey: "lastCheckIn")
+        defaults.set(homeKingdomId, forKey: "homeKingdomId")
+        defaults.set(originKingdomId, forKey: "originKingdomId")
+        
+        // Check-in history (stored as JSON)
+        if let jsonData = try? JSONEncoder().encode(checkInHistory) {
+            defaults.set(jsonData, forKey: "checkInHistory")
+        }
         defaults.set(Array(fiefsRuled), forKey: "fiefsRuled")
         defaults.set(isRuler, forKey: "isRuler")
         defaults.set(activeContractId, forKey: "activeContractId")
@@ -445,6 +573,8 @@ class Player: ObservableObject {
         defaults.set(executionsOrdered, forKey: "executionsOrdered")
         defaults.set(lastCoupAttempt, forKey: "lastCoupAttempt")
         defaults.set(lastDailyCheckIn, forKey: "lastDailyCheckIn")
+        defaults.set(attackDebuff, forKey: "attackDebuff")
+        defaults.set(debuffExpires, forKey: "debuffExpires")
         
         // Progression
         defaults.set(reputation, forKey: "reputation")
@@ -498,6 +628,14 @@ class Player: ObservableObject {
         
         currentKingdom = defaults.string(forKey: "currentKingdom")
         lastCheckIn = defaults.object(forKey: "lastCheckIn") as? Date
+        homeKingdomId = defaults.string(forKey: "homeKingdomId")
+        originKingdomId = defaults.string(forKey: "originKingdomId")
+        
+        // Check-in history
+        if let jsonData = defaults.data(forKey: "checkInHistory"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: jsonData) {
+            checkInHistory = decoded
+        }
         
         if let lat = defaults.object(forKey: "lastCheckInLat") as? Double,
            let lon = defaults.object(forKey: "lastCheckInLon") as? Double {
@@ -508,7 +646,8 @@ class Player: ObservableObject {
             fiefsRuled = Set(fiefs)
         }
         
-        isRuler = defaults.bool(forKey: "isRuler")
+        // Ensure isRuler stays in sync with fiefsRuled
+        isRuler = defaults.bool(forKey: "isRuler") || !fiefsRuled.isEmpty
         activeContractId = defaults.string(forKey: "activeContractId")
         contractsCompleted = defaults.integer(forKey: "contractsCompleted")
         totalWorkContributed = defaults.integer(forKey: "totalWorkContributed")
@@ -518,6 +657,8 @@ class Player: ObservableObject {
         executionsOrdered = defaults.integer(forKey: "executionsOrdered")
         lastCoupAttempt = defaults.object(forKey: "lastCoupAttempt") as? Date
         lastDailyCheckIn = defaults.object(forKey: "lastDailyCheckIn") as? Date
+        attackDebuff = defaults.integer(forKey: "attackDebuff")
+        debuffExpires = defaults.object(forKey: "debuffExpires") as? Date
         
         // Progression
         reputation = defaults.integer(forKey: "reputation")

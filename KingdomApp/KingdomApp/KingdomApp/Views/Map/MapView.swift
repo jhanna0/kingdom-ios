@@ -9,6 +9,7 @@ struct MapView: View {
     @State private var showMyKingdoms = false
     @State private var showContracts = false
     @State private var showCharacterSheet = false
+    @State private var showActivityFeed = false
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
     
@@ -168,8 +169,8 @@ struct MapView: View {
                         
                         Spacer()
                         
-                        // My Kingdoms
-                        if viewModel.player.isRuler {
+                        // My Kingdoms (always show if player has kingdoms)
+                        if viewModel.player.isRuler || !viewModel.player.fiefsRuled.isEmpty {
                             Button(action: {
                                 showMyKingdoms = true
                             }) {
@@ -202,6 +203,11 @@ struct MapView: View {
                             .padding(.vertical, 6)
                             .background(KingdomTheme.Colors.buttonWarning)
                             .cornerRadius(8)
+                        }
+                        
+                        // World Activity Feed
+                        ActivityBadge(worldSimulator: viewModel.worldSimulator) {
+                            showActivityFeed = true
                         }
                     }
                 }
@@ -294,6 +300,12 @@ struct MapView: View {
         }
         .sheet(isPresented: $showCharacterSheet) {
             CharacterSheetView(player: viewModel.player)
+        }
+        .sheet(isPresented: $showActivityFeed) {
+            WorldActivityFeed(
+                worldSimulator: viewModel.worldSimulator,
+                isPresented: $showActivityFeed
+            )
         }
     }
 }

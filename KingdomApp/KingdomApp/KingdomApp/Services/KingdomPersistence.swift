@@ -71,6 +71,7 @@ struct CachedKingdomState: Codable {
     let checkedInPlayers: Int
     let mineLevel: Int
     let marketLevel: Int
+    let taxRate: Int?  // Optional for backwards compatibility
     
     // Income tracking
     let lastIncomeCollection: Date
@@ -95,6 +96,7 @@ struct CachedKingdomState: Codable {
         self.checkedInPlayers = kingdom.checkedInPlayers
         self.mineLevel = kingdom.mineLevel
         self.marketLevel = kingdom.marketLevel
+        self.taxRate = kingdom.taxRate
         
         self.lastIncomeCollection = kingdom.lastIncomeCollection
         self.weeklyUniqueCheckIns = kingdom.weeklyUniqueCheckIns
@@ -123,6 +125,7 @@ struct CachedKingdomState: Codable {
         kingdom.checkedInPlayers = self.checkedInPlayers
         kingdom.mineLevel = self.mineLevel
         kingdom.marketLevel = self.marketLevel
+        kingdom.taxRate = self.taxRate ?? 10  // Default 10% tax if not saved
         kingdom.lastIncomeCollection = self.lastIncomeCollection
         kingdom.weeklyUniqueCheckIns = self.weeklyUniqueCheckIns
         kingdom.totalIncomeCollected = self.totalIncomeCollected

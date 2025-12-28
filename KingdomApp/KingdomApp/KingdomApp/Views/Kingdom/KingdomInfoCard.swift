@@ -131,6 +131,12 @@ struct KingdomInfoCard: View {
             }
             .font(KingdomTheme.Typography.caption())
             
+            // Citizens section - shows NPCs in this kingdom
+            CitizensPreview(
+                kingdomName: kingdom.name,
+                worldSimulator: viewModel.worldSimulator
+            )
+            
             // Check-in/Claim section
             if isPlayerInside {
                 VStack(spacing: 8) {

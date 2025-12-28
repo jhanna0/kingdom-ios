@@ -36,8 +36,18 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var mineLevel: Int
     var marketLevel: Int
     
+    // Tax system (0-100%)
+    var taxRate: Int  // Percentage of mined resources going to treasury
+    
     // Active contract
     var activeContract: Contract?
+    
+    // Daily quests (ruler-issued objectives)
+    var activeQuests: [DailyQuest]
+    
+    // Alliances
+    var allies: Set<String>  // Kingdom IDs of allied kingdoms
+    var enemies: Set<String>  // Kingdom IDs of kingdoms at war
     
     // Income tracking
     var lastIncomeCollection: Date
@@ -66,11 +76,15 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.checkedInPlayers = Int.random(in: 0...5)
         self.mineLevel = Int.random(in: 0...2)
         self.marketLevel = Int.random(in: 0...2)
+        self.taxRate = Int.random(in: 5...20)  // Random starting tax rate
         self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
         self.weeklyUniqueCheckIns = Int.random(in: 0...10)
         self.totalIncomeCollected = 0
         self.incomeHistory = []
         self.activeContract = nil
+        self.activeQuests = []
+        self.allies = []
+        self.enemies = []
     }
     
     /// Check if a point is inside this kingdom's territory
@@ -186,6 +200,54 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var hasIncomeToCollect: Bool {
         let elapsed = Date().timeIntervalSince(lastIncomeCollection)
         return elapsed >= 3600 // At least 1 hour has passed
+    }
+    
+    // MARK: - Tax System
+    
+    /// Calculate tax amount for mined resources
+    func calculateTax(on amount: Int) -> Int {
+        return Int(Double(amount) * Double(taxRate) / 100.0)
+    }
+    
+    /// Set tax rate (ruler only)
+    mutating func setTaxRate(_ rate: Int) {
+        taxRate = max(0, min(100, rate))  // Clamp 0-100
+    }
+    
+    // MARK: - Quest Management
+    
+    /// Add a new quest
+    mutating func addQuest(_ quest: DailyQuest) {
+        activeQuests.append(quest)
+    }
+    
+    /// Remove completed or expired quests
+    mutating func cleanupQuests() {
+        activeQuests.removeAll { $0.isComplete || $0.isExpired }
+    }
+    
+    // MARK: - Alliance System
+    
+    /// Form an alliance with another kingdom
+    mutating func formAlliance(with kingdomId: String) {
+        allies.insert(kingdomId)
+        enemies.remove(kingdomId)
+    }
+    
+    /// Break an alliance
+    mutating func breakAlliance(with kingdomId: String) {
+        allies.remove(kingdomId)
+    }
+    
+    /// Declare war
+    mutating func declareWar(on kingdomId: String) {
+        enemies.insert(kingdomId)
+        allies.remove(kingdomId)
+    }
+    
+    /// Make peace
+    mutating func makePeace(with kingdomId: String) {
+        enemies.remove(kingdomId)
     }
     
     /// Get income ready to collect (without actually collecting)

@@ -11,6 +11,9 @@ class MapViewModel: ObservableObject {
             // Auto-save kingdoms whenever they change
             // TODO: Replace with backend sync in the future
             saveKingdomsToStorage()
+            
+            // Populate kingdoms with NPC citizens
+            worldSimulator.populateKingdoms(kingdoms)
         }
     }
     @Published var cameraPosition: MapCameraPosition
@@ -19,17 +22,24 @@ class MapViewModel: ObservableObject {
     @Published var loadingStatus: String = "Awakening the royal cartographers..."
     @Published var errorMessage: String?
     @Published var player: Player
+    @Published var playerResources: PlayerResources  // Equipment, resources, properties
     @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
+    
+    // World simulation - makes the game feel alive!
+    @Published var worldSimulator = WorldSimulator.shared
+    @Published var showActivityFeed: Bool = false
     
     // Configuration
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
     
     private var hasInitializedLocation = false
     private var hasLoadedPersistedKingdoms = false
+    private var cancellables = Set<AnyCancellable>()
     
     init() {
         // Initialize player (loads from UserDefaults automatically)
         self.player = Player()
+        self.playerResources = PlayerResources.load()
         
         // Start with default location - will be replaced when user location arrives
         let center = SampleData.defaultCenter
@@ -39,6 +49,16 @@ class MapViewModel: ObservableObject {
                 span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3)
             )
         )
+        
+        // CRITICAL: Forward nested ObservableObject changes to MapViewModel
+        // This ensures the UI updates when player/resources state changes
+        player.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        
+        playerResources.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
         
         // Load persisted kingdoms (if any)
         loadPersistedKingdoms()
@@ -370,11 +390,17 @@ class MapViewModel: ObservableObject {
         if incomeEarned > 0 {
             kingdoms[index].collectIncome()
             print("💰 \(kingdom.name) collected \(incomeEarned) gold (now: \(kingdoms[index].treasuryGold)g)")
-            
-            // Update currentKingdomInside if it's the same kingdom
-            if currentKingdomInside?.id == kingdom.id {
-                currentKingdomInside = kingdoms[index]
-            }
+        }
+        
+        // Also collect NPC tax income (citizens mining and paying taxes)
+        let taxIncome = worldSimulator.simulateTaxIncome(for: &kingdoms[index])
+        if taxIncome > 0 {
+            print("💰 Citizens paid \(taxIncome)g in taxes!")
+        }
+        
+        // Update currentKingdomInside if it's the same kingdom
+        if currentKingdomInside?.id == kingdom.id {
+            currentKingdomInside = kingdoms[index]
         }
     }
     
@@ -457,7 +483,13 @@ class MapViewModel: ObservableObject {
         
         kingdoms[index].activeContract = contract
         
+        // Have NPC citizens start working on the contract
+        let npcWorkers = worldSimulator.simulateContractWork(for: &kingdoms[index])
+        
         print("📜 Contract created: \(buildingTypeStr) level \(nextLevel) - ~\(String(format: "%.1f", contract.baseHoursRequired))h with 3 workers")
+        if npcWorkers > 0 {
+            print("👷 \(npcWorkers) citizens joined the work crew!")
+        }
         
         // Update currentKingdomInside if it's the same kingdom
         if currentKingdomInside?.id == kingdom.id {
