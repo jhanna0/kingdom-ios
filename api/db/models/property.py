@@ -26,6 +26,7 @@ class Property(Base):
     owner_name = Column(String, nullable=False)
     
     tier = Column(Integer, default=1)  # 1-5
+    location = Column(String, nullable=True)  # "north", "south", "east", "west"
     purchased_at = Column(DateTime, default=datetime.utcnow)
     last_upgraded = Column(DateTime, nullable=True)
     

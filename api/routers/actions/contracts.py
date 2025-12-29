@@ -1,11 +1,12 @@
 """
-Work on contract action
+Work on contract action (kingdom buildings and property upgrades)
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import json
 
-from db import get_db, User, PlayerState, Kingdom, Contract
+from db import get_db, User, PlayerState, Kingdom, Contract, Property
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import calculate_cooldown, check_cooldown, check_global_action_cooldown, format_datetime_iso
@@ -137,5 +138,115 @@ def work_on_contract(
             "reputation": None,
             "iron": None
         }
+    }
+
+
+@router.post("/work-property/{contract_id}")
+def work_on_property_upgrade(
+    contract_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Contribute one action to a property upgrade contract (same cooldown as building contracts)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    # Check cooldown (same as building work)
+    cooldown_minutes = calculate_cooldown(120, state.building_skill)
+    
+    # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
+    if not DEV_MODE:
+        global_cooldown = check_global_action_cooldown(
+            state, 
+            work_cooldown=cooldown_minutes,
+            patrol_cooldown=10,
+            sabotage_cooldown=1440,
+            scout_cooldown=1440,
+            training_cooldown=120
+        )
+        
+        if not global_cooldown["ready"]:
+            remaining = global_cooldown["seconds_remaining"]
+            minutes = remaining // 60
+            seconds = remaining % 60
+            blocking_action = global_cooldown["blocking_action"]
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
+            )
+    
+    # Get property upgrade contracts
+    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    
+    # Find the contract
+    contract_idx = None
+    contract_data = None
+    for idx, contract in enumerate(property_contracts):
+        if contract["contract_id"] == contract_id:
+            contract_idx = idx
+            contract_data = contract
+            break
+    
+    if contract_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property upgrade contract not found"
+        )
+    
+    if contract_data["status"] == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract is already completed"
+        )
+    
+    # Increment action count
+    contract_data["actions_completed"] += 1
+    
+    # Update player state
+    state.last_work_action = datetime.utcnow()
+    state.total_work_contributed += 1
+    
+    # Check if contract is complete
+    is_complete = contract_data["actions_completed"] >= contract_data["actions_required"]
+    
+    if is_complete:
+        contract_data["status"] = "completed"
+        contract_data["completed_at"] = datetime.utcnow().isoformat()
+        
+        # Upgrade the property tier
+        property = db.query(Property).filter(
+            Property.id == contract_data["property_id"]
+        ).first()
+        
+        if property:
+            property.tier = contract_data["to_tier"]
+            property.last_upgraded = datetime.utcnow()
+        
+        # Mark contract as completed
+        state.contracts_completed += 1
+    
+    # Save updated contracts
+    property_contracts[contract_idx] = contract_data
+    state.property_upgrade_contracts = json.dumps(property_contracts)
+    
+    db.commit()
+    
+    progress_percent = int((contract_data["actions_completed"] / contract_data["actions_required"]) * 100)
+    
+    return {
+        "success": True,
+        "message": "Work action completed! +1 action" + (" - Property upgrade complete!" if is_complete else ""),
+        "contract_id": contract_id,
+        "property_id": contract_data["property_id"],
+        "actions_completed": contract_data["actions_completed"],
+        "total_actions_required": contract_data["actions_required"],
+        "progress_percent": progress_percent,
+        "is_complete": is_complete,
+        "new_tier": contract_data["to_tier"] if is_complete else None,
+        "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes))
     }
 

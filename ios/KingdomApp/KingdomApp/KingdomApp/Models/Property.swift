@@ -17,6 +17,7 @@ struct Property: Identifiable, Codable, Hashable {
     let ownerName: String
     
     var tier: Int  // 1-5, each tier unlocks new features
+    var location: String?  // "north", "south", "east", "west"
     let purchasedAt: Date
     var lastUpgraded: Date?
     
@@ -127,7 +128,8 @@ struct Property: Identifiable, Codable, Hashable {
         kingdomId: String,
         kingdomName: String,
         ownerId: String,
-        ownerName: String
+        ownerName: String,
+        location: String
     ) -> Property {
         return Property(
             id: UUID().uuidString,
@@ -136,6 +138,7 @@ struct Property: Identifiable, Codable, Hashable {
             ownerId: ownerId,
             ownerName: ownerName,
             tier: 1,  // Always start at T1 (Land)
+            location: location,
             purchasedAt: Date(),
             lastUpgraded: nil
         )
@@ -148,15 +151,15 @@ extension Property {
     var tierDescription: String {
         switch tier {
         case 1:
-            return "Undeveloped land with travel benefits"
+            return "Cleared land"
         case 2:
-            return "Basic dwelling for residence"
+            return "Basic dwelling"
         case 3:
-            return "Workshop with crafting facilities"
+            return "Workshop for crafting"
         case 4:
-            return "Luxurious estate exempt from taxes"
+            return "Luxurious estate"
         case 5:
-            return "Fortified estate with maximum benefits"
+            return "Fortified estate"
         default:
             return "Property"
         }
@@ -166,42 +169,23 @@ extension Property {
         var benefits: [String] = []
         
         if tier >= 1 {
-            benefits.append("50% travel cost reduction")
-            benefits.append("Instant travel to \(kingdomName)")
+            benefits.append("Instant travel")
         }
         if tier >= 2 {
-            benefits.append("Personal residence")
+            benefits.append("Residence")
         }
         if tier >= 3 {
-            benefits.append("Can craft weapons and armor")
-            benefits.append("15% faster crafting")
+            benefits.append("Crafting")
         }
         if tier >= 4 {
-            benefits.append("Tax exemption in \(kingdomName)")
+            benefits.append("No taxes")
         }
         if tier >= 5 {
-            benefits.append("50% chance to survive conquest")
+            benefits.append("Conquest protection")
         }
         
         return benefits
     }
 }
 
-// MARK: - Sample Properties
-
-extension Property {
-    static let samples: [Property] = [
-        // One property in one kingdom at tier 3 (Workshop)
-        Property(
-            id: UUID().uuidString,
-            kingdomId: "kingdom1",
-            kingdomName: "Ashford",
-            ownerId: "player1",
-            ownerName: "Sir Aldric",
-            tier: 3,  // Workshop - can craft weapons/armor
-            purchasedAt: Date().addingTimeInterval(-30 * 24 * 3600),
-            lastUpgraded: Date().addingTimeInterval(-7 * 24 * 3600)
-        )
-    ]
-}
 

@@ -131,7 +131,7 @@ struct NotificationOverlay: View {
             type: "contract_ready",
             priority: "high",
             title: "Contract Complete!",
-            message: "Market in Ashford is ready",
+            message: "Market construction complete",
             action: "complete_contract",
             action_id: "123",
             created_at: ISO8601DateFormatter().string(from: Date())

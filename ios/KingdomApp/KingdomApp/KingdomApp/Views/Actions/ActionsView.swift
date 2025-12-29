@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// Convert backend action names to proper display format (present continuous tense)
+fileprivate func actionNameToDisplayName(_ actionName: String?) -> String {
+    guard let name = actionName?.lowercased() else { return "another action" }
+    switch name {
+    case "patrol": return "Patrolling"
+    case "work": return "Working"
+    case "scout": return "Scouting"
+    case "sabotage": return "Sabotaging"
+    case "training": return "Training"
+    default: return name.capitalized
+    }
+}
+
 struct ActionsView: View {
     @ObservedObject var viewModel: MapViewModel
     @State private var actionStatus: AllActionStatus?
@@ -112,7 +125,8 @@ struct ActionsView: View {
                         if let status = actionStatus {
                             // === GLOBAL COOLDOWN WARNING ===
                             if !status.globalCooldown.ready {
-                                let blockingAction = status.globalCooldown.blockingAction ?? "an action"
+                                let blockingAction = status.globalCooldown.blockingAction
+                                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
                                 let remaining = status.globalCooldown.secondsRemaining
                                 let hours = remaining / 3600
                                 let minutes = (remaining % 3600) / 60
@@ -123,7 +137,7 @@ struct ActionsView: View {
                                         .font(KingdomTheme.Typography.headline())
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     
-                                    Text("You performed \(blockingAction) recently. Only ONE action at a time!")
+                                    Text("You are already \(blockingActionDisplay). Only ONE action at a time!")
                                         .font(KingdomTheme.Typography.caption())
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     
@@ -707,9 +721,8 @@ struct WorkContractCard: View {
             .frame(height: 8)
             
             if globalCooldownActive {
-                let blockingName = blockingAction?.capitalized ?? "another action"
-                let isThisAction = blockingAction?.lowercased().contains("work") ?? false
-                Text(isThisAction ? "You are already Working" : "You are already \(blockingName)")
+                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
+                Text("You are already \(blockingActionDisplay)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)
@@ -804,10 +817,8 @@ struct ActionCard: View {
             }
             
             if globalCooldownActive {
-                let actionName = actionTypeName
-                let blockingName = blockingAction?.capitalized ?? "another action"
-                let isThisAction = blockingAction?.lowercased().contains(actionType == .patrol ? "patrol" : actionType == .scout ? "scout" : actionType == .sabotage ? "sabotage" : "work") ?? false
-                Text(isThisAction ? "You are already \(actionName)" : "You are already \(blockingName)")
+                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
+                Text("You are already \(blockingActionDisplay)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)
@@ -844,15 +855,6 @@ struct ActionCard: View {
             return KingdomTheme.Colors.gold
         } else {
             return KingdomTheme.Colors.disabled
-        }
-    }
-    
-    private var actionTypeName: String {
-        switch actionType {
-        case .patrol: return "Patrolling"
-        case .scout: return "Scouting"
-        case .sabotage: return "Sabotaging"
-        case .work: return "Working"
         }
     }
 }
@@ -1015,9 +1017,8 @@ struct TrainingContractCard: View {
             .frame(height: 8)
             
             if globalCooldownActive {
-                let blockingName = blockingAction?.capitalized ?? "another action"
-                let isThisAction = blockingAction?.lowercased().contains("train") ?? false
-                Text(isThisAction ? "You are already Training" : "You are already \(blockingName)")
+                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
+                Text("You are already \(blockingActionDisplay)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)

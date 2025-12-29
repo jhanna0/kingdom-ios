@@ -94,6 +94,10 @@ class PlayerState(Base):
     # Each contract: {id, type, actions_required, actions_completed, created_at, cost_paid}
     training_contracts = Column(JSONB, default=list)
     
+    # Active Property Upgrade Contracts (JSONB array)
+    # Each contract: {contract_id, property_id, from_tier, to_tier, actions_required, actions_completed, status, started_at}
+    property_upgrade_contracts = Column(JSONB, default=list)
+    
     # Equipment (stored as JSONB)
     equipped_weapon = Column(JSONB, nullable=True)
     equipped_armor = Column(JSONB, nullable=True)

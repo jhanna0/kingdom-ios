@@ -12,13 +12,11 @@ struct PropertyCard: View {
     
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-                // Header with icon and tier name
+                // Visual representation of property tier
+                tierVisual
+                
+                // Header with tier name and level
                 HStack {
-                    Image(systemName: tierIcon)
-                        .font(.system(size: 36))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .frame(width: 40)
-                    
                     VStack(alignment: .leading, spacing: 4) {
                         Text(property.tierName)
                             .font(.headline)
@@ -27,7 +25,7 @@ struct PropertyCard: View {
                         HStack(spacing: 3) {
                             ForEach(1...5, id: \.self) { tier in
                                 Circle()
-                                    .fill(tier <= property.tier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.2))
+                                    .fill(tier <= property.tier ? tierColor : KingdomTheme.Colors.inkDark.opacity(0.2))
                                     .frame(width: 6, height: 6)
                             }
                         }
@@ -41,7 +39,7 @@ struct PropertyCard: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(KingdomTheme.Colors.gold)
+                            .background(tierColor)
                             .cornerRadius(4)
                         
                         Text("\(property.currentValue) gold")
@@ -83,14 +81,84 @@ struct PropertyCard: View {
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private var tierIcon: String {
+    // MARK: - Tier Visual
+    
+    private var tierVisual: some View {
+        ZStack {
+            // Background gradient based on tier
+            LinearGradient(
+                colors: [tierColor.opacity(0.15), tierColor.opacity(0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 100)
+            .cornerRadius(8)
+            
+            // Tier-specific illustration
+            HStack(spacing: 16) {
+                Spacer()
+                
+                switch property.tier {
+                case 1:
+                    // T1: Cleared land
+                    Image(systemName: "rectangle.dashed")
+                        .font(.system(size: 50, weight: .light))
+                        .foregroundColor(tierColor)
+                    
+                case 2:
+                    // T2: Simple house
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(tierColor)
+                    
+                case 3:
+                    // T3: House with workshop
+                    HStack(spacing: 8) {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(tierColor)
+                        Image(systemName: "hammer.fill")
+                            .font(.system(size: 35))
+                            .foregroundColor(tierColor.opacity(0.8))
+                            .offset(y: 10)
+                    }
+                    
+                case 4:
+                    // T4: Beautiful property
+                    Image(systemName: "building.columns.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(tierColor)
+                    
+                case 5:
+                    // T5: Estate with crown
+                    VStack(spacing: -5) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 25))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Image(systemName: "building.columns.fill")
+                            .font(.system(size: 45))
+                            .foregroundColor(tierColor)
+                    }
+                    
+                default:
+                    Image(systemName: "questionmark")
+                        .font(.system(size: 50))
+                        .foregroundColor(tierColor)
+                }
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private var tierColor: Color {
         switch property.tier {
-        case 1: return "map"
-        case 2: return "house"
-        case 3: return "hammer"
-        case 4: return "building.columns"
-        case 5: return "crown"
-        default: return "map"
+        case 1: return KingdomTheme.Colors.buttonSecondary
+        case 2: return KingdomTheme.Colors.buttonPrimary
+        case 3: return KingdomTheme.Colors.goldWarm
+        case 4: return KingdomTheme.Colors.gold
+        case 5: return KingdomTheme.Colors.gold
+        default: return KingdomTheme.Colors.inkDark
         }
     }
     
@@ -99,23 +167,23 @@ struct PropertyCard: View {
     private var benefitsPreview: some View {
         VStack(alignment: .leading, spacing: 6) {
             if property.tier >= 1 {
-                benefitRow(text: "50% travel cost, instant travel")
+                benefitRow(text: "Instant travel")
             }
             
             if property.tier >= 2 {
-                benefitRow(text: "Personal residence")
+                benefitRow(text: "Residence")
             }
             
             if property.tier >= 3 {
-                benefitRow(text: "Can craft weapons & armor")
+                benefitRow(text: "Crafting")
             }
             
             if property.tier >= 4 {
-                benefitRow(text: "Tax exemption")
+                benefitRow(text: "No taxes")
             }
             
             if property.tier >= 5 {
-                benefitRow(text: "50% survive conquest")
+                benefitRow(text: "Conquest protection")
             }
         }
     }
@@ -134,28 +202,4 @@ struct PropertyCard: View {
     }
 }
 
-// MARK: - Preview
-
-struct PropertyCard_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: 16) {
-            PropertyCard(
-                property: Property.samples[0],
-                showOwner: true
-            )
-            
-            PropertyCard(
-                property: Property.samples[1],
-                showOwner: false
-            )
-            
-            PropertyCard(
-                property: Property.samples[2],
-                showOwner: true
-            )
-        }
-        .padding()
-        .background(KingdomTheme.Colors.parchment)
-    }
-}
 
