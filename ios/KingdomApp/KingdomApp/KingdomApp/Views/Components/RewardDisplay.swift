@@ -1,316 +1,263 @@
 import SwiftUI
 
 struct Reward {
-    let gold: Int?
-    let reputation: Int?
-    let iron: Int?
+    let goldReward: Int  // Amount earned (e.g., +50)
+    let reputationReward: Int  // Amount earned (e.g., +10)
     let message: String
+    let previousGold: Int  // Before action
+    let previousReputation: Int  // Before action
+    let currentGold: Int  // After action (from backend)
+    let currentReputation: Int  // After action (from backend)
 }
 
 struct RewardDisplayView: View {
     let reward: Reward
     @Binding var isShowing: Bool
     
-    @State private var scale: CGFloat = 0.5
+    @State private var scale: CGFloat = 0.8
     @State private var opacity: Double = 0
-    @State private var bounceOffset: CGFloat = 0
+    @State private var goldCounter: Int
+    @State private var reputationCounter: Int
+    
+    init(reward: Reward, isShowing: Binding<Bool>) {
+        self.reward = reward
+        self._isShowing = isShowing
+        self._goldCounter = State(initialValue: reward.previousGold)
+        self._reputationCounter = State(initialValue: reward.previousReputation)
+    }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            Spacer()
+            
             // Main reward card
-            VStack(spacing: 16) {
-                // Success icon
+            VStack(spacing: 20) {
+                // Success icon with theme colors
                 ZStack {
                     Circle()
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color.green.opacity(0.8),
-                                    Color.green.opacity(0.6)
+                                    KingdomTheme.Colors.goldWarm.opacity(0.3),
+                                    KingdomTheme.Colors.gold.opacity(0.2)
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 80, height: 80)
+                        .frame(width: 70, height: 70)
                     
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.white)
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .symbolEffect(.bounce, options: .speed(0.5))
                 }
-                .scaleEffect(scale)
-                .offset(y: bounceOffset)
+                .padding(.top, 8)
                 
                 // Message
                 Text(reward.message)
-                    .font(KingdomTheme.Typography.headline())
+                    .font(KingdomTheme.Typography.title3())
+                    .fontWeight(.bold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
-                // Rewards earned
-                VStack(spacing: 12) {
-                    if let gold = reward.gold, gold > 0 {
-                        RewardRow(
-                            icon: "dollarsign.circle.fill",
-                            label: "Gold",
-                            amount: "+\(gold)",
-                            color: KingdomTheme.Colors.gold
-                        )
-                    }
+                // Rewards with counter animation
+                VStack(spacing: 16) {
+                    // Gold counter
+                    AnimatedRewardCounter(
+                        icon: "sparkles",
+                        label: "Gold",
+                        currentValue: goldCounter,
+                        addedValue: reward.goldReward,
+                        color: KingdomTheme.Colors.gold
+                    )
                     
-                    if let reputation = reward.reputation, reputation > 0 {
-                        RewardRow(
-                            icon: "star.circle.fill",
-                            label: "Reputation",
-                            amount: "+\(reputation)",
-                            color: Color.purple
-                        )
-                    }
-                    
-                    if let iron = reward.iron, iron > 0 {
-                        RewardRow(
-                            icon: "shield.fill",
-                            label: "Iron",
-                            amount: "+\(iron)",
-                            color: Color.gray
-                        )
-                    }
+                    // Reputation counter
+                    AnimatedRewardCounter(
+                        icon: "star.fill",
+                        label: "Reputation",
+                        currentValue: reputationCounter,
+                        addedValue: reward.reputationReward,
+                        color: KingdomTheme.Colors.buttonWarning
+                    )
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
                 
-                // Close button
+                // Close button with theme color
                 Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         isShowing = false
                     }
                 }) {
                     Text("Continue")
                         .font(KingdomTheme.Typography.body())
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .fontWeight(.bold)
+                        .foregroundColor(KingdomTheme.Colors.parchment)
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(KingdomTheme.Colors.buttonSuccess)
-                        .cornerRadius(12)
+                        .padding(.vertical, 14)
+                        .background(KingdomTheme.Colors.buttonPrimary)
+                        .cornerRadius(KingdomTheme.CornerRadius.large)
                 }
-                .padding(.horizontal)
-                .padding(.top, 8)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
             }
-            .padding(.vertical, 24)
+            .padding(.vertical, 28)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(KingdomTheme.Colors.parchment)
-                    .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.xLarge)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .shadow(color: Color.black.opacity(0.4), radius: 25, x: 0, y: 10)
             )
-            .padding(.horizontal, 40)
+            .overlay(
+                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.xLarge)
+                    .stroke(KingdomTheme.Colors.borderDark, lineWidth: KingdomTheme.BorderWidth.regular)
+            )
+            .padding(.horizontal, 32)
             .scaleEffect(scale)
             .opacity(opacity)
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            Color.black.opacity(0.4)
+            Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .opacity(opacity)
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3)) {
-                        isShowing = false
-                    }
-                }
         )
         .onAppear {
             // Entrance animation
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
                 scale = 1.0
                 opacity = 1.0
             }
             
-            // Bounce animation for the checkmark
-            withAnimation(
-                Animation.easeInOut(duration: 0.5)
-                    .repeatForever(autoreverses: true)
-                    .delay(0.3)
-            ) {
-                bounceOffset = -5
+            // Animate counters after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                animateCounters()
+            }
+        }
+    }
+    
+    private func animateCounters() {
+        // Animate gold counter from previous to current
+        let goldDiff = reward.currentGold - reward.previousGold
+        let goldSteps = min(abs(goldDiff), 30) // Cap animation steps
+        
+        if goldSteps > 0 {
+            let goldIncrement = goldDiff / goldSteps
+            
+            for step in 0...goldSteps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.05) {
+                    if step == goldSteps {
+                        goldCounter = reward.currentGold
+                    } else {
+                        goldCounter = reward.previousGold + (goldIncrement * step)
+                    }
+                }
+            }
+        }
+        
+        // Animate reputation counter from previous to current
+        let repDiff = reward.currentReputation - reward.previousReputation
+        let repSteps = min(abs(repDiff), 20)
+        
+        if repSteps > 0 {
+            let repIncrement = max(1, repDiff / repSteps)
+            
+            for step in 0...repSteps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.06) {
+                    if step == repSteps {
+                        reputationCounter = reward.currentReputation
+                    } else {
+                        reputationCounter = reward.previousReputation + (repIncrement * step)
+                    }
+                }
             }
         }
     }
 }
 
-struct RewardRow: View {
+// MARK: - Animated Reward Counter
+
+struct AnimatedRewardCounter: View {
     let icon: String
     let label: String
-    let amount: String
+    let currentValue: Int
+    let addedValue: Int
     let color: Color
     
-    @State private var slideIn = false
+    @State private var showAddition = false
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 18))
                     .foregroundColor(color)
-            }
-            
-            // Label
-            Text(label)
-                .font(KingdomTheme.Typography.body())
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            Spacer()
-            
-            // Amount
-            Text(amount)
-                .font(KingdomTheme.Typography.headline())
-                .fontWeight(.bold)
-                .foregroundColor(color)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-        )
-        .offset(x: slideIn ? 0 : 300)
-        .opacity(slideIn ? 1 : 0)
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2)) {
-                slideIn = true
-            }
-        }
-    }
-}
-
-// MARK: - Compact Success Banner (Alternative)
-
-struct CompactRewardBanner: View {
-    let reward: Reward
-    @Binding var isShowing: Bool
-    
-    @State private var offset: CGFloat = -200
-    
-    var body: some View {
-        VStack {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(reward.message)
-                        .font(KingdomTheme.Typography.body())
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                    
-                    HStack(spacing: 16) {
-                        if let gold = reward.gold, gold > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "dollarsign.circle.fill")
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                                Text("+\(gold)")
-                                    .fontWeight(.bold)
-                            }
-                            .foregroundColor(.white)
-                        }
-                        
-                        if let reputation = reward.reputation, reputation > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.circle.fill")
-                                    .foregroundColor(.yellow)
-                                Text("+\(reputation)")
-                                    .fontWeight(.bold)
-                            }
-                            .foregroundColor(.white)
-                        }
-                        
-                        if let iron = reward.iron, iron > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "shield.fill")
-                                    .foregroundColor(.gray)
-                                Text("+\(iron)")
-                                    .fontWeight(.bold)
-                            }
-                            .foregroundColor(.white)
-                        }
-                    }
-                    .font(KingdomTheme.Typography.caption())
-                }
+                Text(label)
+                    .font(KingdomTheme.Typography.subheadline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Spacer()
             }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.green.opacity(0.95),
-                                Color.green.opacity(0.85)
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: 5)
-            )
-            .padding(.horizontal)
-            .offset(y: offset)
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                    offset = 0
-                }
+            
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // Current total
+                Text("\(currentValue)")
+                    .font(KingdomTheme.Typography.title2())
+                    .fontWeight(.bold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .contentTransition(.numericText())
                 
-                // Auto-dismiss after 3 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    withAnimation(.spring(response: 0.4)) {
-                        offset = -200
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isShowing = false
-                    }
+                Spacer()
+                
+                // Added amount with animation
+                if addedValue > 0 {
+                    Text("+\(addedValue)")
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                        .opacity(showAddition ? 1 : 0)
+                        .scaleEffect(showAddition ? 1 : 0.5)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: showAddition)
                 }
             }
-            
-            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                .fill(color.opacity(0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                        .stroke(color.opacity(0.25), lineWidth: KingdomTheme.BorderWidth.thin)
+                )
+        )
+        .onAppear {
+            withAnimation {
+                showAddition = true
+            }
         }
     }
 }
 
-#Preview("Full Reward Display") {
+// MARK: - Preview
+
+#Preview("Reward Display") {
     ZStack {
-        Color.gray.ignoresSafeArea()
+        KingdomTheme.Colors.parchment.ignoresSafeArea()
         
         RewardDisplayView(
             reward: Reward(
-                gold: 50,
-                reputation: 10,
-                iron: nil,
-                message: "Work completed successfully!"
-            ),
-            isShowing: .constant(true)
-        )
-    }
-}
-
-#Preview("Compact Banner") {
-    ZStack {
-        Color.gray.ignoresSafeArea()
-        
-        CompactRewardBanner(
-            reward: Reward(
-                gold: 50,
-                reputation: 5,
-                iron: 10,
-                message: "Mining complete!"
+                goldReward: 75,
+                reputationReward: 15,
+                message: "Work completed successfully!",
+                previousGold: 1250,
+                previousReputation: 340,
+                currentGold: 1325,
+                currentReputation: 355
             ),
             isShowing: .constant(true)
         )

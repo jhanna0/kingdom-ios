@@ -343,12 +343,14 @@ def mine_resources(
             detail="Kingdom not found"
         )
     
-    # Calculate resources based on mine level
+    # Calculate rewards based on mine level
     mine_level = kingdom.mine_level or 0
-    base_iron = 10 * mine_level if mine_level > 0 else 5  # Level 0: 5 iron, Level 1: 10, Level 2: 20, etc.
+    base_gold = 20 * mine_level if mine_level > 0 else 10  # Level 0: 10 gold, Level 1: 20, Level 2: 40, etc.
+    base_rep = 5  # Fixed reputation reward
     
     # Update player resources
-    state.iron += base_iron
+    state.gold += base_gold
+    state.reputation += base_rep
     state.last_mining_action = datetime.utcnow()
     
     db.commit()
@@ -356,13 +358,11 @@ def mine_resources(
     return {
         "success": True,
         "message": f"Mining complete!",
-        "iron_gained": base_iron,
-        "total_iron": state.iron,
         "next_mine_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=24)),
         "rewards": {
-            "gold": None,
-            "reputation": None,
-            "iron": base_iron
+            "gold": base_gold,
+            "reputation": base_rep,
+            "iron": None
         }
     }
 

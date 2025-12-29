@@ -275,23 +275,33 @@ struct ActionsView: View {
         
         Task {
             do {
+                // Capture state before action
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
                 let response = try await KingdomAPIService.shared.actions.workOnContract(contractId: contractId)
+                
+                // Refresh player state from backend (which has updated values)
+                await loadActionStatus()
+                await viewModel.loadContracts()
+                await viewModel.refreshPlayerFromBackend()
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
-                            gold: rewards.gold,
-                            reputation: rewards.reputation,
-                            iron: rewards.iron,
-                            message: response.message
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            currentGold: viewModel.player.gold,  // Updated from backend
+                            currentReputation: viewModel.player.reputation  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
                     }
                 }
-                await loadActionStatus()
-                await viewModel.loadContracts()
-                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -305,23 +315,34 @@ struct ActionsView: View {
         Task {
             do {
                 print("🎬 Starting patrol action...")
+                
+                // Capture state before action
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
                 print("✅ Patrol response received: \(response)")
+                
+                // Refresh player state from backend (which has updated values)
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
-                            gold: rewards.gold,
-                            reputation: rewards.reputation,
-                            iron: rewards.iron,
-                            message: response.message
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            currentGold: viewModel.player.gold,  // Updated from backend
+                            currentReputation: viewModel.player.reputation  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
                     }
                 }
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
             } catch {
                 print("❌ Patrol action failed: \(error)")
                 print("❌ Error type: \(type(of: error))")
@@ -336,22 +357,32 @@ struct ActionsView: View {
     private func performMine() {
         Task {
             do {
+                // Capture state before action
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
                 let response = try await KingdomAPIService.shared.actions.mineResources()
+                
+                // Refresh player state from backend (which has updated values)
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
-                            gold: rewards.gold,
-                            reputation: rewards.reputation,
-                            iron: rewards.iron,
-                            message: response.message
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            currentGold: viewModel.player.gold,  // Updated from backend
+                            currentReputation: viewModel.player.reputation  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
                     }
                 }
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -366,22 +397,32 @@ struct ActionsView: View {
         
         Task {
             do {
+                // Capture state before action
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
                 let response = try await KingdomAPIService.shared.actions.scoutKingdom(kingdomId: kingdomId)
+                
+                // Refresh player state from backend (which has updated values)
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
-                            gold: rewards.gold,
-                            reputation: rewards.reputation,
-                            iron: rewards.iron,
-                            message: response.message
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            currentGold: viewModel.player.gold,  // Updated from backend
+                            currentReputation: viewModel.player.reputation  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
                     }
                 }
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription

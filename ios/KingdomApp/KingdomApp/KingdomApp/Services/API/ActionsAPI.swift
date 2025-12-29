@@ -63,15 +63,11 @@ struct PatrolActionResponse: Codable {
 struct MineActionResponse: Codable {
     let success: Bool
     let message: String
-    let ironGained: Int
-    let totalIron: Int
     let nextMineAvailableAt: Date
     let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
         case success, message, rewards
-        case ironGained = "iron_gained"
-        case totalIron = "total_iron"
         case nextMineAvailableAt = "next_mine_available_at"
     }
 }
