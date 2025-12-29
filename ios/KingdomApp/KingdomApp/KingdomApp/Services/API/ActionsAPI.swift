@@ -24,24 +24,50 @@ struct ActionStatus: Codable {
     }
 }
 
+struct TrainingContract: Codable, Identifiable {
+    let id: String
+    let type: String
+    let actionsRequired: Int
+    let actionsCompleted: Int
+    let costPaid: Int
+    let createdAt: String
+    let status: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, type, status
+        case actionsRequired = "actions_required"
+        case actionsCompleted = "actions_completed"
+        case costPaid = "cost_paid"
+        case createdAt = "created_at"
+    }
+    
+    var progress: Double {
+        return Double(actionsCompleted) / Double(actionsRequired)
+    }
+}
+
+struct TrainingCosts: Codable {
+    let attack: Int
+    let defense: Int
+    let leadership: Int
+    let building: Int
+}
+
 struct AllActionStatus: Codable {
     let work: ActionStatus
     let patrol: ActionStatus
     let sabotage: ActionStatus
     let mine: ActionStatus
     let scout: ActionStatus
-    let trainAttack: ActionStatus
-    let trainDefense: ActionStatus
-    let trainLeadership: ActionStatus
-    let trainBuilding: ActionStatus
+    let training: ActionStatus
+    let trainingContracts: [TrainingContract]
+    let trainingCosts: TrainingCosts
     let contracts: [APIContract]
     
     enum CodingKeys: String, CodingKey {
-        case work, patrol, sabotage, mine, scout, contracts
-        case trainAttack = "train_attack"
-        case trainDefense = "train_defense"
-        case trainLeadership = "train_leadership"
-        case trainBuilding = "train_building"
+        case work, patrol, sabotage, mine, scout, training, contracts
+        case trainingContracts = "training_contracts"
+        case trainingCosts = "training_costs"
     }
 }
 
@@ -140,17 +166,23 @@ struct ActionRewards: Codable {
 struct TrainingActionResponse: Codable {
     let success: Bool
     let message: String
-    let statType: String
-    let newValue: Int
-    let sessionsRemaining: Int
+    let contractId: String
+    let trainingType: String
+    let actionsCompleted: Int
+    let actionsRequired: Int
+    let progressPercent: Int
+    let isComplete: Bool
     let nextTrainAvailableAt: Date
     let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
         case success, message, rewards
-        case statType = "stat_type"
-        case newValue = "new_value"
-        case sessionsRemaining = "sessions_remaining"
+        case contractId = "contract_id"
+        case trainingType = "training_type"
+        case actionsCompleted = "actions_completed"
+        case actionsRequired = "actions_required"
+        case progressPercent = "progress_percent"
+        case isComplete = "is_complete"
         case nextTrainAvailableAt = "next_train_available_at"
     }
 }
@@ -160,12 +192,14 @@ struct PurchaseTrainingResponse: Codable {
     let message: String
     let trainingType: String
     let cost: Int
-    let sessionsAvailable: Int
+    let contractId: String
+    let actionsRequired: Int
     
     enum CodingKeys: String, CodingKey {
         case success, message, cost
         case trainingType = "training_type"
-        case sessionsAvailable = "sessions_available"
+        case contractId = "contract_id"
+        case actionsRequired = "actions_required"
     }
 }
 
@@ -211,45 +245,15 @@ class ActionsAPI {
     
     // MARK: - Purchase Training
     
-    func purchaseAttackTraining() async throws -> PurchaseTrainingResponse {
-        let request = client.request(endpoint: "/actions/train/attack/purchase", method: "POST")
+    func purchaseTraining(type: String) async throws -> PurchaseTrainingResponse {
+        let request = client.request(endpoint: "/actions/train/purchase?training_type=\(type)", method: "POST")
         return try await client.execute(request)
     }
     
-    func purchaseDefenseTraining() async throws -> PurchaseTrainingResponse {
-        let request = client.request(endpoint: "/actions/train/defense/purchase", method: "POST")
-        return try await client.execute(request)
-    }
+    // MARK: - Work on Training
     
-    func purchaseLeadershipTraining() async throws -> PurchaseTrainingResponse {
-        let request = client.request(endpoint: "/actions/train/leadership/purchase", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    func purchaseBuildingTraining() async throws -> PurchaseTrainingResponse {
-        let request = client.request(endpoint: "/actions/train/building/purchase", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    // MARK: - Training Actions
-    
-    func trainAttack() async throws -> TrainingActionResponse {
-        let request = client.request(endpoint: "/actions/train/attack", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    func trainDefense() async throws -> TrainingActionResponse {
-        let request = client.request(endpoint: "/actions/train/defense", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    func trainLeadership() async throws -> TrainingActionResponse {
-        let request = client.request(endpoint: "/actions/train/leadership", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    func trainBuilding() async throws -> TrainingActionResponse {
-        let request = client.request(endpoint: "/actions/train/building", method: "POST")
+    func workOnTraining(contractId: String) async throws -> TrainingActionResponse {
+        let request = client.request(endpoint: "/actions/train/\(contractId)", method: "POST")
         return try await client.execute(request)
     }
 }

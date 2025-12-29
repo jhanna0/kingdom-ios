@@ -108,14 +108,9 @@ struct ActionsView: View {
                         
                         // Actions List
                         if let status = actionStatus {
-                            // === TRAINING ACTIONS (Only if purchased) ===
+                            // === TRAINING CONTRACTS (Only if purchased) ===
                             
-                            let hasAnyTrainingSessions = (status.trainAttack.sessionsAvailable ?? 0) > 0 ||
-                                                         (status.trainDefense.sessionsAvailable ?? 0) > 0 ||
-                                                         (status.trainLeadership.sessionsAvailable ?? 0) > 0 ||
-                                                         (status.trainBuilding.sessionsAvailable ?? 0) > 0
-                            
-                            if hasAnyTrainingSessions {
+                            if !status.trainingContracts.isEmpty {
                                 Divider()
                                     .padding(.horizontal)
                                 
@@ -126,67 +121,22 @@ struct ActionsView: View {
                                     .padding(.horizontal)
                                     .padding(.top, KingdomTheme.Spacing.medium)
                                 
-                                Text("Train your skills to improve your character (2 hour cooldown)")
+                                Text("Train your skills - complete actions to level up (2 hour cooldown)")
                                     .font(KingdomTheme.Typography.caption())
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal)
                                     .padding(.bottom, KingdomTheme.Spacing.small)
                                 
-                                // Training Actions - only show if sessions available
-                                if (status.trainAttack.sessionsAvailable ?? 0) > 0 {
-                                    TrainingActionCard(
-                                        title: "Train Attack",
-                                        icon: "bolt.fill",
-                                        description: "Improve offensive strength (+25 XP)",
-                                        status: status.trainAttack,
+                                // Show training contracts like building contracts
+                                ForEach(status.trainingContracts.filter { $0.status != "completed" }) { contract in
+                                    TrainingContractCard(
+                                        contract: contract,
+                                        status: status.training,
                                         fetchedAt: statusFetchedAt ?? Date(),
                                         currentTime: currentTime,
-                                        currentStat: status.trainAttack.currentStat ?? 1,
                                         isEnabled: currentKingdom != nil,
-                                        onAction: { performTrainAttack() }
-                                    )
-                                }
-                                
-                                if (status.trainDefense.sessionsAvailable ?? 0) > 0 {
-                                    TrainingActionCard(
-                                        title: "Train Defense",
-                                        icon: "shield.fill",
-                                        description: "Improve defensive capability (+25 XP)",
-                                        status: status.trainDefense,
-                                        fetchedAt: statusFetchedAt ?? Date(),
-                                        currentTime: currentTime,
-                                        currentStat: status.trainDefense.currentStat ?? 1,
-                                        isEnabled: currentKingdom != nil,
-                                        onAction: { performTrainDefense() }
-                                    )
-                                }
-                                
-                                if (status.trainLeadership.sessionsAvailable ?? 0) > 0 {
-                                    TrainingActionCard(
-                                        title: "Train Leadership",
-                                        icon: "crown.fill",
-                                        description: "Improve vote weight (+25 XP)",
-                                        status: status.trainLeadership,
-                                        fetchedAt: statusFetchedAt ?? Date(),
-                                        currentTime: currentTime,
-                                        currentStat: status.trainLeadership.currentStat ?? 1,
-                                        isEnabled: currentKingdom != nil,
-                                        onAction: { performTrainLeadership() }
-                                    )
-                                }
-                                
-                                if (status.trainBuilding.sessionsAvailable ?? 0) > 0 {
-                                    TrainingActionCard(
-                                        title: "Train Building",
-                                        icon: "hammer.fill",
-                                        description: "Reduce building costs (+25 XP)",
-                                        status: status.trainBuilding,
-                                        fetchedAt: statusFetchedAt ?? Date(),
-                                        currentTime: currentTime,
-                                        currentStat: status.trainBuilding.currentStat ?? 1,
-                                        isEnabled: currentKingdom != nil,
-                                        onAction: { performTrainBuilding() }
+                                        onAction: { performTraining(contractId: contract.id) }
                                     )
                                 }
                             }
@@ -575,126 +525,12 @@ struct ActionsView: View {
     
     // MARK: - Training Actions
     
-    private func performTrainAttack() {
+    private func performTraining(contractId: String) {
         Task {
             do {
                 let previousExperience = viewModel.player.experience
                 
-                let response = try await KingdomAPIService.shared.actions.trainAttack()
-                
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: 0,
-                            reputationReward: 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: viewModel.player.gold,
-                            previousReputation: viewModel.player.reputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performTrainDefense() {
-        Task {
-            do {
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.trainDefense()
-                
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: 0,
-                            reputationReward: 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: viewModel.player.gold,
-                            previousReputation: viewModel.player.reputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performTrainLeadership() {
-        Task {
-            do {
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.trainLeadership()
-                
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: 0,
-                            reputationReward: 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: viewModel.player.gold,
-                            previousReputation: viewModel.player.reputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performTrainBuilding() {
-        Task {
-            do {
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.trainBuilding()
+                let response = try await KingdomAPIService.shared.actions.workOnTraining(contractId: contractId)
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
@@ -989,16 +825,13 @@ struct CooldownTimer: View {
     }
 }
 
-// MARK: - Training Action Card
+// MARK: - Training Contract Card
 
-struct TrainingActionCard: View {
-    let title: String
-    let icon: String
-    let description: String
+struct TrainingContractCard: View {
+    let contract: TrainingContract
     let status: ActionStatus
     let fetchedAt: Date
     let currentTime: Date
-    let currentStat: Int
     let isEnabled: Bool
     let onAction: () -> Void
     
@@ -1012,55 +845,73 @@ struct TrainingActionCard: View {
         return status.ready || calculatedSecondsRemaining <= 0
     }
     
-    var sessionsAvailable: Int {
-        return status.sessionsAvailable ?? 0
+    var iconName: String {
+        switch contract.type {
+        case "attack": return "bolt.fill"
+        case "defense": return "shield.fill"
+        case "leadership": return "crown.fill"
+        case "building": return "hammer.fill"
+        default: return "star.fill"
+        }
+    }
+    
+    var title: String {
+        switch contract.type {
+        case "attack": return "Attack Training"
+        case "defense": return "Defense Training"
+        case "leadership": return "Leadership Training"
+        case "building": return "Building Training"
+        default: return "Training"
+        }
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
-                Image(systemName: icon)
+                Image(systemName: iconName)
                     .font(.title2)
-                    .foregroundColor(isReady && sessionsAvailable > 0 ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(KingdomTheme.Typography.headline())
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text(description)
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    HStack(spacing: 4) {
+                        Text("\(contract.actionsCompleted)/\(contract.actionsRequired) actions")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("•")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("\(Int(contract.progress * 100))%")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .fontWeight(.semibold)
+                    }
                 }
                 
                 Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Level \(currentStat)")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .fontWeight(.semibold)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "ticket.fill")
-                            .font(.caption2)
-                        Text("\(sessionsAvailable)")
-                            .font(KingdomTheme.Typography.caption())
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(sessionsAvailable > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.textMuted)
-                }
             }
             
-            if sessionsAvailable == 0 {
-                Text("No sessions available. Purchase training in Character Sheet")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(KingdomTheme.Colors.parchmentDark)
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
-            } else if isReady && isEnabled {
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.parchmentDark)
+                        .frame(height: 8)
+                    
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.gold)
+                        .frame(width: geometry.size.width * contract.progress, height: 8)
+                }
+                .cornerRadius(4)
+            }
+            .frame(height: 8)
+            
+            if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
@@ -1069,7 +920,7 @@ struct TrainingActionCard: View {
                 }
                 .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
             } else if !isEnabled {
-                Text("Check in to a kingdom first")
+                Text("Check in to a kingdom to train")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)

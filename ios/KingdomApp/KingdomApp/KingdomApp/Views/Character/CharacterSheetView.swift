@@ -486,21 +486,10 @@ struct CharacterSheetView: View {
             do {
                 let api = KingdomAPIService.shared.actions
                 
-                // Purchase the training
-                switch type {
-                case "attack":
-                    _ = try await api.purchaseAttackTraining()
-                case "defense":
-                    _ = try await api.purchaseDefenseTraining()
-                case "leadership":
-                    _ = try await api.purchaseLeadershipTraining()
-                case "building":
-                    _ = try await api.purchaseBuildingTraining()
-                default:
-                    break
-                }
+                // Purchase the training contract
+                let response = try await api.purchaseTraining(type: type)
                 
-                // Refresh player state from backend to get updated gold and sessions
+                // Refresh player state from backend to get updated gold
                 let playerState = try await KingdomAPIService.shared.player.loadState()
                 await MainActor.run {
                     player.updateFromAPIState(playerState)
@@ -508,6 +497,8 @@ struct CharacterSheetView: View {
                     // Haptic feedback for success
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
+                    
+                    print("✅ Purchased \(type) training contract: \(response.actionsRequired) actions required")
                 }
             } catch {
                 await MainActor.run {

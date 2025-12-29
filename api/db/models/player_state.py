@@ -86,16 +86,11 @@ class PlayerState(Base):
     patrol_expires_at = Column(DateTime, nullable=True)  # When current patrol ends
     
     # Training Actions (cooldown-based)
-    last_train_attack_action = Column(DateTime, nullable=True)
-    last_train_defense_action = Column(DateTime, nullable=True)
-    last_train_leadership_action = Column(DateTime, nullable=True)
-    last_train_building_action = Column(DateTime, nullable=True)
+    last_training_action = Column(DateTime, nullable=True)
     
-    # Training Sessions Purchased (not yet used)
-    training_sessions_attack = Column(Integer, default=0)
-    training_sessions_defense = Column(Integer, default=0)
-    training_sessions_leadership = Column(Integer, default=0)
-    training_sessions_building = Column(Integer, default=0)
+    # Active Training Contracts (JSONB array)
+    # Each contract: {id, type, actions_required, actions_completed, created_at, cost_paid}
+    training_contracts = Column(JSONB, default=list)
     
     # Equipment (stored as JSONB)
     equipped_weapon = Column(JSONB, nullable=True)
