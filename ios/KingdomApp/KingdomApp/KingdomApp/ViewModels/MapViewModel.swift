@@ -428,6 +428,11 @@ class MapViewModel: ObservableObject {
                 kingdoms[index].marketLevel += 1
                 print("🏪 Upgraded market to level \(kingdoms[index].marketLevel) (+income)")
             }
+        case .education:
+            if kingdoms[index].educationLevel < 5 {
+                kingdoms[index].educationLevel += 1
+                print("📚 Upgraded education to level \(kingdoms[index].educationLevel) (faster training)")
+            }
         }
         
         // Update currentKingdomInside if it's the same kingdom
@@ -667,6 +672,8 @@ class MapViewModel: ObservableObject {
             return ("Mine", kingdom.mineLevel)
         case .market:
             return ("Market", kingdom.marketLevel)
+        case .education:
+            return ("Education", kingdom.educationLevel)
         }
     }
     

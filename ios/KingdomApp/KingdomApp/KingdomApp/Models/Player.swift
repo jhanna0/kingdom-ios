@@ -47,6 +47,7 @@ class Player: ObservableObject {
     @Published var defensePower: Int = 1        // Defend against coups
     @Published var leadership: Int = 1          // Vote weight multiplier
     @Published var buildingSkill: Int = 1       // Building efficiency & cost reduction
+    @Published var intelligence: Int = 1        // Sabotage/patrol efficiency
     
     // Kingdom-specific reputation
     @Published var kingdomReputation: [String: Int] = [:]  // kingdomId -> rep
@@ -641,6 +642,7 @@ class Player: ObservableObject {
         state["defense_power"] = defensePower
         state["leadership"] = leadership
         state["building_skill"] = buildingSkill
+        state["intelligence"] = intelligence
         
         // Debuffs
         state["attack_debuff"] = attackDebuff
@@ -709,6 +711,7 @@ class Player: ObservableObject {
         defensePower = apiState.defense_power
         leadership = apiState.leadership
         buildingSkill = apiState.building_skill
+        intelligence = apiState.intelligence
         
         // Debuffs
         attackDebuff = apiState.attack_debuff

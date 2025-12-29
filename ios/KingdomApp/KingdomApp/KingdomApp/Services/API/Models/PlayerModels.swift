@@ -28,6 +28,7 @@ struct APIPlayerState: Codable {
     let defense_power: Int
     let leadership: Int
     let building_skill: Int
+    let intelligence: Int
     
     // Debuffs
     let attack_debuff: Int

@@ -37,6 +37,7 @@ class PlayerState(Base):
     defense_power = Column(Integer, default=1)
     leadership = Column(Integer, default=1)
     building_skill = Column(Integer, default=1)
+    intelligence = Column(Integer, default=1)  # Improves sabotage/patrol efficiency
     
     # Combat Debuffs
     attack_debuff = Column(Integer, default=0)

@@ -56,6 +56,34 @@ struct BuildMenuView: View {
                             }
                         )
                         
+                        // Civic Buildings Section
+                        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                            Text("📚 Civic Buildings")
+                                .font(KingdomTheme.Typography.title3())
+                                .fontWeight(.bold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text("Support your citizens' development")
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top)
+                        
+                        // Education upgrade
+                        BuildingUpgradeCardWithContract(
+                            icon: "graduationcap.fill",
+                            name: "Education Hall",
+                            currentLevel: kingdom.educationLevel,
+                            maxLevel: 5,
+                            benefit: educationBenefit(kingdom.educationLevel + 1),
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Education"),
+                            kingdom: kingdom,
+                            onCreateContract: {
+                                selectedBuildingType = .education
+                            }
+                        )
+                        
                         // Defensive Buildings Section
                         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                             Text("🛡️ Defensive Buildings")
@@ -153,6 +181,11 @@ struct BuildMenuView: View {
         return "+\(income)g/day from trade activity"
     }
     
+    private func educationBenefit(_ level: Int) -> String {
+        let reduction = level * 5
+        return "-\(reduction)% training actions required (citizens train faster)"
+    }
+    
     /// Check if kingdom has an active contract for a specific building type
     /// Checks ALL contracts, not just kingdom.activeContract (since we can have multiple in DB before fix)
     private func hasActiveContractForBuilding(kingdom: Kingdom, buildingType: String) -> Bool {
@@ -170,4 +203,5 @@ enum BuildingType {
     case vault
     case mine
     case market
+    case education
 }

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import uuid
 
-from db import get_db, User
+from db import get_db, User, Kingdom
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_cooldown, format_datetime_iso
@@ -26,16 +26,24 @@ def calculate_training_cost(stat_level: int) -> int:
     return int(100.0 * pow(float(stat_level), 1.5))
 
 
-def calculate_training_actions_required(stat_level: int) -> int:
+def calculate_training_actions_required(stat_level: int, education_level: int = 0) -> int:
     """Calculate how many actions required to complete training
     
-    Formula: 3 + (level // 3)
-    Level 1: 3 actions
-    Level 5: 4 actions
-    Level 10: 6 actions
-    Scales with stat level - higher stats take more work
+    Formula: (3 + (level // 3)) * (1 - (education_level * 0.05))
+    Base actions scale with stat level - higher stats take more work
+    Education building reduces actions required by 5% per level (up to 25% at T5)
+    
+    Level 1: 3 actions base
+    Level 5: 4 actions base
+    Level 10: 6 actions base
+    
+    With education T5: 25% reduction
     """
-    return 3 + (stat_level // 3)
+    base_actions = 3 + (stat_level // 3)
+    education_reduction = 1.0 - (education_level * 0.05)
+    reduced_actions = int(base_actions * education_reduction)
+    # Minimum of 1 action required
+    return max(1, reduced_actions)
 
 
 @router.post("/train/purchase")
@@ -57,7 +65,7 @@ def purchase_training(
         )
     
     # Validate training type
-    valid_types = ["attack", "defense", "leadership", "building"]
+    valid_types = ["attack", "defense", "leadership", "building", "intelligence"]
     if training_type not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -69,13 +77,21 @@ def purchase_training(
         "attack": state.attack_power,
         "defense": state.defense_power,
         "leadership": state.leadership,
-        "building": state.building_skill
+        "building": state.building_skill,
+        "intelligence": state.intelligence
     }
     current_stat = stat_map[training_type]
     
-    # Calculate cost and actions required
+    # Get kingdom education level for training bonus
+    education_level = 0
+    if state.current_kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if kingdom:
+            education_level = kingdom.education_level
+    
+    # Calculate cost and actions required (with education bonus)
     training_cost = calculate_training_cost(current_stat)
-    actions_required = calculate_training_actions_required(current_stat)
+    actions_required = calculate_training_actions_required(current_stat, education_level)
     
     if state.gold < training_cost:
         raise HTTPException(
@@ -207,6 +223,10 @@ def work_on_training(
             state.building_skill += 1
             stat_name = "Building Skill"
             new_value = state.building_skill
+        elif training_type == "intelligence":
+            state.intelligence += 1
+            stat_name = "Intelligence"
+            new_value = state.intelligence
         
         # Bonus XP for completing training
         xp_earned += 25  # Total 35 XP when complete

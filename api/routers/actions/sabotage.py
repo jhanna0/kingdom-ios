@@ -41,6 +41,7 @@ SABOTAGE_COOLDOWN_HOURS = 24  # Hours between sabotage attempts
 # Detection mechanics (see calculate_detection_chance function for details)
 BASE_DETECTION_PER_PATROL = 0.005  # 0.5% base detection chance per patrol
 SKILL_REDUCTION_PER_LEVEL = 0.0005  # 0.05% detection reduction per building skill above 3
+INTELLIGENCE_REDUCTION_PER_LEVEL = 0.02  # 2% detection reduction per intelligence level
 MIN_DETECTION_CHANCE = 0.00001      # Minimum detection chance (0.001%)
 
 # ==========================================
@@ -49,15 +50,26 @@ MIN_DETECTION_CHANCE = 0.00001      # Minimum detection chance (0.001%)
 def calculate_detection_chance(
     active_patrols: int,
     city_population: int,
-    saboteur_building_skill: int
+    saboteur_building_skill: int,
+    saboteur_intelligence: int = 1,
+    avg_patrol_intelligence: float = 1.0
 ) -> float:
     """
     Calculate chance of being caught by patrols
     
-    Formula from SABOTAGE_SYSTEM.md:
+    Formula:
     - Base detection: 0.5% per patrol
     - City size scaling: baseDetection / sqrt(totalActivePlayersInCity)
     - Saboteur skill reduction: -0.05% per building skill level above 3
+    - Saboteur intelligence: -2% per intelligence level (reduces detection)
+    - Patrol intelligence: +2% per avg intelligence level (increases detection)
+    
+    Intelligence tiers (both sides):
+    - T1: 2% effect
+    - T2: 4% effect
+    - T3: 6% effect
+    - T4: 8% effect
+    - T5: 10% effect
     
     Returns: probability of being caught (0.0 to 1.0)
     
@@ -85,7 +97,18 @@ def calculate_detection_chance(
     avoid_all_chance = (1.0 - detection_per_patrol) ** active_patrols
     total_detection_chance = 1.0 - avoid_all_chance
     
-    return total_detection_chance
+    # Apply intelligence modifiers (multiplicative)
+    # Saboteur intelligence reduces detection
+    saboteur_intelligence_multiplier = 1.0 - (saboteur_intelligence * INTELLIGENCE_REDUCTION_PER_LEVEL)
+    saboteur_intelligence_multiplier = max(0.0, saboteur_intelligence_multiplier)
+    
+    # Patrol intelligence increases detection
+    patrol_intelligence_multiplier = 1.0 + (avg_patrol_intelligence * INTELLIGENCE_REDUCTION_PER_LEVEL)
+    
+    final_detection_chance = total_detection_chance * saboteur_intelligence_multiplier * patrol_intelligence_multiplier
+    
+    # Clamp between min and 100%
+    return max(MIN_DETECTION_CHANCE, min(1.0, final_detection_chance))
 
 
 def process_sabotage_attempt(
@@ -106,20 +129,30 @@ def process_sabotage_attempt(
     
     TUNE THIS METHOD to adjust sabotage mechanics and consequences
     """
-    # Count active patrols (patrol_expires_at > now)
-    active_patrols = db.query(PlayerState).filter(
+    # Get active patrols and their intelligence
+    active_patrol_states = db.query(PlayerState).filter(
         PlayerState.current_kingdom_id == contract.kingdom_id,
         PlayerState.patrol_expires_at > datetime.utcnow()
-    ).count()
+    ).all()
+    
+    active_patrols = len(active_patrol_states)
+    
+    # Calculate average patrol intelligence for detection bonus
+    avg_patrol_intelligence = 1.0
+    if active_patrols > 0:
+        total_intel = sum(ps.intelligence for ps in active_patrol_states)
+        avg_patrol_intelligence = total_intel / active_patrols
     
     # Get active player count for scaling
     active_player_count = max(1, kingdom.checked_in_players)
     
-    # Calculate detection chance
+    # Calculate detection chance (with intelligence bonuses)
     detection_chance = calculate_detection_chance(
         active_patrols=active_patrols,
         city_population=active_player_count,
-        saboteur_building_skill=saboteur_state.building_skill
+        saboteur_building_skill=saboteur_state.building_skill,
+        saboteur_intelligence=saboteur_state.intelligence,
+        avg_patrol_intelligence=avg_patrol_intelligence
     )
     
     # Roll for detection

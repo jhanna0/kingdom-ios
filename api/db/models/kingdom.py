@@ -33,6 +33,7 @@ class Kingdom(Base):
     vault_level = Column(Integer, default=0)
     mine_level = Column(Integer, default=0)
     market_level = Column(Integer, default=0)
+    education_level = Column(Integer, default=0)  # Reduces training actions required
     
     # Tax & Income
     tax_rate = Column(Integer, default=10)  # 0-100%

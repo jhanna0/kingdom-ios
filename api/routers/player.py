@@ -54,6 +54,7 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         defense_power=state.defense_power,
         leadership=state.leadership,
         building_skill=state.building_skill,
+        intelligence=state.intelligence,
         
         # Debuffs
         attack_debuff=state.attack_debuff,

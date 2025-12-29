@@ -16,6 +16,7 @@ struct APIKingdom: Codable {
     let vault_level: Int
     let mine_level: Int
     let market_level: Int
+    let education_level: Int
     let tax_rate: Int
     let subject_reward_rate: Int
     let allies: [String]?
@@ -51,6 +52,7 @@ struct CityKingdomData: Codable {
     let vault_level: Int
     let mine_level: Int
     let market_level: Int
+    let education_level: Int
 }
 
 struct CityBoundaryResponse: Codable {

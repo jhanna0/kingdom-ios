@@ -72,6 +72,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Economic buildings (generate passive income)
     var mineLevel: Int
     var marketLevel: Int
+    var educationLevel: Int  // Reduces training actions required
     
     // Tax system (0-100%)
     var taxRate: Int  // Percentage of mined resources going to treasury
@@ -124,6 +125,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.checkedInPlayers = Int.random(in: 0...5)
         self.mineLevel = Int.random(in: 0...2)
         self.marketLevel = Int.random(in: 0...2)
+        self.educationLevel = 0  // Start at 0
         self.taxRate = Int.random(in: 5...20)  // Random starting tax rate
         self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
         self.weeklyUniqueCheckIns = Int.random(in: 0...10)

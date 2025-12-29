@@ -38,6 +38,7 @@ class KingdomState(BaseModel):
     vault_level: int = 0
     mine_level: int = 0
     market_level: int = 0
+    education_level: int = 0
     
     # Tax & Income
     tax_rate: int = 10
@@ -67,6 +68,7 @@ class KingdomUpdate(BaseModel):
     vault_level: Optional[int] = None
     mine_level: Optional[int] = None
     market_level: Optional[int] = None
+    education_level: Optional[int] = None
     tax_rate: Optional[int] = None
     subject_reward_rate: Optional[int] = None
     allies: Optional[List[str]] = None

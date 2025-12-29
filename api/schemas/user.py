@@ -34,6 +34,7 @@ class PlayerState(BaseModel):
     defense_power: int = 1
     leadership: int = 1
     building_skill: int = 1
+    intelligence: int = 1
     
     # Debuffs
     attack_debuff: int = 0
@@ -135,6 +136,7 @@ class PlayerStateUpdate(BaseModel):
     defense_power: Optional[int] = None
     leadership: Optional[int] = None
     building_skill: Optional[int] = None
+    intelligence: Optional[int] = None
     
     # Debuffs
     attack_debuff: Optional[int] = None

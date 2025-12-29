@@ -9,10 +9,11 @@ This module organizes action endpoints into logical groupings:
 - scouting: Scout enemy kingdoms for intelligence
 - training: Purchase and complete stat training
 - sabotage: Sabotage enemy kingdom contracts
+- vault_heist: Steal from enemy kingdom vaults (Intelligence T5)
 """
 from fastapi import APIRouter
 
-from . import status, contracts, patrol, mining, scouting, training, sabotage
+from . import status, contracts, patrol, mining, scouting, training, sabotage, vault_heist
 
 # Main actions router
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -25,4 +26,5 @@ router.include_router(mining.router)
 router.include_router(scouting.router)
 router.include_router(training.router)
 router.include_router(sabotage.router)
+router.include_router(vault_heist.router)
 
