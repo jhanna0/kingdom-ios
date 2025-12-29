@@ -58,10 +58,6 @@ struct CharacterSheetView: View {
                     Text("Level \(player.level)")
                         .font(.headline)
                         .foregroundColor(KingdomTheme.Colors.gold)
-                    
-                    Text("\(player.skillPoints) skill points")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 }
             }
             
@@ -267,39 +263,6 @@ struct CharacterSheetView: View {
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
-            if player.skillPoints > 0 {
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Skill Points Available")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        
-                        Spacer()
-                        
-                        Text("\(player.skillPoints)")
-                            .font(.title3.bold())
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                    }
-                    
-                    Text("Use skill points to instantly increase any stat (free!)")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    
-                    VStack(spacing: 8) {
-                        HStack(spacing: 12) {
-                            skillPointButton(iconName: "bolt.fill", stat: .attack)
-                            skillPointButton(iconName: "shield.fill", stat: .defense)
-                        }
-                        HStack(spacing: 12) {
-                            skillPointButton(iconName: "crown.fill", stat: .leadership)
-                            skillPointButton(iconName: "hammer.fill", stat: .building)
-                        }
-                    }
-                }
-            }
-            
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
@@ -316,7 +279,7 @@ struct CharacterSheetView: View {
                         iconName: "bolt.fill",
                         statName: "Attack",
                         currentValue: player.attackPower,
-                        cost: player.getAttackTrainingCost()
+                        cost: player.attackTrainingCost
                     ) {
                         purchaseTraining(type: "attack")
                     }
@@ -325,7 +288,7 @@ struct CharacterSheetView: View {
                         iconName: "shield.fill",
                         statName: "Defense",
                         currentValue: player.defensePower,
-                        cost: player.getDefenseTrainingCost()
+                        cost: player.defenseTrainingCost
                     ) {
                         purchaseTraining(type: "defense")
                     }
@@ -334,7 +297,7 @@ struct CharacterSheetView: View {
                         iconName: "crown.fill",
                         statName: "Leadership",
                         currentValue: player.leadership,
-                        cost: player.getLeadershipTrainingCost()
+                        cost: player.leadershipTrainingCost
                     ) {
                         purchaseTraining(type: "leadership")
                     }
@@ -343,7 +306,7 @@ struct CharacterSheetView: View {
                         iconName: "hammer.fill",
                         statName: "Building",
                         currentValue: player.buildingSkill,
-                        cost: player.getBuildingTrainingCost()
+                        cost: player.buildingTrainingCost
                     ) {
                         purchaseTraining(type: "building")
                     }
@@ -407,30 +370,6 @@ struct CharacterSheetView: View {
             Text("\(value)")
                 .font(.title2.bold().monospacedDigit())
                 .foregroundColor(KingdomTheme.Colors.gold)
-        }
-    }
-    
-    private func skillPointButton(iconName: String, stat: Player.SkillStat) -> some View {
-        Button {
-            player.useSkillPoint(on: stat)
-        } label: {
-            VStack(spacing: 4) {
-                Image(systemName: iconName)
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
-                
-                Text("+1")
-                    .font(.caption.bold())
-                    .foregroundColor(KingdomTheme.Colors.gold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(KingdomTheme.Colors.gold.opacity(0.1))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(KingdomTheme.Colors.gold, lineWidth: 2)
-            )
         }
     }
     

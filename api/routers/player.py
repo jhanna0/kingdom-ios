@@ -10,6 +10,7 @@ from db import get_db, User, PlayerState as DBPlayerState, Kingdom
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from config import DEV_MODE
+from routers.actions.training import calculate_training_cost
 
 router = APIRouter(prefix="/player", tags=["player"])
 
@@ -30,6 +31,16 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
 
 def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
     """Convert PlayerState model to PlayerState schema"""
+    # Calculate training costs based on current stats and total purchases
+    total_trainings = state.total_training_purchases or 0
+    training_costs = {
+        "attack": calculate_training_cost(state.attack_power, total_trainings),
+        "defense": calculate_training_cost(state.defense_power, total_trainings),
+        "leadership": calculate_training_cost(state.leadership, total_trainings),
+        "building": calculate_training_cost(state.building_skill, total_trainings),
+        "intelligence": calculate_training_cost(state.intelligence, total_trainings)
+    }
+    
     return PlayerState(
         id=user.id,
         display_name=user.display_name,
@@ -83,6 +94,7 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         # Contract & Work
         contracts_completed=state.contracts_completed,
         total_work_contributed=state.total_work_contributed,
+        total_training_purchases=total_trainings,
         
         # Resources
         iron=state.iron,
@@ -120,6 +132,9 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         created_at=state.created_at,
         updated_at=state.updated_at,
         last_login=user.last_login,
+        
+        # Training costs (dynamically calculated)
+        training_costs=training_costs,
     )
 
 

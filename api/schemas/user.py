@@ -63,6 +63,7 @@ class PlayerState(BaseModel):
     # Contract & Work
     contracts_completed: int = 0
     total_work_contributed: int = 0
+    total_training_purchases: int = 0  # Total training sessions purchased (for cost scaling)
     
     # Resources
     iron: int = 0
@@ -107,6 +108,9 @@ class PlayerState(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
+    
+    # Training costs (calculated dynamically)
+    training_costs: Optional[dict] = None
     
     class Config:
         from_attributes = True
@@ -165,6 +169,7 @@ class PlayerStateUpdate(BaseModel):
     # Contract & Work
     contracts_completed: Optional[int] = None
     total_work_contributed: Optional[int] = None
+    total_training_purchases: Optional[int] = None
     
     # Resources
     iron: Optional[int] = None

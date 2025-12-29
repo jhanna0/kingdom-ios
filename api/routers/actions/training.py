@@ -15,15 +15,63 @@ from .utils import check_cooldown, format_datetime_iso
 router = APIRouter()
 
 
-def calculate_training_cost(stat_level: int) -> int:
-    """Calculate gold cost to purchase training based on current stat level
+@router.get("/train/costs")
+def get_training_costs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get current training costs for all stats"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
     
-    Formula: 100 * (level^1.5)
-    Level 1→2: 100g
-    Level 5→6: 559g
-    Level 10→11: 1581g
+    total_trainings = state.total_training_purchases or 0
+    
+    return {
+        "total_training_purchases": total_trainings,
+        "costs": {
+            "attack": calculate_training_cost(state.attack_power, total_trainings),
+            "defense": calculate_training_cost(state.defense_power, total_trainings),
+            "leadership": calculate_training_cost(state.leadership, total_trainings),
+            "building": calculate_training_cost(state.building_skill, total_trainings),
+            "intelligence": calculate_training_cost(state.intelligence, total_trainings)
+        },
+        "current_stats": {
+            "attack": state.attack_power,
+            "defense": state.defense_power,
+            "leadership": state.leadership,
+            "building": state.building_skill,
+            "intelligence": state.intelligence
+        },
+        "gold": state.gold
+    }
+
+
+def calculate_training_cost(stat_level: int, total_trainings: int = 0) -> int:
+    """Calculate gold cost to purchase training based on current stat level and total trainings
+    
+    Formula: 100 * (level^1.5) * (1.15^total_trainings)
+    
+    Base cost scales with stat level:
+    - Level 1→2: 100g (base)
+    - Level 5→6: 559g (base)
+    - Level 10→11: 1581g (base)
+    
+    Global multiplier (1.15^total_trainings) makes everything more expensive:
+    - 0 trainings: 1.0x
+    - 5 trainings: 2.01x
+    - 10 trainings: 4.05x
+    - 15 trainings: 8.14x
+    - 20 trainings: 16.37x
+    
+    This forces strategic choices - can't easily max everything!
     """
-    return int(100.0 * pow(float(stat_level), 1.5))
+    base_cost = 100.0 * pow(float(stat_level), 1.5)
+    global_multiplier = pow(1.15, float(total_trainings))
+    return int(base_cost * global_multiplier)
 
 
 def calculate_training_actions_required(stat_level: int, education_level: int = 0) -> int:
@@ -89,8 +137,11 @@ def purchase_training(
         if kingdom:
             education_level = kingdom.education_level
     
-    # Calculate cost and actions required (with education bonus)
-    training_cost = calculate_training_cost(current_stat)
+    # Get total training purchases for global cost scaling
+    total_trainings = state.total_training_purchases or 0
+    
+    # Calculate cost and actions required (with education bonus and global scaling)
+    training_cost = calculate_training_cost(current_stat, total_trainings)
     actions_required = calculate_training_actions_required(current_stat, education_level)
     
     if state.gold < training_cost:
@@ -120,10 +171,11 @@ def purchase_training(
         "status": "in_progress"
     }
     
-    # Add contract and spend gold
+    # Add contract, spend gold, and increment training counter
     training_contracts.append(new_contract)
     state.training_contracts = training_contracts
     state.gold -= training_cost
+    state.total_training_purchases = total_trainings + 1  # Increment for next purchase
     
     db.commit()
     

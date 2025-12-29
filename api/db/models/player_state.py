@@ -68,6 +68,7 @@ class PlayerState(Base):
     # Contract & Work tracking
     contracts_completed = Column(Integer, default=0)
     total_work_contributed = Column(Integer, default=0)
+    total_training_purchases = Column(Integer, default=0)  # Global training counter for cost scaling
     
     # Resources
     iron = Column(Integer, default=0)

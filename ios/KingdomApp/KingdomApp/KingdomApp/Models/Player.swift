@@ -29,6 +29,13 @@ class Player: ObservableObject {
     // Work & Contracts
     @Published var contractsCompleted: Int = 0
     @Published var totalWorkContributed: Int = 0
+    @Published var totalTrainingPurchases: Int = 0  // Global training counter for cost scaling
+    
+    // Training costs (from backend)
+    @Published var attackTrainingCost: Int = 100
+    @Published var defenseTrainingCost: Int = 100
+    @Published var leadershipTrainingCost: Int = 100
+    @Published var buildingTrainingCost: Int = 100
     
     // Stats
     @Published var coupsWon: Int = 0
@@ -249,47 +256,9 @@ class Player: ObservableObject {
         saveToUserDefaults()
     }
     
-    // MARK: - Training (Spend Gold on Stats)
-    
-    /// Train attack power
-    func trainAttack() -> Bool {
-        let cost = getTrainingCost(for: attackPower)
-        guard spendGold(cost) else { return false }
-        
-        attackPower += 1
-        saveToUserDefaults()
-        return true
-    }
-    
-    /// Train defense power
-    func trainDefense() -> Bool {
-        let cost = getTrainingCost(for: defensePower)
-        guard spendGold(cost) else { return false }
-        
-        defensePower += 1
-        saveToUserDefaults()
-        return true
-    }
-    
-    /// Train leadership
-    func trainLeadership() -> Bool {
-        let cost = getTrainingCost(for: leadership)
-        guard spendGold(cost) else { return false }
-        
-        leadership += 1
-        saveToUserDefaults()
-        return true
-    }
-    
-    /// Train building skill
-    func trainBuilding() -> Bool {
-        let cost = getTrainingCost(for: buildingSkill)
-        guard spendGold(cost) else { return false }
-        
-        buildingSkill += 1
-        saveToUserDefaults()
-        return true
-    }
+    // MARK: - Training
+    // Training is now handled via backend API calls (see CharacterSheetView)
+    // Costs are calculated on the backend and included in player state
     
     /// Use skill point to increase stat
     func useSkillPoint(on stat: SkillStat) -> Bool {
@@ -316,31 +285,8 @@ class Player: ObservableObject {
         case attack, defense, leadership, building
     }
     
-    /// Get training cost (increases with stat level)
-    private func getTrainingCost(for statLevel: Int) -> Int {
-        // Cost formula: 100 * (level^1.5)
-        // Level 1→2: 100g
-        // Level 5→6: 559g
-        // Level 10→11: 1581g
-        return Int(100.0 * pow(Double(statLevel), 1.5))
-    }
-    
-    /// Get training cost for display
-    func getAttackTrainingCost() -> Int {
-        return getTrainingCost(for: attackPower)
-    }
-    
-    func getDefenseTrainingCost() -> Int {
-        return getTrainingCost(for: defensePower)
-    }
-    
-    func getLeadershipTrainingCost() -> Int {
-        return getTrainingCost(for: leadership)
-    }
-    
-    func getBuildingTrainingCost() -> Int {
-        return getTrainingCost(for: buildingSkill)
-    }
+    // Training costs are now provided by the backend in player state
+    // No local calculation needed!
     
     /// Get building cost discount (percentage)
     /// Each level of building skill reduces costs by 2%
@@ -684,6 +630,7 @@ class Player: ObservableObject {
         // Contract & Work
         state["contracts_completed"] = contractsCompleted
         state["total_work_contributed"] = totalWorkContributed
+        state["total_training_purchases"] = totalTrainingPurchases
         
         // Rewards
         state["total_rewards_received"] = totalRewardsReceived
@@ -751,6 +698,18 @@ class Player: ObservableObject {
         // Contract & Work
         contractsCompleted = apiState.contracts_completed
         totalWorkContributed = apiState.total_work_contributed
+        totalTrainingPurchases = apiState.total_training_purchases
+        
+        // Training costs from backend
+        if let costs = apiState.training_costs {
+            attackTrainingCost = costs.attack
+            defenseTrainingCost = costs.defense
+            leadershipTrainingCost = costs.leadership
+            buildingTrainingCost = costs.building
+            print("💰 Updated training costs: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building)")
+        } else {
+            print("⚠️ No training costs in API response")
+        }
         
         // Rewards
         totalRewardsReceived = apiState.total_rewards_received
@@ -858,6 +817,7 @@ class Player: ObservableObject {
         defaults.set(isRuler, forKey: "isRuler")
         defaults.set(contractsCompleted, forKey: "contractsCompleted")
         defaults.set(totalWorkContributed, forKey: "totalWorkContributed")
+        defaults.set(totalTrainingPurchases, forKey: "totalTrainingPurchases")
         defaults.set(coupsWon, forKey: "coupsWon")
         defaults.set(coupsFailed, forKey: "coupsFailed")
         defaults.set(timesExecuted, forKey: "timesExecuted")
@@ -878,6 +838,12 @@ class Player: ObservableObject {
         defaults.set(defensePower, forKey: "defensePower")
         defaults.set(leadership, forKey: "leadership")
         defaults.set(buildingSkill, forKey: "buildingSkill")
+        
+        // Save training costs
+        defaults.set(attackTrainingCost, forKey: "attackTrainingCost")
+        defaults.set(defenseTrainingCost, forKey: "defenseTrainingCost")
+        defaults.set(leadershipTrainingCost, forKey: "leadershipTrainingCost")
+        defaults.set(buildingTrainingCost, forKey: "buildingTrainingCost")
         
         // Kingdom reputation (stored as JSON)
         if let jsonData = try? JSONEncoder().encode(kingdomReputation) {
@@ -948,6 +914,7 @@ class Player: ObservableObject {
         isRuler = defaults.bool(forKey: "isRuler") || !fiefsRuled.isEmpty
         contractsCompleted = defaults.integer(forKey: "contractsCompleted")
         totalWorkContributed = defaults.integer(forKey: "totalWorkContributed")
+        totalTrainingPurchases = defaults.integer(forKey: "totalTrainingPurchases")
         coupsWon = defaults.integer(forKey: "coupsWon")
         coupsFailed = defaults.integer(forKey: "coupsFailed")
         timesExecuted = defaults.integer(forKey: "timesExecuted")
@@ -973,6 +940,16 @@ class Player: ObservableObject {
         if leadership == 0 { leadership = 1 }
         buildingSkill = defaults.integer(forKey: "buildingSkill")
         if buildingSkill == 0 { buildingSkill = 1 }
+        
+        // Load training costs (fallback to 100 if not set)
+        attackTrainingCost = defaults.integer(forKey: "attackTrainingCost")
+        if attackTrainingCost == 0 { attackTrainingCost = 100 }
+        defenseTrainingCost = defaults.integer(forKey: "defenseTrainingCost")
+        if defenseTrainingCost == 0 { defenseTrainingCost = 100 }
+        leadershipTrainingCost = defaults.integer(forKey: "leadershipTrainingCost")
+        if leadershipTrainingCost == 0 { leadershipTrainingCost = 100 }
+        buildingTrainingCost = defaults.integer(forKey: "buildingTrainingCost")
+        if buildingTrainingCost == 0 { buildingTrainingCost = 100 }
         
         // Kingdom reputation
         if let jsonData = defaults.data(forKey: "kingdomReputation"),

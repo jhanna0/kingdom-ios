@@ -53,6 +53,27 @@ struct TrainingCosts: Codable {
     let building: Int
 }
 
+struct TrainingCostsResponse: Codable {
+    let totalTrainingPurchases: Int
+    let costs: TrainingCosts
+    let currentStats: CurrentStats
+    let gold: Int
+    
+    struct CurrentStats: Codable {
+        let attack: Int
+        let defense: Int
+        let leadership: Int
+        let building: Int
+        let intelligence: Int
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case costs, gold
+        case totalTrainingPurchases = "total_training_purchases"
+        case currentStats = "current_stats"
+    }
+}
+
 struct AllActionStatus: Codable {
     let work: ActionStatus
     let patrol: ActionStatus
@@ -366,6 +387,13 @@ class ActionsAPI {
     
     func scoutKingdom(kingdomId: String) async throws -> ScoutActionResponse {
         let request = client.request(endpoint: "/actions/scout/\(kingdomId)", method: "POST")
+        return try await client.execute(request)
+    }
+    
+    // MARK: - Training Costs
+    
+    func getTrainingCosts() async throws -> TrainingCostsResponse {
+        let request = client.request(endpoint: "/actions/train/costs", method: "GET")
         return try await client.execute(request)
     }
     

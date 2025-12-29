@@ -57,6 +57,18 @@ struct APIPlayerState: Codable {
     // Contract & Work
     let contracts_completed: Int
     let total_work_contributed: Int
+    let total_training_purchases: Int
+    
+    // Training costs (calculated by backend)
+    let training_costs: TrainingCostsFromAPI?
+    
+    struct TrainingCostsFromAPI: Codable {
+        let attack: Int
+        let defense: Int
+        let leadership: Int
+        let building: Int
+        let intelligence: Int
+    }
     
     // Resources
     let iron: Int
