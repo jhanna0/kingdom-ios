@@ -54,7 +54,6 @@ struct APIPlayerState: Codable {
     let last_coup_attempt: String?
     
     // Contract & Work
-    let active_contract_id: String?
     let contracts_completed: Int
     let total_work_contributed: Int
     

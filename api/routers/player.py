@@ -80,7 +80,6 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         last_coup_attempt=state.last_coup_attempt,
         
         # Contract & Work
-        active_contract_id=state.active_contract_id,
         contracts_completed=state.contracts_completed,
         total_work_contributed=state.total_work_contributed,
         

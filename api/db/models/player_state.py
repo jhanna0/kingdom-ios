@@ -65,7 +65,6 @@ class PlayerState(Base):
     last_coup_attempt = Column(DateTime, nullable=True)
     
     # Contract & Work tracking
-    active_contract_id = Column(String, nullable=True)
     contracts_completed = Column(Integer, default=0)
     total_work_contributed = Column(Integer, default=0)
     

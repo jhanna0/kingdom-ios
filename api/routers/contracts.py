@@ -5,7 +5,6 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Optional
-import uuid
 import math
 
 from db import get_db, User, PlayerState, Kingdom, Contract
@@ -63,7 +62,6 @@ def contract_to_response(contract: Contract) -> ContractResponse:
         actions_completed=contract.actions_completed or 0,
         action_contributions=contract.action_contributions or {},
         reward_pool=contract.reward_pool,
-        workers=contract.workers or [],
         created_by=contract.created_by,
         created_at=contract.created_at,
         completed_at=contract.completed_at,
@@ -99,13 +97,17 @@ def get_my_contracts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get contracts where current user is a worker"""
-    contracts = db.query(Contract).filter(
-        Contract.workers.contains([current_user.id]),
+    """Get contracts where current user has contributed"""
+    # Find contracts where user has made contributions
+    all_contracts = db.query(Contract).filter(
         Contract.status.in_(["open", "in_progress"])
     ).all()
     
-    return [contract_to_response(c) for c in contracts]
+    # Filter to only contracts where user has contributed
+    user_id_str = str(current_user.id)
+    my_contracts = [c for c in all_contracts if user_id_str in (c.action_contributions or {})]
+    
+    return [contract_to_response(c) for c in my_contracts]
 
 
 @router.get("/{contract_id}", response_model=ContractResponse)
@@ -195,7 +197,6 @@ def create_contract(
         )
     
     contract = Contract(
-        id=str(uuid.uuid4()),
         kingdom_id=data.kingdom_id,
         kingdom_name=data.kingdom_name,
         building_type=data.building_type,
@@ -206,7 +207,6 @@ def create_contract(
         actions_completed=0,
         action_contributions={},
         reward_pool=data.reward_pool,
-        workers=[],
         created_by=current_user.id,
         status="open"
     )
@@ -219,108 +219,6 @@ def create_contract(
 
 
 # ===== Contract Actions =====
-
-@router.post("/{contract_id}/join")
-def join_contract(
-    contract_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Join a contract as a worker"""
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
-    
-    if not contract:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Contract not found"
-        )
-    
-    if contract.status not in ["open", "in_progress"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Contract is not accepting workers"
-        )
-    
-    # DEV MODE: Allow rulers to join their own contracts
-    if not DEV_MODE and contract.created_by == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rulers cannot accept their own contracts"
-        )
-    
-    workers = contract.workers or []
-    
-    if current_user.id in workers:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Already joined this contract"
-        )
-    
-    workers.append(current_user.id)
-    contract.workers = workers
-    
-    # Start work timer if first worker
-    if contract.work_started_at is None:
-        contract.work_started_at = datetime.utcnow()
-        contract.status = "in_progress"
-    
-    # Update user's active contract in player state
-    state = current_user.player_state
-    if not state:
-        state = PlayerState(user_id=current_user.id, hometown_kingdom_id=current_user.hometown_kingdom_id)
-        db.add(state)
-    state.active_contract_id = contract_id
-    
-    db.commit()
-    db.refresh(contract)
-    
-    return {
-        "success": True,
-        "message": f"Joined contract for {contract.building_type}",
-        "contract": contract_to_response(contract)
-    }
-
-
-@router.post("/{contract_id}/leave")
-def leave_contract(
-    contract_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Leave a contract"""
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
-    
-    if not contract:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Contract not found"
-        )
-    
-    workers = contract.workers or []
-    
-    if current_user.id not in workers:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Not a worker on this contract"
-        )
-    
-    workers.remove(current_user.id)
-    contract.workers = workers
-    
-    # If no workers left, reset timer
-    if len(workers) == 0:
-        contract.work_started_at = None
-        contract.status = "open"
-    
-    # Clear user's active contract in player state
-    state = current_user.player_state
-    if state and state.active_contract_id == contract_id:
-        state.active_contract_id = None
-    
-    db.commit()
-    
-    return {"success": True, "message": "Left contract"}
-
 
 @router.post("/{contract_id}/complete")
 def complete_contract(
@@ -343,40 +241,24 @@ def complete_contract(
             detail="Contract is not in progress"
         )
     
-    # Check if enough time has passed (skip in dev mode)
-    if not DEV_MODE and contract.work_started_at:
-        worker_count = len(contract.workers or [])
-        ideal_workers = 3.0
-        worker_multiplier = ideal_workers / max(worker_count, 1)
-        hours_needed = contract.base_hours_required * worker_multiplier
-        
-        elapsed = (datetime.utcnow() - contract.work_started_at).total_seconds() / 3600.0
-        
-        if elapsed < hours_needed:
-            remaining = hours_needed - elapsed
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Contract not ready. {remaining:.1f} hours remaining."
-            )
+    # Check if contract is actually complete (based on actions)
+    if contract.actions_completed < contract.total_actions_required:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Contract not complete. {contract.actions_completed}/{contract.total_actions_required} actions done."
+        )
     
-    # Complete the contract
+    # Complete the contract (rewards already distributed per action)
     contract.status = "completed"
     contract.completed_at = datetime.utcnow()
     
-    # Distribute rewards
-    workers = contract.workers or []
-    reward_per_worker = contract.reward_pool // max(len(workers), 1)
-    
-    # DEV MODE: Boost rewards
-    rep_bonus = 100 if DEV_MODE else 10
-    
-    for worker_id in workers:
+    # Mark contract as completed for all contributors
+    contributions = contract.action_contributions or {}
+    for worker_id_str in contributions.keys():
+        worker_id = int(worker_id_str)
         worker_state = db.query(PlayerState).filter(PlayerState.user_id == worker_id).first()
         if worker_state:
-            worker_state.gold += reward_per_worker
             worker_state.contracts_completed += 1
-            worker_state.active_contract_id = None
-            worker_state.reputation += rep_bonus  # Rep for completing contract
     
     # Upgrade the building
     kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
@@ -391,8 +273,8 @@ def complete_contract(
     return {
         "success": True,
         "message": f"Contract completed! {contract.building_type} upgraded.",
-        "rewards_distributed": contract.reward_pool,
-        "workers_paid": len(workers)
+        "total_actions": contract.actions_completed,
+        "contributors": len(contributions)
     }
 
 
@@ -424,12 +306,6 @@ def cancel_contract(
         )
     
     contract.status = "cancelled"
-    
-    # Clear active contract for all workers
-    for worker_id in (contract.workers or []):
-        worker = db.query(User).filter(User.id == worker_id).first()
-        if worker and worker.active_contract_id == contract_id:
-            worker.active_contract_id = None
     
     db.commit()
     

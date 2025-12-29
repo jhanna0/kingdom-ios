@@ -16,7 +16,8 @@ class Contract(Base):
     """
     __tablename__ = "contracts"
     
-    id = Column(String, primary_key=True)
+    # Primary key - PostgreSQL auto-incrementing integer
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     kingdom_name = Column(String, nullable=False)
     
@@ -36,9 +37,6 @@ class Contract(Base):
     
     # Rewards
     reward_pool = Column(Integer, default=0)
-    
-    # Workers (stored as JSONB list of player IDs)
-    workers = Column(JSONB, default=list)
     
     # Status
     created_by = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)

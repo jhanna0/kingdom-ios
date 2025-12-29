@@ -60,7 +60,7 @@ class ContractAPI {
     // MARK: - Contract Actions
     
     /// Join a contract as a worker
-    func joinContract(contractId: String) async throws -> ContractJoinResponse {
+    func joinContract(contractId: Int) async throws -> ContractJoinResponse {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
@@ -80,7 +80,7 @@ class ContractAPI {
     }
     
     /// Complete a contract (auto-triggered when ready)
-    func completeContract(contractId: String) async throws -> ContractCompleteResponse {
+    func completeContract(contractId: Int) async throws -> ContractCompleteResponse {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }

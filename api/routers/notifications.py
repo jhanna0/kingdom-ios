@@ -49,42 +49,42 @@ def get_user_updates(
     notifications = []
     
     # ===== Check for completed contracts =====
-    active_contracts = db.query(Contract).filter(
-        Contract.workers.contains([current_user.id]),
-        Contract.status == "in_progress"
+    # Find contracts where user has contributed
+    all_contracts = db.query(Contract).filter(
+        Contract.status.in_(["open", "in_progress"])
     ).all()
+    
+    user_id_str = str(current_user.id)
+    active_contracts = [c for c in all_contracts if user_id_str in (c.action_contributions or {})]
     
     ready_to_complete = []
     in_progress = []
     
     for contract in active_contracts:
-        if contract.work_started_at:
-            worker_count = len(contract.workers or [])
-            ideal_workers = 3.0
-            worker_multiplier = ideal_workers / max(worker_count, 1)
-            hours_needed = contract.base_hours_required * worker_multiplier
+        # Check if contract is complete based on actions
+        if contract.actions_completed >= contract.total_actions_required:
+            user_actions = contract.action_contributions.get(user_id_str, 0)
+            total_actions = sum(contract.action_contributions.values())
+            proportional_reward = int((user_actions / total_actions) * contract.reward_pool) if total_actions > 0 else 0
             
-            elapsed = (datetime.utcnow() - contract.work_started_at).total_seconds() / 3600.0
+            ready_to_complete.append({
+                "id": contract.id,
+                "kingdom_name": contract.kingdom_name,
+                "building_type": contract.building_type,
+                "building_level": contract.building_level,
+                "reward": proportional_reward
+            })
             
-            if DEV_MODE or elapsed >= hours_needed:
-                ready_to_complete.append({
-                    "id": contract.id,
-                    "kingdom_name": contract.kingdom_name,
-                    "building_type": contract.building_type,
-                    "building_level": contract.building_level,
-                    "reward": contract.reward_pool // max(len(contract.workers), 1)
-                })
-                
-                notifications.append({
-                    "type": "contract_ready",
-                    "priority": "high",
-                    "title": "Contract Complete!",
-                    "message": f"{contract.building_type} in {contract.kingdom_name} is ready",
-                    "action": "complete_contract",
-                    "action_id": contract.id,
-                    "created_at": datetime.utcnow().isoformat()
-                })
-            else:
+            notifications.append({
+                "type": "contract_ready",
+                "priority": "high",
+                "title": "Contract Complete!",
+                "message": f"{contract.building_type} in {contract.kingdom_name} is ready",
+                "action": "complete_contract",
+                "action_id": contract.id,
+                "created_at": datetime.utcnow().isoformat()
+            })
+        else:
                 remaining_hours = hours_needed - elapsed
                 progress = elapsed / hours_needed
                 in_progress.append({
@@ -212,23 +212,18 @@ def get_quick_summary(
     """
     state = get_player_state(db, current_user)
     
-    # Count ready contracts
-    active_contracts = db.query(Contract).filter(
-        Contract.workers.contains([current_user.id]),
-        Contract.status == "in_progress"
+    # Count ready contracts where user has contributed
+    all_contracts = db.query(Contract).filter(
+        Contract.status.in_(["open", "in_progress"])
     ).all()
+    
+    user_id_str = str(current_user.id)
+    active_contracts = [c for c in all_contracts if user_id_str in (c.action_contributions or {})]
     
     ready_count = 0
     for contract in active_contracts:
-        if contract.work_started_at:
-            worker_count = len(contract.workers or [])
-            ideal_workers = 3.0
-            worker_multiplier = ideal_workers / max(worker_count, 1)
-            hours_needed = contract.base_hours_required * worker_multiplier
-            elapsed = (datetime.utcnow() - contract.work_started_at).total_seconds() / 3600.0
-            
-            if DEV_MODE or elapsed >= hours_needed:
-                ready_count += 1
+        if contract.actions_completed >= contract.total_actions_required:
+            ready_count += 1
     
     return {
         "ready_contracts": ready_count,

@@ -16,9 +16,9 @@ struct ActionsView: View {
         return viewModel.kingdoms.first { $0.name == currentKingdomName }
     }
     
-    var activeContract: Contract? {
-        guard let contractId = viewModel.player.activeContractId else { return nil }
-        return viewModel.availableContracts.first { $0.id == contractId }
+    var availableContractsInKingdom: [Contract] {
+        guard let kingdom = currentKingdom else { return [] }
+        return viewModel.availableContracts.filter { $0.kingdomId == kingdom.id }
     }
     
     var isInHomeKingdom: Bool {
@@ -121,24 +121,30 @@ struct ActionsView: View {
                                     .padding(.horizontal)
                                     .padding(.top, KingdomTheme.Spacing.medium)
                                 
-                                // Work on Contract
-                                if let contract = activeContract {
-                                    ActionCard(
-                                        title: "Work on Contract",
-                                        icon: "hammer.fill",
-                                        description: "Contribute to \(contract.buildingType) construction",
-                                        status: status.work,
-                                        fetchedAt: statusFetchedAt ?? Date(),
-                                        currentTime: currentTime,
-                                        actionType: .work,
-                                        isEnabled: true,
-                                        onAction: { performWork() }
-                                    )
+                                // Work on Contracts
+                                if !availableContractsInKingdom.isEmpty {
+                                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                                        Text("Work on Contracts")
+                                            .font(KingdomTheme.Typography.subheadline())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                            .padding(.horizontal)
+                                            .padding(.top, KingdomTheme.Spacing.small)
+                                        
+                                        ForEach(availableContractsInKingdom) { contract in
+                                            WorkContractCard(
+                                                contract: contract,
+                                                status: status.work,
+                                                fetchedAt: statusFetchedAt ?? Date(),
+                                                currentTime: currentTime,
+                                                onAction: { performWork(contractId: contract.id) }
+                                            )
+                                        }
+                                    }
                                 } else {
                                     InfoCard(
-                                        title: "No Active Contract",
+                                        title: "No Active Contracts",
                                         icon: "hammer.fill",
-                                        description: "Join a contract to start working",
+                                        description: "Ruler can create contracts for building upgrades",
                                         color: .gray
                                     )
                                 }
@@ -266,9 +272,7 @@ struct ActionsView: View {
         isLoading = false
     }
     
-    private func performWork() {
-        guard let contractId = activeContract?.id else { return }
-        
+    private func performWork(contractId: Int) {
         Task {
             do {
                 // Capture state before action
@@ -439,6 +443,78 @@ struct ActionsView: View {
     
     private func stopUIUpdateTimer() {
         // Timer will be deallocated when view disappears
+    }
+}
+
+// MARK: - Work Contract Card
+
+struct WorkContractCard: View {
+    let contract: Contract
+    let status: ActionStatus
+    let fetchedAt: Date
+    let currentTime: Date
+    let onAction: () -> Void
+    
+    var calculatedSecondsRemaining: Int {
+        let elapsed = currentTime.timeIntervalSince(fetchedAt)
+        let remaining = max(0, Double(status.secondsRemaining) - elapsed)
+        return Int(remaining)
+    }
+    
+    var isReady: Bool {
+        return status.ready || calculatedSecondsRemaining <= 0
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: "hammer.fill")
+                    .font(.title2)
+                    .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(contract.buildingType)
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("\(contract.actionsCompleted)/\(contract.totalActionsRequired) actions • \(contract.rewardPool)g pool")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+            }
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.parchmentDark)
+                        .frame(height: 8)
+                    
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.gold)
+                        .frame(width: geometry.size.width * contract.progress, height: 8)
+                }
+                .cornerRadius(4)
+            }
+            .frame(height: 8)
+            
+            if isReady {
+                Button(action: onAction) {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("Work on This")
+                    }
+                }
+                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+            } else {
+                CooldownTimer(secondsRemaining: calculatedSecondsRemaining)
+            }
+        }
+        .padding()
+        .parchmentCard()
+        .padding(.horizontal)
     }
 }
 

@@ -60,7 +60,6 @@ class PlayerState(BaseModel):
     last_coup_attempt: Optional[datetime] = None
     
     # Contract & Work
-    active_contract_id: Optional[str] = None
     contracts_completed: int = 0
     total_work_contributed: int = 0
     
@@ -162,7 +161,6 @@ class PlayerStateUpdate(BaseModel):
     last_coup_attempt: Optional[datetime] = None
     
     # Contract & Work
-    active_contract_id: Optional[str] = None
     contracts_completed: Optional[int] = None
     total_work_contributed: Optional[int] = None
     

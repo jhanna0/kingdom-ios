@@ -129,7 +129,7 @@ class ActionsAPI {
     
     // MARK: - Work on Contract
     
-    func workOnContract(contractId: String) async throws -> WorkActionResponse {
+    func workOnContract(contractId: Int) async throws -> WorkActionResponse {
         let request = client.request(endpoint: "/actions/work/\(contractId)", method: "POST")
         return try await client.execute(request)
     }

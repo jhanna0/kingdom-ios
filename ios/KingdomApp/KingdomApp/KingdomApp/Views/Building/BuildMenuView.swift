@@ -115,13 +115,6 @@ struct BuildMenuView: View {
                         // Contract created successfully!
                         selectedBuildingType = nil
                         
-                        // Add to activity feed
-                        viewModel.worldSimulator.addActivity(
-                            "📜 Contract posted: \(buildingName) upgrade",
-                            in: kingdom.name,
-                            icon: "📋"
-                        )
-                        
                         // Force refresh kingdom data
                         Task {
                             await viewModel.loadContracts()

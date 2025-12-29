@@ -6,12 +6,7 @@ import CoreLocation
 
 @MainActor
 class MapViewModel: ObservableObject {
-    @Published var kingdoms: [Kingdom] = [] {
-        didSet {
-            // Populate kingdoms with NPC citizens
-            worldSimulator.populateKingdoms(kingdoms)
-        }
-    }
+    @Published var kingdoms: [Kingdom] = []
     @Published var cameraPosition: MapCameraPosition
     @Published var userLocation: CLLocationCoordinate2D?
     @Published var isLoading: Bool = false
@@ -20,10 +15,6 @@ class MapViewModel: ObservableObject {
     @Published var player: Player
     @Published var playerResources: PlayerResources  // Equipment, resources, properties
     @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
-    
-    // World simulation - makes the game feel alive!
-    @Published var worldSimulator = WorldSimulator.shared
-    @Published var showActivityFeed: Bool = false
     
     // API Service - connects to backend server
     var apiService = KingdomAPIService.shared
@@ -127,9 +118,6 @@ class MapViewModel: ObservableObject {
         
         // Check which kingdom user is inside (local detection)
         checkKingdomLocation(location)
-        
-        // Check and complete any ready contracts
-        checkAndCompleteContracts()
         
         // Only initialize once
         if !hasInitializedLocation {
@@ -464,12 +452,6 @@ class MapViewModel: ObservableObject {
             print("💰 \(kingdom.name) collected \(incomeEarned) gold (now: \(kingdoms[index].treasuryGold)g)")
         }
         
-        // Also collect NPC tax income (citizens mining and paying taxes)
-        let taxIncome = worldSimulator.simulateTaxIncome(for: &kingdoms[index])
-        if taxIncome > 0 {
-            print("💰 Citizens paid \(taxIncome)g in taxes!")
-        }
-        
         // Update currentKingdomInside if it's the same kingdom
         if currentKingdomInside?.id == kingdom.id {
             currentKingdomInside = kingdoms[index]
@@ -550,36 +532,6 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Accept a contract and start working
-    func acceptContract(kingdom: Kingdom) -> Bool {
-        // Find contract in available contracts
-        guard let contract = availableContracts.first(where: { $0.kingdomId == kingdom.id }) else {
-            print("❌ No active contract in this kingdom")
-            return false
-        }
-        
-        // Call API to join contract
-        Task {
-            do {
-                let response = try await contractAPI.joinContract(contractId: contract.id)
-                print("✅ Joined contract: \(response.message)")
-                
-                // Update player state
-                await MainActor.run {
-                    player.activeContractId = contract.id
-                    player.saveToUserDefaults()
-                }
-                
-                // Reload contracts AND refresh kingdom data
-                await loadContracts()
-                await refreshKingdomData()
-            } catch {
-                print("❌ Failed to join contract: \(error)")
-            }
-        }
-        
-        return true
-    }
     
     /// Refresh kingdom data from backend (force fetch)
     func refreshKingdomData() async {
@@ -608,69 +560,6 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Stop working on a contract
-    func leaveContract() -> Bool {
-        guard let contractId = player.activeContractId else {
-            print("❌ Not working on any contract")
-            return false
-        }
-        
-        // Find the kingdom with this contract
-        guard let kingdomIndex = kingdoms.firstIndex(where: { $0.activeContract?.id == contractId }) else {
-            print("❌ Contract not found")
-            return false
-        }
-        
-        guard var contract = kingdoms[kingdomIndex].activeContract else {
-            return false
-        }
-        
-        contract.removeWorker(player.playerId)
-        kingdoms[kingdomIndex].activeContract = contract
-        player.activeContractId = nil
-        player.saveToUserDefaults()
-        
-        print("🚪 Left contract")
-        
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdoms[kingdomIndex].id {
-            currentKingdomInside = kingdoms[kingdomIndex]
-        }
-        
-        return true
-    }
-    
-    /// Check all contracts and auto-complete any that are ready
-    func checkAndCompleteContracts() {
-        for kingdom in kingdoms {
-            guard let contract = kingdom.activeContract else { continue }
-            
-            // Skip if not ready
-            guard contract.isReadyToComplete else { continue }
-            
-            // Complete the contract via API
-            Task {
-                await completeContract(contractId: contract.id, kingdomId: kingdom.id)
-            }
-        }
-    }
-    
-    /// Complete a contract via API and refresh data
-    func completeContract(contractId: String, kingdomId: String) async {
-        do {
-            let response = try await contractAPI.completeContract(contractId: contractId)
-            print("✅ Contract completed via API: \(response.message)")
-            
-            // Reload the specific kingdom from backend to get updated building levels
-            await refreshKingdomFromBackend(kingdomId: kingdomId)
-            
-            // Reload player state to get updated gold
-            await refreshPlayerFromBackend()
-            
-        } catch {
-            print("❌ Failed to complete contract: \(error)")
-        }
-    }
     
     /// Refresh a specific kingdom from backend
     private func refreshKingdomFromBackend(kingdomId: String) async {
@@ -709,7 +598,6 @@ class MapViewModel: ObservableObject {
                 player.gold = apiPlayerState.gold
                 player.reputation = apiPlayerState.reputation
                 player.level = apiPlayerState.level
-                player.activeContractId = apiPlayerState.active_contract_id
                 player.contractsCompleted = apiPlayerState.contracts_completed
                 player.saveToUserDefaults()
                 
@@ -753,7 +641,6 @@ class MapViewModel: ObservableObject {
                         actionsCompleted: apiContract.actions_completed,
                         actionContributions: apiContract.action_contributions,
                         rewardPool: apiContract.reward_pool,
-                        workers: Set(apiContract.workers),
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },
@@ -767,12 +654,6 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Get player's active contract
-    func getPlayerActiveContract() -> Contract? {
-        guard let contractId = player.activeContractId else { return nil }
-        return kingdoms.compactMap { $0.activeContract }
-            .first { $0.id == contractId }
-    }
     
     // Helper to get building info
     private func getBuildingInfo(kingdom: Kingdom, buildingType: BuildingType) -> (String, Int) {

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Contract Models
 
 struct APIContract: Codable {
-    let id: String
+    let id: Int
     let kingdom_id: String
     let kingdom_name: String
     let building_type: String
@@ -18,7 +18,6 @@ struct APIContract: Codable {
     let action_contributions: [String: Int]
     
     let reward_pool: Int
-    let workers: [Int]  // Changed from [String] to [Int] - backend uses integer user IDs
     let created_by: Int  // Changed from String to Int - backend uses integer user ID
     let created_at: String
     let completed_at: String?
@@ -43,7 +42,7 @@ struct ContractJoinResponse: Codable {
 struct ContractCompleteResponse: Codable {
     let success: Bool
     let message: String
-    let rewards_distributed: Int
-    let workers_paid: Int
+    let total_actions: Int
+    let contributors: Int
 }
 

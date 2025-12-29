@@ -142,10 +142,10 @@ def work_on_contract(
             detail="Contract not found"
         )
     
-    if contract.status not in ["open", "in_progress"]:
+    if contract.status == "completed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Contract is not accepting work"
+            detail="Contract is already completed"
         )
     
     # Check if user is checked into the kingdom
@@ -154,17 +154,6 @@ def work_on_contract(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must be checked into the kingdom to work on contracts"
         )
-    
-    # Add user to workers if not already
-    workers = contract.workers or []
-    if current_user.id not in workers:
-        workers.append(current_user.id)
-        contract.workers = workers
-        
-        # Start work timer if first worker
-        if contract.work_started_at is None:
-            contract.work_started_at = datetime.utcnow()
-            contract.status = "in_progress"
     
     # Increment action count
     contract.actions_completed += 1
@@ -178,7 +167,15 @@ def work_on_contract(
     # Update player state
     state.last_work_action = datetime.utcnow()
     state.total_work_contributed += 1
-    state.active_contract_id = contract_id
+    
+    # Calculate reward per action (gold per action = reward_pool / total_actions_required)
+    gold_per_action = contract.reward_pool / contract.total_actions_required
+    gold_earned = int(gold_per_action)
+    rep_earned = 5  # Small rep per action
+    
+    # Award gold and rep immediately for this action
+    state.gold += gold_earned
+    state.reputation += rep_earned
     
     # Check if contract is complete
     is_complete = contract.actions_completed >= contract.total_actions_required
@@ -187,22 +184,12 @@ def work_on_contract(
         contract.status = "completed"
         contract.completed_at = datetime.utcnow()
         
-        # Distribute rewards based on contribution
-        total_contributions = sum(contributions.values())
-        
-        # DEV MODE: Boost rewards
-        rep_bonus = 100 if DEV_MODE else 10
-        
-        for worker_id_str, contribution_count in contributions.items():
+        # Mark contract as completed for all contributors
+        for worker_id_str in contributions.keys():
             worker_id = int(worker_id_str)
             worker_state = db.query(PlayerState).filter(PlayerState.user_id == worker_id).first()
             if worker_state:
-                # Proportional reward based on contribution
-                reward = int((contribution_count / total_contributions) * contract.reward_pool)
-                worker_state.gold += reward
                 worker_state.contracts_completed += 1
-                worker_state.active_contract_id = None
-                worker_state.reputation += rep_bonus
         
         # Upgrade the building
         kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
@@ -218,14 +205,6 @@ def work_on_contract(
     progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
     user_contribution = contributions.get(user_id_str, 0)
     
-    # Calculate rewards for this action (only if contract completed)
-    gold_earned = 0
-    rep_earned = 0
-    if is_complete:
-        # User's proportional reward
-        gold_earned = int((user_contribution / sum(contributions.values())) * contract.reward_pool)
-        rep_earned = 100 if DEV_MODE else 10
-    
     return {
         "success": True,
         "message": "Work action completed! +1 action" + (" - Contract complete!" if is_complete else ""),
@@ -237,10 +216,10 @@ def work_on_contract(
         "is_complete": is_complete,
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "rewards": {
-            "gold": gold_earned if gold_earned > 0 else None,
-            "reputation": rep_earned if rep_earned > 0 else None,
+            "gold": gold_earned,
+            "reputation": rep_earned,
             "iron": None
-        } if is_complete else None
+        }
     }
 
 

@@ -241,13 +241,6 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
-                // Citizens section - shows NPCs in this kingdom
-                CitizensPreview(
-                    kingdomName: kingdom.name,
-                    worldSimulator: viewModel.worldSimulator
-                )
-                .padding(.horizontal)
-                
                 // Treasury & Income Section
                 VStack(spacing: KingdomTheme.Spacing.small) {
                     HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -387,11 +380,11 @@ struct KingdomInfoSheetView: View {
                             }
                             
                             HStack(spacing: 8) {
-                                Label("\(contract.workers.count) workers", systemImage: "person.2.fill")
+                                Label("\(contract.contributorCount) contributors", systemImage: "person.2.fill")
                                     .font(KingdomTheme.Typography.caption2())
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
                                 
-                                Label("\(contract.rewardPerWorker)g reward", systemImage: "dollarsign.circle")
+                                Label("\(contract.rewardPool)g pool", systemImage: "dollarsign.circle")
                                     .font(KingdomTheme.Typography.caption2())
                                     .foregroundColor(KingdomTheme.Colors.gold)
                             }

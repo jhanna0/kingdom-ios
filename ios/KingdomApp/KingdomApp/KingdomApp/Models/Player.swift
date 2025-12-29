@@ -27,7 +27,6 @@ class Player: ObservableObject {
     @Published var isRuler: Bool = false
     
     // Work & Contracts
-    @Published var activeContractId: String?  // Contract player is currently working on
     @Published var contractsCompleted: Int = 0
     @Published var totalWorkContributed: Int = 0
     
@@ -681,7 +680,6 @@ class Player: ObservableObject {
         }
         
         // Contract & Work
-        state["active_contract_id"] = activeContractId
         state["contracts_completed"] = contractsCompleted
         state["total_work_contributed"] = totalWorkContributed
         
@@ -748,7 +746,6 @@ class Player: ObservableObject {
         }
         
         // Contract & Work
-        activeContractId = apiState.active_contract_id
         contractsCompleted = apiState.contracts_completed
         totalWorkContributed = apiState.total_work_contributed
         
@@ -856,7 +853,6 @@ class Player: ObservableObject {
         }
         defaults.set(Array(fiefsRuled), forKey: "fiefsRuled")
         defaults.set(isRuler, forKey: "isRuler")
-        defaults.set(activeContractId, forKey: "activeContractId")
         defaults.set(contractsCompleted, forKey: "contractsCompleted")
         defaults.set(totalWorkContributed, forKey: "totalWorkContributed")
         defaults.set(coupsWon, forKey: "coupsWon")
@@ -947,7 +943,6 @@ class Player: ObservableObject {
         
         // Ensure isRuler stays in sync with fiefsRuled
         isRuler = defaults.bool(forKey: "isRuler") || !fiefsRuled.isEmpty
-        activeContractId = defaults.string(forKey: "activeContractId")
         contractsCompleted = defaults.integer(forKey: "contractsCompleted")
         totalWorkContributed = defaults.integer(forKey: "totalWorkContributed")
         coupsWon = defaults.integer(forKey: "coupsWon")

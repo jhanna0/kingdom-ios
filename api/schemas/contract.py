@@ -19,7 +19,7 @@ class ContractCreate(BaseModel):
 
 class ContractResponse(BaseModel):
     """Contract response"""
-    id: str
+    id: int
     kingdom_id: str
     kingdom_name: str
     building_type: str
@@ -34,7 +34,6 @@ class ContractResponse(BaseModel):
     action_contributions: dict = {}  # {user_id: action_count}
     
     reward_pool: int
-    workers: List[int] = []  # Integer user IDs
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -47,7 +46,6 @@ class ContractResponse(BaseModel):
 class ContractUpdate(BaseModel):
     """Update contract"""
     status: Optional[str] = None
-    workers: Optional[List[int]] = None  # Integer user IDs
     work_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 

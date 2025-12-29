@@ -6,10 +6,8 @@ struct MapView: View {
     @StateObject private var locationManager = LocationManager()
     @State private var kingdomForInfoSheet: Kingdom?
     @State private var showMyKingdoms = false
-    @State private var showContracts = false
     @State private var showActions = false
     @State private var showCharacterSheet = false
-    @State private var showActivityFeed = false
     @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
@@ -216,11 +214,6 @@ struct MapView: View {
                                 .background(KingdomTheme.Colors.buttonSuccess)
                                 .cornerRadius(6)
                         }
-                        
-                        // World Activity Feed
-                        ActivityBadge(worldSimulator: viewModel.worldSimulator) {
-                            showActivityFeed = true
-                        }
                     }
                 }
                 .padding(.horizontal, 14)
@@ -274,9 +267,6 @@ struct MapView: View {
                 }
             )
         }
-        .sheet(isPresented: $showContracts) {
-            ContractsListView(viewModel: viewModel)
-        }
         .sheet(isPresented: $showActions) {
             NavigationStack {
                 ActionsView(viewModel: viewModel)
@@ -303,12 +293,6 @@ struct MapView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showActivityFeed) {
-            WorldActivityFeed(
-                worldSimulator: viewModel.worldSimulator,
-                isPresented: $showActivityFeed
-            )
         }
         .sheet(item: $kingdomToShow) { kingdom in
             NavigationStack {
