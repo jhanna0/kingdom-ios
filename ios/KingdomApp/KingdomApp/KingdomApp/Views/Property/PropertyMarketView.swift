@@ -1,12 +1,11 @@
 import SwiftUI
 
-/// Market view for purchasing new properties
+/// Market view for purchasing land in kingdoms
 struct PropertyMarketView: View {
     @ObservedObject var player: Player
-    @State private var availableProperties: [PropertyListing] = []
-    @State private var selectedType: PropertyType = .house
+    @State private var availableKingdoms: [KingdomListing] = []
     @State private var showingPurchaseConfirmation = false
-    @State private var propertyToPurchase: PropertyListing?
+    @State private var kingdomToPurchase: KingdomListing?
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -15,19 +14,16 @@ struct PropertyMarketView: View {
                 // Player resources
                 resourcesCard
                 
-                // Type selector
-                typeSelector
+                // Info about land ownership
+                landInfoCard
                 
-                // Info about selected type
-                typeInfoCard
-                
-                // Available listings
-                availableListingsSection
+                // Available kingdoms
+                availableKingdomsSection
             }
             .padding()
         }
         .parchmentBackground()
-        .navigationTitle("Property Market")
+        .navigationTitle("Buy Land")
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
         .toolbar {
@@ -38,18 +34,18 @@ struct PropertyMarketView: View {
                 .buttonStyle(.toolbar)
             }
         }
-        .alert("Purchase Property", isPresented: $showingPurchaseConfirmation) {
+        .alert("Purchase Land", isPresented: $showingPurchaseConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Purchase") {
                 purchaseProperty()
             }
         } message: {
-            if let property = propertyToPurchase {
-                Text("Buy \(property.type.rawValue) in \(property.kingdomName) for \(property.price)💰?")
+            if let kingdom = kingdomToPurchase {
+                Text("Buy land in \(kingdom.kingdomName) for \(kingdom.price) gold?")
             }
         }
         .onAppear {
-            loadAvailableProperties()
+            loadAvailableKingdoms()
         }
     }
     
@@ -62,7 +58,7 @@ struct PropertyMarketView: View {
                     .font(.caption)
                     .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 
-                Text("\(player.gold)💰")
+                Text("\(player.gold) gold")
                     .font(.title2.bold().monospacedDigit())
                     .foregroundColor(KingdomTheme.Colors.gold)
             }
@@ -74,7 +70,7 @@ struct PropertyMarketView: View {
                     .font(.caption)
                     .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 
-                Text("\(player.reputation)⭐")
+                Text("\(player.reputation)")
                     .font(.title2.bold().monospacedDigit())
                     .foregroundColor(player.reputation >= 50 ? .green : .red)
             }
@@ -83,64 +79,21 @@ struct PropertyMarketView: View {
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Type Selector
+    // MARK: - Land Info Card
     
-    private var typeSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Property Type")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            HStack(spacing: 12) {
-                ForEach(PropertyType.allCases, id: \.self) { type in
-                    Button(action: { selectedType = type }) {
-                        VStack(spacing: 6) {
-                            Text(type.icon)
-                                .font(.system(size: 30))
-                            
-                            Text(type.rawValue)
-                                .font(.caption.bold())
-                                .foregroundColor(selectedType == type ? .white : KingdomTheme.Colors.inkDark)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            selectedType == type 
-                                ? KingdomTheme.Colors.buttonPrimary 
-                                : KingdomTheme.Colors.parchmentLight
-                        )
-                        .cornerRadius(KingdomTheme.CornerRadius.large)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                                .stroke(
-                                    selectedType == type 
-                                        ? KingdomTheme.Colors.buttonPrimary 
-                                        : KingdomTheme.Colors.inkDark.opacity(0.3),
-                                    lineWidth: KingdomTheme.BorderWidth.regular
-                                )
-                        )
-                    }
-                }
-            }
-        }
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    // MARK: - Type Info Card
-    
-    private var typeInfoCard: some View {
+    private var landInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(selectedType.icon)
+                Image(systemName: "map")
                     .font(.system(size: 40))
+                    .foregroundColor(KingdomTheme.Colors.gold)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(selectedType.rawValue)
+                    Text("Purchase Land")
                         .font(.title3.bold())
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text("Base Price: \(selectedType.basePrice)💰")
+                    Text("Start your property empire")
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 }
@@ -150,91 +103,57 @@ struct PropertyMarketView: View {
             
             Divider()
             
-            Text("Benefits by Tier:")
+            Text("What You Get:")
                 .font(.subheadline.bold())
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            switch selectedType {
-            case .house:
-                houseTierInfo
-            case .shop:
-                shopTierInfo
-            case .personalMine:
-                mineTierInfo
+            VStack(alignment: .leading, spacing: 8) {
+                benefitRow(text: "50% reduced travel costs to this kingdom")
+                benefitRow(text: "Instant travel from anywhere")
+                benefitRow(text: "Upgrade to unlock more benefits")
             }
+            
+            Text("Upgrade your land to build a house, workshop, and more!")
+                .font(.caption)
+                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
+                .padding(.top, 4)
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private var houseTierInfo: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            tierInfoRow(tier: 1, description: "Badge 'Citizen' + 10 rep bonus")
-            tierInfoRow(tier: 2, description: "50% travel costs + instant travel")
-            tierInfoRow(tier: 3, description: "🌱 Garden: 10% faster actions")
-            tierInfoRow(tier: 4, description: "🏛️ Beautiful: 50% tax reduction")
-            tierInfoRow(tier: 5, description: "🛡️ Fortified: 50% survive conquest")
-        }
-    }
-    
-    private var shopTierInfo: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            tierInfoRow(tier: 1, description: "💰 10 gold per day")
-            tierInfoRow(tier: 2, description: "💰 25 gold per day")
-            tierInfoRow(tier: 3, description: "💰 50 gold per day")
-            tierInfoRow(tier: 4, description: "💰 100 gold per day")
-            tierInfoRow(tier: 5, description: "💰 200 gold per day")
-        }
-    }
-    
-    private var mineTierInfo: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            tierInfoRow(tier: 1, description: "⚒️ 5 iron/day, no taxes")
-            tierInfoRow(tier: 2, description: "⚒️ 10 iron + 🛡️ 2 steel/day")
-            tierInfoRow(tier: 3, description: "⚒️ 15 iron + 🛡️ 5 steel/day")
-            tierInfoRow(tier: 4, description: "⚒️ 20 iron + 🛡️ 10 steel/day")
-            tierInfoRow(tier: 5, description: "⚒️ 25 iron + 🛡️ 15 steel/day")
-        }
-    }
-    
-    private func tierInfoRow(tier: Int, description: String) -> some View {
+    private func benefitRow(text: String) -> some View {
         HStack(spacing: 8) {
-            Text("Tier \(tier)")
-                .font(.caption.bold())
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(KingdomTheme.Colors.gold)
-                .cornerRadius(4)
-            
-            Text(description)
+            Image(systemName: "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .foregroundColor(KingdomTheme.Colors.gold)
+                .frame(width: 14)
             
-            Spacer()
+            Text(text)
+                .font(.caption)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }
     
-    // MARK: - Available Listings
     
-    private var availableListingsSection: some View {
+    // MARK: - Available Kingdoms
+    
+    private var availableKingdomsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Available in Nearby Kingdoms")
                 .font(.headline)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            let filteredListings = availableProperties.filter { $0.type == selectedType }
-            
-            if filteredListings.isEmpty {
+            if availableKingdoms.isEmpty {
                 emptyStateView
             } else {
-                ForEach(filteredListings) { listing in
-                    PropertyListingCard(
-                        listing: listing,
+                ForEach(availableKingdoms) { kingdom in
+                    KingdomListingCard(
+                        kingdom: kingdom,
                         playerGold: player.gold,
                         playerReputation: player.reputation,
                         onPurchase: {
-                            propertyToPurchase = listing
+                            kingdomToPurchase = kingdom
                             showingPurchaseConfirmation = true
                         }
                     )
@@ -245,11 +164,11 @@ struct PropertyMarketView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "building.2.crop.circle")
+            Image(systemName: "map")
                 .font(.system(size: 40))
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
             
-            Text("No properties available")
+            Text("No land available nearby")
                 .font(.subheadline)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
         }
@@ -260,51 +179,40 @@ struct PropertyMarketView: View {
     
     // MARK: - Helper Functions
     
-    private func loadAvailableProperties() {
+    private func loadAvailableKingdoms() {
         // TODO: Load from API
         // For now, generate sample listings
-        availableProperties = [
-            PropertyListing(
+        availableKingdoms = [
+            KingdomListing(
                 id: UUID().uuidString,
-                type: .house,
                 kingdomId: "kingdom1",
                 kingdomName: "Ashford",
                 price: 500,
                 kingdomPopulation: 10
             ),
-            PropertyListing(
+            KingdomListing(
                 id: UUID().uuidString,
-                type: .house,
                 kingdomId: "kingdom2",
                 kingdomName: "Riverwatch",
                 price: 650,
                 kingdomPopulation: 20
             ),
-            PropertyListing(
+            KingdomListing(
                 id: UUID().uuidString,
-                type: .shop,
-                kingdomId: "kingdom1",
-                kingdomName: "Ashford",
-                price: 1000,
-                kingdomPopulation: 10
-            ),
-            PropertyListing(
-                id: UUID().uuidString,
-                type: .personalMine,
-                kingdomId: "kingdom2",
-                kingdomName: "Riverwatch",
-                price: 2100,
-                kingdomPopulation: 20
+                kingdomId: "kingdom3",
+                kingdomName: "Ironhold",
+                price: 750,
+                kingdomPopulation: 30
             )
         ]
     }
     
     private func purchaseProperty() {
-        guard let listing = propertyToPurchase else { return }
-        guard player.gold >= listing.price else { return }
+        guard let kingdom = kingdomToPurchase else { return }
+        guard player.gold >= kingdom.price else { return }
         guard player.reputation >= 50 else { return }
         
-        player.gold -= listing.price
+        player.gold -= kingdom.price
         
         // TODO: Create property via API
         // For now, just deduct gold
@@ -313,27 +221,26 @@ struct PropertyMarketView: View {
     }
 }
 
-// MARK: - Property Listing Model
+// MARK: - Kingdom Listing Model
 
-struct PropertyListing: Identifiable {
+struct KingdomListing: Identifiable {
     let id: String
-    let type: PropertyType
     let kingdomId: String
     let kingdomName: String
     let price: Int
     let kingdomPopulation: Int
 }
 
-// MARK: - Property Listing Card
+// MARK: - Kingdom Listing Card
 
-struct PropertyListingCard: View {
-    let listing: PropertyListing
+struct KingdomListingCard: View {
+    let kingdom: KingdomListing
     let playerGold: Int
     let playerReputation: Int
     let onPurchase: () -> Void
     
     private var canAfford: Bool {
-        playerGold >= listing.price
+        playerGold >= kingdom.price
     }
     
     private var hasReputation: Bool {
@@ -347,18 +254,19 @@ struct PropertyListingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(listing.type.icon)
+                Image(systemName: "map")
                     .font(.system(size: 32))
+                    .foregroundColor(KingdomTheme.Colors.gold)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(listing.kingdomName)
+                    Text(kingdom.kingdomName)
                         .font(.headline)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 4) {
                         Image(systemName: "person.2.fill")
                             .font(.caption2)
-                        Text("\(listing.kingdomPopulation) citizens")
+                        Text("\(kingdom.kingdomPopulation) citizens")
                             .font(.caption)
                     }
                     .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
@@ -367,11 +275,11 @@ struct PropertyListingCard: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(listing.price)💰")
+                    Text("\(kingdom.price) gold")
                         .font(.title3.bold().monospacedDigit())
                         .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)
                     
-                    Text("Tier 1")
+                    Text("Land (T1)")
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 }
@@ -393,7 +301,7 @@ struct PropertyListingCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .font(.caption)
-                            Text("Need \(listing.price - playerGold) more gold")
+                            Text("Need \(kingdom.price - playerGold) more gold")
                                 .font(.caption)
                         }
                         .foregroundColor(.red)
@@ -403,7 +311,7 @@ struct PropertyListingCard: View {
             
             Button(action: onPurchase) {
                 HStack {
-                    Image(systemName: "cart.fill")
+                    Image(systemName: "map")
                     Text("Purchase Land")
                 }
             }

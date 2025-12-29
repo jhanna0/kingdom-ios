@@ -134,25 +134,42 @@ All buildings have 5 tiers (T0 = unbuilt, T1-T5 = upgrades).
 
 ---
 
-## 🏠 PLAYER PROPERTIES (5 Tiers Each)
+## PLAYER PROPERTIES (5 Tiers)
 
-### 🏠 House
-**Purpose:** Personal benefits and lifestyle improvements
+**One property per kingdom** - Players buy land, then upgrade it through 5 tiers.
 
-- **T1:** 50% travel cost + instant travel to this kingdom
-- **T2:** +5% faster actions when checked in here
-- **T3:** +10% faster actions when checked in here
-- **T4:** 50% tax reduction in this kingdom
-- **T5:** 50% chance to survive conquest + retain property
+### Tier 1: Land
+**Purpose:** Travel benefits
 
-### 🏢 Workshop
-**Purpose:** Passive income + crafting speed
+- 50% reduced travel cost to this kingdom
+- Instant travel from anywhere
 
-- **T1:** 10g/day
-- **T2:** 25g/day + 10% faster crafting
-- **T3:** 50g/day + 20% faster crafting
-- **T4:** 100g/day + 30% faster crafting
-- **T5:** 200g/day + 50% faster crafting
+### Tier 2: House
+**Purpose:** Personal residence
+
+- All T1 benefits
+- Personal dwelling (benefit TBD)
+
+### Tier 3: Workshop
+**Purpose:** Crafting capabilities
+
+- All previous benefits
+- Can craft weapons and armor
+- 15% faster crafting speed
+
+### Tier 4: Beautiful Property
+**Purpose:** Tax exemption
+
+- All previous benefits
+- No taxes in this kingdom
+
+### Tier 5: Estate
+**Purpose:** Maximum protection (TBD)
+
+- All previous benefits
+- 50% chance to survive conquest
+- Property retained after defeat
+
 ---
 
 ## ⭐ REPUTATION SYSTEM

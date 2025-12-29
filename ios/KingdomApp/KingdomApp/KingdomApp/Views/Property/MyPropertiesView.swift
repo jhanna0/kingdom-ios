@@ -66,7 +66,7 @@ struct MyPropertiesView: View {
                         .font(.title.bold().monospacedDigit())
                         .foregroundColor(KingdomTheme.Colors.gold)
                     
-                    Text("Properties Owned")
+                    Text(properties.count == 1 ? "Property Owned" : "Properties Owned")
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 }
@@ -74,46 +74,11 @@ struct MyPropertiesView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(totalValue)💰")
+                    Text("\(totalValue) gold")
                         .font(.title3.bold().monospacedDigit())
                         .foregroundColor(KingdomTheme.Colors.gold)
                     
                     Text("Total Value")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-            }
-            
-            Divider()
-            
-            // Daily income breakdown
-            HStack(spacing: 20) {
-                VStack(spacing: 4) {
-                    Text("\(dailyGoldIncome)💰")
-                        .font(.headline.monospacedDigit())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Gold/Day")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                VStack(spacing: 4) {
-                    Text("\(dailyIronIncome)⚒️")
-                        .font(.headline.monospacedDigit())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Iron/Day")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                VStack(spacing: 4) {
-                    Text("\(dailySteelIncome)🛡️")
-                        .font(.headline.monospacedDigit())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Steel/Day")
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 }
@@ -127,24 +92,7 @@ struct MyPropertiesView: View {
     
     private var propertiesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Group by type
-            if !houses.isEmpty {
-                propertyTypeSection(title: "🏠 Houses", properties: houses)
-            }
-            
-            if !shops.isEmpty {
-                propertyTypeSection(title: "🏪 Shops", properties: shops)
-            }
-            
-            if !mines.isEmpty {
-                propertyTypeSection(title: "⛏️ Personal Mines", properties: mines)
-            }
-        }
-    }
-    
-    private func propertyTypeSection(title: String, properties: [Property]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
+            Text("Your Properties")
                 .font(.headline)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
@@ -171,7 +119,7 @@ struct MyPropertiesView: View {
                 .font(.title3.bold())
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            Text("Purchase land and properties to earn passive income and unlock special benefits!")
+            Text("Purchase land in kingdoms to unlock travel benefits, then upgrade to unlock crafting and tax exemptions!")
                 .font(.body)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -179,8 +127,8 @@ struct MyPropertiesView: View {
             
             NavigationLink(value: PropertyDestination.market) {
                 HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Browse Properties")
+                    Image(systemName: "map")
+                    Text("Buy Land")
                 }
             }
             .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary))
@@ -235,32 +183,8 @@ struct MyPropertiesView: View {
     
     // MARK: - Computed Properties
     
-    private var houses: [Property] {
-        properties.filter { $0.type == .house }
-    }
-    
-    private var shops: [Property] {
-        properties.filter { $0.type == .shop }
-    }
-    
-    private var mines: [Property] {
-        properties.filter { $0.type == .personalMine }
-    }
-    
     private var totalValue: Int {
         properties.reduce(0) { $0 + $1.currentValue }
-    }
-    
-    private var dailyGoldIncome: Int {
-        properties.reduce(0) { $0 + $1.dailyGoldIncome }
-    }
-    
-    private var dailyIronIncome: Int {
-        properties.reduce(0) { $0 + $1.dailyIronYield }
-    }
-    
-    private var dailySteelIncome: Int {
-        properties.reduce(0) { $0 + $1.dailySteelYield }
     }
     
     // MARK: - Helper Functions

@@ -118,49 +118,38 @@ struct ActionsView: View {
                                 let minutes = (remaining % 3600) / 60
                                 let seconds = remaining % 60
                                 
-                                VStack(spacing: KingdomTheme.Spacing.medium) {
-                                    HStack(spacing: KingdomTheme.Spacing.small) {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Action in Progress")
-                                                .font(KingdomTheme.Typography.headline())
-                                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                                            
-                                            Text("You performed \(blockingAction) recently. Only ONE action at a time!")
-                                                .font(KingdomTheme.Typography.caption())
-                                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                            
-                                            if hours > 0 {
-                                                Text("Available in: \(hours)h \(minutes)m \(seconds)s")
-                                                    .font(KingdomTheme.Typography.body())
-                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                                                    .fontWeight(.semibold)
-                                            } else if minutes > 0 {
-                                                Text("Available in: \(minutes)m \(seconds)s")
-                                                    .font(KingdomTheme.Typography.body())
-                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                                                    .fontWeight(.semibold)
-                                            } else {
-                                                Text("Available in: \(seconds)s")
-                                                    .font(KingdomTheme.Typography.body())
-                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                                                    .fontWeight(.semibold)
-                                            }
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Action in Progress")
+                                        .font(KingdomTheme.Typography.headline())
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    
+                                    Text("You performed \(blockingAction) recently. Only ONE action at a time!")
+                                        .font(KingdomTheme.Typography.caption())
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    
+                                    HStack {
+                                        if hours > 0 {
+                                            Text("Available in \(hours)h \(minutes)m \(seconds)s")
+                                                .font(KingdomTheme.Typography.body())
+                                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                .fontWeight(.semibold)
+                                        } else if minutes > 0 {
+                                            Text("Available in \(minutes)m \(seconds)s")
+                                                .font(KingdomTheme.Typography.body())
+                                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                .fontWeight(.semibold)
+                                        } else {
+                                            Text("Available in \(seconds)s")
+                                                .font(KingdomTheme.Typography.body())
+                                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                .fontWeight(.semibold)
                                         }
-                                        
-                                        Spacer()
                                     }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding()
-                                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                                .background(KingdomTheme.Colors.buttonWarning.opacity(0.15))
                                 .cornerRadius(KingdomTheme.CornerRadius.medium)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
-                                        .stroke(KingdomTheme.Colors.buttonWarning, lineWidth: 2)
-                                )
                                 .padding(.horizontal)
                             }
                             
@@ -193,6 +182,7 @@ struct ActionsView: View {
                                         currentTime: currentTime,
                                         isEnabled: currentKingdom != nil,
                                         globalCooldownActive: !status.globalCooldown.ready,
+                                        blockingAction: status.globalCooldown.blockingAction,
                                         onAction: { performTraining(contractId: contract.id) }
                                     )
                                 }
@@ -227,6 +217,7 @@ struct ActionsView: View {
                                                 fetchedAt: statusFetchedAt ?? Date(),
                                                 currentTime: currentTime,
                                                 globalCooldownActive: !status.globalCooldown.ready,
+                                                blockingAction: status.globalCooldown.blockingAction,
                                                 onAction: { performWork(contractId: contract.id) }
                                             )
                                         }
@@ -252,6 +243,7 @@ struct ActionsView: View {
                                     isEnabled: true,
                                     activeCount: status.patrol.activePatrollers,
                                     globalCooldownActive: !status.globalCooldown.ready,
+                                    blockingAction: status.globalCooldown.blockingAction,
                                     onAction: { performPatrol() }
                                 )
                                 
@@ -280,6 +272,7 @@ struct ActionsView: View {
                                     isEnabled: true,
                                     activeCount: nil,
                                     globalCooldownActive: !status.globalCooldown.ready,
+                                    blockingAction: status.globalCooldown.blockingAction,
                                     onAction: { performScout() }
                                 )
                                 
@@ -295,6 +288,7 @@ struct ActionsView: View {
                                     isEnabled: true,
                                     activeCount: nil,
                                     globalCooldownActive: !status.globalCooldown.ready,
+                                    blockingAction: status.globalCooldown.blockingAction,
                                     onAction: { showSabotageTargetSelection() }
                                 )
                             } else {
@@ -645,6 +639,7 @@ struct WorkContractCard: View {
     let fetchedAt: Date
     let currentTime: Date
     let globalCooldownActive: Bool
+    let blockingAction: String?
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -712,7 +707,9 @@ struct WorkContractCard: View {
             .frame(height: 8)
             
             if globalCooldownActive {
-                Text("Another action is on cooldown")
+                let blockingName = blockingAction?.capitalized ?? "another action"
+                let isThisAction = blockingAction?.lowercased().contains("work") ?? false
+                Text(isThisAction ? "You are already Working" : "You are already \(blockingName)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)
@@ -754,6 +751,7 @@ struct ActionCard: View {
     let isEnabled: Bool
     let activeCount: Int?
     let globalCooldownActive: Bool
+    let blockingAction: String?
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -806,7 +804,10 @@ struct ActionCard: View {
             }
             
             if globalCooldownActive {
-                Text("Another action is on cooldown")
+                let actionName = actionTypeName
+                let blockingName = blockingAction?.capitalized ?? "another action"
+                let isThisAction = blockingAction?.lowercased().contains(actionType == .patrol ? "patrol" : actionType == .scout ? "scout" : actionType == .sabotage ? "sabotage" : "work") ?? false
+                Text(isThisAction ? "You are already \(actionName)" : "You are already \(blockingName)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)
@@ -843,6 +844,15 @@ struct ActionCard: View {
             return KingdomTheme.Colors.gold
         } else {
             return KingdomTheme.Colors.disabled
+        }
+    }
+    
+    private var actionTypeName: String {
+        switch actionType {
+        case .patrol: return "Patrolling"
+        case .scout: return "Scouting"
+        case .sabotage: return "Sabotaging"
+        case .work: return "Working"
         }
     }
 }
@@ -925,6 +935,7 @@ struct TrainingContractCard: View {
     let currentTime: Date
     let isEnabled: Bool
     let globalCooldownActive: Bool
+    let blockingAction: String?
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -1004,7 +1015,9 @@ struct TrainingContractCard: View {
             .frame(height: 8)
             
             if globalCooldownActive {
-                Text("Another action is on cooldown")
+                let blockingName = blockingAction?.capitalized ?? "another action"
+                let isThisAction = blockingAction?.lowercased().contains("train") ?? false
+                Text(isThisAction ? "You are already Training" : "You are already \(blockingName)")
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)

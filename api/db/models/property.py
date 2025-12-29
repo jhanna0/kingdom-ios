@@ -9,12 +9,17 @@ from ..base import Base
 
 class Property(Base):
     """
-    Player-owned properties (houses, shops, personal mines)
+    Player-owned property - ONE per kingdom with 5-tier progression
+    Players buy land (T1) in a kingdom, then upgrade through tiers
+    T1: Land (travel benefits)
+    T2: House (residence)
+    T3: Workshop (crafting)
+    T4: Beautiful Property (tax exemption)
+    T5: Estate (conquest protection)
     """
     __tablename__ = "properties"
     
     id = Column(String, primary_key=True)
-    type = Column(String, nullable=False)  # house, shop, personal_mine
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     kingdom_name = Column(String, nullable=False)
     owner_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
@@ -23,8 +28,7 @@ class Property(Base):
     tier = Column(Integer, default=1)  # 1-5
     purchased_at = Column(DateTime, default=datetime.utcnow)
     last_upgraded = Column(DateTime, nullable=True)
-    last_income_collection = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):
-        return f"<Property(id='{self.id}', type='{self.type}', tier={self.tier})>"
+        return f"<Property(id='{self.id}', tier={self.tier}, kingdom='{self.kingdom_name}')>"
 

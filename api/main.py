@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from db import init_db
 from routers import cities, game, auth, player, contracts, notifications, actions
+from routers import property as property_router
 import config  # Import to trigger dev mode message
 
 
@@ -27,6 +28,7 @@ async def startup_event():
     print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
     print("👤 Player state: /player/state, /player/sync")
     print("📜 Contracts: /contracts")
+    print("🏠 Properties: /properties")
 
 
 # Enable CORS so iOS app can connect
@@ -47,6 +49,7 @@ app.include_router(player.router)
 app.include_router(contracts.router)
 app.include_router(notifications.router)
 app.include_router(actions.router)
+app.include_router(property_router.router)
 
 
 # Health check

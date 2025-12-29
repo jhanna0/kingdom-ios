@@ -1,194 +1,113 @@
 import Foundation
 
 // MARK: - Property System
-// Land ownership for players (houses, shops, personal mines)
-
-enum PropertyType: String, Codable, CaseIterable {
-    case house = "House"
-    case shop = "Shop"
-    case personalMine = "Personal Mine"
-    
-    var icon: String {
-        switch self {
-        case .house: return "🏠"
-        case .shop: return "🏪"
-        case .personalMine: return "⛏️"
-        }
-    }
-    
-    var basePrice: Int {
-        switch self {
-        case .house: return 500
-        case .shop: return 1000
-        case .personalMine: return 2000
-        }
-    }
-}
+// ONE property per kingdom - progressive 5-tier upgrade system
+// Players buy land (T1) in a kingdom, then upgrade it to unlock more benefits
+// T1: Land (travel benefits)
+// T2: House (residence)
+// T3: Workshop (crafting)
+// T4: Beautiful Property (tax exemption)
+// T5: Estate (conquest protection)
 
 struct Property: Identifiable, Codable, Hashable {
     let id: String
-    let type: PropertyType
     let kingdomId: String
     let kingdomName: String
     let ownerId: String
     let ownerName: String
     
-    var tier: Int  // 1-5, affects bonuses
+    var tier: Int  // 1-5, each tier unlocks new features
     let purchasedAt: Date
     var lastUpgraded: Date?
-    var lastIncomeCollection: Date
     
     // MARK: - Computed Properties
     
     var name: String {
-        "\(type.rawValue) (Tier \(tier))"
+        tierName
     }
     
-    var icon: String {
-        type.icon
+    var tierName: String {
+        switch tier {
+        case 1: return "Land"
+        case 2: return "House"
+        case 3: return "Workshop"
+        case 4: return "Beautiful Property"
+        case 5: return "Estate"  // TBD
+        default: return "Property"
+        }
     }
     
-    // MARK: - House Benefits (by tier)
+    // MARK: - T1: Land Benefits
     
     var travelCostReduction: Double {
-        guard type == .house else { return 0 }
-        switch tier {
-        case 1: return 0.50  // 50% off travel
-        case 2: return 0.50
-        case 3: return 0.50
-        case 4: return 0.50
-        case 5: return 0.50
-        default: return 0
-        }
+        // T1+: 50% off travel to this kingdom
+        return tier >= 1 ? 0.50 : 0
     }
     
     var instantTravel: Bool {
-        // All house tiers give instant travel to that kingdom
-        return type == .house && tier >= 1
+        // T1+: Can instantly travel to this kingdom
+        return tier >= 1
     }
     
-    var actionSpeedBonus: Double {
-        guard type == .house else { return 0 }
-        switch tier {
-        case 3, 4, 5: return 0.10  // 10% faster actions
-        default: return 0
-        }
+    // MARK: - T2: House Benefits
+    
+    var hasHouse: Bool {
+        return tier >= 2
     }
     
-    var taxReduction: Double {
-        guard type == .house else { return 0 }
-        switch tier {
-        case 4, 5: return 0.50  // 50% tax reduction
-        default: return 0
-        }
+    // TODO: Define T2 house benefit
+    
+    // MARK: - T3: Workshop Benefits
+    
+    var canCraft: Bool {
+        // T3+: Can craft weapons and armor
+        return tier >= 3
     }
+    
+    var craftingSpeedBonus: Double {
+        // T3+: Faster crafting
+        return tier >= 3 ? 0.15 : 0  // 15% faster crafting
+    }
+    
+    // MARK: - T4: Beautiful Property Benefits
+    
+    var taxExemption: Bool {
+        // T4+: No more taxes in this kingdom
+        return tier >= 4
+    }
+    
+    // MARK: - T5: Estate Benefits (TBD)
     
     var conquestSurvivalChance: Double {
-        guard type == .house else { return 0 }
-        switch tier {
-        case 5: return 0.50  // 50% chance to survive conquest
-        default: return 0
-        }
-    }
-    
-    // MARK: - Shop Benefits
-    
-    var dailyGoldIncome: Int {
-        guard type == .shop else { return 0 }
-        switch tier {
-        case 1: return 10
-        case 2: return 25
-        case 3: return 50
-        case 4: return 100
-        case 5: return 200
-        default: return 0
-        }
-    }
-    
-    // MARK: - Personal Mine Benefits
-    
-    var dailyIronYield: Int {
-        guard type == .personalMine else { return 0 }
-        switch tier {
-        case 1: return 5
-        case 2: return 10
-        case 3: return 15
-        case 4: return 20
-        case 5: return 25
-        default: return 0
-        }
-    }
-    
-    var dailySteelYield: Int {
-        guard type == .personalMine else { return 0 }
-        switch tier {
-        case 1: return 0
-        case 2: return 2
-        case 3: return 5
-        case 4: return 10
-        case 5: return 15
-        default: return 0
-        }
-    }
-    
-    var noTaxOnMining: Bool {
-        // Personal mines have no tax!
-        return type == .personalMine
+        // T5: 50% chance to survive conquest
+        return tier >= 5 ? 0.50 : 0
     }
     
     // MARK: - Pricing
     
+    static let baseLandPrice = 500
+    
     var currentValue: Int {
         // Value increases with tier
-        let baseValue = type.basePrice
         let tierMultiplier = Double(tier) * 1.5
-        return Int(Double(baseValue) * tierMultiplier)
+        return Int(Double(Property.baseLandPrice) * tierMultiplier)
     }
     
     var upgradeCost: Int {
         guard tier < 5 else { return 0 }
         let nextTier = tier + 1
-        let baseValue = type.basePrice
-        // Each tier upgrade costs more
-        return Int(Double(baseValue) * pow(2.0, Double(nextTier - 1)))
+        // Each tier upgrade costs exponentially more
+        // T1->T2: 500, T2->T3: 1000, T3->T4: 2000, T4->T5: 4000
+        return Property.baseLandPrice * Int(pow(2.0, Double(nextTier - 2)))
     }
     
-    static func purchasePrice(type: PropertyType, tier: Int = 1, kingdomPopulation: Int) -> Int {
-        // Price scales with kingdom size
-        let basePrice = type.basePrice
+    static func purchasePrice(kingdomPopulation: Int) -> Int {
+        // T1 land price scales with kingdom size
         let populationMultiplier = 1.0 + (Double(kingdomPopulation) / 50.0)
-        return Int(Double(basePrice) * populationMultiplier)
-    }
-    
-    // MARK: - Pending Income
-    
-    var pendingGoldIncome: Int {
-        guard type == .shop else { return 0 }
-        let hoursSinceCollection = Date().timeIntervalSince(lastIncomeCollection) / 3600.0
-        return Int(Double(dailyGoldIncome) * (hoursSinceCollection / 24.0))
-    }
-    
-    var pendingIronIncome: Int {
-        guard type == .personalMine else { return 0 }
-        let hoursSinceCollection = Date().timeIntervalSince(lastIncomeCollection) / 3600.0
-        return Int(Double(dailyIronYield) * (hoursSinceCollection / 24.0))
-    }
-    
-    var pendingSteelIncome: Int {
-        guard type == .personalMine else { return 0 }
-        let hoursSinceCollection = Date().timeIntervalSince(lastIncomeCollection) / 3600.0
-        return Int(Double(dailySteelYield) * (hoursSinceCollection / 24.0))
+        return Int(Double(baseLandPrice) * populationMultiplier)
     }
     
     // MARK: - Mutations
-    
-    mutating func collectIncome() -> (gold: Int, iron: Int, steel: Int) {
-        let gold = pendingGoldIncome
-        let iron = pendingIronIncome
-        let steel = pendingSteelIncome
-        lastIncomeCollection = Date()
-        return (gold, iron, steel)
-    }
     
     mutating func upgrade() -> Bool {
         guard tier < 5 else { return false }
@@ -205,7 +124,6 @@ struct Property: Identifiable, Codable, Hashable {
     // MARK: - Factory
     
     static func purchase(
-        type: PropertyType,
         kingdomId: String,
         kingdomName: String,
         ownerId: String,
@@ -213,42 +131,59 @@ struct Property: Identifiable, Codable, Hashable {
     ) -> Property {
         return Property(
             id: UUID().uuidString,
-            type: type,
             kingdomId: kingdomId,
             kingdomName: kingdomName,
             ownerId: ownerId,
             ownerName: ownerName,
-            tier: 1,
+            tier: 1,  // Always start at T1 (Land)
             purchasedAt: Date(),
-            lastUpgraded: nil,
-            lastIncomeCollection: Date()
+            lastUpgraded: nil
         )
     }
 }
 
-// MARK: - House Tier Descriptions
+// MARK: - Tier Descriptions
 
 extension Property {
-    var tierBenefitDescription: String {
-        guard type == .house else { return "" }
-        
+    var tierDescription: String {
+        switch tier {
+        case 1:
+            return "Undeveloped land with travel benefits"
+        case 2:
+            return "Basic dwelling for residence"
+        case 3:
+            return "Workshop with crafting facilities"
+        case 4:
+            return "Luxurious estate exempt from taxes"
+        case 5:
+            return "Fortified estate with maximum benefits"
+        default:
+            return "Property"
+        }
+    }
+    
+    var currentBenefits: [String] {
         var benefits: [String] = []
         
-        // Always have these
-        benefits.append("50% travel cost reduction")
-        benefits.append("Instant travel to \(kingdomName)")
-        
+        if tier >= 1 {
+            benefits.append("50% travel cost reduction")
+            benefits.append("Instant travel to \(kingdomName)")
+        }
+        if tier >= 2 {
+            benefits.append("Personal residence")
+        }
         if tier >= 3 {
-            benefits.append("10% faster actions")
+            benefits.append("Can craft weapons and armor")
+            benefits.append("15% faster crafting")
         }
         if tier >= 4 {
-            benefits.append("50% tax reduction")
+            benefits.append("Tax exemption in \(kingdomName)")
         }
         if tier >= 5 {
             benefits.append("50% chance to survive conquest")
         }
         
-        return benefits.joined(separator: "\n")
+        return benefits
     }
 }
 
@@ -256,41 +191,16 @@ extension Property {
 
 extension Property {
     static let samples: [Property] = [
+        // One property in one kingdom at tier 3 (Workshop)
         Property(
             id: UUID().uuidString,
-            type: .house,
             kingdomId: "kingdom1",
             kingdomName: "Ashford",
             ownerId: "player1",
             ownerName: "Sir Aldric",
-            tier: 3,
+            tier: 3,  // Workshop - can craft weapons/armor
             purchasedAt: Date().addingTimeInterval(-30 * 24 * 3600),
-            lastUpgraded: Date().addingTimeInterval(-7 * 24 * 3600),
-            lastIncomeCollection: Date().addingTimeInterval(-2 * 3600)
-        ),
-        Property(
-            id: UUID().uuidString,
-            type: .shop,
-            kingdomId: "kingdom1",
-            kingdomName: "Ashford",
-            ownerId: "player1",
-            ownerName: "Sir Aldric",
-            tier: 2,
-            purchasedAt: Date().addingTimeInterval(-20 * 24 * 3600),
-            lastUpgraded: nil,
-            lastIncomeCollection: Date().addingTimeInterval(-12 * 3600)
-        ),
-        Property(
-            id: UUID().uuidString,
-            type: .personalMine,
-            kingdomId: "kingdom2",
-            kingdomName: "Riverwatch",
-            ownerId: "player2",
-            ownerName: "Lady Beatrix",
-            tier: 4,
-            purchasedAt: Date().addingTimeInterval(-60 * 24 * 3600),
-            lastUpgraded: Date().addingTimeInterval(-3 * 24 * 3600),
-            lastIncomeCollection: Date().addingTimeInterval(-6 * 3600)
+            lastUpgraded: Date().addingTimeInterval(-7 * 24 * 3600)
         )
     ]
 }

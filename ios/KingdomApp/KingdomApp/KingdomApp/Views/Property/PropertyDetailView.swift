@@ -14,7 +14,7 @@ struct PropertyDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with property icon and name
+                // Header with property tier and name
                 headerCard
                 
                 // Location info
@@ -22,11 +22,6 @@ struct PropertyDetailView: View {
                 
                 // Current benefits
                 benefitsCard
-                
-                // Pending income (if applicable)
-                if property.type == .shop || property.type == .personalMine {
-                    incomeCard
-                }
                 
                 // Upgrade section
                 if property.tier < 5 {
@@ -43,7 +38,7 @@ struct PropertyDetailView: View {
             .padding()
         }
         .parchmentBackground()
-        .navigationTitle(property.type.rawValue)
+        .navigationTitle(property.tierName)
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
     }
@@ -52,34 +47,52 @@ struct PropertyDetailView: View {
     
     private var headerCard: some View {
         VStack(spacing: 12) {
-            Text(property.icon)
-                .font(.system(size: 80))
+            // Property icon based on tier
+            Image(systemName: tierIcon)
+                .font(.system(size: 60))
+                .foregroundColor(KingdomTheme.Colors.gold)
             
-            Text(property.type.rawValue)
-                .font(.title2.bold())
+            Text(property.tierName)
+                .font(.title.bold())
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            // Tier stars
+            Text(property.tierDescription)
+                .font(.subheadline)
+                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .multilineTextAlignment(.center)
+            
+            // Tier progress
             HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { tier in
-                    Image(systemName: tier <= property.tier ? "star.fill" : "star")
-                        .font(.title3)
-                        .foregroundColor(tier <= property.tier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                    Circle()
+                        .fill(tier <= property.tier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.2))
+                        .frame(width: 12, height: 12)
                 }
             }
             
             Text("Tier \(property.tier) of 5")
-                .font(.headline)
+                .font(.caption.bold())
                 .foregroundColor(KingdomTheme.Colors.gold)
             
             // Current value
-            Text("Value: \(property.currentValue)💰")
+            Text("Estimated Value: \(property.currentValue) gold")
                 .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
         }
         .frame(maxWidth: .infinity)
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private var tierIcon: String {
+        switch property.tier {
+        case 1: return "map"
+        case 2: return "house"
+        case 3: return "hammer"
+        case 4: return "building.columns"
+        case 5: return "crown"
+        default: return "map"
+        }
     }
     
     // MARK: - Location Card
@@ -130,252 +143,115 @@ struct PropertyDetailView: View {
     
     private var benefitsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Current Benefits")
+            Text("Active Benefits")
                 .font(.headline)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            switch property.type {
-            case .house:
-                houseBenefitsList
-            case .shop:
-                shopBenefitsList
-            case .personalMine:
-                mineBenefitsList
+            if property.currentBenefits.isEmpty {
+                Text("No benefits at this tier")
+                    .font(.subheadline)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(property.currentBenefits, id: \.self) { benefit in
+                        benefitRow(benefit: benefit, active: true)
+                    }
+                }
+            }
+            
+            // Show locked benefits
+            let lockedBenefits = getLockedBenefits()
+            if !lockedBenefits.isEmpty {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                Text("Locked Benefits")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(lockedBenefits, id: \.benefit) { item in
+                        benefitRow(benefit: item.benefit, active: false, unlockTier: item.tier)
+                    }
+                }
             }
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private var houseBenefitsList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            benefitRow(
-                icon: "arrow.down.circle.fill",
-                title: "Travel Cost Reduction",
-                value: "\(Int(property.travelCostReduction * 100))% off"
-            )
-            
-            benefitRow(
-                icon: "airplane",
-                title: "Instant Travel",
-                value: "To \(property.kingdomName)"
-            )
-            
-            if property.tier >= 3 {
-                benefitRow(
-                    icon: "bolt.fill",
-                    title: "Garden Bonus",
-                    value: "10% faster actions"
-                )
-            } else {
-                benefitRow(
-                    icon: "lock.fill",
-                    title: "Garden Bonus",
-                    value: "Unlock at Tier 3",
-                    locked: true
-                )
-            }
-            
-            if property.tier >= 4 {
-                benefitRow(
-                    icon: "percent",
-                    title: "Beautiful Estate",
-                    value: "50% tax reduction"
-                )
-            } else {
-                benefitRow(
-                    icon: "lock.fill",
-                    title: "Beautiful Estate",
-                    value: "Unlock at Tier 4",
-                    locked: true
-                )
-            }
-            
-            if property.tier >= 5 {
-                benefitRow(
-                    icon: "shield.fill",
-                    title: "Fortified Home",
-                    value: "50% survive conquest"
-                )
-            } else {
-                benefitRow(
-                    icon: "lock.fill",
-                    title: "Fortified Home",
-                    value: "Unlock at Tier 5",
-                    locked: true
-                )
-            }
-        }
-    }
-    
-    private var shopBenefitsList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            benefitRow(
-                icon: "dollarsign.circle.fill",
-                title: "Daily Income",
-                value: "\(property.dailyGoldIncome)💰 per day"
-            )
-            
-            benefitRow(
-                icon: "building.2.fill",
-                title: "Passive Earnings",
-                value: "Collect anytime"
-            )
-            
-            benefitRow(
-                icon: "chart.line.uptrend.xyaxis",
-                title: "Investment",
-                value: "Growing asset"
-            )
-        }
-    }
-    
-    private var mineBenefitsList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            benefitRow(
-                icon: "hammer.fill",
-                title: "Iron Production",
-                value: "\(property.dailyIronYield) iron/day"
-            )
-            
-            if property.tier >= 2 {
-                benefitRow(
-                    icon: "shield.lefthalf.filled",
-                    title: "Steel Production",
-                    value: "\(property.dailySteelYield) steel/day"
-                )
-            } else {
-                benefitRow(
-                    icon: "lock.fill",
-                    title: "Steel Production",
-                    value: "Unlock at Tier 2",
-                    locked: true
-                )
-            }
-            
-            benefitRow(
-                icon: "checkmark.shield.fill",
-                title: "Tax Free",
-                value: "No ruler taxes"
-            )
-            
-            benefitRow(
-                icon: "calendar",
-                title: "Passive Mining",
-                value: "Automatic collection"
-            )
-        }
-    }
-    
-    private func benefitRow(icon: String, title: String, value: String, locked: Bool = false) -> some View {
+    private func benefitRow(benefit: String, active: Bool, unlockTier: Int? = nil) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(locked ? KingdomTheme.Colors.inkDark.opacity(0.3) : KingdomTheme.Colors.gold)
-                .frame(width: 24)
+            Image(systemName: active ? "checkmark.circle.fill" : "lock.fill")
+                .font(.body)
+                .foregroundColor(active ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                .frame(width: 20)
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.bold())
-                    .foregroundColor(locked ? KingdomTheme.Colors.inkDark.opacity(0.5) : KingdomTheme.Colors.inkDark)
-                
-                Text(value)
-                    .font(.caption)
-                    .foregroundColor(locked ? KingdomTheme.Colors.inkDark.opacity(0.4) : KingdomTheme.Colors.inkDark.opacity(0.7))
-            }
+            Text(benefit)
+                .font(.subheadline)
+                .foregroundColor(active ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
             
             Spacer()
-        }
-    }
-    
-    // MARK: - Income Card
-    
-    private var incomeCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Pending Income")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            if property.type == .shop {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(property.pendingGoldIncome)💰")
-                            .font(.title2.bold().monospacedDigit())
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        
-                        Text("Ready to collect")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: collectIncome) {
-                        Text("Collect")
-                    }
-                    .buttonStyle(.medievalSubtle(color: KingdomTheme.Colors.buttonPrimary))
-                    .disabled(property.pendingGoldIncome == 0)
-                }
-            } else if property.type == .personalMine {
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("⚒️ \(property.pendingIronIncome) Iron")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Spacer()
-                    }
-                    
-                    if property.tier >= 2 {
-                        HStack {
-                            Text("🛡️ \(property.pendingSteelIncome) Steel")
-                                .font(.subheadline.bold())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Spacer()
-                        }
-                    }
-                    
-                    Button(action: collectIncome) {
-                        Text("Collect Resources")
-                    }
-                    .buttonStyle(.medievalSubtle(color: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
-                    .disabled(property.pendingIronIncome == 0)
-                }
+            if let tier = unlockTier {
+                Text("T\(tier)")
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(KingdomTheme.Colors.inkDark.opacity(0.4))
+                    .cornerRadius(4)
             }
         }
-        .padding()
-        .parchmentCard(
-            backgroundColor: KingdomTheme.Colors.gold.opacity(0.1),
-            borderColor: KingdomTheme.Colors.gold,
-            hasShadow: false
-        )
     }
+    
+    private func getLockedBenefits() -> [(benefit: String, tier: Int)] {
+        var locked: [(String, Int)] = []
+        
+        if property.tier < 2 {
+            locked.append(("Personal residence", 2))
+        }
+        if property.tier < 3 {
+            locked.append(("Can craft weapons and armor", 3))
+            locked.append(("15% faster crafting", 3))
+        }
+        if property.tier < 4 {
+            locked.append(("Tax exemption in \(property.kingdomName)", 4))
+        }
+        if property.tier < 5 {
+            locked.append(("50% chance to survive conquest", 5))
+        }
+        
+        return locked
+    }
+    
     
     // MARK: - Upgrade Card
     
     private var upgradeCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Upgrade to Tier \(property.tier + 1)")
-                    .font(.headline)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Upgrade to \(nextTierName)")
+                        .font(.headline)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text(nextTierDescription)
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                }
                 
                 Spacer()
                 
-                Text("\(property.upgradeCost)💰")
+                Text("\(property.upgradeCost) gold")
                     .font(.title3.bold().monospacedDigit())
                     .foregroundColor(player.gold >= property.upgradeCost ? KingdomTheme.Colors.gold : .red)
             }
             
-            Text("Unlock new benefits and increase property value")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            
             Button(action: upgradeProperty) {
                 HStack {
                     Image(systemName: "arrow.up.circle.fill")
-                    Text("Upgrade Property")
+                    Text("Upgrade to Tier \(property.tier + 1)")
                 }
             }
             .buttonStyle(.medieval(
@@ -401,6 +277,26 @@ struct PropertyDetailView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
         )
+    }
+    
+    private var nextTierName: String {
+        switch property.tier + 1 {
+        case 2: return "House"
+        case 3: return "Workshop"
+        case 4: return "Beautiful Property"
+        case 5: return "Estate"
+        default: return "Next Tier"
+        }
+    }
+    
+    private var nextTierDescription: String {
+        switch property.tier + 1 {
+        case 2: return "Build a personal residence"
+        case 3: return "Add workshop for crafting"
+        case 4: return "Luxurious estate with tax exemption"
+        case 5: return "Fortified estate with maximum protection"
+        default: return ""
+        }
     }
     
     // MARK: - Max Level Card
@@ -433,36 +329,17 @@ struct PropertyDetailView: View {
     
     private var futureBenefitsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Future Upgrades")
+            Text("Upgrade Path")
                 .font(.headline)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            Text("Benefits you'll unlock at higher tiers:")
+            Text("What you'll unlock at higher tiers:")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
             VStack(alignment: .leading, spacing: 8) {
-                switch property.type {
-                case .house:
-                    if property.tier < 3 {
-                        futureBenefitRow(tier: 3, description: "🌱 Plant garden: 10% faster actions")
-                    }
-                    if property.tier < 4 {
-                        futureBenefitRow(tier: 4, description: "🏛️ Beautiful estate: 50% tax reduction")
-                    }
-                    if property.tier < 5 {
-                        futureBenefitRow(tier: 5, description: "🛡️ Fortified: 50% survive conquest")
-                    }
-                case .shop:
-                    ForEach((property.tier + 1)...5, id: \.self) { tier in
-                        let income = shopIncomeAtTier(tier)
-                        futureBenefitRow(tier: tier, description: "💰 \(income) gold per day")
-                    }
-                case .personalMine:
-                    ForEach((property.tier + 1)...5, id: \.self) { tier in
-                        let (iron, steel) = mineYieldAtTier(tier)
-                        futureBenefitRow(tier: tier, description: "⚒️ \(iron) iron, 🛡️ \(steel) steel per day")
-                    }
+                ForEach((property.tier + 1)...5, id: \.self) { tier in
+                    futureTierRow(tier: tier)
                 }
             }
         }
@@ -470,9 +347,9 @@ struct PropertyDetailView: View {
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func futureBenefitRow(tier: Int, description: String) -> some View {
-        HStack(spacing: 8) {
-            Text("Tier \(tier)")
+    private func futureTierRow(tier: Int) -> some View {
+        HStack(spacing: 12) {
+            Text("T\(tier)")
                 .font(.caption.bold())
                 .foregroundColor(.white)
                 .padding(.horizontal, 8)
@@ -480,28 +357,41 @@ struct PropertyDetailView: View {
                 .background(KingdomTheme.Colors.gold)
                 .cornerRadius(4)
             
-            Text(description)
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tierNameFor(tier))
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text(tierBenefitsFor(tier))
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+            }
             
             Spacer()
         }
     }
     
-    // MARK: - Helper Functions
-    
-    private func collectIncome() {
-        let income = property.collectIncome()
-        
-        // Update player resources
-        player.gold += income.gold
-        // TODO: Add iron and steel to player inventory system when implemented
-        // player.iron += income.iron
-        // player.steel += income.steel
-        
-        // TODO: Show success feedback with collected amounts
-        print("Collected: \(income.gold) gold, \(income.iron) iron, \(income.steel) steel")
+    private func tierNameFor(_ tier: Int) -> String {
+        switch tier {
+        case 2: return "House"
+        case 3: return "Workshop"
+        case 4: return "Beautiful Property"
+        case 5: return "Estate"
+        default: return "Tier \(tier)"
+        }
     }
+    
+    private func tierBenefitsFor(_ tier: Int) -> String {
+        switch tier {
+        case 2: return "Personal residence"
+        case 3: return "Craft weapons & armor, 15% faster crafting"
+        case 4: return "Tax exemption in \(property.kingdomName)"
+        case 5: return "50% survive conquest"
+        default: return ""
+        }
+    }
+    
+    // MARK: - Helper Functions
     
     private func upgradeProperty() {
         guard player.gold >= property.upgradeCost else { return }
@@ -516,23 +406,6 @@ struct PropertyDetailView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    private func shopIncomeAtTier(_ tier: Int) -> Int {
-        switch tier {
-        case 1: return 10
-        case 2: return 25
-        case 3: return 50
-        case 4: return 100
-        case 5: return 200
-        default: return 0
-        }
-    }
-    
-    private func mineYieldAtTier(_ tier: Int) -> (iron: Int, steel: Int) {
-        let iron = [5, 10, 15, 20, 25][tier - 1]
-        let steel = [0, 2, 5, 10, 15][tier - 1]
-        return (iron, steel)
     }
 }
 
