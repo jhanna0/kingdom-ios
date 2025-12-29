@@ -10,6 +10,8 @@ struct ActionsView: View {
     @State private var showReward = false
     @State private var currentReward: Reward?
     @State private var currentTime = Date()
+    @State private var showSabotageTargets = false
+    @State private var sabotageTargets: SabotageTargetsResponse?
     
     var currentKingdom: Kingdom? {
         guard let currentKingdomName = viewModel.player.currentKingdom else { return nil }
@@ -237,18 +239,18 @@ struct ActionsView: View {
                                     onAction: { performScout() }
                                 )
                                 
-                                // Sabotage (coming soon)
+                                // Sabotage
                                 ActionCard(
-                                    title: "Sabotage (Coming Soon)",
+                                    title: "Sabotage Contract",
                                     icon: "flame.fill",
-                                    description: "Damage enemy buildings and infrastructure",
+                                    description: "Delay enemy construction projects (300g cost)",
                                     status: status.sabotage,
                                     fetchedAt: statusFetchedAt ?? Date(),
                                     currentTime: currentTime,
                                     actionType: .sabotage,
-                                    isEnabled: false,
+                                    isEnabled: true,
                                     activeCount: nil,
-                                    onAction: { /* Not implemented yet */ }
+                                    onAction: { showSabotageTargetSelection() }
                                 )
                             } else {
                                 // Not in any kingdom
@@ -285,6 +287,17 @@ struct ActionsView: View {
             if showReward, let reward = currentReward {
                 RewardDisplayView(reward: reward, isShowing: $showReward)
                     .transition(.opacity)
+            }
+        }
+        .sheet(isPresented: $showSabotageTargets) {
+            if let targets = sabotageTargets {
+                SabotageTargetSelectionView(
+                    targets: targets,
+                    onSabotage: { contractId in
+                        showSabotageTargets = false
+                        performSabotage(contractId: contractId)
+                    }
+                )
             }
         }
     }
@@ -499,6 +512,62 @@ struct ActionsView: View {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func showSabotageTargetSelection() {
+        Task {
+            do {
+                let targets = try await KingdomAPIService.shared.actions.getSabotageTargets()
+                await MainActor.run {
+                    sabotageTargets = targets
+                    showSabotageTargets = true
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performSabotage(contractId: Int) {
+        Task {
+            do {
+                // Capture state before action
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
+                let response = try await KingdomAPIService.shared.actions.sabotageContract(contractId: contractId)
+                
+                // Refresh player state from backend (which has updated values)
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    currentReward = Reward(
+                        goldReward: response.rewards.netGold,
+                        reputationReward: response.rewards.reputation,
+                        experienceReward: 0,
+                        message: response.message,
+                        previousGold: previousGold,
+                        previousReputation: previousReputation,
+                        previousExperience: viewModel.player.experience,
+                        currentGold: viewModel.player.gold,
+                        currentReputation: viewModel.player.reputation,
+                        currentExperience: viewModel.player.experience
+                    )
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showReward = true
                     }
                 }
             } catch {
@@ -934,6 +1003,265 @@ struct TrainingContractCard: View {
         .padding()
         .parchmentCard()
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Sabotage Target Selection View
+
+struct SabotageTargetSelectionView: View {
+    let targets: SabotageTargetsResponse
+    let onSabotage: (Int) -> Void
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                KingdomTheme.Colors.parchment
+                    .ignoresSafeArea()
+                
+                if targets.targets.isEmpty {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        
+                        Text("No Active Contracts")
+                            .font(KingdomTheme.Typography.title2())
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text(targets.message ?? "This kingdom has no active construction projects to sabotage.")
+                            .font(KingdomTheme.Typography.body())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: KingdomTheme.Spacing.large) {
+                            // Header Info
+                            VStack(spacing: KingdomTheme.Spacing.medium) {
+                                HStack {
+                                    Image(systemName: "flame.fill")
+                                        .font(.title2)
+                                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Sabotage Target")
+                                            .font(KingdomTheme.Typography.headline())
+                                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                                        
+                                        Text(targets.kingdom.name)
+                                            .font(KingdomTheme.Typography.body())
+                                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                
+                                // Cost and Status
+                                HStack(spacing: KingdomTheme.Spacing.medium) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Cost")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "dollarsign.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(KingdomTheme.Colors.gold)
+                                            
+                                            Text("\(targets.sabotageCost)g")
+                                                .font(KingdomTheme.Typography.body())
+                                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    
+                                    Divider()
+                                        .frame(height: 30)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Your Gold")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        
+                                        Text("\(targets.goldAvailable)g")
+                                            .font(KingdomTheme.Typography.body())
+                                            .foregroundColor(targets.canSabotage ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    Spacer()
+                                }
+                            }
+                            .padding()
+                            .parchmentCard(
+                                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                                hasShadow: false
+                            )
+                            .padding(.horizontal)
+                            
+                            // Warning
+                            if !targets.canSabotage {
+                                HStack(spacing: KingdomTheme.Spacing.small) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    
+                                    if !targets.cooldown.ready {
+                                        Text("Sabotage on cooldown: \(formatSeconds(targets.cooldown.secondsRemaining))")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    } else if targets.goldAvailable < targets.sabotageCost {
+                                        Text("Insufficient gold")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    }
+                                }
+                                .padding()
+                                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                                .padding(.horizontal)
+                            }
+                            
+                            // Target List
+                            Text("Select a Contract to Sabotage")
+                                .font(KingdomTheme.Typography.headline())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal)
+                            
+                            ForEach(targets.targets) { target in
+                                SabotageTargetCard(
+                                    target: target,
+                                    canSabotage: targets.canSabotage,
+                                    onSelect: {
+                                        onSabotage(target.contractId)
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.vertical)
+                    }
+                }
+            }
+            .navigationTitle("Sabotage")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+            }
+        }
+    }
+    
+    private func formatSeconds(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+// MARK: - Sabotage Target Card
+
+struct SabotageTargetCard: View {
+    let target: SabotageTarget
+    let canSabotage: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: iconForBuildingType(target.buildingType))
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(target.buildingType)
+                            .font(KingdomTheme.Typography.headline())
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text("Level \(target.buildingLevel)")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(KingdomTheme.Colors.parchmentDark)
+                            .cornerRadius(4)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text(target.progress)
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("•")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("\(target.progressPercent)% complete")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .fontWeight(.semibold)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Sabotage Effect Preview
+            HStack(spacing: KingdomTheme.Spacing.small) {
+                Image(systemName: "timer")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                
+                Text("Will add +\(target.potentialDelay) actions required")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+            .cornerRadius(KingdomTheme.CornerRadius.small)
+            
+            // Action Button
+            Button(action: onSelect) {
+                HStack {
+                    Image(systemName: "flame.fill")
+                    Text("Sabotage This Contract")
+                }
+            }
+            .buttonStyle(.medieval(
+                color: canSabotage ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.disabled,
+                fullWidth: true
+            ))
+            .disabled(!canSabotage)
+        }
+        .padding()
+        .parchmentCard()
+        .padding(.horizontal)
+    }
+    
+    private func iconForBuildingType(_ type: String) -> String {
+        switch type.lowercased() {
+        case "walls": return "building.2.fill"
+        case "mine": return "hammer.circle.fill"
+        case "market": return "cart.fill"
+        case "vault": return "archivebox.fill"
+        default: return "building.fill"
+        }
     }
 }
 
