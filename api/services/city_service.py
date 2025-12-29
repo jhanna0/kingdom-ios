@@ -158,10 +158,7 @@ async def get_cities_near_location(
     
     If check_current=True, marks which kingdom the user is currently inside.
     """
-    print(f"🔍 City lookup request: lat={lat}, lon={lon}, radius={radius}km")
-    
     # Fetch neighboring cities from OSM (fast query using shared boundaries)
-    print(f"🌐 Fetching neighboring cities from OSM...")
     city_ids = await fetch_nearby_city_ids(lat, lon, radius)
     
     if not city_ids:

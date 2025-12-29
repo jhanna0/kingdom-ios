@@ -86,10 +86,13 @@ class APIClient: ObservableObject {
             throw APIError.serverError("HTTP \(httpResponse.statusCode)")
         }
         
-        // Debug: Print raw response
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("📥 API Response (\(request.url?.path ?? "unknown")):")
-            print(jsonString)
+        // Debug: Print raw response (skip cities endpoint due to large boundary data)
+        let path = request.url?.path ?? "unknown"
+        if !path.contains("/cities") {
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("📥 API Response (\(path)):")
+                print(jsonString)
+            }
         }
         
         let decoder = JSONDecoder()

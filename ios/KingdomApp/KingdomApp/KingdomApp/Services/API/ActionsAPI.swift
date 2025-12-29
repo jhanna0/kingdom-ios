@@ -7,12 +7,14 @@ struct ActionStatus: Codable {
     let secondsRemaining: Int
     let cooldownMinutes: Double
     let isPatrolling: Bool?
+    let activePatrollers: Int?
     
     enum CodingKeys: String, CodingKey {
         case ready
         case secondsRemaining = "seconds_remaining"
         case cooldownMinutes = "cooldown_minutes"
         case isPatrolling = "is_patrolling"
+        case activePatrollers = "active_patrollers"
     }
 }
 
@@ -22,6 +24,7 @@ struct AllActionStatus: Codable {
     let sabotage: ActionStatus
     let mine: ActionStatus
     let scout: ActionStatus
+    let contracts: [APIContract]
 }
 
 struct WorkActionResponse: Codable {
@@ -112,6 +115,7 @@ struct ScoutActionResponse: Codable {
 struct ActionRewards: Codable {
     let gold: Int?
     let reputation: Int?
+    let experience: Int?
     let iron: Int?
 }
 

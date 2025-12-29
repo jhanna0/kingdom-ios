@@ -159,6 +159,7 @@ struct ActionsView: View {
                                     currentTime: currentTime,
                                     actionType: .patrol,
                                     isEnabled: true,
+                                    activeCount: status.patrol.activePatrollers,
                                     onAction: { performPatrol() }
                                 )
                                 
@@ -172,6 +173,7 @@ struct ActionsView: View {
                                     currentTime: currentTime,
                                     actionType: .mine,
                                     isEnabled: true,
+                                    activeCount: nil,
                                     onAction: { performMine() }
                                 )
                                 
@@ -198,6 +200,7 @@ struct ActionsView: View {
                                     currentTime: currentTime,
                                     actionType: .scout,
                                     isEnabled: true,
+                                    activeCount: nil,
                                     onAction: { performScout() }
                                 )
                                 
@@ -211,6 +214,7 @@ struct ActionsView: View {
                                     currentTime: currentTime,
                                     actionType: .sabotage,
                                     isEnabled: false,
+                                    activeCount: nil,
                                     onAction: { /* Not implemented yet */ }
                                 )
                             } else {
@@ -263,8 +267,33 @@ struct ActionsView: View {
     private func loadActionStatus() async {
         isLoading = true
         do {
-            actionStatus = try await KingdomAPIService.shared.actions.getActionStatus()
+            let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            actionStatus = status
             statusFetchedAt = Date()
+            
+            // Update contracts from the same response
+            await MainActor.run {
+                viewModel.availableContracts = status.contracts.compactMap { apiContract in
+                    Contract(
+                        id: apiContract.id,
+                        kingdomId: apiContract.kingdom_id,
+                        kingdomName: apiContract.kingdom_name,
+                        buildingType: apiContract.building_type,
+                        buildingLevel: apiContract.building_level,
+                        basePopulation: apiContract.base_population,
+                        baseHoursRequired: apiContract.base_hours_required,
+                        workStartedAt: apiContract.work_started_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                        totalActionsRequired: apiContract.total_actions_required,
+                        actionsCompleted: apiContract.actions_completed,
+                        actionContributions: apiContract.action_contributions,
+                        rewardPool: apiContract.reward_pool,
+                        createdBy: apiContract.created_by,
+                        createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
+                        completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                        status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
+                    )
+                }
+            }
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -278,6 +307,7 @@ struct ActionsView: View {
                 // Capture state before action
                 let previousGold = viewModel.player.gold
                 let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
                 
                 let response = try await KingdomAPIService.shared.actions.workOnContract(contractId: contractId)
                 
@@ -291,11 +321,14 @@ struct ActionsView: View {
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
                             reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
                             message: response.message,
                             previousGold: previousGold,
                             previousReputation: previousReputation,
+                            previousExperience: previousExperience,
                             currentGold: viewModel.player.gold,  // Updated from backend
-                            currentReputation: viewModel.player.reputation  // Updated from backend
+                            currentReputation: viewModel.player.reputation,  // Updated from backend
+                            currentExperience: viewModel.player.experience  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
@@ -319,6 +352,7 @@ struct ActionsView: View {
                 // Capture state before action
                 let previousGold = viewModel.player.gold
                 let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
                 
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
                 print("✅ Patrol response received: \(response)")
@@ -332,11 +366,14 @@ struct ActionsView: View {
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
                             reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
                             message: response.message,
                             previousGold: previousGold,
                             previousReputation: previousReputation,
+                            previousExperience: previousExperience,
                             currentGold: viewModel.player.gold,  // Updated from backend
-                            currentReputation: viewModel.player.reputation  // Updated from backend
+                            currentReputation: viewModel.player.reputation,  // Updated from backend
+                            currentExperience: viewModel.player.experience  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
@@ -360,6 +397,7 @@ struct ActionsView: View {
                 // Capture state before action
                 let previousGold = viewModel.player.gold
                 let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
                 
                 let response = try await KingdomAPIService.shared.actions.mineResources()
                 
@@ -372,11 +410,14 @@ struct ActionsView: View {
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
                             reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
                             message: response.message,
                             previousGold: previousGold,
                             previousReputation: previousReputation,
+                            previousExperience: previousExperience,
                             currentGold: viewModel.player.gold,  // Updated from backend
-                            currentReputation: viewModel.player.reputation  // Updated from backend
+                            currentReputation: viewModel.player.reputation,  // Updated from backend
+                            currentExperience: viewModel.player.experience  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
@@ -400,6 +441,7 @@ struct ActionsView: View {
                 // Capture state before action
                 let previousGold = viewModel.player.gold
                 let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
                 
                 let response = try await KingdomAPIService.shared.actions.scoutKingdom(kingdomId: kingdomId)
                 
@@ -412,11 +454,14 @@ struct ActionsView: View {
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
                             reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
                             message: response.message,
                             previousGold: previousGold,
                             previousReputation: previousReputation,
+                            previousExperience: previousExperience,
                             currentGold: viewModel.player.gold,  // Updated from backend
-                            currentReputation: viewModel.player.reputation  // Updated from backend
+                            currentReputation: viewModel.player.reputation,  // Updated from backend
+                            currentExperience: viewModel.player.experience  // Updated from backend
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
@@ -477,9 +522,28 @@ struct WorkContractCard: View {
                         .font(KingdomTheme.Typography.headline())
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text("\(contract.actionsCompleted)/\(contract.totalActionsRequired) actions • \(contract.rewardPool)g pool")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    HStack(spacing: 4) {
+                                        Text("\(contract.actionsCompleted)/\(contract.totalActionsRequired) actions")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        
+                                        Text("•")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        
+                                        Text("\(Int(contract.progress * 100))%")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.gold)
+                                            .fontWeight(.semibold)
+                                        
+                                        Text("•")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        
+                                        Text("\(contract.rewardPool)g pool")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    }
                 }
                 
                 Spacer()
@@ -533,6 +597,7 @@ struct ActionCard: View {
     let currentTime: Date
     let actionType: ActionType
     let isEnabled: Bool
+    let activeCount: Int?
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -554,9 +619,27 @@ struct ActionCard: View {
                     .foregroundColor(iconColor)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(KingdomTheme.Typography.headline())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(KingdomTheme.Typography.headline())
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        // Show active count for patrol (always show if available)
+                        if let count = activeCount {
+                            HStack(spacing: 4) {
+                                Image(systemName: "person.2.fill")
+                                    .font(.caption)
+                                Text("\(count)")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(count > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.textMuted)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background((count > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled).opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                    }
                     
                     Text(description)
                         .font(KingdomTheme.Typography.caption())

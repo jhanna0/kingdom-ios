@@ -65,7 +65,7 @@ def get_action_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get cooldown status for all actions"""
+    """Get cooldown status for all actions AND available contracts in current kingdom"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -80,6 +80,24 @@ def get_action_status(
     mine_cooldown = 1440  # 24 hours (once per day)
     scout_cooldown = 1440  # 24 hours (once per day)
     
+    # Count active patrollers in current kingdom
+    active_patrollers = 0
+    if state.current_kingdom_id:
+        active_patrollers = db.query(PlayerState).filter(
+            PlayerState.current_kingdom_id == state.current_kingdom_id,
+            PlayerState.patrol_expires_at > datetime.utcnow()
+        ).count()
+    
+    # Get contracts for current kingdom
+    contracts = []
+    if state.current_kingdom_id:
+        from routers.contracts import contract_to_response
+        contracts_query = db.query(Contract).filter(
+            Contract.kingdom_id == state.current_kingdom_id,
+            Contract.status.in_(["open", "in_progress"])
+        ).all()
+        contracts = [contract_to_response(c) for c in contracts_query]
+    
     return {
         "work": {
             **check_cooldown(state.last_work_action, work_cooldown),
@@ -88,7 +106,8 @@ def get_action_status(
         "patrol": {
             **check_cooldown(state.last_patrol_action, patrol_cooldown),
             "cooldown_minutes": patrol_cooldown,
-            "is_patrolling": state.patrol_expires_at and state.patrol_expires_at > datetime.utcnow()
+            "is_patrolling": state.patrol_expires_at and state.patrol_expires_at > datetime.utcnow(),
+            "active_patrollers": active_patrollers
         },
         "sabotage": {
             **check_cooldown(state.last_sabotage_action, sabotage_cooldown),
@@ -101,7 +120,8 @@ def get_action_status(
         "scout": {
             **check_cooldown(state.last_scout_action, scout_cooldown),
             "cooldown_minutes": scout_cooldown
-        }
+        },
+        "contracts": contracts
     }
 
 
@@ -171,11 +191,9 @@ def work_on_contract(
     # Calculate reward per action (gold per action = reward_pool / total_actions_required)
     gold_per_action = contract.reward_pool / contract.total_actions_required
     gold_earned = int(gold_per_action)
-    rep_earned = 5  # Small rep per action
     
-    # Award gold and rep immediately for this action
+    # Award gold only for this action
     state.gold += gold_earned
-    state.reputation += rep_earned
     
     # Check if contract is complete
     is_complete = contract.actions_completed >= contract.total_actions_required
@@ -217,7 +235,8 @@ def work_on_contract(
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "rewards": {
             "gold": gold_earned,
-            "reputation": rep_earned,
+            "experience": None,
+            "reputation": None,
             "iron": None
         }
     }
@@ -265,9 +284,9 @@ def start_patrol(
     state.last_patrol_action = datetime.utcnow()
     state.patrol_expires_at = datetime.utcnow() + timedelta(minutes=10)
     
-    # Award gold and reputation for patrol
-    state.gold += 5
-    state.reputation += 5
+    # Award reputation for patrol (civic duty)
+    rep_earned = 10
+    state.reputation += rep_earned
     
     db.commit()
     
@@ -276,8 +295,9 @@ def start_patrol(
         "message": "Patrol started! Guard duty for 10 minutes.",
         "expires_at": format_datetime_iso(state.patrol_expires_at),
         "rewards": {
-            "gold": 5,
-            "reputation": 5,
+            "gold": None,
+            "reputation": rep_earned,
+            "experience": None,
             "iron": None
         }
     }

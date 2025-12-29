@@ -12,7 +12,6 @@ class CityAPI {
         lon: Double,
         radiusKm: Double = 30.0
     ) async throws -> [CityBoundaryResponse] {
-        print("🌐 Fetching cities from API: lat=\(lat), lon=\(lon), radius=\(radiusKm)km")
         
         let request = client.request(
             endpoint: "/cities?lat=\(lat)&lon=\(lon)&radius=\(radiusKm)"

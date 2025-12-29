@@ -205,8 +205,6 @@ class MapViewModel: ObservableObject {
         
         Task {
             // Fetch directly from backend API (no local cache)
-            print("🌐 Fetching cities from backend API...")
-            
             do {
                 // Fetch cities from backend API (which handles OSM fetching and DB caching)
                 let foundKingdoms = try await apiService.fetchCities(
@@ -620,9 +618,12 @@ class MapViewModel: ObservableObject {
     
     func loadContracts() async {
         do {
+            print("🔄 Loading contracts from API...")
             // Load both open AND in_progress contracts so users can see their active work
             let openContracts = try await contractAPI.listContracts(kingdomId: nil, status: "open")
+            print("   📋 Open contracts: \(openContracts.count)")
             let inProgressContracts = try await contractAPI.listContracts(kingdomId: nil, status: "in_progress")
+            print("   📋 In-progress contracts: \(inProgressContracts.count)")
             let allContracts = openContracts + inProgressContracts
             
             await MainActor.run {

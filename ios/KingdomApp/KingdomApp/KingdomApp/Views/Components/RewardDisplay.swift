@@ -3,11 +3,14 @@ import SwiftUI
 struct Reward {
     let goldReward: Int  // Amount earned (e.g., +50)
     let reputationReward: Int  // Amount earned (e.g., +10)
+    let experienceReward: Int  // Amount earned (e.g., +10)
     let message: String
     let previousGold: Int  // Before action
     let previousReputation: Int  // Before action
+    let previousExperience: Int  // Before action
     let currentGold: Int  // After action (from backend)
     let currentReputation: Int  // After action (from backend)
+    let currentExperience: Int  // After action (from backend)
 }
 
 struct RewardDisplayView: View {
@@ -18,12 +21,14 @@ struct RewardDisplayView: View {
     @State private var opacity: Double = 0
     @State private var goldCounter: Int
     @State private var reputationCounter: Int
+    @State private var experienceCounter: Int
     
     init(reward: Reward, isShowing: Binding<Bool>) {
         self.reward = reward
         self._isShowing = isShowing
         self._goldCounter = State(initialValue: reward.previousGold)
         self._reputationCounter = State(initialValue: reward.previousReputation)
+        self._experienceCounter = State(initialValue: reward.previousExperience)
     }
     
     var body: some View {
@@ -64,23 +69,38 @@ struct RewardDisplayView: View {
                 
                 // Rewards with counter animation
                 VStack(spacing: 16) {
-                    // Gold counter
-                    AnimatedRewardCounter(
-                        icon: "sparkles",
-                        label: "Gold",
-                        currentValue: goldCounter,
-                        addedValue: reward.goldReward,
-                        color: KingdomTheme.Colors.gold
-                    )
+                    // Gold counter (if earned)
+                    if reward.goldReward > 0 {
+                        AnimatedRewardCounter(
+                            icon: "sparkles",
+                            label: "Gold",
+                            currentValue: goldCounter,
+                            addedValue: reward.goldReward,
+                            color: KingdomTheme.Colors.gold
+                        )
+                    }
                     
-                    // Reputation counter
-                    AnimatedRewardCounter(
-                        icon: "star.fill",
-                        label: "Reputation",
-                        currentValue: reputationCounter,
-                        addedValue: reward.reputationReward,
-                        color: KingdomTheme.Colors.buttonWarning
-                    )
+                    // Reputation counter (if earned)
+                    if reward.reputationReward > 0 {
+                        AnimatedRewardCounter(
+                            icon: "star.fill",
+                            label: "Reputation",
+                            currentValue: reputationCounter,
+                            addedValue: reward.reputationReward,
+                            color: KingdomTheme.Colors.buttonWarning
+                        )
+                    }
+                    
+                    // Experience counter (if earned)
+                    if reward.experienceReward > 0 {
+                        AnimatedRewardCounter(
+                            icon: "book.fill",
+                            label: "Experience",
+                            currentValue: experienceCounter,
+                            addedValue: reward.experienceReward,
+                            color: KingdomTheme.Colors.buttonSuccess
+                        )
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
@@ -175,6 +195,24 @@ struct RewardDisplayView: View {
                 }
             }
         }
+        
+        // Animate experience counter from previous to current
+        let xpDiff = reward.currentExperience - reward.previousExperience
+        let xpSteps = min(abs(xpDiff), 20)
+        
+        if xpSteps > 0 {
+            let xpIncrement = max(1, xpDiff / xpSteps)
+            
+            for step in 0...xpSteps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.06) {
+                    if step == xpSteps {
+                        experienceCounter = reward.currentExperience
+                    } else {
+                        experienceCounter = reward.previousExperience + (xpIncrement * step)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -252,12 +290,15 @@ struct AnimatedRewardCounter: View {
         RewardDisplayView(
             reward: Reward(
                 goldReward: 75,
-                reputationReward: 15,
+                reputationReward: 0,
+                experienceReward: 10,
                 message: "Work completed successfully!",
                 previousGold: 1250,
                 previousReputation: 340,
+                previousExperience: 50,
                 currentGold: 1325,
-                currentReputation: 355
+                currentReputation: 340,
+                currentExperience: 60
             ),
             isShowing: .constant(true)
         )

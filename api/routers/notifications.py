@@ -85,15 +85,19 @@ def get_user_updates(
                 "created_at": datetime.utcnow().isoformat()
             })
         else:
-                remaining_hours = hours_needed - elapsed
-                progress = elapsed / hours_needed
-                in_progress.append({
-                    "id": contract.id,
-                    "kingdom_name": contract.kingdom_name,
-                    "building_type": contract.building_type,
-                    "progress": min(progress, 1.0),
-                    "hours_remaining": remaining_hours
-                })
+            # Use action-based progress
+            progress = contract.actions_completed / contract.total_actions_required if contract.total_actions_required > 0 else 0
+            actions_remaining = contract.total_actions_required - contract.actions_completed
+            
+            in_progress.append({
+                "id": contract.id,
+                "kingdom_name": contract.kingdom_name,
+                "building_type": contract.building_type,
+                "progress": min(progress, 1.0),
+                "actions_remaining": actions_remaining,
+                "actions_completed": contract.actions_completed,
+                "total_actions_required": contract.total_actions_required
+            })
     
     # ===== Check kingdoms you rule =====
     ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()

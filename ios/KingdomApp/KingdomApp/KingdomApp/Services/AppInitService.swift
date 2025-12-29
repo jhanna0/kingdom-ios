@@ -138,7 +138,7 @@ struct ContractUpdates: Codable {
 }
 
 struct ReadyContract: Codable, Identifiable {
-    let id: String
+    let id: Int
     let kingdom_name: String
     let building_type: String
     let building_level: Int
@@ -146,11 +146,13 @@ struct ReadyContract: Codable, Identifiable {
 }
 
 struct ProgressContract: Codable, Identifiable {
-    let id: String
+    let id: Int
     let kingdom_name: String
     let building_type: String
     let progress: Double
-    let hours_remaining: Double
+    let actions_remaining: Int
+    let actions_completed: Int
+    let total_actions_required: Int
 }
 
 struct KingdomUpdate: Codable, Identifiable {
