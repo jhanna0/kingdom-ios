@@ -8,7 +8,7 @@ struct ContractsListView: View {
     @ObservedObject var viewModel: MapViewModel
     
     var availableContracts: [Contract] {
-        viewModel.getAvailableContracts()
+        viewModel.availableContracts
     }
     
     var playerActiveContract: Contract? {
@@ -95,6 +95,10 @@ struct ContractsListView: View {
                 }
             }
         }
+        .task {
+            // Load contracts from API when view appears
+            await viewModel.loadContracts()
+        }
     }
 }
 
@@ -115,8 +119,8 @@ struct ContractDetailView: View {
     var canAccept: Bool {
         !isPlayerWorking && 
         !contract.isComplete && 
-        viewModel.player.activeContractId == nil &&
-        contract.createdBy != viewModel.player.playerId
+        viewModel.player.activeContractId == nil
+        // Removed ruler check - dev mode allows it
     }
     
     var body: some View {
@@ -349,9 +353,16 @@ struct ContractDetailView: View {
     
     private var acceptContractButton: some View {
         Button(action: {
-            if let kingdom = viewModel.kingdoms.first(where: { $0.activeContract?.id == contract.id }) {
-                if viewModel.acceptContract(kingdom: kingdom) {
+            Task {
+                do {
+                    let _ = try await viewModel.contractAPI.joinContract(contractId: contract.id)
                     successMessage = "Signed up! Contract will complete automatically."
+                    showSuccessMessage = true
+                    
+                    // Reload contracts
+                    await viewModel.loadContracts()
+                } catch {
+                    successMessage = "Failed to join: \(error.localizedDescription)"
                     showSuccessMessage = true
                 }
             }

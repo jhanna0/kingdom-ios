@@ -9,6 +9,7 @@ from typing import Optional
 from db import get_db, User, PlayerState as DBPlayerState
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
+from config import DEV_MODE
 
 router = APIRouter(prefix="/player", tags=["player"])
 
@@ -503,5 +504,56 @@ def use_skill_point(
         "stat": stat,
         "new_level": current_level + 1,
         "remaining_skill_points": state.skill_points
+    }
+
+
+# ===== Dev Tools =====
+
+@router.post("/dev/boost")
+def dev_boost(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """DEV ONLY: Instantly boost resources for testing"""
+    if not DEV_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dev mode is disabled"
+        )
+    
+    state = get_or_create_player_state(db, current_user)
+    
+    # Give testing resources
+    state.gold += 10000
+    state.experience += 500
+    state.skill_points += 10
+    state.reputation += 500
+    state.iron += 100
+    state.steel += 50
+    
+    # Level up if possible
+    levels_gained = 0
+    while True:
+        xp_needed = 100 * (2 ** (state.level - 1))
+        if state.experience >= xp_needed:
+            state.experience -= xp_needed
+            state.level += 1
+            state.skill_points += 3
+            state.gold += 50
+            levels_gained += 1
+        else:
+            break
+    
+    state.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Dev boost applied!",
+        "gold": state.gold,
+        "level": state.level,
+        "skill_points": state.skill_points,
+        "reputation": state.reputation,
+        "levels_gained": levels_gained
     }
 

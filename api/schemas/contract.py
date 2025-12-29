@@ -27,7 +27,7 @@ class ContractResponse(BaseModel):
     base_hours_required: float
     work_started_at: Optional[datetime] = None
     reward_pool: int
-    workers: List[str] = []
+    workers: List[int] = []  # Integer user IDs
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -40,7 +40,7 @@ class ContractResponse(BaseModel):
 class ContractUpdate(BaseModel):
     """Update contract"""
     status: Optional[str] = None
-    workers: Optional[List[str]] = None
+    workers: Optional[List[int]] = None  # Integer user IDs
     work_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 

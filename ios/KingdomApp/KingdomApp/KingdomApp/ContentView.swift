@@ -8,9 +8,34 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var appInit: AppInitService
+    
     var body: some View {
-        MapView()
-            .ignoresSafeArea()
+        ZStack {
+            MapView()
+                .ignoresSafeArea()
+            
+            // Show notifications overlay
+            NotificationOverlay()
+                .allowsHitTesting(true)
+            
+            // Loading indicator during init
+            if appInit.isLoading {
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .padding()
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(12)
+                    
+                    Text("Loading your kingdom...")
+                        .foregroundColor(.white)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.3))
+            }
+        }
     }
 }
 

@@ -10,6 +10,7 @@ import uuid
 from db import get_db, User, PlayerState, Kingdom, UserKingdom, CheckInHistory, CityBoundary
 from schemas import CheckInRequest, CheckInResponse, CheckInRewards
 from routers.auth import get_current_user
+from config import DEV_MODE
 
 
 router = APIRouter(tags=["game"])
@@ -171,6 +172,9 @@ def create_kingdom(
             )
     
     # Create kingdom - USE OSM ID as the kingdom ID for consistency with map
+    # DEV MODE: Give starting treasury so you can actually create contracts
+    starting_treasury = 10000 if DEV_MODE else 0
+    
     kingdom = Kingdom(
         id=city_boundary_osm_id,  # Use OSM ID so map cities match kingdoms!
         name=name,
@@ -178,7 +182,7 @@ def create_kingdom(
         ruler_id=current_user.id,
         population=1,
         level=1,
-        treasury_gold=0
+        treasury_gold=starting_treasury
     )
     
     db.add(kingdom)
@@ -241,10 +245,10 @@ def check_in(
     # Get or create user-kingdom relationship
     user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom.id)
     
-    # Check cooldown (1 hour between check-ins to same kingdom)
+    # Check cooldown (1 hour in production, 5 minutes in dev mode)
     if user_kingdom.last_checkin:
         time_since_last = datetime.utcnow() - user_kingdom.last_checkin
-        cooldown = timedelta(hours=1)
+        cooldown = timedelta(minutes=5) if DEV_MODE else timedelta(hours=1)
         
         if time_since_last < cooldown:
             remaining = cooldown - time_since_last
@@ -257,6 +261,11 @@ def check_in(
     # Calculate rewards
     base_gold = 10
     base_xp = 5
+    
+    # DEV MODE: 10x rewards
+    if DEV_MODE:
+        base_gold *= 10
+        base_xp *= 10
     
     # Bonus if you're the ruler
     if user_kingdom.is_ruler:

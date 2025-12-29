@@ -12,8 +12,8 @@ struct APIContract: Codable {
     let base_hours_required: Double
     let work_started_at: String?
     let reward_pool: Int
-    let workers: [String]
-    let created_by: String
+    let workers: [Int]  // Changed from [String] to [Int] - backend uses integer user IDs
+    let created_by: Int  // Changed from String to Int - backend uses integer user ID
     let created_at: String
     let completed_at: String?
     let status: String  // open, in_progress, completed, cancelled

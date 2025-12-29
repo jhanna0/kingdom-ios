@@ -11,6 +11,7 @@ import math
 from db import get_db, User, PlayerState, Kingdom, Contract
 from schemas import ContractCreate, ContractResponse
 from routers.auth import get_current_user
+from config import DEV_MODE
 
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
@@ -172,6 +173,13 @@ def join_contract(
             detail="Contract is not accepting workers"
         )
     
+    # DEV MODE: Allow rulers to join their own contracts
+    if not DEV_MODE and contract.created_by == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rulers cannot accept their own contracts"
+        )
+    
     workers = contract.workers or []
     
     if current_user.id in workers:
@@ -267,8 +275,8 @@ def complete_contract(
             detail="Contract is not in progress"
         )
     
-    # Check if enough time has passed
-    if contract.work_started_at:
+    # Check if enough time has passed (skip in dev mode)
+    if not DEV_MODE and contract.work_started_at:
         worker_count = len(contract.workers or [])
         ideal_workers = 3.0
         worker_multiplier = ideal_workers / max(worker_count, 1)
@@ -291,13 +299,16 @@ def complete_contract(
     workers = contract.workers or []
     reward_per_worker = contract.reward_pool // max(len(workers), 1)
     
+    # DEV MODE: Boost rewards
+    rep_bonus = 100 if DEV_MODE else 10
+    
     for worker_id in workers:
-        worker = db.query(User).filter(User.id == worker_id).first()
-        if worker:
-            worker.gold += reward_per_worker
-            worker.contracts_completed += 1
-            worker.active_contract_id = None
-            worker.reputation += 10  # Rep for completing contract
+        worker_state = db.query(PlayerState).filter(PlayerState.user_id == worker_id).first()
+        if worker_state:
+            worker_state.gold += reward_per_worker
+            worker_state.contracts_completed += 1
+            worker_state.active_contract_id = None
+            worker_state.reputation += rep_bonus  # Rep for completing contract
     
     # Upgrade the building
     kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()

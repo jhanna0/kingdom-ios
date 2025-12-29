@@ -27,6 +27,7 @@ class MapViewModel: ObservableObject {
     
     // API Service - connects to backend server
     var apiService = KingdomAPIService.shared
+    let contractAPI = ContractAPI()
     
     // Configuration
     var loadRadiusMiles: Double = 10  // How many miles around user to load cities
@@ -501,12 +502,6 @@ class MapViewModel: ObservableObject {
             return false
         }
         
-        // Check if there's already an active contract
-        if kingdoms[index].activeContract != nil {
-            print("❌ Kingdom already has an active contract")
-            return false
-        }
-        
         // Get building type string and next level
         let (buildingTypeStr, currentLevel) = getBuildingInfo(kingdom: kingdoms[index], buildingType: buildingType)
         
@@ -518,39 +513,25 @@ class MapViewModel: ObservableObject {
         
         let nextLevel = currentLevel + 1
         
-        // Check if kingdom has enough treasury gold for reward pool
-        guard kingdoms[index].treasuryGold >= rewardPool else {
-            print("❌ Kingdom treasury insufficient: need \(rewardPool), have \(kingdoms[index].treasuryGold)")
-            return false
-        }
-        
-        // Deduct from kingdom treasury
-        kingdoms[index].treasuryGold -= rewardPool
-        
-        // Create the contract
-        let contract = Contract.create(
-            kingdomId: kingdom.id,
-            kingdomName: kingdom.name,
-            buildingType: buildingTypeStr,
-            buildingLevel: nextLevel,
-            population: kingdoms[index].checkedInPlayers,
-            rewardPool: rewardPool,
-            createdBy: player.playerId
-        )
-        
-        kingdoms[index].activeContract = contract
-        
-        // Have NPC citizens start working on the contract
-        let npcWorkers = worldSimulator.simulateContractWork(for: &kingdoms[index])
-        
-        print("📜 Contract created: \(buildingTypeStr) level \(nextLevel) - ~\(String(format: "%.1f", contract.baseHoursRequired))h with 3 workers")
-        if npcWorkers > 0 {
-            print("👷 \(npcWorkers) citizens joined the work crew!")
-        }
-        
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdom.id {
-            currentKingdomInside = kingdoms[index]
+        // Call API to create contract
+        Task {
+            do {
+                let apiContract = try await contractAPI.createContract(
+                    kingdomId: kingdom.id,
+                    kingdomName: kingdom.name,
+                    buildingType: buildingTypeStr,
+                    buildingLevel: nextLevel,
+                    rewardPool: rewardPool,
+                    basePopulation: kingdoms[index].checkedInPlayers
+                )
+                
+                print("✅ Contract created via API: \(apiContract.id)")
+                
+                // Reload contracts to show the new one
+                await loadContracts()
+            } catch {
+                print("❌ Failed to create contract: \(error)")
+            }
         }
         
         return true
@@ -558,52 +539,29 @@ class MapViewModel: ObservableObject {
     
     /// Accept a contract and start working
     func acceptContract(kingdom: Kingdom) -> Bool {
-        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
-            print("❌ Kingdom not found")
-            return false
-        }
-        
-        guard var contract = kingdoms[index].activeContract else {
+        // Find contract in available contracts
+        guard let contract = availableContracts.first(where: { $0.kingdomId == kingdom.id }) else {
             print("❌ No active contract in this kingdom")
             return false
         }
         
-        // Check if contract is already complete
-        if contract.isComplete {
-            print("❌ Contract already complete")
-            return false
-        }
-        
-        // Check if player already working on a different contract
-        if let activeId = player.activeContractId, activeId != contract.id {
-            print("❌ Already working on another contract")
-            return false
-        }
-        
-        // Check if player is already working on this contract
-        if contract.workers.contains(player.playerId) {
-            print("❌ Already working on this contract")
-            return false
-        }
-        
-        // Can't work on your own contract
-        if contract.createdBy == player.playerId {
-            print("❌ Cannot work on your own contract")
-            return false
-        }
-        
-        // Accept the contract - this starts/updates the timer
-        contract.addWorker(player.playerId)
-        kingdoms[index].activeContract = contract
-        player.activeContractId = contract.id
-        player.saveToUserDefaults()
-        
-        let timeEstimate = contract.hoursToComplete
-        print("✅ Accepted contract: \(contract.buildingType) level \(contract.buildingLevel) (~\(String(format: "%.1f", timeEstimate))h)")
-        
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdom.id {
-            currentKingdomInside = kingdoms[index]
+        // Call API to join contract
+        Task {
+            do {
+                let response = try await contractAPI.joinContract(contractId: contract.id)
+                print("✅ Joined contract: \(response.message)")
+                
+                // Update player state
+                await MainActor.run {
+                    player.activeContractId = contract.id
+                    player.saveToUserDefaults()
+                }
+                
+                // Reload contracts
+                await loadContracts()
+            } catch {
+                print("❌ Failed to join contract: \(error)")
+            }
         }
         
         return true
@@ -702,10 +660,45 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Get all available contracts
+    /// Get all available contracts (from API)
     func getAvailableContracts() -> [Contract] {
-        return kingdoms.compactMap { $0.activeContract }
-            .filter { !$0.isComplete }
+        // TODO: Fetch from API
+        // For now return empty - we'll load async
+        return []
+    }
+    
+    /// Fetch contracts from API
+    @Published var availableContracts: [Contract] = []
+    
+    func loadContracts() async {
+        do {
+            let apiContracts = try await contractAPI.listContracts(kingdomId: nil, status: "open")
+            
+            await MainActor.run {
+                // Convert APIContract to local Contract model
+                self.availableContracts = apiContracts.compactMap { apiContract in
+                    Contract(
+                        id: apiContract.id,
+                        kingdomId: apiContract.kingdom_id,
+                        kingdomName: apiContract.kingdom_name,
+                        buildingType: apiContract.building_type,
+                        buildingLevel: apiContract.building_level,
+                        basePopulation: apiContract.base_population,
+                        baseHoursRequired: apiContract.base_hours_required,
+                        workStartedAt: apiContract.work_started_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                        rewardPool: apiContract.reward_pool,
+                        workers: Set(apiContract.workers),
+                        createdBy: apiContract.created_by,
+                        createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
+                        completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                        status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
+                    )
+                }
+                print("✅ Loaded \(self.availableContracts.count) contracts from API")
+            }
+        } catch {
+            print("❌ Failed to load contracts: \(error)")
+        }
     }
     
     /// Get player's active contract

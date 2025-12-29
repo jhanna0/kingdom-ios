@@ -7,11 +7,19 @@ class ContractAPI {
     // MARK: - Contract CRUD
     
     /// List all contracts for a kingdom
-    func listContracts(kingdomId: String, status: String? = nil) async throws -> [APIContract] {
-        var endpoint = "/contracts?kingdom_id=\(kingdomId)"
-        if let status = status {
-            endpoint += "&status=\(status)"
+    func listContracts(kingdomId: String? = nil, status: String? = nil) async throws -> [APIContract] {
+        var endpoint = "/contracts?"
+        
+        if let kingdomId = kingdomId {
+            endpoint += "kingdom_id=\(kingdomId)&"
         }
+        
+        if let status = status {
+            endpoint += "status=\(status)&"
+        }
+        
+        // Remove trailing & or ?
+        endpoint = endpoint.trimmingCharacters(in: CharacterSet(charactersIn: "&?"))
         
         let request = client.request(endpoint: endpoint)
         return try await client.execute(request)
