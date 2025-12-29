@@ -14,20 +14,27 @@ struct KingdomInfoSheetView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
                 // Header with medieval styling
-                VStack(spacing: KingdomTheme.Spacing.small) {
-                    HStack {
-                        Text("🏰")
-                            .font(.system(size: 36))
-                        
-                        Text(kingdom.name)
-                            .font(KingdomTheme.Typography.largeTitle())
-                            .fontWeight(.bold)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    HStack(alignment: .center) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "building.columns.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(Color(
+                                    red: kingdom.color.strokeRGBA.red,
+                                    green: kingdom.color.strokeRGBA.green,
+                                    blue: kingdom.color.strokeRGBA.blue
+                                ))
+                            
+                            Text(kingdom.name)
+                                .font(KingdomTheme.Typography.largeTitle())
+                                .fontWeight(.bold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                         
                         Spacer()
                         
                         if kingdom.isUnclaimed {
-                            Text("⚠️ Unclaimed")
+                            Text("Unclaimed")
                                 .font(KingdomTheme.Typography.caption())
                                 .foregroundColor(KingdomTheme.Colors.error)
                                 .padding(.horizontal, 10)
@@ -37,16 +44,18 @@ struct KingdomInfoSheetView: View {
                         }
                     }
                     
-                    if kingdom.isUnclaimed {
-                        Text("No ruler!")
-                            .font(KingdomTheme.Typography.subheadline())
-                            .foregroundColor(KingdomTheme.Colors.error)
-                    } else {
-                        HStack(spacing: 6) {
-                            if kingdom.rulerId == player.playerId {
-                                Image(systemName: "crown.fill")
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                            }
+                    HStack(alignment: .center, spacing: 6) {
+                        if kingdom.isUnclaimed {
+                            Image(systemName: "crown")
+                                .font(.subheadline)
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                            Text("No ruler")
+                                .font(KingdomTheme.Typography.subheadline())
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else {
+                            Image(systemName: "crown.fill")
+                                .font(.subheadline)
+                                .foregroundColor(kingdom.rulerId == player.playerId ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
                             
                             Text("Ruled by \(kingdom.rulerName)")
                                 .font(KingdomTheme.Typography.subheadline())
@@ -62,6 +71,7 @@ struct KingdomInfoSheetView: View {
                     }
                 }
                 .padding(.horizontal)
+                .padding(.top, 8)
                 
                 // Kingdom color divider with medieval style
                 Rectangle()
@@ -75,6 +85,106 @@ struct KingdomInfoSheetView: View {
                     .frame(height: 3)
                     .cornerRadius(1.5)
                     .padding(.horizontal)
+                
+                // Ruler Actions (moved to top, after header)
+                if isPlayerInside && kingdom.rulerId == player.playerId {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                            Text("You rule this kingdom")
+                                .font(KingdomTheme.Typography.subheadline())
+                                .fontWeight(.bold)
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(KingdomTheme.Spacing.medium)
+                        .background(KingdomTheme.Colors.parchmentHighlight)
+                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                                .stroke(KingdomTheme.Colors.gold, lineWidth: KingdomTheme.BorderWidth.regular)
+                        )
+                        
+                        // Manage Kingdom button
+                        Button(action: onViewKingdom) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "gearshape.fill")
+                                    .foregroundColor(.white)
+                                Text("Manage Kingdom")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(KingdomTheme.Spacing.medium)
+                            .background(KingdomTheme.Colors.buttonPrimary)
+                            .foregroundColor(.white)
+                            .cornerRadius(KingdomTheme.CornerRadius.medium)
+                        }
+                    }
+                    .padding(.horizontal)
+                } else if isPlayerInside && kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
+                    // Can claim!
+                    Button(action: {
+                        _ = viewModel.claimKingdom()
+                        dismiss()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.fill")
+                                .foregroundColor(.white)
+                            Text("Claim This Kingdom")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(KingdomTheme.Spacing.medium)
+                        .background(KingdomTheme.Colors.gold)
+                        .foregroundColor(.white)
+                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    }
+                    .padding(.horizontal)
+                } else if isPlayerInside && (!player.isCheckedIn() || player.currentKingdom != kingdom.name) {
+                    // Need to enter the kingdom
+                    Button(action: {
+                        _ = viewModel.checkIn()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "door.right.hand.open")
+                                .foregroundColor(.white)
+                            Text("Enter Kingdom")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(KingdomTheme.Spacing.medium)
+                        .background(KingdomTheme.Colors.buttonSuccess)
+                        .foregroundColor(.white)
+                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    }
+                    .padding(.horizontal)
+                } else if isPlayerInside {
+                    // Already present but someone else rules it
+                    HStack(spacing: 6) {
+                        Image(systemName: "figure.walk")
+                            .foregroundColor(KingdomTheme.Colors.divider)
+                        Text("You are here")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.divider)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(8)
+                    .background(KingdomTheme.Colors.parchmentMuted)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .padding(.horizontal)
+                } else {
+                    // Not inside this kingdom
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.circle")
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                        Text("You must travel here first")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                    }
+                    .padding(8)
+                    .padding(.horizontal)
+                }
                 
                 // Population Stats
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -177,23 +287,6 @@ struct KingdomInfoSheetView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, KingdomTheme.Spacing.medium)
                     }
-                    
-                    // Show pending income if any
-                    if kingdom.pendingIncome > 0 {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            Text("+\(kingdom.pendingIncome)g ready to collect")
-                                .font(KingdomTheme.Typography.subheadline())
-                                .fontWeight(.medium)
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, KingdomTheme.Spacing.medium)
-                        .padding(.vertical, KingdomTheme.Spacing.small)
-                        .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
-                    }
                 }
                 .padding(KingdomTheme.Spacing.medium)
                 .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentDark, hasShadow: false)
@@ -265,7 +358,7 @@ struct KingdomInfoSheetView: View {
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             Spacer()
                             if contract.isComplete {
-                                Text("✓ Complete")
+                                Text("Complete")
                                     .font(KingdomTheme.Typography.caption())
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                                     .padding(.horizontal, 8)
@@ -273,7 +366,7 @@ struct KingdomInfoSheetView: View {
                                     .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
                                     .cornerRadius(KingdomTheme.CornerRadius.small)
                             } else {
-                                Text("⏳ In Progress")
+                                Text("In Progress")
                                     .font(KingdomTheme.Typography.caption())
                                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                                     .padding(.horizontal, 8)
@@ -284,9 +377,14 @@ struct KingdomInfoSheetView: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("🏗️ \(contract.buildingType) Level \(contract.buildingLevel)")
-                                .font(KingdomTheme.Typography.caption())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            HStack(spacing: 4) {
+                                Image(systemName: "building.2.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                Text("\(contract.buildingType) Level \(contract.buildingLevel)")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
                             
                             HStack(spacing: 8) {
                                 Label("\(contract.workers.count) workers", systemImage: "person.2.fill")
@@ -334,125 +432,66 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
-                // Check-in/Claim section
-                if isPlayerInside {
-                    VStack(spacing: 8) {
-                        if kingdom.rulerId == player.playerId {
-                            // You own this kingdom - show ruler options
-                            VStack(spacing: 8) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                    Text("You rule this kingdom")
-                                        .font(KingdomTheme.Typography.subheadline())
-                                        .fontWeight(.bold)
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(KingdomTheme.Spacing.medium)
-                                .background(KingdomTheme.Colors.parchmentHighlight)
-                                .cornerRadius(KingdomTheme.CornerRadius.medium)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
-                                        .stroke(KingdomTheme.Colors.gold, lineWidth: KingdomTheme.BorderWidth.regular)
-                                )
-                                
-                                // Collect income button (if income is pending)
-                                if kingdom.pendingIncome > 0 {
-                                    MedievalActionButton(
-                                        title: "💰 Collect \(kingdom.pendingIncome)g Income",
-                                        color: KingdomTheme.Colors.buttonSuccess,
-                                        fullWidth: true
-                                    ) {
-                                        viewModel.collectKingdomIncome(for: kingdom)
-                                    }
-                                }
-                                
-                                // Manage Kingdom button
-                                MedievalActionButton(
-                                    title: "⚙️ Manage Kingdom",
-                                    color: KingdomTheme.Colors.buttonPrimary,
-                                    fullWidth: true
-                                ) {
-                                    onViewKingdom()
-                                }
-                            }
-                        } else if kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
-                            // Can claim!
-                            MedievalActionButton(
-                                title: "Claim This Kingdom",
-                                color: KingdomTheme.Colors.gold,
-                                fullWidth: true
-                            ) {
-                                _ = viewModel.claimKingdom()
-                                dismiss()
-                            }
-                        } else if !player.isCheckedIn() || player.currentKingdom != kingdom.name {
-                            // Need to enter the kingdom
-                            MedievalActionButton(
-                                title: "⚔️ Enter Kingdom",
-                                color: KingdomTheme.Colors.buttonSuccess,
-                                fullWidth: true
-                            ) {
-                                _ = viewModel.checkIn()
-                            }
-                        } else {
-                            // Already present but someone else rules it
-                            HStack(spacing: 6) {
-                                Image(systemName: "figure.walk")
-                                    .foregroundColor(KingdomTheme.Colors.divider)
-                                Text("You are here")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.divider)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(8)
-                            .background(KingdomTheme.Colors.parchmentMuted)
-                            .cornerRadius(KingdomTheme.CornerRadius.medium)
-                        }
-                    }
-                    .padding(.horizontal)
-                } else {
-                    // Not inside this kingdom
-                    HStack(spacing: 6) {
-                        Image(systemName: "location.circle")
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                        Text("You must travel here first")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                    }
-                    .padding(8)
-                    .padding(.horizontal)
-                }
-                
                 // Action buttons - Medieval war council style (only if kingdom has ruler)
                 if !kingdom.isUnclaimed && kingdom.rulerId != player.playerId {
                     VStack(spacing: 8) {
                         HStack(spacing: 10) {
-                            MedievalActionButton(
-                                title: "⚔️ Declare War",
-                                color: KingdomTheme.Colors.buttonDanger
-                            ) {
+                            Button(action: {
                                 // TODO: Implement declare war
                                 print("Declare war on \(kingdom.name)")
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(.white)
+                                        .font(.caption)
+                                    Text("Declare War")
+                                        .fontWeight(.semibold)
+                                        .font(KingdomTheme.Typography.caption())
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 12)
+                                .background(KingdomTheme.Colors.buttonDanger)
+                                .foregroundColor(.white)
+                                .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
                             
-                            MedievalActionButton(
-                                title: "🤝 Form Alliance",
-                                color: KingdomTheme.Colors.buttonSuccess
-                            ) {
+                            Button(action: {
                                 // TODO: Implement form alliance
                                 print("Form alliance with \(kingdom.name)")
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "hand.raised.fill")
+                                        .foregroundColor(.white)
+                                        .font(.caption)
+                                    Text("Form Alliance")
+                                        .fontWeight(.semibold)
+                                        .font(KingdomTheme.Typography.caption())
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 12)
+                                .background(KingdomTheme.Colors.buttonSuccess)
+                                .foregroundColor(.white)
+                                .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
                         }
                         
-                        MedievalActionButton(
-                            title: "🗡️ Stage Coup",
-                            color: KingdomTheme.Colors.buttonSpecial,
-                            fullWidth: true
-                        ) {
+                        Button(action: {
                             // TODO: Implement stage coup
                             print("Stage coup in \(kingdom.name)")
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "bolt.fill")
+                                    .foregroundColor(.white)
+                                Text("Stage Coup")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(KingdomTheme.Spacing.medium)
+                            .background(KingdomTheme.Colors.buttonSpecial)
+                            .foregroundColor(.white)
+                            .cornerRadius(KingdomTheme.CornerRadius.medium)
                         }
                     }
                     .padding(.horizontal)
@@ -462,12 +501,6 @@ struct KingdomInfoSheetView: View {
             .padding(.top)
         }
         .background(KingdomTheme.Colors.parchment)
-        .onAppear {
-            // Auto-collect income when viewing kingdom (if player is ruler)
-            if kingdom.rulerId == player.playerId {
-                viewModel.autoCollectIncomeForKingdom(kingdom)
-            }
-        }
     }
 }
 
