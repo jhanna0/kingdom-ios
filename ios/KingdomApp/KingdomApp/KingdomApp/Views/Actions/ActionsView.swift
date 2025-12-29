@@ -108,6 +108,89 @@ struct ActionsView: View {
                         
                         // Actions List
                         if let status = actionStatus {
+                            // === TRAINING ACTIONS (Only if purchased) ===
+                            
+                            let hasAnyTrainingSessions = (status.trainAttack.sessionsAvailable ?? 0) > 0 ||
+                                                         (status.trainDefense.sessionsAvailable ?? 0) > 0 ||
+                                                         (status.trainLeadership.sessionsAvailable ?? 0) > 0 ||
+                                                         (status.trainBuilding.sessionsAvailable ?? 0) > 0
+                            
+                            if hasAnyTrainingSessions {
+                                Divider()
+                                    .padding(.horizontal)
+                                
+                                Text("Character Training")
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.top, KingdomTheme.Spacing.medium)
+                                
+                                Text("Train your skills to improve your character (2 hour cooldown)")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.bottom, KingdomTheme.Spacing.small)
+                                
+                                // Training Actions - only show if sessions available
+                                if (status.trainAttack.sessionsAvailable ?? 0) > 0 {
+                                    TrainingActionCard(
+                                        title: "Train Attack",
+                                        icon: "bolt.fill",
+                                        description: "Improve offensive strength (+25 XP)",
+                                        status: status.trainAttack,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
+                                        currentStat: status.trainAttack.currentStat ?? 1,
+                                        isEnabled: currentKingdom != nil,
+                                        onAction: { performTrainAttack() }
+                                    )
+                                }
+                                
+                                if (status.trainDefense.sessionsAvailable ?? 0) > 0 {
+                                    TrainingActionCard(
+                                        title: "Train Defense",
+                                        icon: "shield.fill",
+                                        description: "Improve defensive capability (+25 XP)",
+                                        status: status.trainDefense,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
+                                        currentStat: status.trainDefense.currentStat ?? 1,
+                                        isEnabled: currentKingdom != nil,
+                                        onAction: { performTrainDefense() }
+                                    )
+                                }
+                                
+                                if (status.trainLeadership.sessionsAvailable ?? 0) > 0 {
+                                    TrainingActionCard(
+                                        title: "Train Leadership",
+                                        icon: "crown.fill",
+                                        description: "Improve vote weight (+25 XP)",
+                                        status: status.trainLeadership,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
+                                        currentStat: status.trainLeadership.currentStat ?? 1,
+                                        isEnabled: currentKingdom != nil,
+                                        onAction: { performTrainLeadership() }
+                                    )
+                                }
+                                
+                                if (status.trainBuilding.sessionsAvailable ?? 0) > 0 {
+                                    TrainingActionCard(
+                                        title: "Train Building",
+                                        icon: "hammer.fill",
+                                        description: "Reduce building costs (+25 XP)",
+                                        status: status.trainBuilding,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
+                                        currentStat: status.trainBuilding.currentStat ?? 1,
+                                        isEnabled: currentKingdom != nil,
+                                        onAction: { performTrainBuilding() }
+                                    )
+                                }
+                            }
+                            
                             if isInHomeKingdom {
                                 // === BENEFICIAL ACTIONS (Home Kingdom) ===
                                 
@@ -489,6 +572,160 @@ struct ActionsView: View {
     private func stopUIUpdateTimer() {
         // Timer will be deallocated when view disappears
     }
+    
+    // MARK: - Training Actions
+    
+    private func performTrainAttack() {
+        Task {
+            do {
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.trainAttack()
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: 0,
+                            reputationReward: 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: viewModel.player.gold,
+                            previousReputation: viewModel.player.reputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performTrainDefense() {
+        Task {
+            do {
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.trainDefense()
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: 0,
+                            reputationReward: 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: viewModel.player.gold,
+                            previousReputation: viewModel.player.reputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performTrainLeadership() {
+        Task {
+            do {
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.trainLeadership()
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: 0,
+                            reputationReward: 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: viewModel.player.gold,
+                            previousReputation: viewModel.player.reputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performTrainBuilding() {
+        Task {
+            do {
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.trainBuilding()
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: 0,
+                            reputationReward: 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: viewModel.player.gold,
+                            previousReputation: viewModel.player.reputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Work Contract Card
@@ -749,6 +986,103 @@ struct CooldownTimer: View {
         .padding()
         .background(KingdomTheme.Colors.parchmentDark)
         .cornerRadius(KingdomTheme.CornerRadius.medium)
+    }
+}
+
+// MARK: - Training Action Card
+
+struct TrainingActionCard: View {
+    let title: String
+    let icon: String
+    let description: String
+    let status: ActionStatus
+    let fetchedAt: Date
+    let currentTime: Date
+    let currentStat: Int
+    let isEnabled: Bool
+    let onAction: () -> Void
+    
+    var calculatedSecondsRemaining: Int {
+        let elapsed = currentTime.timeIntervalSince(fetchedAt)
+        let remaining = max(0, Double(status.secondsRemaining) - elapsed)
+        return Int(remaining)
+    }
+    
+    var isReady: Bool {
+        return status.ready || calculatedSecondsRemaining <= 0
+    }
+    
+    var sessionsAvailable: Int {
+        return status.sessionsAvailable ?? 0
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(isReady && sessionsAvailable > 0 ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text(description)
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Level \(currentStat)")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .fontWeight(.semibold)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "ticket.fill")
+                            .font(.caption2)
+                        Text("\(sessionsAvailable)")
+                            .font(KingdomTheme.Typography.caption())
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(sessionsAvailable > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.textMuted)
+                }
+            }
+            
+            if sessionsAvailable == 0 {
+                Text("No sessions available. Purchase training in Character Sheet")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else if isReady && isEnabled {
+                Button(action: onAction) {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("Train Now")
+                    }
+                }
+                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+            } else if !isEnabled {
+                Text("Check in to a kingdom first")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else {
+                CooldownTimer(secondsRemaining: calculatedSecondsRemaining)
+            }
+        }
+        .padding()
+        .parchmentCard()
+        .padding(.horizontal)
     }
 }
 

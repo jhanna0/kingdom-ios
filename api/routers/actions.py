@@ -79,6 +79,7 @@ def get_action_status(
     sabotage_cooldown = 1440  # 24 hours (once per day)
     mine_cooldown = 1440  # 24 hours (once per day)
     scout_cooldown = 1440  # 24 hours (once per day)
+    training_cooldown = 120  # 2 hours for training actions
     
     # Count active patrollers in current kingdom
     active_patrollers = 0
@@ -120,6 +121,34 @@ def get_action_status(
         "scout": {
             **check_cooldown(state.last_scout_action, scout_cooldown),
             "cooldown_minutes": scout_cooldown
+        },
+        "train_attack": {
+            **check_cooldown(state.last_train_attack_action, training_cooldown),
+            "cooldown_minutes": training_cooldown,
+            "current_stat": state.attack_power,
+            "sessions_available": state.training_sessions_attack,
+            "purchase_cost": calculate_training_cost(state.attack_power)
+        },
+        "train_defense": {
+            **check_cooldown(state.last_train_defense_action, training_cooldown),
+            "cooldown_minutes": training_cooldown,
+            "current_stat": state.defense_power,
+            "sessions_available": state.training_sessions_defense,
+            "purchase_cost": calculate_training_cost(state.defense_power)
+        },
+        "train_leadership": {
+            **check_cooldown(state.last_train_leadership_action, training_cooldown),
+            "cooldown_minutes": training_cooldown,
+            "current_stat": state.leadership,
+            "sessions_available": state.training_sessions_leadership,
+            "purchase_cost": calculate_training_cost(state.leadership)
+        },
+        "train_building": {
+            **check_cooldown(state.last_train_building_action, training_cooldown),
+            "cooldown_minutes": training_cooldown,
+            "current_stat": state.building_skill,
+            "sessions_available": state.training_sessions_building,
+            "purchase_cost": calculate_training_cost(state.building_skill)
         },
         "contracts": contracts
     }
@@ -434,6 +463,425 @@ def scout_kingdom(
             "gold": 10,  # Small reward for scouting
             "reputation": None,
             "iron": None
+        }
+    }
+
+
+# ===== Training Actions =====
+
+def calculate_training_cost(stat_level: int) -> int:
+    """Calculate gold cost to purchase training based on current stat level
+    
+    Formula: 100 * (level^1.5)
+    Level 1→2: 100g
+    Level 5→6: 559g
+    Level 10→11: 1581g
+    """
+    return int(100.0 * pow(float(stat_level), 1.5))
+
+
+# ===== Purchase Training Sessions =====
+
+@router.post("/train/attack/purchase")
+def purchase_attack_training(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Purchase an attack training session (costs gold)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    # Calculate gold cost
+    training_cost = calculate_training_cost(state.attack_power)
+    if state.gold < training_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
+        )
+    
+    # Purchase training session
+    state.gold -= training_cost
+    state.training_sessions_attack += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Purchased attack training session for {training_cost}g",
+        "training_type": "attack",
+        "cost": training_cost,
+        "sessions_available": state.training_sessions_attack
+    }
+
+
+@router.post("/train/attack")
+def train_attack(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Perform attack training (requires purchased session, 2 hour cooldown)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    # Check if user has a training session
+    if state.training_sessions_attack <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No attack training sessions available. Purchase one first!"
+        )
+    
+    # Check cooldown
+    cooldown_status = check_cooldown(state.last_train_attack_action, 120)  # 2 hours
+    if not DEV_MODE and not cooldown_status["ready"]:
+        hours = cooldown_status["seconds_remaining"] // 3600
+        minutes = (cooldown_status["seconds_remaining"] % 3600) // 60
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Training on cooldown. Wait {hours}h {minutes}m"
+        )
+    
+    # Check if user is checked in
+    if not state.current_kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must be checked into a kingdom to train"
+        )
+    
+    # Consume session and train!
+    state.training_sessions_attack -= 1
+    state.attack_power += 1
+    state.last_train_attack_action = datetime.utcnow()
+    
+    # Award XP for training
+    xp_earned = 25
+    state.experience += xp_earned
+    
+    # Check for level up
+    xp_needed = 100 * (2 ** (state.level - 1))
+    if state.experience >= xp_needed:
+        state.level += 1
+        state.skill_points += 3
+        state.experience -= xp_needed
+        state.gold += 50  # Bonus gold on level up
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Combat training complete! Attack Power increased to {state.attack_power}",
+        "stat_type": "attack",
+        "new_value": state.attack_power,
+        "sessions_remaining": state.training_sessions_attack,
+        "next_train_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=2)),
+        "rewards": {
+            "gold": None,
+            "reputation": None,
+            "experience": xp_earned
+        }
+    }
+
+
+@router.post("/train/defense/purchase")
+def purchase_defense_training(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Purchase a defense training session (costs gold)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    training_cost = calculate_training_cost(state.defense_power)
+    if state.gold < training_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
+        )
+    
+    state.gold -= training_cost
+    state.training_sessions_defense += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Purchased defense training session for {training_cost}g",
+        "training_type": "defense",
+        "cost": training_cost,
+        "sessions_available": state.training_sessions_defense
+    }
+
+
+@router.post("/train/defense")
+def train_defense(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Perform defense training (requires purchased session, 2 hour cooldown)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    if state.training_sessions_defense <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No defense training sessions available. Purchase one first!"
+        )
+    
+    cooldown_status = check_cooldown(state.last_train_defense_action, 120)
+    if not DEV_MODE and not cooldown_status["ready"]:
+        hours = cooldown_status["seconds_remaining"] // 3600
+        minutes = (cooldown_status["seconds_remaining"] % 3600) // 60
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Training on cooldown. Wait {hours}h {minutes}m"
+        )
+    
+    if not state.current_kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must be checked into a kingdom to train"
+        )
+    
+    state.training_sessions_defense -= 1
+    state.defense_power += 1
+    state.last_train_defense_action = datetime.utcnow()
+    
+    xp_earned = 25
+    state.experience += xp_earned
+    
+    xp_needed = 100 * (2 ** (state.level - 1))
+    if state.experience >= xp_needed:
+        state.level += 1
+        state.skill_points += 3
+        state.experience -= xp_needed
+        state.gold += 50
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Defense training complete! Defense Power increased to {state.defense_power}",
+        "stat_type": "defense",
+        "new_value": state.defense_power,
+        "sessions_remaining": state.training_sessions_defense,
+        "next_train_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=2)),
+        "rewards": {
+            "gold": None,
+            "reputation": None,
+            "experience": xp_earned
+        }
+    }
+
+
+@router.post("/train/leadership/purchase")
+def purchase_leadership_training(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Purchase a leadership training session (costs gold)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    training_cost = calculate_training_cost(state.leadership)
+    if state.gold < training_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
+        )
+    
+    state.gold -= training_cost
+    state.training_sessions_leadership += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Purchased leadership training session for {training_cost}g",
+        "training_type": "leadership",
+        "cost": training_cost,
+        "sessions_available": state.training_sessions_leadership
+    }
+
+
+@router.post("/train/leadership")
+def train_leadership(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Perform leadership training (requires purchased session, 2 hour cooldown)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    if state.training_sessions_leadership <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No leadership training sessions available. Purchase one first!"
+        )
+    
+    cooldown_status = check_cooldown(state.last_train_leadership_action, 120)
+    if not DEV_MODE and not cooldown_status["ready"]:
+        hours = cooldown_status["seconds_remaining"] // 3600
+        minutes = (cooldown_status["seconds_remaining"] % 3600) // 60
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Training on cooldown. Wait {hours}h {minutes}m"
+        )
+    
+    if not state.current_kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must be checked into a kingdom to train"
+        )
+    
+    state.training_sessions_leadership -= 1
+    state.leadership += 1
+    state.last_train_leadership_action = datetime.utcnow()
+    
+    xp_earned = 25
+    state.experience += xp_earned
+    
+    xp_needed = 100 * (2 ** (state.level - 1))
+    if state.experience >= xp_needed:
+        state.level += 1
+        state.skill_points += 3
+        state.experience -= xp_needed
+        state.gold += 50
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Leadership training complete! Leadership increased to {state.leadership}",
+        "stat_type": "leadership",
+        "new_value": state.leadership,
+        "sessions_remaining": state.training_sessions_leadership,
+        "next_train_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=2)),
+        "rewards": {
+            "gold": None,
+            "reputation": None,
+            "experience": xp_earned
+        }
+    }
+
+
+@router.post("/train/building/purchase")
+def purchase_building_training(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Purchase a building training session (costs gold)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    training_cost = calculate_training_cost(state.building_skill)
+    if state.gold < training_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
+        )
+    
+    state.gold -= training_cost
+    state.training_sessions_building += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Purchased building training session for {training_cost}g",
+        "training_type": "building",
+        "cost": training_cost,
+        "sessions_available": state.training_sessions_building
+    }
+
+
+@router.post("/train/building")
+def train_building(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Perform building training (requires purchased session, 2 hour cooldown)"""
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    if state.training_sessions_building <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No building training sessions available. Purchase one first!"
+        )
+    
+    cooldown_status = check_cooldown(state.last_train_building_action, 120)
+    if not DEV_MODE and not cooldown_status["ready"]:
+        hours = cooldown_status["seconds_remaining"] // 3600
+        minutes = (cooldown_status["seconds_remaining"] % 3600) // 60
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Training on cooldown. Wait {hours}h {minutes}m"
+        )
+    
+    if not state.current_kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must be checked into a kingdom to train"
+        )
+    
+    state.training_sessions_building -= 1
+    state.building_skill += 1
+    state.last_train_building_action = datetime.utcnow()
+    
+    xp_earned = 25
+    state.experience += xp_earned
+    
+    xp_needed = 100 * (2 ** (state.level - 1))
+    if state.experience >= xp_needed:
+        state.level += 1
+        state.skill_points += 3
+        state.experience -= xp_needed
+        state.gold += 50
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Building training complete! Building Skill increased to {state.building_skill}",
+        "stat_type": "building",
+        "new_value": state.building_skill,
+        "sessions_remaining": state.training_sessions_building,
+        "next_train_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=2)),
+        "rewards": {
+            "gold": None,
+            "reputation": None,
+            "experience": xp_earned
         }
     }
 

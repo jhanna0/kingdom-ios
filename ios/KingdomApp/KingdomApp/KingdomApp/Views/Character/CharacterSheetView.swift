@@ -5,6 +5,8 @@ import SwiftUI
 struct CharacterSheetView: View {
     @ObservedObject var player: Player
     @Environment(\.dismiss) var dismiss
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         ScrollView {
@@ -18,8 +20,8 @@ struct CharacterSheetView: View {
                 // Combat stats section
                 combatStatsCard
                 
-                // Training section
-                trainingCard
+                // Info card about training
+                trainingInfoCard
             }
             .padding()
         }
@@ -193,7 +195,7 @@ struct CharacterSheetView: View {
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             statRow(
-                icon: "⚔️",
+                iconName: "bolt.fill",
                 name: "Attack Power",
                 value: player.attackPower,
                 description: "Offensive strength in coups"
@@ -202,7 +204,7 @@ struct CharacterSheetView: View {
             Divider()
             
             statRow(
-                icon: "🛡️",
+                iconName: "shield.fill",
                 name: "Defense Power",
                 value: player.defensePower,
                 description: "Defend against coups"
@@ -211,7 +213,7 @@ struct CharacterSheetView: View {
             Divider()
             
             statRow(
-                icon: "👑",
+                iconName: "crown.fill",
                 name: "Leadership",
                 value: player.leadership,
                 description: "Bonus to vote weight"
@@ -220,7 +222,7 @@ struct CharacterSheetView: View {
             Divider()
             
             statRow(
-                icon: "🏗️",
+                iconName: "hammer.fill",
                 name: "Building Skill",
                 value: player.buildingSkill,
                 description: "\(Int(player.getBuildingCostDiscount() * 100))% cost reduction"
@@ -235,131 +237,115 @@ struct CharacterSheetView: View {
         )
     }
     
-    // MARK: - Training Card
+    // MARK: - Training Info Card
     
-    private var trainingCard: some View {
+    private var trainingInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Training")
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("Character Progression")
                     .font(.headline)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
-                Text("\(player.gold)💰")
-                    .font(.headline.monospacedDigit())
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                HStack(spacing: 4) {
+                    Text("\(player.gold)")
+                        .font(.headline.monospacedDigit())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 6))
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
             }
             
-            Text("Manage your gold wisely - invest in power or save for other opportunities")
+            Text("Purchase training sessions here, then perform them in the Actions page (2 hour cooldown per training)")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            
-            Divider()
-            
-            // Purchase XP Section
-            VStack(alignment: .leading, spacing: 8) {
-                Text("📚 Purchase Experience")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("Buy XP to level up and earn skill points")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                
-                HStack(spacing: 8) {
-                    xpPurchaseButton(xp: 10, cost: 100, label: "Small")
-                    xpPurchaseButton(xp: 50, cost: 500, label: "Medium")
-                    xpPurchaseButton(xp: 100, cost: 1000, label: "Large")
-                }
-            }
-            
-            Divider()
-            
-            // Direct Stat Training (More expensive than XP route)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("⚔️ Direct Training")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("Instant stat increases (more expensive)")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            }
-            
-            // Train Attack
-            trainingButton(
-                icon: "⚔️",
-                name: "Train Attack",
-                cost: player.getAttackTrainingCost(),
-                currentValue: player.attackPower,
-                canAfford: player.gold >= player.getAttackTrainingCost()
-            ) {
-                if player.trainAttack() {
-                    // Success feedback (could add haptics here)
-                }
-            }
-            
-            // Train Defense
-            trainingButton(
-                icon: "🛡️",
-                name: "Train Defense",
-                cost: player.getDefenseTrainingCost(),
-                currentValue: player.defensePower,
-                canAfford: player.gold >= player.getDefenseTrainingCost()
-            ) {
-                if player.trainDefense() {
-                    // Success feedback
-                }
-            }
-            
-            // Train Leadership
-            trainingButton(
-                icon: "👑",
-                name: "Train Leadership",
-                cost: player.getLeadershipTrainingCost(),
-                currentValue: player.leadership,
-                canAfford: player.gold >= player.getLeadershipTrainingCost()
-            ) {
-                if player.trainLeadership() {
-                    // Success feedback
-                }
-            }
-            
-            // Train Building
-            trainingButton(
-                icon: "🏗️",
-                name: "Train Building",
-                cost: player.getBuildingTrainingCost(),
-                currentValue: player.buildingSkill,
-                canAfford: player.gold >= player.getBuildingTrainingCost()
-            ) {
-                if player.trainBuilding() {
-                    // Success feedback
-                }
-            }
             
             if player.skillPoints > 0 {
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Skill Points: \(player.skillPoints)")
-                        .font(.subheadline.bold())
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                    HStack {
+                        Text("Skill Points Available")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        
+                        Spacer()
+                        
+                        Text("\(player.skillPoints)")
+                            .font(.title3.bold())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                    }
                     
-                    Text("Use skill points to increase stats for free!")
+                    Text("Use skill points to instantly increase any stat (free!)")
                         .font(.caption)
                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                     
                     VStack(spacing: 8) {
                         HStack(spacing: 12) {
-                            skillPointButton(icon: "⚔️", stat: .attack)
-                            skillPointButton(icon: "🛡️", stat: .defense)
+                            skillPointButton(iconName: "bolt.fill", stat: .attack)
+                            skillPointButton(iconName: "shield.fill", stat: .defense)
                         }
                         HStack(spacing: 12) {
-                            skillPointButton(icon: "👑", stat: .leadership)
-                            skillPointButton(icon: "🏗️", stat: .building)
+                            skillPointButton(iconName: "crown.fill", stat: .leadership)
+                            skillPointButton(iconName: "hammer.fill", stat: .building)
                         }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Purchase Training Sessions")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("Buy training to perform in Actions page")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                
+                VStack(spacing: 8) {
+                    purchaseTrainingButton(
+                        iconName: "bolt.fill",
+                        statName: "Attack",
+                        currentValue: player.attackPower,
+                        cost: player.getAttackTrainingCost()
+                    ) {
+                        purchaseTraining(type: "attack")
+                    }
+                    
+                    purchaseTrainingButton(
+                        iconName: "shield.fill",
+                        statName: "Defense",
+                        currentValue: player.defensePower,
+                        cost: player.getDefenseTrainingCost()
+                    ) {
+                        purchaseTraining(type: "defense")
+                    }
+                    
+                    purchaseTrainingButton(
+                        iconName: "crown.fill",
+                        statName: "Leadership",
+                        currentValue: player.leadership,
+                        cost: player.getLeadershipTrainingCost()
+                    ) {
+                        purchaseTraining(type: "leadership")
+                    }
+                    
+                    purchaseTrainingButton(
+                        iconName: "hammer.fill",
+                        statName: "Building",
+                        currentValue: player.buildingSkill,
+                        cost: player.getBuildingTrainingCost()
+                    ) {
+                        purchaseTraining(type: "building")
                     }
                 }
             }
@@ -371,6 +357,11 @@ struct CharacterSheetView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
         )
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
     }
     
     // MARK: - Helper Views
@@ -394,10 +385,12 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func statRow(icon: String, name: String, value: Int, description: String) -> some View {
+    private func statRow(iconName: String, name: String, value: Int, description: String) -> some View {
         HStack(spacing: 12) {
-            Text(icon)
+            Image(systemName: iconName)
                 .font(.title2)
+                .foregroundColor(KingdomTheme.Colors.gold)
+                .frame(width: 30)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
@@ -417,53 +410,14 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func trainingButton(
-        icon: String,
-        name: String,
-        cost: Int,
-        currentValue: Int,
-        canAfford: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(icon)
-                    .font(.title3)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.subheadline.bold())
-                    
-                    Text("\(currentValue) → \(currentValue + 1)")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                Text("\(cost)💰")
-                    .font(.subheadline.bold().monospacedDigit())
-                    .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)
-            }
-            .padding()
-            .background(canAfford ? KingdomTheme.Colors.inkDark.opacity(0.05) : KingdomTheme.Colors.inkDark.opacity(0.02))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(canAfford ? KingdomTheme.Colors.inkDark.opacity(0.3) : .red.opacity(0.3), lineWidth: 1)
-            )
-        }
-        .disabled(!canAfford)
-        .foregroundColor(KingdomTheme.Colors.inkDark)
-    }
-    
-    private func skillPointButton(icon: String, stat: Player.SkillStat) -> some View {
+    private func skillPointButton(iconName: String, stat: Player.SkillStat) -> some View {
         Button {
             player.useSkillPoint(on: stat)
         } label: {
             VStack(spacing: 4) {
-                Text(icon)
+                Image(systemName: iconName)
                     .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
                 
                 Text("+1")
                     .font(.caption.bold())
@@ -480,25 +434,43 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func xpPurchaseButton(xp: Int, cost: Int, label: String) -> some View {
-        Button {
-            _ = player.purchaseXP(amount: xp)
-        } label: {
-            VStack(spacing: 4) {
-                Text(label)
-                    .font(.caption.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+    private func purchaseTrainingButton(
+        iconName: String,
+        statName: String,
+        currentValue: Int,
+        cost: Int,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    .frame(width: 24)
                 
-                Text("+\(xp) XP")
-                    .font(.caption2)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(statName) Training")
+                        .font(.subheadline.bold())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Current: \(currentValue)")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                }
                 
-                Text("\(cost)💰")
-                    .font(.caption.bold().monospacedDigit())
-                    .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : .red)
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Text("\(cost)")
+                        .font(.subheadline.bold().monospacedDigit())
+                        .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : .red)
+                    
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 6))
+                        .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : .red)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding()
             .background(player.gold >= cost ? KingdomTheme.Colors.inkDark.opacity(0.05) : KingdomTheme.Colors.inkDark.opacity(0.02))
             .cornerRadius(8)
             .overlay(
@@ -507,6 +479,47 @@ struct CharacterSheetView: View {
             )
         }
         .disabled(player.gold < cost)
+    }
+    
+    private func purchaseTraining(type: String) {
+        Task {
+            do {
+                let api = KingdomAPIService.shared.actions
+                
+                // Purchase the training
+                switch type {
+                case "attack":
+                    _ = try await api.purchaseAttackTraining()
+                case "defense":
+                    _ = try await api.purchaseDefenseTraining()
+                case "leadership":
+                    _ = try await api.purchaseLeadershipTraining()
+                case "building":
+                    _ = try await api.purchaseBuildingTraining()
+                default:
+                    break
+                }
+                
+                // Refresh player state from backend to get updated gold and sessions
+                let playerState = try await KingdomAPIService.shared.player.loadState()
+                await MainActor.run {
+                    player.updateFromAPIState(playerState)
+                    
+                    // Haptic feedback for success
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    
+                    // Haptic feedback for error
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
     }
     
     // MARK: - Helper Functions
