@@ -14,26 +14,57 @@ struct KingdomAppApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authManager.isAuthenticated {
-                ContentView()
-                    .environmentObject(authManager)
-                    .environmentObject(appInit)
-                    .task {
-                        // Initialize app data when authenticated
-                        await appInit.initialize()
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                if authManager.isAuthenticated {
+                    AuthenticatedView()
+                        .environmentObject(authManager)
+                        .environmentObject(appInit)
+                } else if authManager.needsOnboarding {
+                    OnboardingView()
+                        .environmentObject(authManager)
+                } else if !authManager.isCheckingAuth {
+                    AuthView()
+                        .environmentObject(authManager)
+                }
+            }
+        }
+    }
+}
+
+struct AuthenticatedView: View {
+    @EnvironmentObject var appInit: AppInitService
+    @StateObject private var viewModel = MapViewModel()
+    @State private var hasLoadedInitially = false
+    
+    var body: some View {
+        ZStack {
+            MapView(viewModel: viewModel)
+                .ignoresSafeArea()
+                .opacity(hasLoadedInitially ? 1 : 0)
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    Task {
+                        await appInit.refresh()
                     }
-                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                        // Refresh when app comes to foreground
-                        Task {
-                            await appInit.refresh()
-                        }
-                    }
-            } else if authManager.needsOnboarding {
-                OnboardingView()
-                    .environmentObject(authManager)
-            } else {
-                AuthView()
-                    .environmentObject(authManager)
+                }
+            
+            // Show loading screen until initial load completes
+            if !hasLoadedInitially {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    MedievalLoadingView(status: "Loading your kingdom...")
+                }
+            }
+        }
+        .task {
+            await appInit.initialize()
+        }
+        .onChange(of: viewModel.isLoading) { _, isLoading in
+            if !isLoading {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    hasLoadedInitially = true
+                }
             }
         }
     }

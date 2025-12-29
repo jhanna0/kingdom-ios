@@ -6,6 +6,7 @@ import Combine
 class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
     @Published var needsOnboarding = false
+    @Published var isCheckingAuth = true  // NEW: prevents flash
     @Published var authToken: String?
     @Published var currentUser: UserData?
     @Published var errorMessage: String?
@@ -203,6 +204,7 @@ class AuthManager: ObservableObject {
                 }
             }
         }
+        isCheckingAuth = false  // Done checking
     }
 }
 

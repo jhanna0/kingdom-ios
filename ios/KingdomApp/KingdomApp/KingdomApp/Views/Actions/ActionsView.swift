@@ -36,10 +36,7 @@ struct ActionsView: View {
             KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
-            if isLoading && actionStatus == nil {
-                MedievalLoadingView(status: "Loading actions...")
-            } else {
-                ScrollView {
+            ScrollView {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         // Header
                         VStack(spacing: KingdomTheme.Spacing.medium) {
@@ -223,7 +220,6 @@ struct ActionsView: View {
                     }
                     .padding(.vertical)
                 }
-            }
         }
         .navigationTitle("Actions")
         .navigationBarTitleDisplayMode(.inline)

@@ -2,7 +2,7 @@ import SwiftUI
 import MapKit
 
 struct MapView: View {
-    @StateObject private var viewModel = MapViewModel()
+    @ObservedObject var viewModel: MapViewModel
     @StateObject private var locationManager = LocationManager()
     @State private var kingdomForInfoSheet: Kingdom?
     @State private var showMyKingdoms = false
@@ -63,13 +63,6 @@ struct MapView: View {
             .mapControls {
                 MapCompass()
                 MapScaleView()
-            }
-            
-            // Loading overlay - Medieval style
-            if viewModel.isLoading {
-                MedievalLoadingView(status: viewModel.loadingStatus)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.5), value: viewModel.isLoading)
             }
             
             // Error overlay - Medieval style
@@ -344,5 +337,5 @@ struct MapView: View {
 }
 
 #Preview {
-    MapView()
+    MapView(viewModel: MapViewModel())
 }
