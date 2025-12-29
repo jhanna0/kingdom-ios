@@ -37,6 +37,7 @@ class KingdomData(BaseModel):
     vault_level: int
     mine_level: int
     market_level: int
+    farm_level: int = 0
     education_level: int = 0
 
 

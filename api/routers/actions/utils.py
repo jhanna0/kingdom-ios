@@ -50,7 +50,7 @@ def check_cooldown(last_action: datetime, cooldown_minutes: float) -> Dict:
 
 
 def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = 10, 
-                                  sabotage_cooldown: float = 1440, mine_cooldown: float = 1440,
+                                  sabotage_cooldown: float = 1440,
                                   scout_cooldown: float = 1440, training_cooldown: float = 120) -> Dict:
     """Check if ANY action is on cooldown (global action lock)
     
@@ -62,7 +62,6 @@ def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: f
         ("work", state.last_work_action, work_cooldown),
         ("patrol", state.last_patrol_action, patrol_cooldown),
         ("sabotage", state.last_sabotage_action, sabotage_cooldown),
-        ("mine", state.last_mining_action, mine_cooldown),
         ("scout", state.last_scout_action, scout_cooldown),
         ("training", state.last_training_action, training_cooldown),
     ]

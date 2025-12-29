@@ -72,6 +72,8 @@ class CityAPI {
                 kingdom.vaultLevel = kingdomData.vault_level
                 kingdom.mineLevel = kingdomData.mine_level
                 kingdom.marketLevel = kingdomData.market_level
+                kingdom.farmLevel = kingdomData.farm_level
+                kingdom.educationLevel = kingdomData.education_level
                 kingdom.checkedInPlayers = kingdomData.population
             }
             

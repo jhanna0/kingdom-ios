@@ -255,21 +255,6 @@ struct ActionsView: View {
                                     onAction: { performPatrol() }
                                 )
                                 
-                                // Mine Resources
-                                ActionCard(
-                                    title: "Mine Resources",
-                                    icon: "hammer.circle.fill",
-                                    description: "Collect iron from the kingdom mine",
-                                    status: status.mine,
-                                    fetchedAt: statusFetchedAt ?? Date(),
-                                    currentTime: currentTime,
-                                    actionType: .mine,
-                                    isEnabled: true,
-                                    activeCount: nil,
-                                    globalCooldownActive: !status.globalCooldown.ready,
-                                    onAction: { performMine() }
-                                )
-                                
                             } else if isInEnemyKingdom {
                                 // === MALICIOUS ACTIONS (Enemy Kingdom) ===
                                 
@@ -497,47 +482,6 @@ struct ActionsView: View {
         }
     }
     
-    private func performMine() {
-        Task {
-            do {
-                // Capture state before action
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.mineResources()
-                
-                // Refresh player state from backend (which has updated values)
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: rewards.gold ?? 0,
-                            reputationReward: rewards.reputation ?? 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: previousGold,
-                            previousReputation: previousReputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,  // Updated from backend
-                            currentReputation: viewModel.player.reputation,  // Updated from backend
-                            currentExperience: viewModel.player.experience  // Updated from backend
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
     
     private func performScout() {
         guard let kingdomId = currentKingdom?.id else { return }
@@ -796,7 +740,7 @@ struct WorkContractCard: View {
 // MARK: - Action Card
 
 enum ActionType {
-    case work, patrol, mine, scout, sabotage
+    case work, patrol, scout, sabotage
 }
 
 struct ActionCard: View {

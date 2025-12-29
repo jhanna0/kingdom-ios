@@ -17,6 +17,7 @@ struct ContractCreationView: View {
         case .vault: return "Vault"
         case .mine: return "Mine"
         case .market: return "Market"
+        case .farm: return "Farm"
         case .education: return "Education"
         }
     }
@@ -27,6 +28,7 @@ struct ContractCreationView: View {
         case .vault: return kingdom.vaultLevel
         case .mine: return kingdom.mineLevel
         case .market: return kingdom.marketLevel
+        case .farm: return kingdom.farmLevel
         case .education: return kingdom.educationLevel
         }
     }

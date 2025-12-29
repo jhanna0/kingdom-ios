@@ -421,12 +421,17 @@ class MapViewModel: ObservableObject {
         case .mine:
             if kingdoms[index].mineLevel < 5 {
                 kingdoms[index].mineLevel += 1
-                print("⛏️ Upgraded mine to level \(kingdoms[index].mineLevel) (+income)")
+                print("⛏️ Upgraded mine to level \(kingdoms[index].mineLevel) (unlocks materials)")
             }
         case .market:
             if kingdoms[index].marketLevel < 5 {
                 kingdoms[index].marketLevel += 1
                 print("🏪 Upgraded market to level \(kingdoms[index].marketLevel) (+income)")
+            }
+        case .farm:
+            if kingdoms[index].farmLevel < 5 {
+                kingdoms[index].farmLevel += 1
+                print("🌾 Upgraded farm to level \(kingdoms[index].farmLevel) (faster contracts)")
             }
         case .education:
             if kingdoms[index].educationLevel < 5 {
@@ -672,6 +677,8 @@ class MapViewModel: ObservableObject {
             return ("Mine", kingdom.mineLevel)
         case .market:
             return ("Market", kingdom.marketLevel)
+        case .farm:
+            return ("Farm", kingdom.farmLevel)
         case .education:
             return ("Education", kingdom.educationLevel)
         }

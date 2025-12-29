@@ -72,6 +72,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Economic buildings (generate passive income)
     var mineLevel: Int
     var marketLevel: Int
+    var farmLevel: Int  // Speeds up contract completion
     var educationLevel: Int  // Reduces training actions required
     
     // Tax system (0-100%)
@@ -125,6 +126,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.checkedInPlayers = Int.random(in: 0...5)
         self.mineLevel = Int.random(in: 0...2)
         self.marketLevel = Int.random(in: 0...2)
+        self.farmLevel = 0  // Start at 0
         self.educationLevel = 0  // Start at 0
         self.taxRate = Int.random(in: 5...20)  // Random starting tax rate
         self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
@@ -191,18 +193,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         // Each unique player who checked in this week adds 5 gold/day
         let populationBonus = weeklyUniqueCheckIns * 5
         
-        // Building bonuses
-        let mineBonus: Int = {
-            switch mineLevel {
-            case 1: return 10
-            case 2: return 25
-            case 3: return 50
-            case 4: return 80
-            case 5: return 120
-            default: return 0
-            }
-        }()
-        
+        // Market generates passive income
         let marketBonus: Int = {
             switch marketLevel {
             case 1: return 15
@@ -214,7 +205,49 @@ struct Kingdom: Identifiable, Equatable, Hashable {
             }
         }()
         
-        return baseIncome + populationBonus + mineBonus + marketBonus
+        return baseIncome + populationBonus + marketBonus
+    }
+    
+    // MARK: - Material Availability
+    
+    /// Get available materials based on mine level
+    func getAvailableMaterials() -> [String] {
+        switch mineLevel {
+        case 0: return []
+        case 1: return ["stone"]
+        case 2: return ["stone", "iron"]
+        case 3: return ["stone", "iron", "steel"]
+        case 4: return ["stone", "iron", "steel", "titanium"]
+        case 5: return ["stone", "iron", "steel", "titanium"]
+        default: return []
+        }
+    }
+    
+    /// Get material cost in gold
+    func getMaterialCost(material: String) -> Int {
+        switch material.lowercased() {
+        case "stone": return 10
+        case "iron": return 25
+        case "steel": return 50
+        case "titanium": return 100
+        default: return 0
+        }
+    }
+    
+    /// Get purchase quantity multiplier based on market level
+    func getPurchaseQuantityMultiplier() -> Double {
+        switch marketLevel {
+        case 0: return 0.0  // No market = can't buy
+        case 1, 2: return 1.0
+        case 3, 4: return 1.5
+        case 5: return 2.0
+        default: return 1.0
+        }
+    }
+    
+    /// Check if materials can be purchased (requires market T1+)
+    var canPurchaseMaterials: Bool {
+        return marketLevel >= 1
     }
     
     /// Calculate hourly income (for real-time display)

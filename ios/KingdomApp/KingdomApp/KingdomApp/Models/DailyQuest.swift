@@ -4,7 +4,6 @@ import Foundation
 // Ruler-issued objectives for kingdom subjects
 
 enum QuestType: String, Codable, CaseIterable {
-    case mineResources = "Mine Resources"
     case craftWeapons = "Craft Weapons"
     case craftArmor = "Craft Armor"
     case maintainStreak = "Maintain Check-in Streak"
@@ -12,10 +11,10 @@ enum QuestType: String, Codable, CaseIterable {
     case prepareForWar = "Prepare for War"
     case defendKingdom = "Defend the Realm"
     case tradeGoods = "Complete Trades"
+    case gatherMaterials = "Gather Materials"
     
     var icon: String {
         switch self {
-        case .mineResources: return "⛏️"
         case .craftWeapons: return "🗡️"
         case .craftArmor: return "🛡️"
         case .maintainStreak: return "🔥"
@@ -23,12 +22,12 @@ enum QuestType: String, Codable, CaseIterable {
         case .prepareForWar: return "⚔️"
         case .defendKingdom: return "🏰"
         case .tradeGoods: return "💰"
+        case .gatherMaterials: return "📦"
         }
     }
     
     var description: String {
         switch self {
-        case .mineResources: return "Gather iron and steel from the mines"
         case .craftWeapons: return "Forge weapons for the kingdom's arsenal"
         case .craftArmor: return "Create protective equipment"
         case .maintainStreak: return "Check in daily without missing a day"
@@ -36,6 +35,7 @@ enum QuestType: String, Codable, CaseIterable {
         case .prepareForWar: return "Ready yourself for the coming battle"
         case .defendKingdom: return "Stand ready to defend against attacks"
         case .tradeGoods: return "Engage in commerce with fellow subjects"
+        case .gatherMaterials: return "Purchase materials from the market"
         }
     }
 }
@@ -109,10 +109,10 @@ struct DailyQuest: Identifiable, Codable, Hashable {
     
     // MARK: - Factory Methods
     
-    static func createMiningQuest(
+    static func createMaterialGatheringQuest(
         kingdomId: String,
         kingdomName: String,
-        targetIron: Int,
+        targetMaterials: Int,
         goldReward: Int,
         createdBy: String
     ) -> DailyQuest {
@@ -120,12 +120,12 @@ struct DailyQuest: Identifiable, Codable, Hashable {
             id: UUID().uuidString,
             kingdomId: kingdomId,
             kingdomName: kingdomName,
-            type: .mineResources,
+            type: .gatherMaterials,
             scope: .collective,
-            title: "Mine \(targetIron) Iron This Week",
-            description: "The forges hunger for ore! All subjects contribute to the mining quota.",
-            targetAmount: targetIron,
-            targetUnit: "iron",
+            title: "Purchase \(targetMaterials) Materials This Week",
+            description: "Support the kingdom economy! Buy materials from the market.",
+            targetAmount: targetMaterials,
+            targetUnit: "materials",
             goldReward: goldReward,
             reputationReward: 10,
             createdAt: Date(),
@@ -243,12 +243,12 @@ extension DailyQuest {
             id: UUID().uuidString,
             kingdomId: "kingdom1",
             kingdomName: "Ashford",
-            type: .mineResources,
+            type: .gatherMaterials,
             scope: .collective,
-            title: "Mine 100 Iron This Week",
-            description: "The forges hunger for ore!",
+            title: "Purchase 100 Materials This Week",
+            description: "Support the kingdom economy!",
             targetAmount: 100,
-            targetUnit: "iron",
+            targetUnit: "materials",
             goldReward: 500,
             reputationReward: 10,
             currentProgress: 45,

@@ -31,7 +31,6 @@ def get_action_status(
     work_cooldown = calculate_cooldown(120, state.building_skill)  # Base 2 hours
     patrol_cooldown = 10  # Always 10 minutes
     sabotage_cooldown = 1440  # 24 hours (once per day)
-    mine_cooldown = 1440  # 24 hours (once per day)
     scout_cooldown = 1440  # 24 hours (once per day)
     training_cooldown = 120  # 2 hours for training actions
     
@@ -59,7 +58,6 @@ def get_action_status(
         work_cooldown, 
         patrol_cooldown, 
         sabotage_cooldown, 
-        mine_cooldown, 
         scout_cooldown, 
         training_cooldown
     )
@@ -79,10 +77,6 @@ def get_action_status(
         "sabotage": {
             **check_cooldown(state.last_sabotage_action, sabotage_cooldown),
             "cooldown_minutes": sabotage_cooldown
-        },
-        "mine": {
-            **check_cooldown(state.last_mining_action, mine_cooldown),
-            "cooldown_minutes": mine_cooldown
         },
         "scout": {
             **check_cooldown(state.last_scout_action, scout_cooldown),

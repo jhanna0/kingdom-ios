@@ -31,8 +31,9 @@ class Kingdom(Base):
     # Buildings
     wall_level = Column(Integer, default=0)
     vault_level = Column(Integer, default=0)
-    mine_level = Column(Integer, default=0)
-    market_level = Column(Integer, default=0)
+    mine_level = Column(Integer, default=0)  # Unlocks material availability for purchase
+    market_level = Column(Integer, default=0)  # Passive income + material purchase hub
+    farm_level = Column(Integer, default=0)  # Speeds up contract completion
     education_level = Column(Integer, default=0)  # Reduces training actions required
     
     # Tax & Income

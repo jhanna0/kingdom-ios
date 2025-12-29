@@ -91,7 +91,6 @@ struct AllActionStatus: Codable {
     let work: ActionStatus
     let patrol: ActionStatus
     let sabotage: ActionStatus
-    let mine: ActionStatus
     let scout: ActionStatus
     let training: ActionStatus
     let trainingContracts: [TrainingContract]
@@ -99,7 +98,7 @@ struct AllActionStatus: Codable {
     let contracts: [APIContract]
     
     enum CodingKeys: String, CodingKey {
-        case work, patrol, sabotage, mine, scout, training, contracts
+        case work, patrol, sabotage, scout, training, contracts
         case globalCooldown = "global_cooldown"
         case trainingContracts = "training_contracts"
         case trainingCosts = "training_costs"
@@ -139,18 +138,6 @@ struct PatrolActionResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case success, message, rewards
         case expiresAt = "expires_at"
-    }
-}
-
-struct MineActionResponse: Codable {
-    let success: Bool
-    let message: String
-    let nextMineAvailableAt: Date
-    let rewards: ActionRewards?
-    
-    enum CodingKeys: String, CodingKey {
-        case success, message, rewards
-        case nextMineAvailableAt = "next_mine_available_at"
     }
 }
 
@@ -387,13 +374,6 @@ class ActionsAPI {
     
     func startPatrol() async throws -> PatrolActionResponse {
         let request = client.request(endpoint: "/actions/patrol", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    // MARK: - Mine Resources
-    
-    func mineResources() async throws -> MineActionResponse {
-        let request = client.request(endpoint: "/actions/mine", method: "POST")
         return try await client.execute(request)
     }
     

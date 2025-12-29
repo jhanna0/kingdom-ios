@@ -31,10 +31,10 @@ struct BuildMenuView: View {
                         // Mine upgrade
                         BuildingUpgradeCardWithContract(
                             icon: "hammer.fill",
-                            name: "Gold Mine",
+                            name: "Mine",
                             currentLevel: kingdom.mineLevel,
                             maxLevel: 5,
-                            benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
+                            benefit: mineBenefit(kingdom.mineLevel + 1),
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Mine"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
@@ -55,6 +55,21 @@ struct BuildMenuView: View {
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .market
+                            }
+                        )
+                        
+                        // Farm upgrade
+                        BuildingUpgradeCardWithContract(
+                            icon: "leaf.fill",
+                            name: "Farm",
+                            currentLevel: kingdom.farmLevel,
+                            maxLevel: 5,
+                            benefit: farmBenefit(kingdom.farmLevel + 1),
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Farm"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
+                            kingdom: kingdom,
+                            onCreateContract: {
+                                selectedBuildingType = .farm
                             }
                         )
                         
@@ -158,18 +173,18 @@ struct BuildMenuView: View {
     }
     
     // Income benefit descriptions
-    private func mineIncomeBenefit(_ level: Int) -> String {
-        let income: Int = {
+    private func mineBenefit(_ level: Int) -> String {
+        let materials: [String] = {
             switch level {
-            case 1: return 10
-            case 2: return 25
-            case 3: return 50
-            case 4: return 80
-            case 5: return 120
-            default: return 0
+            case 1: return ["Stone"]
+            case 2: return ["Stone", "Iron"]
+            case 3: return ["Stone", "Iron", "Steel"]
+            case 4: return ["Stone", "Iron", "Steel", "Titanium"]
+            case 5: return ["All materials at 2x quantity"]
+            default: return []
             }
         }()
-        return "+\(income)g/day passive income"
+        return "Unlocks: " + materials.joined(separator: ", ")
     }
     
     private func marketIncomeBenefit(_ level: Int) -> String {
@@ -184,6 +199,20 @@ struct BuildMenuView: View {
             }
         }()
         return "+\(income)g/day from trade activity"
+    }
+    
+    private func farmBenefit(_ level: Int) -> String {
+        let reduction: Int = {
+            switch level {
+            case 1: return 5
+            case 2: return 10
+            case 3: return 20
+            case 4: return 25
+            case 5: return 33
+            default: return 0
+            }
+        }()
+        return "Citizens complete contracts \(reduction)% faster"
     }
     
     private func educationBenefit(_ level: Int) -> String {
@@ -216,5 +245,6 @@ enum BuildingType {
     case vault
     case mine
     case market
+    case farm
     case education
 }

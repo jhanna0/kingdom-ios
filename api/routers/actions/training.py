@@ -212,7 +212,6 @@ def work_on_training(
             work_cooldown=work_cooldown,
             patrol_cooldown=10,
             sabotage_cooldown=1440,
-            mine_cooldown=1440,
             scout_cooldown=1440,
             training_cooldown=120
         )

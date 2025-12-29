@@ -38,7 +38,6 @@ def work_on_contract(
             work_cooldown=cooldown_minutes,
             patrol_cooldown=10,
             sabotage_cooldown=1440,
-            mine_cooldown=1440,
             scout_cooldown=1440,
             training_cooldown=120
         )
