@@ -37,13 +37,27 @@ struct ActionsView: View {
     }
     
     var isInHomeKingdom: Bool {
-        guard let kingdom = currentKingdom else { return false }
-        return viewModel.isHomeKingdom(kingdom)
+        guard let kingdom = currentKingdom else {
+            print("🎭 isInHomeKingdom: NO KINGDOM")
+            return false
+        }
+        let result = viewModel.isHomeKingdom(kingdom)
+        print("🎭 isInHomeKingdom for \(kingdom.name): \(result)")
+        print("   - Kingdom ID: \(kingdom.id)")
+        print("   - Kingdom Ruler: \(kingdom.rulerId ?? 0)")
+        print("   - Player ID: \(viewModel.player.playerId)")
+        print("   - Player Hometown: \(viewModel.player.hometownKingdomId ?? "nil")")
+        return result
     }
     
     var isInEnemyKingdom: Bool {
-        guard let kingdom = currentKingdom else { return false }
-        return !viewModel.isHomeKingdom(kingdom)
+        guard let kingdom = currentKingdom else {
+            print("🎭 isInEnemyKingdom: NO KINGDOM")
+            return false
+        }
+        let result = !viewModel.isHomeKingdom(kingdom)
+        print("🎭 isInEnemyKingdom for \(kingdom.name): \(result)")
+        return result
     }
     
     var body: some View {
@@ -353,12 +367,6 @@ struct ActionsView: View {
                 )
             }
         }
-    }
-    
-    // MARK: - Helpers
-    
-    private func isHomeKingdom(_ kingdom: Kingdom) -> Bool {
-        return kingdom.rulerId == viewModel.player.playerId
     }
     
     // MARK: - API Calls

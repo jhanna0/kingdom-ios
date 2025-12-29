@@ -160,11 +160,8 @@ class MapViewModel: ObservableObject {
                     )
                     
                     await MainActor.run {
-                        // Update player from backend response (includes check-in rewards)
-                        player.gold = updatedState.gold
-                        player.level = updatedState.level
-                        player.experience = updatedState.experience
-                        player.reputation = updatedState.reputation
+                        // Update player from backend response (includes check-in rewards and ALL player data)
+                        player.updateFromAPIState(updatedState)
                         player.currentKingdom = current.name
                         player.saveToUserDefaults()
                         
@@ -183,10 +180,23 @@ class MapViewModel: ObservableObject {
     
     /// Check if a kingdom is the player's home kingdom
     func isHomeKingdom(_ kingdom: Kingdom) -> Bool {
+        // For espionage/foreign status, check hometown kingdom (not just where they visit most)
         // Home kingdom is one where:
         // 1. Player is the ruler, OR
-        // 2. It's their most frequently checked-in kingdom
-        return kingdom.rulerId == player.playerId || player.homeKingdomId == kingdom.name
+        // 2. It's their hometown kingdom (hometown_kingdom_id from backend)
+        let isRuler = kingdom.rulerId == player.playerId
+        let isHometown = player.hometownKingdomId == kingdom.id
+        
+        print("🏠 isHomeKingdom check for \(kingdom.name):")
+        print("   - Kingdom ID: \(kingdom.id)")
+        print("   - Kingdom Ruler ID: \(kingdom.rulerId ?? 0)")
+        print("   - Player ID: \(player.playerId)")
+        print("   - Player Hometown ID: \(player.hometownKingdomId ?? "nil")")
+        print("   - Is Ruler: \(isRuler)")
+        print("   - Is Hometown: \(isHometown)")
+        print("   - Result: \(isRuler || isHometown)")
+        
+        return isRuler || isHometown
     }
     
     private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
@@ -624,12 +634,8 @@ class MapViewModel: ObservableObject {
             let apiPlayerState = try await apiService.loadPlayerState()
             
             await MainActor.run {
-                player.gold = apiPlayerState.gold
-                player.reputation = apiPlayerState.reputation
-                player.level = apiPlayerState.level
-                player.contractsCompleted = apiPlayerState.contracts_completed
-                player.saveToUserDefaults()
-                
+                // Use the full sync method to update ALL player fields
+                player.updateFromAPIState(apiPlayerState)
                 print("✅ Refreshed player state - Gold: \(apiPlayerState.gold)")
             }
         } catch {

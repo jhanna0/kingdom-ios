@@ -207,9 +207,10 @@ def get_player_state(
                 state.check_in_history = check_in_history
                 
                 # Update hometown
-                most_visited = max(check_in_history.items(), key=lambda x: x[1])
-                if most_visited[0] == kingdom.id:
-                    state.hometown_kingdom_id = kingdom.id
+                # DISABLED FOR TESTING: Allow manual hometown setting for espionage testing
+                # most_visited = max(check_in_history.items(), key=lambda x: x[1])
+                # if most_visited[0] == kingdom.id:
+                #     state.hometown_kingdom_id = kingdom.id
                 
                 # Level up
                 while True:
