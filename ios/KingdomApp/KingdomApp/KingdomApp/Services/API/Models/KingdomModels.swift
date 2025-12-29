@@ -79,10 +79,7 @@ struct CheckInResponse: Codable {
     let rewards: CheckInRewards
 }
 
-struct CheckInRewards: Codable {
-    let gold: Int
-    let experience: Int
-}
+// Note: CheckInRewards is defined in PlayerModels.swift
 
 // MARK: - Conquest Models
 

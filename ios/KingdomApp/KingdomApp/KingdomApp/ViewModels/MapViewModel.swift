@@ -125,7 +125,7 @@ class MapViewModel: ObservableObject {
     func updateUserLocation(_ location: CLLocationCoordinate2D) {
         userLocation = location
         
-        // Check which kingdom user is inside
+        // Check which kingdom user is inside (local detection)
         checkKingdomLocation(location)
         
         // Check and complete any ready contracts
@@ -158,12 +158,47 @@ class MapViewModel: ObservableObject {
             kingdom.contains(location)
         }
         
-        // Log when entering/leaving kingdoms
+        // Handle entering/leaving kingdoms
         if let current = currentKingdomInside, previousKingdom?.id != current.id {
             print("🏰 Entered \(current.name)")
+            
+            // AUTOMATIC CHECK-IN: Load player state with kingdom_id
+            // Backend will auto-check us in and return updated state
+            Task {
+                do {
+                    let updatedState = try await apiService.loadPlayerState(
+                        kingdomId: current.id,
+                        location: location
+                    )
+                    
+                    await MainActor.run {
+                        // Update player from backend response (includes check-in rewards)
+                        player.gold = updatedState.gold
+                        player.level = updatedState.level
+                        player.experience = updatedState.experience
+                        player.reputation = updatedState.reputation
+                        player.currentKingdom = current.name
+                        player.saveToUserDefaults()
+                        
+                        print("✅ Auto-checked in to \(current.name)")
+                    }
+                } catch {
+                    print("⚠️ Failed to auto check-in: \(error.localizedDescription)")
+                }
+            }
         } else if previousKingdom != nil && currentKingdomInside == nil {
             print("🚪 Left \(previousKingdom!.name)")
+            player.currentKingdom = nil
+            player.saveToUserDefaults()
         }
+    }
+    
+    /// Check if a kingdom is the player's home kingdom
+    func isHomeKingdom(_ kingdom: Kingdom) -> Bool {
+        // Home kingdom is one where:
+        // 1. Player is the ruler, OR
+        // 2. It's their most frequently checked-in kingdom
+        return kingdom.rulerId == player.playerId || player.homeKingdomId == kingdom.name
     }
     
     private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {

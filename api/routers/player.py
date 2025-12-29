@@ -3,10 +3,10 @@ Player state endpoints - Sync, load, save player data
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
-from db import get_db, User, PlayerState as DBPlayerState
+from db import get_db, User, PlayerState as DBPlayerState, Kingdom
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from config import DEV_MODE
@@ -141,15 +141,87 @@ def apply_state_update(state: DBPlayerState, update: PlayerStateUpdate) -> None:
 @router.get("/state", response_model=PlayerState)
 def get_player_state(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    kingdom_id: Optional[str] = None,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None
 ):
     """
     Get current player state
     
     Returns the complete player state for the authenticated user.
     Use this to load player data on app launch.
+    
+    If kingdom_id + lat/lon provided, auto-checks in to that kingdom.
     """
     state = get_or_create_player_state(db, current_user)
+    
+    # Auto check-in if kingdom_id provided
+    if kingdom_id and lat is not None and lon is not None:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+        if kingdom:
+            # Check cooldown
+            can_checkin = True
+            if state.current_kingdom_id == kingdom.id and state.last_check_in:
+                time_since_last = datetime.utcnow() - state.last_check_in
+                cooldown = timedelta(minutes=5) if DEV_MODE else timedelta(hours=1)
+                can_checkin = time_since_last >= cooldown
+            
+            if can_checkin:
+                # Calculate rewards
+                base_gold = 10
+                base_xp = 5
+                
+                if DEV_MODE:
+                    base_gold *= 10
+                    base_xp *= 10
+                
+                if kingdom.ruler_id == current_user.id:
+                    base_gold *= 2
+                    base_xp *= 2
+                
+                gold_reward = base_gold * kingdom.level
+                xp_reward = base_xp * kingdom.level
+                
+                # Update state
+                state.gold += gold_reward
+                state.experience += xp_reward
+                state.total_checkins += 1
+                state.current_kingdom_id = kingdom.id
+                state.last_check_in = datetime.utcnow()
+                state.last_check_in_lat = lat
+                state.last_check_in_lon = lon
+                
+                # Update check-in history
+                check_in_history = state.check_in_history or {}
+                check_in_history[kingdom.id] = check_in_history.get(kingdom.id, 0) + 1
+                state.check_in_history = check_in_history
+                
+                # Update hometown
+                most_visited = max(check_in_history.items(), key=lambda x: x[1])
+                if most_visited[0] == kingdom.id:
+                    state.hometown_kingdom_id = kingdom.id
+                
+                # Level up
+                while True:
+                    xp_needed = 100 * (2 ** (state.level - 1))
+                    if state.experience >= xp_needed:
+                        state.experience -= xp_needed
+                        state.level += 1
+                        state.skill_points += 3
+                        state.gold += 50
+                    else:
+                        break
+                
+                # Update kingdom
+                kingdom.treasury_gold += gold_reward // 10
+                kingdom.last_activity = datetime.utcnow()
+                
+                db.commit()
+                db.refresh(state)
+                
+                print(f"✅ Auto-checked in {current_user.display_name} to {kingdom.name} (+{gold_reward}g, +{xp_reward} XP)")
+    
     return player_state_to_response(current_user, state)
 
 

@@ -5,7 +5,7 @@ import Foundation
 /// Complete player state from API
 struct APIPlayerState: Codable {
     // Identity
-    let id: String
+    let id: Int  // User ID from database (auto-increment integer)
     let display_name: String
     let email: String?
     let avatar_url: String?
@@ -121,6 +121,19 @@ struct APIPropertyItem: Codable {
 
 // MARK: - Request/Response Models
 
+struct PlayerStateResponse: Codable {
+    let player_state: APIPlayerState
+    let location_info: LocationInfo?
+}
+
+struct LocationInfo: Codable {
+    let in_kingdom: Bool
+    let current_kingdom: LocationKingdomInfo?
+    let is_home_kingdom: Bool
+    let available_actions: [String]
+    let check_in_result: CheckInResult?
+}
+
 struct PlayerSyncRequest: Codable {
     let player_state: [String: AnyCodable]
     let last_sync_time: String?
@@ -165,6 +178,31 @@ struct SkillPointResponse: Codable {
     let stat: String
     let new_level: Int
     let remaining_skill_points: Int
+}
+
+struct LocationKingdomInfo: Codable {
+    let id: String
+    let name: String
+    let ruler_id: Int?
+    let ruler_name: String?
+    let level: Int
+    let population: Int
+    let wall_level: Int
+    let vault_level: Int
+    let mine_level: Int
+    let market_level: Int
+}
+
+struct CheckInResult: Codable {
+    let checked_in: Bool
+    let message: String
+    let rewards: CheckInRewards
+    let levels_gained: Int?
+}
+
+struct CheckInRewards: Codable {
+    let gold: Int
+    let experience: Int
 }
 
 // MARK: - AnyCodable Helper

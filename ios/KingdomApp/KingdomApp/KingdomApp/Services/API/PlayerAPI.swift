@@ -6,13 +6,26 @@ class PlayerAPI {
     
     // MARK: - State Management
     
-    /// Load player state from server
-    func loadState() async throws -> APIPlayerState {
+    /// Load player state from server (with optional auto check-in)
+    func loadState(kingdomId: String? = nil, lat: Double? = nil, lon: Double? = nil) async throws -> APIPlayerState {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
         
-        let request = client.request(endpoint: "/player/state")
+        var endpoint = "/player/state"
+        var queryParams: [String] = []
+        
+        if let kingdomId = kingdomId, let lat = lat, let lon = lon {
+            queryParams.append("kingdom_id=\(kingdomId)")
+            queryParams.append("lat=\(lat)")
+            queryParams.append("lon=\(lon)")
+        }
+        
+        if !queryParams.isEmpty {
+            endpoint += "?" + queryParams.joined(separator: "&")
+        }
+        
+        let request = client.request(endpoint: endpoint)
         return try await client.execute(request)
     }
     
@@ -149,5 +162,6 @@ class PlayerAPI {
         let request = client.request(endpoint: "/player/skill-point/\(stat)", method: "POST")
         return try await client.execute(request)
     }
+    
 }
 

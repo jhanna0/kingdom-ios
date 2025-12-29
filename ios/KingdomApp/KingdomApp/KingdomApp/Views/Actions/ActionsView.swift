@@ -20,6 +20,16 @@ struct ActionsView: View {
         return viewModel.availableContracts.first { $0.id == contractId }
     }
     
+    var isInHomeKingdom: Bool {
+        guard let kingdom = currentKingdom else { return false }
+        return viewModel.isHomeKingdom(kingdom)
+    }
+    
+    var isInEnemyKingdom: Bool {
+        guard let kingdom = currentKingdom else { return false }
+        return !viewModel.isHomeKingdom(kingdom)
+    }
+    
     var body: some View {
         ZStack {
             KingdomTheme.Colors.parchment
@@ -37,11 +47,32 @@ struct ActionsView: View {
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             if let kingdom = currentKingdom {
-                                Text("In \(kingdom.name)")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                HStack(spacing: 8) {
+                                    Text("In \(kingdom.name)")
+                                        .font(KingdomTheme.Typography.body())
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    
+                                    // Show context badge
+                                    if isInHomeKingdom {
+                                        Text("🏠 HOME")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(KingdomTheme.Colors.buttonSuccess)
+                                            .cornerRadius(4)
+                                    } else {
+                                        Text("⚔️ ENEMY")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.red)
+                                            .cornerRadius(4)
+                                    }
+                                }
                             } else {
-                                Text("Check in to a kingdom to perform actions")
+                                Text("Enter a kingdom to perform actions")
                                     .font(KingdomTheme.Typography.body())
                                     .foregroundColor(.orange)
                             }
@@ -51,58 +82,96 @@ struct ActionsView: View {
                         
                         // Actions List
                         if let status = actionStatus {
-                            // Work on Contract
-                            if let contract = activeContract {
+                            if isInHomeKingdom {
+                                // === BENEFICIAL ACTIONS (Home Kingdom) ===
+                                
+                                Text("🏠 Beneficial Actions")
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.top, KingdomTheme.Spacing.small)
+                                
+                                // Work on Contract
+                                if let contract = activeContract {
+                                    ActionCard(
+                                        title: "Work on Contract",
+                                        icon: "hammer.fill",
+                                        description: "Contribute to \(contract.buildingType) construction",
+                                        status: status.work,
+                                        actionType: .work,
+                                        isEnabled: true,
+                                        onAction: { performWork() }
+                                    )
+                                } else {
+                                    InfoCard(
+                                        title: "No Active Contract",
+                                        icon: "hammer.fill",
+                                        description: "Join a contract to start working",
+                                        color: .gray
+                                    )
+                                }
+                                
+                                // Patrol
                                 ActionCard(
-                                    title: "Work on Contract",
-                                    icon: "hammer.fill",
-                                    description: "Contribute to \(contract.buildingType) construction",
-                                    status: status.work,
-                                    actionType: .work,
-                                    isEnabled: currentKingdom != nil,
-                                    onAction: { performWork() }
+                                    title: "Patrol",
+                                    icon: "eye.fill",
+                                    description: "Guard against saboteurs for 10 minutes",
+                                    status: status.patrol,
+                                    actionType: .patrol,
+                                    isEnabled: true,
+                                    onAction: { performPatrol() }
                                 )
-                            } else {
-                                InfoCard(
-                                    title: "No Active Contract",
-                                    icon: "hammer.fill",
-                                    description: "Join a contract to start working",
-                                    color: .gray
+                                
+                                // Mine Resources
+                                ActionCard(
+                                    title: "Mine Resources",
+                                    icon: "pickaxe",
+                                    description: "Collect iron from the kingdom mine",
+                                    status: status.mine,
+                                    actionType: .mine,
+                                    isEnabled: true,
+                                    onAction: { performMine() }
                                 )
-                            }
-                            
-                            // Patrol
-                            ActionCard(
-                                title: "Patrol",
-                                icon: "eye.fill",
-                                description: "Guard against saboteurs for 10 minutes",
-                                status: status.patrol,
-                                actionType: .patrol,
-                                isEnabled: currentKingdom != nil,
-                                onAction: { performPatrol() }
-                            )
-                            
-                            // Mine Resources
-                            ActionCard(
-                                title: "Mine Resources",
-                                icon: "pickaxe",
-                                description: "Collect iron from the kingdom mine",
-                                status: status.mine,
-                                actionType: .mine,
-                                isEnabled: currentKingdom != nil,
-                                onAction: { performMine() }
-                            )
-                            
-                            // Scout (if in enemy territory)
-                            if let kingdom = currentKingdom, !isHomeKingdom(kingdom) {
+                                
+                            } else if isInEnemyKingdom {
+                                // === MALICIOUS ACTIONS (Enemy Kingdom) ===
+                                
+                                Text("⚔️ Hostile Actions")
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(.red)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.top, KingdomTheme.Spacing.small)
+                                
+                                // Scout
                                 ActionCard(
                                     title: "Scout Kingdom",
                                     icon: "magnifyingglass",
-                                    description: "Gather intelligence on this kingdom",
+                                    description: "Gather intelligence on this enemy kingdom",
                                     status: status.scout,
                                     actionType: .scout,
                                     isEnabled: true,
                                     onAction: { performScout() }
+                                )
+                                
+                                // Sabotage (coming soon)
+                                ActionCard(
+                                    title: "Sabotage (Coming Soon)",
+                                    icon: "flame.fill",
+                                    description: "Damage enemy buildings and infrastructure",
+                                    status: status.sabotage,
+                                    actionType: .sabotage,
+                                    isEnabled: false,
+                                    onAction: { /* Not implemented yet */ }
+                                )
+                            } else {
+                                // Not in any kingdom
+                                InfoCard(
+                                    title: "Enter a Kingdom",
+                                    icon: "location.fill",
+                                    description: "Move to a kingdom to perform actions",
+                                    color: .orange
                                 )
                             }
                         }

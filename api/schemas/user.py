@@ -11,7 +11,7 @@ from .equipment import EquipmentItem, PropertyItem
 class PlayerState(BaseModel):
     """Complete player state for sync"""
     # Identity
-    id: str
+    id: int  # User ID from database (auto-increment)
     display_name: str
     email: Optional[str] = None
     avatar_url: Optional[str] = None
