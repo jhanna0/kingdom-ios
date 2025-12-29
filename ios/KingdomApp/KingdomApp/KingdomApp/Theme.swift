@@ -67,6 +67,10 @@ struct KingdomTheme {
         static let loadingTint = Color(red: 0.5, green: 0.3, blue: 0.1)
         /// Error/alert color
         static let error = Color(red: 0.7, green: 0.3, blue: 0.1)
+        /// Disabled/muted state - darker brown for better contrast on parchment
+        static let disabled = Color(red: 0.5, green: 0.4, blue: 0.3)
+        /// Muted text for de-emphasized content
+        static let textMuted = Color(red: 0.45, green: 0.35, blue: 0.25)
     }
     
     // MARK: - Typography

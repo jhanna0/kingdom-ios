@@ -62,7 +62,9 @@ class APIClient: ObservableObject {
     }
     
     func request<T: Encodable>(endpoint: String, method: String, body: T) throws -> URLRequest {
-        let data = try JSONEncoder().encode(body)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(body)
         return request(endpoint: endpoint, method: method, jsonData: data)
     }
     
@@ -84,8 +86,40 @@ class APIClient: ObservableObject {
             throw APIError.serverError("HTTP \(httpResponse.statusCode)")
         }
         
+        // Debug: Print raw response
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📥 API Response (\(request.url?.path ?? "unknown")):")
+            print(jsonString)
+        }
+        
         let decoder = JSONDecoder()
-        return try decoder.decode(T.self, from: data)
+        decoder.dateDecodingStrategy = .iso8601
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            print("❌ Decoding error for \(T.self):")
+            print("Error: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("Key '\(key.stringValue)' not found: \(context.debugDescription)")
+                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                case .typeMismatch(let type, let context):
+                    print("Type mismatch for type \(type): \(context.debugDescription)")
+                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                case .valueNotFound(let type, let context):
+                    print("Value not found for type \(type): \(context.debugDescription)")
+                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                case .dataCorrupted(let context):
+                    print("Data corrupted: \(context.debugDescription)")
+                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                @unknown default:
+                    print("Unknown decoding error")
+                }
+            }
+            throw error
+        }
     }
     
     func executeVoid(_ request: URLRequest) async throws {

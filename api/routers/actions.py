@@ -12,6 +12,13 @@ from routers.auth import get_current_user
 from config import DEV_MODE
 
 
+def format_datetime_iso(dt: datetime) -> str:
+    """Format datetime as ISO8601 with Z suffix for UTC"""
+    if dt is None:
+        return None
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 
@@ -228,7 +235,7 @@ def work_on_contract(
         "progress_percent": progress_percent,
         "your_contribution": user_contribution,
         "is_complete": is_complete,
-        "next_work_available_at": datetime.utcnow() + timedelta(minutes=cooldown_minutes),
+        "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "rewards": {
             "gold": gold_earned if gold_earned > 0 else None,
             "reputation": rep_earned if rep_earned > 0 else None,
@@ -288,7 +295,7 @@ def start_patrol(
     return {
         "success": True,
         "message": "Patrol started! Guard duty for 10 minutes.",
-        "expires_at": state.patrol_expires_at,
+        "expires_at": format_datetime_iso(state.patrol_expires_at),
         "rewards": {
             "gold": 5,
             "reputation": 5,
@@ -351,7 +358,7 @@ def mine_resources(
         "message": f"Mining complete!",
         "iron_gained": base_iron,
         "total_iron": state.iron,
-        "next_mine_available_at": datetime.utcnow() + timedelta(hours=24),
+        "next_mine_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=24)),
         "rewards": {
             "gold": None,
             "reputation": None,
@@ -423,7 +430,7 @@ def scout_kingdom(
             "checked_in_players": kingdom.checked_in_players,
             "population": kingdom.population
         },
-        "next_scout_available_at": datetime.utcnow() + timedelta(hours=24),
+        "next_scout_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=24)),
         "rewards": {
             "gold": 10,  # Small reward for scouting
             "reputation": None,

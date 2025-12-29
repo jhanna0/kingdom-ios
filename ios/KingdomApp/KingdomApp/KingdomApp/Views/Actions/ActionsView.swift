@@ -3,12 +3,13 @@ import SwiftUI
 struct ActionsView: View {
     @ObservedObject var viewModel: MapViewModel
     @State private var actionStatus: AllActionStatus?
+    @State private var statusFetchedAt: Date?
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showReward = false
     @State private var currentReward: Reward?
-    @State private var refreshTimer: Timer?
+    @State private var currentTime = Date()
     
     var currentKingdom: Kingdom? {
         guard let currentKingdomName = viewModel.player.currentKingdom else { return nil }
@@ -41,56 +42,87 @@ struct ActionsView: View {
                 ScrollView {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         // Header
-                        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                            Text("Available Actions")
-                                .font(KingdomTheme.Typography.title2())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        VStack(spacing: KingdomTheme.Spacing.medium) {
+                            // Title
+                            HStack {
+                                Image(systemName: "figure.walk")
+                                    .font(.title2)
+                                    .foregroundColor(KingdomTheme.Colors.gold)
+                                
+                                Text("Available Actions")
+                                    .font(KingdomTheme.Typography.title2())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                
+                                Spacer()
+                            }
                             
+                            // Kingdom Context Card
                             if let kingdom = currentKingdom {
-                                HStack(spacing: 8) {
-                                    Text("In \(kingdom.name)")
+                                HStack(spacing: KingdomTheme.Spacing.medium) {
+                                    // Icon based on kingdom type
+                                    Image(systemName: isInHomeKingdom ? "crown.fill" : "shield.fill")
+                                        .font(.title3)
+                                        .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
+                                        .frame(width: 40, height: 40)
+                                        .background(isInHomeKingdom ? KingdomTheme.Colors.gold.opacity(0.1) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(kingdom.name)
+                                            .font(KingdomTheme.Typography.headline())
+                                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                                        
+                                        Text(isInHomeKingdom ? "Your Kingdom" : "Enemy Territory")
+                                            .font(KingdomTheme.Typography.caption())
+                                            .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding(KingdomTheme.Spacing.medium)
+                                .parchmentCard(
+                                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                                    hasShadow: false
+                                )
+                            } else {
+                                HStack(spacing: KingdomTheme.Spacing.medium) {
+                                    Image(systemName: "map")
+                                        .font(.title3)
+                                        .foregroundColor(KingdomTheme.Colors.textMuted)
+                                        .frame(width: 40, height: 40)
+                                        .background(KingdomTheme.Colors.disabled.opacity(0.1))
+                                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                                    
+                                    Text("Enter a kingdom to perform actions")
                                         .font(KingdomTheme.Typography.body())
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     
-                                    // Show context badge
-                                    if isInHomeKingdom {
-                                        Text("🏠 HOME")
-                                            .font(KingdomTheme.Typography.caption())
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(KingdomTheme.Colors.buttonSuccess)
-                                            .cornerRadius(4)
-                                    } else {
-                                        Text("⚔️ ENEMY")
-                                            .font(KingdomTheme.Typography.caption())
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.red)
-                                            .cornerRadius(4)
-                                    }
+                                    Spacer()
                                 }
-                            } else {
-                                Text("Enter a kingdom to perform actions")
-                                    .font(KingdomTheme.Typography.body())
-                                    .foregroundColor(.orange)
+                                .padding(KingdomTheme.Spacing.medium)
+                                .parchmentCard(
+                                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                                    hasShadow: false
+                                )
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
+                        .padding(.top, KingdomTheme.Spacing.small)
                         
                         // Actions List
                         if let status = actionStatus {
                             if isInHomeKingdom {
                                 // === BENEFICIAL ACTIONS (Home Kingdom) ===
                                 
-                                Text("🏠 Beneficial Actions")
+                                Divider()
+                                    .padding(.horizontal)
+                                
+                                Text("Beneficial Actions")
                                     .font(KingdomTheme.Typography.headline())
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal)
-                                    .padding(.top, KingdomTheme.Spacing.small)
+                                    .padding(.top, KingdomTheme.Spacing.medium)
                                 
                                 // Work on Contract
                                 if let contract = activeContract {
@@ -99,6 +131,8 @@ struct ActionsView: View {
                                         icon: "hammer.fill",
                                         description: "Contribute to \(contract.buildingType) construction",
                                         status: status.work,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
                                         actionType: .work,
                                         isEnabled: true,
                                         onAction: { performWork() }
@@ -118,6 +152,8 @@ struct ActionsView: View {
                                     icon: "eye.fill",
                                     description: "Guard against saboteurs for 10 minutes",
                                     status: status.patrol,
+                                    fetchedAt: statusFetchedAt ?? Date(),
+                                    currentTime: currentTime,
                                     actionType: .patrol,
                                     isEnabled: true,
                                     onAction: { performPatrol() }
@@ -126,9 +162,11 @@ struct ActionsView: View {
                                 // Mine Resources
                                 ActionCard(
                                     title: "Mine Resources",
-                                    icon: "pickaxe",
+                                    icon: "hammer.circle.fill",
                                     description: "Collect iron from the kingdom mine",
                                     status: status.mine,
+                                    fetchedAt: statusFetchedAt ?? Date(),
+                                    currentTime: currentTime,
                                     actionType: .mine,
                                     isEnabled: true,
                                     onAction: { performMine() }
@@ -137,12 +175,15 @@ struct ActionsView: View {
                             } else if isInEnemyKingdom {
                                 // === MALICIOUS ACTIONS (Enemy Kingdom) ===
                                 
-                                Text("⚔️ Hostile Actions")
+                                Divider()
+                                    .padding(.horizontal)
+                                
+                                Text("Hostile Actions")
                                     .font(KingdomTheme.Typography.headline())
-                                    .foregroundColor(.red)
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal)
-                                    .padding(.top, KingdomTheme.Spacing.small)
+                                    .padding(.top, KingdomTheme.Spacing.medium)
                                 
                                 // Scout
                                 ActionCard(
@@ -150,6 +191,8 @@ struct ActionsView: View {
                                     icon: "magnifyingglass",
                                     description: "Gather intelligence on this enemy kingdom",
                                     status: status.scout,
+                                    fetchedAt: statusFetchedAt ?? Date(),
+                                    currentTime: currentTime,
                                     actionType: .scout,
                                     isEnabled: true,
                                     onAction: { performScout() }
@@ -161,6 +204,8 @@ struct ActionsView: View {
                                     icon: "flame.fill",
                                     description: "Damage enemy buildings and infrastructure",
                                     status: status.sabotage,
+                                    fetchedAt: statusFetchedAt ?? Date(),
+                                    currentTime: currentTime,
                                     actionType: .sabotage,
                                     isEnabled: false,
                                     onAction: { /* Not implemented yet */ }
@@ -187,10 +232,10 @@ struct ActionsView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
         .task {
             await loadActionStatus()
-            startRefreshTimer()
+            startUIUpdateTimer()
         }
         .onDisappear {
-            stopRefreshTimer()
+            stopUIUpdateTimer()
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -217,6 +262,7 @@ struct ActionsView: View {
         isLoading = true
         do {
             actionStatus = try await KingdomAPIService.shared.actions.getActionStatus()
+            statusFetchedAt = Date()
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -258,7 +304,9 @@ struct ActionsView: View {
     private func performPatrol() {
         Task {
             do {
+                print("🎬 Starting patrol action...")
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
+                print("✅ Patrol response received: \(response)")
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
@@ -275,6 +323,8 @@ struct ActionsView: View {
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
             } catch {
+                print("❌ Patrol action failed: \(error)")
+                print("❌ Error type: \(type(of: error))")
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     showError = true
@@ -343,17 +393,15 @@ struct ActionsView: View {
     
     // MARK: - Timer
     
-    private func startRefreshTimer() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            Task {
-                await loadActionStatus()
-            }
+    private func startUIUpdateTimer() {
+        // Update current time every second to trigger countdown UI refresh
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            currentTime = Date()
         }
     }
     
-    private func stopRefreshTimer() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+    private func stopUIUpdateTimer() {
+        // Timer will be deallocated when view disappears
     }
 }
 
@@ -368,11 +416,22 @@ struct ActionCard: View {
     let icon: String
     let description: String
     let status: ActionStatus
+    let fetchedAt: Date
+    let currentTime: Date
     let actionType: ActionType
     let isEnabled: Bool
     let onAction: () -> Void
     
-    @State private var timeRemaining: TimeInterval = 0
+    var calculatedSecondsRemaining: Int {
+        // Calculate how much time has elapsed since we fetched the status
+        let elapsed = currentTime.timeIntervalSince(fetchedAt)
+        let remaining = max(0, Double(status.secondsRemaining) - elapsed)
+        return Int(remaining)
+    }
+    
+    var isReady: Bool {
+        return status.ready || calculatedSecondsRemaining <= 0
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -394,7 +453,7 @@ struct ActionCard: View {
                 Spacer()
             }
             
-            if status.ready && isEnabled {
+            if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
@@ -405,13 +464,13 @@ struct ActionCard: View {
             } else if !isEnabled {
                 Text("Check in to a kingdom first")
                     .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(.orange)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(8)
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
             } else {
-                CooldownTimer(secondsRemaining: status.secondsRemaining)
+                CooldownTimer(secondsRemaining: calculatedSecondsRemaining)
             }
         }
         .padding()
@@ -420,10 +479,10 @@ struct ActionCard: View {
     }
     
     private var iconColor: Color {
-        if status.ready && isEnabled {
+        if isReady && isEnabled {
             return KingdomTheme.Colors.gold
         } else {
-            return .gray
+            return KingdomTheme.Colors.disabled
         }
     }
 }
@@ -484,16 +543,16 @@ struct CooldownTimer: View {
     var body: some View {
         HStack {
             Image(systemName: "clock.fill")
-                .foregroundColor(.gray)
+                .foregroundColor(KingdomTheme.Colors.disabled)
             
             Text("Available in \(formattedTime)")
                 .font(KingdomTheme.Typography.body())
-                .foregroundColor(.gray)
+                .foregroundColor(KingdomTheme.Colors.textMuted)
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(8)
+        .background(KingdomTheme.Colors.parchmentDark)
+        .cornerRadius(KingdomTheme.CornerRadius.medium)
     }
 }
 
