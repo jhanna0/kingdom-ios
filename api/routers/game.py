@@ -143,6 +143,7 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "farm_level": kingdom.farm_level,
         "education_level": kingdom.education_level,
         "tax_rate": kingdom.tax_rate,
+        "travel_fee": kingdom.travel_fee,
         "subject_reward_rate": kingdom.subject_reward_rate,
         "total_income_collected": kingdom.total_income_collected,
         "total_rewards_distributed": kingdom.total_rewards_distributed,

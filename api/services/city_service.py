@@ -102,7 +102,9 @@ def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) 
             vault_level=kingdom.vault_level,
             mine_level=kingdom.mine_level,
             market_level=kingdom.market_level,
-            education_level=kingdom.education_level
+            farm_level=kingdom.farm_level,
+            education_level=kingdom.education_level,
+            travel_fee=kingdom.travel_fee
         )
     
     return result

@@ -592,6 +592,7 @@ class MapViewModel: ObservableObject {
                     kingdoms[index].vaultLevel = apiKingdom.vault_level
                     kingdoms[index].mineLevel = apiKingdom.mine_level
                     kingdoms[index].marketLevel = apiKingdom.market_level
+                    kingdoms[index].travelFee = apiKingdom.travel_fee
                     kingdoms[index].checkedInPlayers = apiKingdom.population
                     kingdoms[index].activeContract = nil // Clear completed contract
                     

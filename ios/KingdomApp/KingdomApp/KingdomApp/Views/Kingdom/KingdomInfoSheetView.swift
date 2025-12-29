@@ -141,24 +141,6 @@ struct KingdomInfoSheetView: View {
                         .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
                     .padding(.horizontal)
-                } else if isPlayerInside && (!player.isCheckedIn() || player.currentKingdom != kingdom.name) {
-                    // Need to enter the kingdom
-                    Button(action: {
-                        _ = viewModel.checkIn()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "door.right.hand.open")
-                                .foregroundColor(.white)
-                            Text("Enter Kingdom")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(KingdomTheme.Spacing.medium)
-                        .background(KingdomTheme.Colors.buttonSuccess)
-                        .foregroundColor(.white)
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
-                    }
-                    .padding(.horizontal)
                 } else if isPlayerInside {
                     // Already present but someone else rules it
                     HStack(spacing: 6) {

@@ -39,6 +39,7 @@ class KingdomData(BaseModel):
     market_level: int
     farm_level: int = 0
     education_level: int = 0
+    travel_fee: int = 10
 
 
 class CityBoundaryResponse(BaseModel):

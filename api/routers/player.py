@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 
-from db import get_db, User, PlayerState as DBPlayerState, Kingdom
+from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from config import DEV_MODE
@@ -171,6 +171,37 @@ def get_player_state(
     if kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
         if kingdom:
+            # Check if entering a NEW kingdom (for travel fee)
+            is_entering_new_kingdom = state.current_kingdom_id != kingdom.id
+            
+            # Charge travel fee if entering new kingdom (not ruler or property owner)
+            if is_entering_new_kingdom and kingdom.travel_fee > 0:
+                # Check if player is ruler (rulers don't pay)
+                is_ruler = kingdom.ruler_id == current_user.id
+                
+                # Check if player owns property in this kingdom (property owners don't pay)
+                owns_property = db.query(Property).filter(
+                    Property.kingdom_id == kingdom.id,
+                    Property.owner_id == current_user.id
+                ).first() is not None
+                
+                if is_ruler:
+                    print(f"👑 {current_user.display_name} rules {kingdom.name} - no travel fee")
+                elif owns_property:
+                    print(f"🏠 {current_user.display_name} owns property in {kingdom.name} - no travel fee")
+                else:
+                    # Check if player has enough gold
+                    if state.gold < kingdom.travel_fee:
+                        raise HTTPException(
+                            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                            detail=f"Insufficient gold. Need {kingdom.travel_fee}g to enter {kingdom.name}"
+                        )
+                    
+                    # Charge travel fee
+                    state.gold -= kingdom.travel_fee
+                    kingdom.treasury_gold += kingdom.travel_fee
+                    print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+            
             # Check cooldown
             can_checkin = True
             if state.current_kingdom_id == kingdom.id and state.last_check_in:

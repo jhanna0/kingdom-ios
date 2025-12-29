@@ -15,6 +15,9 @@ struct MapView: View {
     @State private var showAPIDebug = false
     @State private var showActivity = false
     @State private var notificationBadgeCount = 0
+    @State private var showTravelFeeToast = false
+    @State private var travelFeeMessage = ""
+    @State private var travelFeeIcon = ""
     
     var body: some View {
         ZStack {
@@ -91,6 +94,32 @@ struct MapView: View {
                 .padding(KingdomTheme.Spacing.xxLarge)
                 .parchmentCard(cornerRadius: KingdomTheme.CornerRadius.xxLarge)
                 .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
+            }
+            
+            // Travel fee toast notification (at the very top, above sheets)
+            if showTravelFeeToast {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: travelFeeIcon)
+                            .foregroundColor(.white)
+                        Text(travelFeeMessage)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.85))
+                            .shadow(color: .black.opacity(0.3), radius: 8)
+                    )
+                    .padding(.top, 70)
+                    
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.easeInOut, value: showTravelFeeToast)
+                .zIndex(999)
             }
             
             // Clean top HUD
@@ -265,17 +294,35 @@ struct MapView: View {
         .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
             // Show card when entering a new kingdom
             if let kingdom = newValue, oldValue?.id != newValue?.id {
-                // Add smooth delay for initial presentation
-                if !hasShownInitialKingdom {
-                    hasShownInitialKingdom = true
-                    // Wait for map to fade in, then show sheet
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        kingdomForInfoSheet = kingdom
-                    }
-                } else {
-                    // Subsequent kingdom changes show immediately
-                    kingdomForInfoSheet = kingdom
+                // Show travel fee notification
+                let isRuler = kingdom.rulerId == viewModel.player.playerId
+                // TODO: Check if owns property (need to implement property ownership check)
+                let ownsProperty = false
+                
+                if isRuler {
+                    travelFeeMessage = "Free Travel - You rule \(kingdom.name)"
+                    travelFeeIcon = "crown.fill"
+                    showTravelFeeToast = true
+                } else if ownsProperty {
+                    travelFeeMessage = "Free Travel - You own property in \(kingdom.name)"
+                    travelFeeIcon = "house.fill"
+                    showTravelFeeToast = true
+                } else if kingdom.travelFee > 0 {
+                    travelFeeMessage = "Paid \(kingdom.travelFee)g to enter \(kingdom.name)"
+                    travelFeeIcon = "dollarsign.circle.fill"
+                    showTravelFeeToast = true
                 }
+                
+                // Hide toast after 3 seconds
+                if showTravelFeeToast {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        showTravelFeeToast = false
+                    }
+                }
+                
+                // Don't auto-show info sheet when entering a kingdom
+                // Let user see the travel fee toast instead
+                // They can tap the kingdom marker to open the sheet
             }
         }
         .onChange(of: viewModel.isLoading) { oldValue, newValue in

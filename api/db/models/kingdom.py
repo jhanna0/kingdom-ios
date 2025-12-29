@@ -38,6 +38,7 @@ class Kingdom(Base):
     
     # Tax & Income
     tax_rate = Column(Integer, default=10)  # 0-100%
+    travel_fee = Column(Integer, default=10)  # Gold charged when entering kingdom
     last_income_collection = Column(DateTime, default=datetime.utcnow)
     weekly_unique_check_ins = Column(Integer, default=0)
     total_income_collected = Column(Integer, default=0)

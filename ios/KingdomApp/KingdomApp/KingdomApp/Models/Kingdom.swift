@@ -98,6 +98,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     
     // Tax system (0-100%)
     var taxRate: Int  // Percentage of mined resources going to treasury
+    var travelFee: Int  // Gold charged when entering kingdom (rulers exempt)
     
     // Active contract
     var activeContract: Contract?
@@ -150,6 +151,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.farmLevel = 0  // Start at 0
         self.educationLevel = 0  // Start at 0
         self.taxRate = Int.random(in: 5...20)  // Random starting tax rate
+        self.travelFee = 10  // Default travel fee
         self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
         self.weeklyUniqueCheckIns = Int.random(in: 0...10)
         self.totalIncomeCollected = 0
