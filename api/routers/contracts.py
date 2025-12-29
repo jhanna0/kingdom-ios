@@ -29,6 +29,25 @@ def calculate_base_hours(building_type: str, building_level: int, population: in
     return base_hours * population_multiplier
 
 
+def calculate_actions_required(building_type: str, building_level: int, population: int) -> int:
+    """Calculate total actions required based on building type, level, and population
+    
+    Small towns need fewer actions, big cities need many more!
+    Example:
+    - Level 3 Walls, 10 people: 400 * 1.33 = ~533 actions
+    - Level 3 Walls, 1000 people: 400 * 34.33 = ~13,732 actions
+    """
+    # Base actions: 100 * 2^(level-1)
+    # Level 1: 100, Level 2: 200, Level 3: 400, Level 4: 800, Level 5: 1600
+    base_actions = 100 * math.pow(2.0, building_level - 1)
+    
+    # Population multiplier: +33% actions per 10 people
+    # Same scaling as time - bigger cities need proportionally more work
+    population_multiplier = 1.0 + (population / 30.0)
+    
+    return int(base_actions * population_multiplier)
+
+
 def contract_to_response(contract: Contract) -> ContractResponse:
     """Convert Contract model to response schema"""
     return ContractResponse(
@@ -40,6 +59,9 @@ def contract_to_response(contract: Contract) -> ContractResponse:
         base_population=contract.base_population,
         base_hours_required=contract.base_hours_required,
         work_started_at=contract.work_started_at,
+        total_actions_required=contract.total_actions_required,
+        actions_completed=contract.actions_completed or 0,
+        action_contributions=contract.action_contributions or {},
         reward_pool=contract.reward_pool,
         workers=contract.workers or [],
         created_by=contract.created_by,
@@ -106,7 +128,18 @@ def create_contract(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new contract (ruler only)"""
+    """Create a new contract (ruler only)
+    
+    Action requirements are calculated at creation time based on:
+    - Building level (exponential: 100 * 2^(level-1))
+    - Population scaling (+33% per 10 people)
+    
+    This means:
+    - Small town (10 people): Level 3 walls = ~533 actions
+    - Big city (1000 people): Level 3 walls = ~13,732 actions
+    
+    Population scaling ensures buildings in NYC are proportionally harder than small towns!
+    """
     # Verify user is the ruler of this kingdom
     kingdom = db.query(Kingdom).filter(Kingdom.id == data.kingdom_id).first()
     
@@ -151,6 +184,16 @@ def create_contract(
         data.base_population
     )
     
+    # Calculate action requirements based on population and level
+    if data.total_actions_required:
+        total_actions = data.total_actions_required
+    else:
+        total_actions = calculate_actions_required(
+            data.building_type,
+            data.building_level,
+            data.base_population
+        )
+    
     contract = Contract(
         id=str(uuid.uuid4()),
         kingdom_id=data.kingdom_id,
@@ -159,6 +202,9 @@ def create_contract(
         building_level=data.building_level,
         base_population=data.base_population,
         base_hours_required=base_hours,
+        total_actions_required=total_actions,
+        actions_completed=0,
+        action_contributions={},
         reward_pool=data.reward_pool,
         workers=[],
         created_by=current_user.id,

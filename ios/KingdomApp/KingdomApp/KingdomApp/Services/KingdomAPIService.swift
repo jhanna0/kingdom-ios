@@ -10,6 +10,7 @@ import Combine
 ///   - `KingdomAPIService.shared.kingdom` for kingdom operations
 ///   - `KingdomAPIService.shared.city` for city boundary operations
 ///   - `KingdomAPIService.shared.contract` for contract operations
+///   - `KingdomAPIService.shared.actions` for action operations (work, patrol, mine, etc.)
 class KingdomAPIService: ObservableObject {
     // MARK: - Singleton
     static let shared = KingdomAPIService()
@@ -19,6 +20,7 @@ class KingdomAPIService: ObservableObject {
     let kingdom = KingdomAPI()
     let city = CityAPI()
     let contract = ContractAPI()
+    let actions = ActionsAPI()
     
     // MARK: - Shared Client
     private let client = APIClient.shared

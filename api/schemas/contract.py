@@ -14,6 +14,7 @@ class ContractCreate(BaseModel):
     building_level: int
     reward_pool: int
     base_population: int = 0
+    total_actions_required: Optional[int] = None  # Auto-calculated if not provided
 
 
 class ContractResponse(BaseModel):
@@ -26,6 +27,12 @@ class ContractResponse(BaseModel):
     base_population: int
     base_hours_required: float
     work_started_at: Optional[datetime] = None
+    
+    # Action-based system
+    total_actions_required: int
+    actions_completed: int = 0
+    action_contributions: dict = {}  # {user_id: action_count}
+    
     reward_pool: int
     workers: List[int] = []  # Integer user IDs
     created_by: int

@@ -61,6 +61,14 @@ class Player: ObservableObject {
     @Published var lastCoupAttempt: Date?
     @Published var lastDailyCheckIn: Date?      // For daily bonuses
     
+    // Action System Cooldowns
+    @Published var lastWorkAction: Date?
+    @Published var lastPatrolAction: Date?
+    @Published var lastSabotageAction: Date?
+    @Published var lastMiningAction: Date?
+    @Published var lastScoutAction: Date?
+    @Published var patrolExpiresAt: Date?       // When current patrol ends (10 min)
+    
     // Temporary debuffs (from failed battles)
     @Published var attackDebuff: Int = 0        // Temporary attack reduction
     @Published var debuffExpires: Date?         // When the debuff ends

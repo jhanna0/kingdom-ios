@@ -7,6 +7,7 @@ struct MapView: View {
     @State private var kingdomForInfoSheet: Kingdom?
     @State private var showMyKingdoms = false
     @State private var showContracts = false
+    @State private var showActions = false
     @State private var showCharacterSheet = false
     @State private var showActivityFeed = false
     @State private var showProperties = false
@@ -199,15 +200,15 @@ struct MapView: View {
                             }
                         }
                         
-                        // Contracts (icon only)
+                        // Actions (icon only)
                         Button(action: {
-                            showContracts = true
+                            showActions = true
                         }) {
-                            Image(systemName: "doc.text.fill")
+                            Image(systemName: "hammer.fill")
                                 .font(.system(size: 16))
                                 .foregroundColor(.white)
                                 .frame(width: 32, height: 32)
-                                .background(KingdomTheme.Colors.buttonWarning)
+                                .background(KingdomTheme.Colors.buttonSuccess)
                                 .cornerRadius(6)
                         }
                         
@@ -282,6 +283,11 @@ struct MapView: View {
         }
         .sheet(isPresented: $showContracts) {
             ContractsListView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showActions) {
+            NavigationStack {
+                ActionsView(viewModel: viewModel)
+            }
         }
         .sheet(isPresented: $showProperties) {
             MyPropertiesView(player: viewModel.player)

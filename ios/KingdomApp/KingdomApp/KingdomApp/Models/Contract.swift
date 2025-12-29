@@ -17,6 +17,11 @@ struct Contract: Identifiable, Codable, Hashable {
     let baseHoursRequired: Double // Base time with ideal workers
     var workStartedAt: Date? // When first worker accepted
     
+    // Action requirements (new system)
+    let totalActionsRequired: Int // Total actions needed to complete
+    var actionsCompleted: Int // Current action progress
+    var actionContributions: [String: Int] // user_id: action_count
+    
     // Rewards
     let rewardPool: Int // Total gold to distribute equally
     
@@ -56,8 +61,18 @@ struct Contract: Identifiable, Codable, Hashable {
     
     /// Progress percentage (0.0 to 1.0)
     var progress: Double {
+        if status == .completed {
+            return 1.0
+        }
+        
+        // Use action-based progress
+        if totalActionsRequired > 0 {
+            return Double(actionsCompleted) / Double(totalActionsRequired)
+        }
+        
+        // Fallback to time-based for legacy contracts
         guard let startTime = workStartedAt, status == .inProgress else {
-            return status == .completed ? 1.0 : 0.0
+            return 0.0
         }
         
         let elapsed = Date().timeIntervalSince(startTime) / 3600.0 // hours
@@ -78,6 +93,12 @@ struct Contract: Identifiable, Codable, Hashable {
     
     /// Check if contract is ready to complete
     var isReadyToComplete: Bool {
+        // Check action-based completion
+        if totalActionsRequired > 0 {
+            return actionsCompleted >= totalActionsRequired
+        }
+        
+        // Fallback to time-based for legacy contracts
         guard let remaining = hoursRemaining else { return false }
         return remaining <= 0.0
     }
@@ -145,6 +166,9 @@ struct Contract: Identifiable, Codable, Hashable {
         let populationMultiplier = 1.0 + (Double(population) / 30.0) // +33% time per 10 people
         let totalHours = baseHours * populationMultiplier
         
+        // Calculate action requirements: 100 * 2^(level-1)
+        let totalActions = Int(100 * pow(2.0, Double(buildingLevel - 1)))
+        
         return Contract(
             id: UUID().uuidString,
             kingdomId: kingdomId,
@@ -154,6 +178,9 @@ struct Contract: Identifiable, Codable, Hashable {
             basePopulation: population,
             baseHoursRequired: totalHours,
             workStartedAt: nil,
+            totalActionsRequired: totalActions,
+            actionsCompleted: 0,
+            actionContributions: [:],
             rewardPool: rewardPool,
             workers: [],
             createdBy: createdBy,
@@ -175,6 +202,9 @@ extension Contract {
         basePopulation: 15,
         baseHoursRequired: 4.0,
         workStartedAt: Date().addingTimeInterval(-7200), // Started 2 hours ago
+        totalActionsRequired: 200,
+        actionsCompleted: 75,
+        actionContributions: ["1": 40, "2": 35],
         rewardPool: 500,
         workers: [1, 2],  // Integer player IDs
         createdBy: 1,
@@ -193,6 +223,9 @@ extension Contract {
             basePopulation: 15,
             baseHoursRequired: 4.0,
             workStartedAt: Date().addingTimeInterval(-7200), // Started 2 hours ago
+            totalActionsRequired: 200,
+            actionsCompleted: 75,
+            actionContributions: ["1": 40, "2": 35],
             rewardPool: 500,
             workers: [1, 2],
             createdBy: 1,
@@ -209,6 +242,9 @@ extension Contract {
             basePopulation: 25,
             baseHoursRequired: 10.0,
             workStartedAt: nil,
+            totalActionsRequired: 400,
+            actionsCompleted: 0,
+            actionContributions: [:],
             rewardPool: 800,
             workers: [],
             createdBy: 2,
@@ -225,6 +261,9 @@ extension Contract {
             basePopulation: 20,
             baseHoursRequired: 20.0,
             workStartedAt: Date().addingTimeInterval(-50400), // Started 14 hours ago
+            totalActionsRequired: 800,
+            actionsCompleted: 320,
+            actionContributions: ["3": 110, "4": 105, "5": 105],
             rewardPool: 1200,
             workers: [3, 4, 5],
             createdBy: 1,

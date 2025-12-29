@@ -177,23 +177,37 @@ struct ContractDetailView: View {
     }
     
     private var progressStatusText: some View {
-        HStack {
-            if let remaining = contract.hoursRemaining {
-                Text(formatTime(remaining))
-                    .font(KingdomTheme.Typography.title3())
-                    .foregroundColor(KingdomTheme.Colors.gold)
+        VStack(alignment: .leading, spacing: 4) {
+            // Action-based progress
+            if contract.totalActionsRequired > 0 {
+                HStack {
+                    Text("\(contract.actionsCompleted) / \(contract.totalActionsRequired) actions")
+                        .font(KingdomTheme.Typography.title3())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
                 
-                Text("remaining")
-                    .font(KingdomTheme.Typography.body())
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            } else if contract.status == .open {
-                Text("Waiting for workers")
-                    .font(KingdomTheme.Typography.body())
+                Text("\(Int(contract.progress * 100))% complete")
+                    .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             } else {
-                Text("Complete")
-                    .font(KingdomTheme.Typography.title3())
-                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                // Fallback to time-based for legacy contracts
+                if let remaining = contract.hoursRemaining {
+                    Text(formatTime(remaining))
+                        .font(KingdomTheme.Typography.title3())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    
+                    Text("remaining")
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                } else if contract.status == .open {
+                    Text("Waiting for workers")
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                } else {
+                    Text("Complete")
+                        .font(KingdomTheme.Typography.title3())
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                }
             }
         }
     }

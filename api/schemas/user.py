@@ -76,6 +76,13 @@ class PlayerState(BaseModel):
     last_building_action: Optional[datetime] = None
     last_spy_action: Optional[datetime] = None
     
+    # Action System (cooldown-based)
+    last_work_action: Optional[datetime] = None
+    last_patrol_action: Optional[datetime] = None
+    last_sabotage_action: Optional[datetime] = None
+    last_scout_action: Optional[datetime] = None
+    patrol_expires_at: Optional[datetime] = None
+    
     # Equipment
     equipped_weapon: Optional[EquipmentItem] = None
     equipped_armor: Optional[EquipmentItem] = None
@@ -172,6 +179,13 @@ class PlayerStateUpdate(BaseModel):
     last_crafting_action: Optional[datetime] = None
     last_building_action: Optional[datetime] = None
     last_spy_action: Optional[datetime] = None
+    
+    # Action System (cooldown-based)
+    last_work_action: Optional[datetime] = None
+    last_patrol_action: Optional[datetime] = None
+    last_sabotage_action: Optional[datetime] = None
+    last_scout_action: Optional[datetime] = None
+    patrol_expires_at: Optional[datetime] = None
     
     # Equipment
     equipped_weapon: Optional[EquipmentItem] = None

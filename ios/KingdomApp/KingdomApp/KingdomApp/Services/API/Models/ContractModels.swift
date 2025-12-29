@@ -11,6 +11,12 @@ struct APIContract: Codable {
     let base_population: Int
     let base_hours_required: Double
     let work_started_at: String?
+    
+    // Action-based system
+    let total_actions_required: Int
+    let actions_completed: Int
+    let action_contributions: [String: Int]
+    
     let reward_pool: Int
     let workers: [Int]  // Changed from [String] to [Int] - backend uses integer user IDs
     let created_by: Int  // Changed from String to Int - backend uses integer user ID

@@ -79,6 +79,13 @@ class PlayerState(Base):
     last_building_action = Column(DateTime, nullable=True)
     last_spy_action = Column(DateTime, nullable=True)
     
+    # Action System (cooldown-based)
+    last_work_action = Column(DateTime, nullable=True)
+    last_patrol_action = Column(DateTime, nullable=True)
+    last_sabotage_action = Column(DateTime, nullable=True)
+    last_scout_action = Column(DateTime, nullable=True)
+    patrol_expires_at = Column(DateTime, nullable=True)  # When current patrol ends
+    
     # Equipment (stored as JSONB)
     equipped_weapon = Column(JSONB, nullable=True)
     equipped_armor = Column(JSONB, nullable=True)

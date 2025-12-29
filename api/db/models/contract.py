@@ -24,10 +24,15 @@ class Contract(Base):
     building_type = Column(String, nullable=False)
     building_level = Column(Integer, nullable=False)
     
-    # Time requirements
+    # Time requirements (legacy, for reference)
     base_population = Column(Integer, default=0)
     base_hours_required = Column(Float, nullable=False)
     work_started_at = Column(DateTime, nullable=True)
+    
+    # Action requirements (new system)
+    total_actions_required = Column(Integer, nullable=False, default=1000)
+    actions_completed = Column(Integer, default=0)
+    action_contributions = Column(JSONB, default=dict)  # {user_id: action_count}
     
     # Rewards
     reward_pool = Column(Integer, default=0)
