@@ -9,6 +9,7 @@ from .property import Property
 from .city_boundary import CityBoundary
 from .check_in import CheckInHistory
 from .kingdom_intelligence import KingdomIntelligence
+from .coup import CoupEvent
 
 __all__ = [
     "User",
@@ -20,5 +21,6 @@ __all__ = [
     "CityBoundary",
     "CheckInHistory",
     "KingdomIntelligence",
+    "CoupEvent",
 ]
 

@@ -11,6 +11,7 @@ from .models import (
     Property,
     CityBoundary,
     CheckInHistory,
+    CoupEvent,
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     "Property",
     "CityBoundary",
     "CheckInHistory",
+    "CoupEvent",
 ]
 

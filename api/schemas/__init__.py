@@ -30,6 +30,16 @@ from .common import (
     CityBoundaryResponse,
     KingdomData,
 )
+from .coup import (
+    CoupInitiateRequest,
+    CoupInitiateResponse,
+    CoupJoinRequest,
+    CoupJoinResponse,
+    CoupEventResponse,
+    CoupResolveResponse,
+    CoupParticipant,
+    ActiveCoupsResponse,
+)
 
 __all__ = [
     # User/Player
@@ -56,5 +66,14 @@ __all__ = [
     "CheckInResponse",
     "CityBoundaryResponse",
     "KingdomData",
+    # Coup
+    "CoupInitiateRequest",
+    "CoupInitiateResponse",
+    "CoupJoinRequest",
+    "CoupJoinResponse",
+    "CoupEventResponse",
+    "CoupResolveResponse",
+    "CoupParticipant",
+    "ActiveCoupsResponse",
 ]
 
