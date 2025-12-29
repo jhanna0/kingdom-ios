@@ -19,6 +19,10 @@ class Kingdom(Base):
     # Current ruler (nullable - kingdoms can be unclaimed)
     ruler_id = Column(BigInteger, ForeignKey("users.id"), nullable=True, index=True)
     
+    # Empire/faction system
+    empire_id = Column(String, nullable=True, index=True)  # Which empire controls this city
+    original_kingdom_id = Column(String, nullable=True)  # Original city identity (for reconquest)
+    
     # Reference to the city boundary
     city_boundary_osm_id = Column(String, nullable=True)
     

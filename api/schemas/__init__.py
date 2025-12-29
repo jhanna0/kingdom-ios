@@ -40,6 +40,16 @@ from .coup import (
     CoupParticipant,
     ActiveCoupsResponse,
 )
+from .invasion import (
+    InvasionDeclareRequest,
+    InvasionDeclareResponse,
+    InvasionJoinRequest,
+    InvasionJoinResponse,
+    InvasionEventResponse,
+    InvasionResolveResponse,
+    InvasionParticipant,
+    ActiveInvasionsResponse,
+)
 
 __all__ = [
     # User/Player
@@ -75,5 +85,14 @@ __all__ = [
     "CoupResolveResponse",
     "CoupParticipant",
     "ActiveCoupsResponse",
+    # Invasion
+    "InvasionDeclareRequest",
+    "InvasionDeclareResponse",
+    "InvasionJoinRequest",
+    "InvasionJoinResponse",
+    "InvasionEventResponse",
+    "InvasionResolveResponse",
+    "InvasionParticipant",
+    "ActiveInvasionsResponse",
 ]
 
