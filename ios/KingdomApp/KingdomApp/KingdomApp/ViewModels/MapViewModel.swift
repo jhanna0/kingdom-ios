@@ -199,9 +199,8 @@ class MapViewModel: ObservableObject {
                     print("❌ No towns found from API")
                     isLoading = false
                 } else {
-                    // Merge with existing kingdoms to preserve state changes
-                    let mergedKingdoms = mergeKingdoms(existing: kingdoms, new: foundKingdoms)
-                    kingdoms = mergedKingdoms
+                    // Backend is the source of truth - just use it directly
+                    kingdoms = foundKingdoms
                     
                     // Sync player's fiefsRuled with kingdoms they rule
                     syncPlayerKingdoms()
@@ -225,25 +224,6 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Merge new kingdoms with existing ones, preserving state of existing kingdoms
-    /// This is crucial to maintain upgrades, rulers, contracts, etc.
-    /// TODO: Backend will handle this via proper sync/merge logic
-    private func mergeKingdoms(existing: [Kingdom], new: [Kingdom]) -> [Kingdom] {
-        var result: [Kingdom] = []
-        
-        for newKingdom in new {
-            // Check if we already have this kingdom (by name, since GeoJSON doesn't have IDs)
-            if let existingKingdom = existing.first(where: { $0.name == newKingdom.name }) {
-                // Keep the existing kingdom (preserves all state)
-                result.append(existingKingdom)
-            } else {
-                // New kingdom - add it
-                result.append(newKingdom)
-            }
-        }
-        
-        return result
-    }
     
     /// Refresh kingdoms - try again with real data
     func refreshKingdoms() {
@@ -490,16 +470,16 @@ class MapViewModel: ObservableObject {
     // MARK: - Contract System
     
     /// Create a new contract for building upgrade
-    func createContract(kingdom: Kingdom, buildingType: BuildingType, rewardPool: Int) -> Bool {
+    func createContract(kingdom: Kingdom, buildingType: BuildingType, rewardPool: Int) async throws -> Bool {
         guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
             print("❌ Kingdom not found")
-            return false
+            throw NSError(domain: "MapViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kingdom not found"])
         }
         
         // Check if ruler owns this kingdom
         guard kingdoms[index].rulerId == player.playerId else {
             print("❌ You don't rule this kingdom")
-            return false
+            throw NSError(domain: "MapViewModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "You don't rule this kingdom"])
         }
         
         // Get building type string and next level
@@ -508,33 +488,32 @@ class MapViewModel: ObservableObject {
         // Check if building can be upgraded
         if currentLevel >= 5 {
             print("❌ Building already at max level")
-            return false
+            throw NSError(domain: "MapViewModel", code: 3, userInfo: [NSLocalizedDescriptionKey: "Building already at max level"])
         }
         
         let nextLevel = currentLevel + 1
         
         // Call API to create contract
-        Task {
-            do {
-                let apiContract = try await contractAPI.createContract(
-                    kingdomId: kingdom.id,
-                    kingdomName: kingdom.name,
-                    buildingType: buildingTypeStr,
-                    buildingLevel: nextLevel,
-                    rewardPool: rewardPool,
-                    basePopulation: kingdoms[index].checkedInPlayers
-                )
-                
-                print("✅ Contract created via API: \(apiContract.id)")
-                
-                // Reload contracts to show the new one
-                await loadContracts()
-            } catch {
-                print("❌ Failed to create contract: \(error)")
-            }
+        do {
+            let apiContract = try await contractAPI.createContract(
+                kingdomId: kingdom.id,
+                kingdomName: kingdom.name,
+                buildingType: buildingTypeStr,
+                buildingLevel: nextLevel,
+                rewardPool: rewardPool,
+                basePopulation: kingdoms[index].checkedInPlayers
+            )
+            
+            print("✅ Contract created via API: \(apiContract.id)")
+            
+            // Reload contracts to show the new one
+            await loadContracts()
+            
+            return true
+        } catch {
+            print("❌ Failed to create contract: \(error)")
+            throw error
         }
-        
-        return true
     }
     
     /// Accept a contract and start working
@@ -557,14 +536,42 @@ class MapViewModel: ObservableObject {
                     player.saveToUserDefaults()
                 }
                 
-                // Reload contracts
+                // Reload contracts AND refresh kingdom data
                 await loadContracts()
+                await refreshKingdomData()
             } catch {
                 print("❌ Failed to join contract: \(error)")
             }
         }
         
         return true
+    }
+    
+    /// Refresh kingdom data from backend (force fetch)
+    func refreshKingdomData() async {
+        guard let location = userLocation else { return }
+        
+        do {
+            let foundKingdoms = try await apiService.fetchCities(
+                lat: location.latitude,
+                lon: location.longitude,
+                radiusKm: loadRadiusMiles * 1.60934
+            )
+            
+            await MainActor.run {
+                // Backend is the source of truth - just use it
+                kingdoms = foundKingdoms
+                
+                // Update currentKingdomInside if needed
+                if let currentId = currentKingdomInside?.id {
+                    currentKingdomInside = kingdoms.first(where: { $0.id == currentId })
+                }
+                
+                print("✅ Refreshed kingdom data from backend")
+            }
+        } catch {
+            print("❌ Failed to refresh kingdoms: \(error)")
+        }
     }
     
     /// Stop working on a contract

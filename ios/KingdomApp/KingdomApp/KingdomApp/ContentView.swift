@@ -15,10 +15,6 @@ struct ContentView: View {
             MapView()
                 .ignoresSafeArea()
             
-            // Show notifications overlay
-            NotificationOverlay()
-                .allowsHitTesting(true)
-            
             // Loading indicator during init
             if appInit.isLoading {
                 VStack {

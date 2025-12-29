@@ -34,7 +34,7 @@ class CityAPI {
         let cityResponses = try await fetchCities(lat: lat, lon: lon, radiusKm: radiusKm)
         
         let colors = KingdomColor.allCases
-        let kingdoms = cityResponses.enumerated().compactMap { index, city in
+        let kingdoms: [Kingdom] = cityResponses.enumerated().compactMap { index, city in
             // Convert boundary coordinates
             let boundary = city.boundary.map { coord in
                 CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
@@ -55,13 +55,28 @@ class CityAPI {
             let rulerName = city.kingdom?.ruler_name ?? "Unclaimed"
             let rulerId = city.kingdom?.ruler_id
             
-            return Kingdom(
+            // Create kingdom with backend data
+            guard var kingdom = Kingdom(
                 name: city.name,
                 rulerName: rulerName,
                 rulerId: rulerId,
                 territory: territory,
                 color: color
-            )
+            ) else {
+                return nil
+            }
+            
+            // Update with backend building levels if kingdom data exists
+            if let kingdomData = city.kingdom {
+                kingdom.treasuryGold = kingdomData.treasury_gold
+                kingdom.wallLevel = kingdomData.wall_level
+                kingdom.vaultLevel = kingdomData.vault_level
+                kingdom.mineLevel = kingdomData.mine_level
+                kingdom.marketLevel = kingdomData.market_level
+                kingdom.checkedInPlayers = kingdomData.population
+            }
+            
+            return kingdom
         }
         
         print("✅ Converted to \(kingdoms.count) Kingdom objects")

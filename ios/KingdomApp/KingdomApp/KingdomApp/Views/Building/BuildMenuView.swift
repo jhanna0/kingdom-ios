@@ -36,6 +36,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
                             hasActiveContract: kingdom.activeContract?.buildingType == "Mine",
+                            kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .mine
                             }
@@ -49,6 +50,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
                             hasActiveContract: kingdom.activeContract?.buildingType == "Market",
+                            kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .market
                             }
@@ -76,6 +78,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
                             hasActiveContract: kingdom.activeContract?.buildingType == "Walls",
+                            kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .walls
                             }
@@ -89,6 +92,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
                             hasActiveContract: kingdom.activeContract?.buildingType == "Vault",
+                            kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .vault
                             }
@@ -106,7 +110,23 @@ struct BuildMenuView: View {
                 ContractCreationView(
                     kingdom: kingdom,
                     buildingType: buildingType,
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    onSuccess: { buildingName in
+                        // Contract created successfully!
+                        selectedBuildingType = nil
+                        
+                        // Add to activity feed
+                        viewModel.worldSimulator.addActivity(
+                            "📜 Contract posted: \(buildingName) upgrade",
+                            in: kingdom.name,
+                            icon: "📋"
+                        )
+                        
+                        // Force refresh kingdom data
+                        Task {
+                            await viewModel.loadContracts()
+                        }
+                    }
                 )
             }
     }

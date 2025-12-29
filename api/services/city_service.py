@@ -73,7 +73,11 @@ def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) 
             ruler_name=ruler_name,
             level=kingdom.level,
             population=kingdom.population,
-            treasury_gold=kingdom.treasury_gold
+            treasury_gold=kingdom.treasury_gold,
+            wall_level=kingdom.wall_level,
+            vault_level=kingdom.vault_level,
+            mine_level=kingdom.mine_level,
+            market_level=kingdom.market_level
         )
     
     return result

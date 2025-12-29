@@ -146,7 +146,8 @@ class WorldSimulator: ObservableObject {
     
     // MARK: - Activity Logging
     
-    private func logActivity(_ message: String, in kingdom: String, icon: String = "📜") {
+    /// Add an activity log entry (public API for game events)
+    func addActivity(_ message: String, in kingdom: String, icon: String = "📜") {
         let log = ActivityLog(
             message: message,
             kingdomName: kingdom,
@@ -158,6 +159,11 @@ class WorldSimulator: ObservableObject {
         if recentActivity.count > maxActivityLog {
             recentActivity = Array(recentActivity.prefix(maxActivityLog))
         }
+    }
+    
+    /// Private wrapper for internal use
+    private func logActivity(_ message: String, in kingdom: String, icon: String = "📜") {
+        addActivity(message, in: kingdom, icon: icon)
     }
     
     func getActivityFor(kingdom: String) -> [ActivityLog] {

@@ -7,10 +7,27 @@ struct BuildingUpgradeCardWithContract: View {
     let maxLevel: Int
     let benefit: String
     let hasActiveContract: Bool
+    let kingdom: Kingdom
     let onCreateContract: () -> Void
     
     var isMaxLevel: Bool {
         currentLevel >= maxLevel
+    }
+    
+    // Calculate contract cost right here
+    private var contractCost: Int {
+        let nextLevel = currentLevel + 1
+        let baseHours = 2.0 * pow(2.0, Double(nextLevel - 1))
+        let populationMultiplier = 1.0 + (Double(kingdom.checkedInPlayers) / 30.0)
+        let estimatedHours = baseHours * populationMultiplier
+        
+        let baseReward = 100 * nextLevel
+        let timeBonus = Int(estimatedHours * 10.0)
+        return baseReward + timeBonus
+    }
+    
+    private var canAfford: Bool {
+        kingdom.treasuryGold >= contractCost
     }
     
     var body: some View {
@@ -35,6 +52,7 @@ struct BuildingUpgradeCardWithContract: View {
             }
             
             if !isMaxLevel {
+                // Benefit
                 Text(benefit)
                     .font(KingdomTheme.Typography.caption())
                     .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -54,30 +72,64 @@ struct BuildingUpgradeCardWithContract: View {
                     .background(KingdomTheme.Colors.parchmentDark)
                     .cornerRadius(8)
                 } else {
-                    // Create contract
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Create Contract")
-                                .font(KingdomTheme.Typography.caption())
-                                .fontWeight(.semibold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                    // Show contract cost prominently
+                    VStack(spacing: 8) {
+                        // Cost display
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Contract Cost")
+                                    .font(KingdomTheme.Typography.caption2())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "crown.fill")
+                                        .font(.caption)
+                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                    Text("\(contractCost)g")
+                                        .font(KingdomTheme.Typography.headline())
+                                        .fontWeight(.bold)
+                                        .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)
+                                }
+                            }
                             
-                            Text("Workers build, you pay reward")
-                                .font(KingdomTheme.Typography.caption2())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Spacer()
+                            
+                            // Treasury display
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Treasury")
+                                    .font(KingdomTheme.Typography.caption2())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "building.columns.fill")
+                                        .font(.caption)
+                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                                    Text("\(kingdom.treasuryGold)g")
+                                        .font(KingdomTheme.Typography.caption())
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : .red)
+                                }
+                            }
                         }
                         
-                        Spacer()
-                        
+                        // Post contract button
                         Button(action: onCreateContract) {
-                            Text("Post")
-                                .font(KingdomTheme.Typography.caption())
+                            HStack {
+                                Image(systemName: "doc.badge.plus")
+                                Text(canAfford ? "Post Contract" : "Insufficient Funds")
+                            }
+                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.medievalSubtle(color: KingdomTheme.Colors.buttonWarning))
+                        .buttonStyle(.medieval(color: canAfford ? KingdomTheme.Colors.buttonWarning : .gray, fullWidth: true))
+                        .disabled(!canAfford)
                     }
-                    .padding(8)
-                    .background(KingdomTheme.Colors.parchmentDark.opacity(0.5))
+                    .padding(12)
+                    .background(KingdomTheme.Colors.parchmentDark.opacity(0.3))
                     .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(canAfford ? KingdomTheme.Colors.gold.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+                    )
                 }
             } else {
                 Text("Maximum level reached")

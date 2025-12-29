@@ -33,6 +33,10 @@ class KingdomData(BaseModel):
     level: int
     population: int
     treasury_gold: int
+    wall_level: int
+    vault_level: int
+    mine_level: int
+    market_level: int
 
 
 class CityBoundaryResponse(BaseModel):

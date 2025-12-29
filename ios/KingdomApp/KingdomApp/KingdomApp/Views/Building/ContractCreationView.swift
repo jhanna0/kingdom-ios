@@ -4,10 +4,12 @@ struct ContractCreationView: View {
     let kingdom: Kingdom
     let buildingType: BuildingType
     @ObservedObject var viewModel: MapViewModel
+    let onSuccess: (String) -> Void
     @Environment(\.dismiss) var dismiss
     
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isCreating = false
     
     private var buildingName: String {
         switch buildingType {
@@ -176,12 +178,18 @@ struct ContractCreationView: View {
                     // Create button
                     Button(action: createContract) {
                         HStack {
-                            Image(systemName: "doc.badge.plus")
-                            Text("Post Contract for \(autoReward)g")
+                            if isCreating {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                Text("Posting...")
+                            } else {
+                                Image(systemName: "doc.badge.plus")
+                                Text("Post Contract for \(autoReward)g")
+                            }
                         }
                     }
                     .buttonStyle(.medieval(color: autoReward <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonSuccess : .gray, fullWidth: true))
-                    .disabled(autoReward > kingdom.treasuryGold)
+                    .disabled(autoReward > kingdom.treasuryGold || isCreating)
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
                 }
@@ -209,11 +217,25 @@ struct ContractCreationView: View {
             return
         }
         
-        if viewModel.createContract(kingdom: kingdom, buildingType: buildingType, rewardPool: reward) {
-            dismiss()
-        } else {
-            errorMessage = "Failed to create contract"
-            showError = true
+        isCreating = true
+        
+        // Call the create contract method asynchronously
+        Task {
+            do {
+                _ = try await viewModel.createContract(kingdom: kingdom, buildingType: buildingType, rewardPool: reward)
+                
+                // Success! Dismiss and call success handler
+                await MainActor.run {
+                    dismiss()
+                    onSuccess(buildingName)
+                }
+            } catch {
+                await MainActor.run {
+                    isCreating = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
         }
     }
 }

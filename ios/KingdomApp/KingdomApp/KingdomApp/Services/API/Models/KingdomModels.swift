@@ -47,6 +47,10 @@ struct CityKingdomData: Codable {
     let level: Int
     let population: Int
     let treasury_gold: Int
+    let wall_level: Int
+    let vault_level: Int
+    let mine_level: Int
+    let market_level: Int
 }
 
 struct CityBoundaryResponse: Codable {
