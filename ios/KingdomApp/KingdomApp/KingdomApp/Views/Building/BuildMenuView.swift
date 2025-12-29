@@ -35,7 +35,7 @@ struct BuildMenuView: View {
                             currentLevel: kingdom.mineLevel,
                             maxLevel: 5,
                             benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
-                            hasActiveContract: kingdom.activeContract?.buildingType == "Mine",
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Mine"),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .mine
@@ -49,7 +49,7 @@ struct BuildMenuView: View {
                             currentLevel: kingdom.marketLevel,
                             maxLevel: 5,
                             benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
-                            hasActiveContract: kingdom.activeContract?.buildingType == "Market",
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Market"),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .market
@@ -77,7 +77,7 @@ struct BuildMenuView: View {
                             currentLevel: kingdom.wallLevel,
                             maxLevel: 5,
                             benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
-                            hasActiveContract: kingdom.activeContract?.buildingType == "Walls",
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Walls"),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .walls
@@ -91,7 +91,7 @@ struct BuildMenuView: View {
                             currentLevel: kingdom.vaultLevel,
                             maxLevel: 5,
                             benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
-                            hasActiveContract: kingdom.activeContract?.buildingType == "Vault",
+                            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Vault"),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .vault
@@ -158,6 +158,17 @@ struct BuildMenuView: View {
             }
         }()
         return "+\(income)g/day from trade activity"
+    }
+    
+    /// Check if kingdom has an active contract for a specific building type
+    /// Checks ALL contracts, not just kingdom.activeContract (since we can have multiple in DB before fix)
+    private func hasActiveContractForBuilding(kingdom: Kingdom, buildingType: String) -> Bool {
+        // Check all available contracts for this kingdom
+        return viewModel.availableContracts.contains { contract in
+            contract.kingdomId == kingdom.id &&
+            contract.buildingType == buildingType &&
+            (contract.status == .open || contract.status == .inProgress)
+        }
     }
 }
 

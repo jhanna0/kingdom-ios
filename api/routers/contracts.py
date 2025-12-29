@@ -122,6 +122,28 @@ def create_contract(
             detail="Only the ruler can create contracts"
         )
     
+    # Check if kingdom already has an active contract (open or in_progress)
+    existing_contract = db.query(Contract).filter(
+        Contract.kingdom_id == data.kingdom_id,
+        Contract.status.in_(["open", "in_progress"])
+    ).first()
+    
+    if existing_contract:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Kingdom already has an active contract for {existing_contract.building_type}"
+        )
+    
+    # Check if kingdom has enough gold in treasury
+    if kingdom.treasury_gold < data.reward_pool:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient treasury funds. Have: {kingdom.treasury_gold}, Need: {data.reward_pool}"
+        )
+    
+    # Deduct gold from kingdom treasury
+    kingdom.treasury_gold -= data.reward_pool
+    
     # Calculate base hours required
     base_hours = calculate_base_hours(
         data.building_type,

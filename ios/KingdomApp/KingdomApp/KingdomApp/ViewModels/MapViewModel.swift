@@ -608,62 +608,81 @@ class MapViewModel: ObservableObject {
     
     /// Check all contracts and auto-complete any that are ready
     func checkAndCompleteContracts() {
-        for (index, kingdom) in kingdoms.enumerated() {
+        for kingdom in kingdoms {
             guard let contract = kingdom.activeContract else { continue }
             
             // Skip if not ready
             guard contract.isReadyToComplete else { continue }
             
-            // Complete the contract
-            completeContract(kingdomIndex: index)
+            // Complete the contract via API
+            Task {
+                await completeContract(contractId: contract.id, kingdomId: kingdom.id)
+            }
         }
     }
     
-    /// Complete a contract and distribute rewards
-    private func completeContract(kingdomIndex: Int) {
-        guard var contract = kingdoms[kingdomIndex].activeContract else { return }
-        
-        let buildingType = contract.buildingType
-        let level = contract.buildingLevel
-        let rewardPerWorker = contract.rewardPerWorker
-        
-        // Mark as complete
-        contract.complete()
-        
-        // Upgrade the building
-        switch buildingType.lowercased() {
-        case "walls":
-            kingdoms[kingdomIndex].wallLevel = level
-        case "vault":
-            kingdoms[kingdomIndex].vaultLevel = level
-        case "mine":
-            kingdoms[kingdomIndex].mineLevel = level
-        case "market":
-            kingdoms[kingdomIndex].marketLevel = level
-        default:
-            break
+    /// Complete a contract via API and refresh data
+    func completeContract(contractId: String, kingdomId: String) async {
+        do {
+            let response = try await contractAPI.completeContract(contractId: contractId)
+            print("✅ Contract completed via API: \(response.message)")
+            
+            // Reload the specific kingdom from backend to get updated building levels
+            await refreshKingdomFromBackend(kingdomId: kingdomId)
+            
+            // Reload player state to get updated gold
+            await refreshPlayerFromBackend()
+            
+        } catch {
+            print("❌ Failed to complete contract: \(error)")
         }
-        
-        // Distribute rewards equally to all workers
-        for workerId in contract.workers {
-            if workerId == player.playerId {
-                player.gold += rewardPerWorker
-                player.contractsCompleted += 1
-                player.activeContractId = nil
-                player.saveToUserDefaults()
-                print("💰 Contract complete! Earned \(rewardPerWorker) gold")
+    }
+    
+    /// Refresh a specific kingdom from backend
+    private func refreshKingdomFromBackend(kingdomId: String) async {
+        do {
+            let apiKingdom = try await apiService.kingdom.getKingdom(id: kingdomId)
+            
+            await MainActor.run {
+                if let index = kingdoms.firstIndex(where: { $0.id == kingdomId }) {
+                    kingdoms[index].treasuryGold = apiKingdom.treasury_gold
+                    kingdoms[index].wallLevel = apiKingdom.wall_level
+                    kingdoms[index].vaultLevel = apiKingdom.vault_level
+                    kingdoms[index].mineLevel = apiKingdom.mine_level
+                    kingdoms[index].marketLevel = apiKingdom.market_level
+                    kingdoms[index].checkedInPlayers = apiKingdom.population
+                    kingdoms[index].activeContract = nil // Clear completed contract
+                    
+                    // Update currentKingdomInside if it's the same kingdom
+                    if currentKingdomInside?.id == kingdomId {
+                        currentKingdomInside = kingdoms[index]
+                    }
+                    
+                    print("✅ Refreshed kingdom \(apiKingdom.name) - Market Lv.\(apiKingdom.market_level)")
+                }
             }
-            // TODO: When multiplayer, distribute to other players
+        } catch {
+            print("❌ Failed to refresh kingdom: \(error)")
         }
-        
-        // Clear the contract
-        kingdoms[kingdomIndex].activeContract = nil
-        
-        print("🎉 \(buildingType) upgraded to level \(level)!")
-        
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdoms[kingdomIndex].id {
-            currentKingdomInside = kingdoms[kingdomIndex]
+    }
+    
+    /// Refresh player data from backend
+    private func refreshPlayerFromBackend() async {
+        do {
+            let apiPlayerState = try await apiService.loadPlayerState()
+            
+            await MainActor.run {
+                player.gold = apiPlayerState.gold
+                player.reputation = apiPlayerState.reputation
+                player.level = apiPlayerState.level
+                player.activeContractId = apiPlayerState.active_contract_id
+                player.contractsCompleted = apiPlayerState.contracts_completed
+                player.saveToUserDefaults()
+                
+                print("✅ Refreshed player state - Gold: \(apiPlayerState.gold)")
+            }
+        } catch {
+            print("❌ Failed to refresh player state: \(error)")
         }
     }
     
@@ -679,11 +698,14 @@ class MapViewModel: ObservableObject {
     
     func loadContracts() async {
         do {
-            let apiContracts = try await contractAPI.listContracts(kingdomId: nil, status: "open")
+            // Load both open AND in_progress contracts so users can see their active work
+            let openContracts = try await contractAPI.listContracts(kingdomId: nil, status: "open")
+            let inProgressContracts = try await contractAPI.listContracts(kingdomId: nil, status: "in_progress")
+            let allContracts = openContracts + inProgressContracts
             
             await MainActor.run {
                 // Convert APIContract to local Contract model
-                self.availableContracts = apiContracts.compactMap { apiContract in
+                self.availableContracts = allContracts.compactMap { apiContract in
                     Contract(
                         id: apiContract.id,
                         kingdomId: apiContract.kingdom_id,
@@ -701,7 +723,7 @@ class MapViewModel: ObservableObject {
                         status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
                     )
                 }
-                print("✅ Loaded \(self.availableContracts.count) contracts from API")
+                print("✅ Loaded \(self.availableContracts.count) contracts from API (open: \(openContracts.count), in_progress: \(inProgressContracts.count))")
             }
         } catch {
             print("❌ Failed to load contracts: \(error)")
