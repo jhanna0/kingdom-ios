@@ -7,7 +7,7 @@ from datetime import datetime
 
 from db import get_db, User, PlayerState, Contract
 from routers.auth import get_current_user
-from .utils import check_cooldown, calculate_cooldown
+from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
 from .training import calculate_training_cost
 
 
@@ -53,7 +53,19 @@ def get_action_status(
         ).all()
         contracts = [contract_to_response(c) for c in contracts_query]
     
+    # Check global action cooldown (ONE ACTION AT A TIME!)
+    global_cooldown = check_global_action_cooldown(
+        state, 
+        work_cooldown, 
+        patrol_cooldown, 
+        sabotage_cooldown, 
+        mine_cooldown, 
+        scout_cooldown, 
+        training_cooldown
+    )
+    
     return {
+        "global_cooldown": global_cooldown,  # NEW: Global action lock
         "work": {
             **check_cooldown(state.last_work_action, work_cooldown),
             "cooldown_minutes": work_cooldown

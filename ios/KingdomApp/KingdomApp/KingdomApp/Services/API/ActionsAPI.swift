@@ -74,7 +74,20 @@ struct TrainingCostsResponse: Codable {
     }
 }
 
+struct GlobalCooldown: Codable {
+    let ready: Bool
+    let secondsRemaining: Int
+    let blockingAction: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case ready
+        case secondsRemaining = "seconds_remaining"
+        case blockingAction = "blocking_action"
+    }
+}
+
 struct AllActionStatus: Codable {
+    let globalCooldown: GlobalCooldown
     let work: ActionStatus
     let patrol: ActionStatus
     let sabotage: ActionStatus
@@ -87,6 +100,7 @@ struct AllActionStatus: Codable {
     
     enum CodingKeys: String, CodingKey {
         case work, patrol, sabotage, mine, scout, training, contracts
+        case globalCooldown = "global_cooldown"
         case trainingContracts = "training_contracts"
         case trainingCosts = "training_costs"
     }

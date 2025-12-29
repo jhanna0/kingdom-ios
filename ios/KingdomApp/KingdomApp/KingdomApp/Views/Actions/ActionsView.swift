@@ -110,6 +110,60 @@ struct ActionsView: View {
                         
                         // Actions List
                         if let status = actionStatus {
+                            // === GLOBAL COOLDOWN WARNING ===
+                            if !status.globalCooldown.ready {
+                                let blockingAction = status.globalCooldown.blockingAction ?? "an action"
+                                let remaining = status.globalCooldown.secondsRemaining
+                                let hours = remaining / 3600
+                                let minutes = (remaining % 3600) / 60
+                                let seconds = remaining % 60
+                                
+                                VStack(spacing: KingdomTheme.Spacing.medium) {
+                                    HStack(spacing: KingdomTheme.Spacing.small) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.title2)
+                                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Action in Progress")
+                                                .font(KingdomTheme.Typography.headline())
+                                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                            
+                                            Text("You performed \(blockingAction) recently. Only ONE action at a time!")
+                                                .font(KingdomTheme.Typography.caption())
+                                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                            
+                                            if hours > 0 {
+                                                Text("Available in: \(hours)h \(minutes)m \(seconds)s")
+                                                    .font(KingdomTheme.Typography.body())
+                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                    .fontWeight(.semibold)
+                                            } else if minutes > 0 {
+                                                Text("Available in: \(minutes)m \(seconds)s")
+                                                    .font(KingdomTheme.Typography.body())
+                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                    .fontWeight(.semibold)
+                                            } else {
+                                                Text("Available in: \(seconds)s")
+                                                    .font(KingdomTheme.Typography.body())
+                                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                                    .fontWeight(.semibold)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                }
+                                .padding()
+                                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                                        .stroke(KingdomTheme.Colors.buttonWarning, lineWidth: 2)
+                                )
+                                .padding(.horizontal)
+                            }
+                            
                             // === TRAINING CONTRACTS (Only if purchased) ===
                             
                             if !status.trainingContracts.isEmpty {
@@ -138,6 +192,7 @@ struct ActionsView: View {
                                         fetchedAt: statusFetchedAt ?? Date(),
                                         currentTime: currentTime,
                                         isEnabled: currentKingdom != nil,
+                                        globalCooldownActive: !status.globalCooldown.ready,
                                         onAction: { performTraining(contractId: contract.id) }
                                     )
                                 }
@@ -171,6 +226,7 @@ struct ActionsView: View {
                                                 status: status.work,
                                                 fetchedAt: statusFetchedAt ?? Date(),
                                                 currentTime: currentTime,
+                                                globalCooldownActive: !status.globalCooldown.ready,
                                                 onAction: { performWork(contractId: contract.id) }
                                             )
                                         }
@@ -195,6 +251,7 @@ struct ActionsView: View {
                                     actionType: .patrol,
                                     isEnabled: true,
                                     activeCount: status.patrol.activePatrollers,
+                                    globalCooldownActive: !status.globalCooldown.ready,
                                     onAction: { performPatrol() }
                                 )
                                 
@@ -209,6 +266,7 @@ struct ActionsView: View {
                                     actionType: .mine,
                                     isEnabled: true,
                                     activeCount: nil,
+                                    globalCooldownActive: !status.globalCooldown.ready,
                                     onAction: { performMine() }
                                 )
                                 
@@ -236,6 +294,7 @@ struct ActionsView: View {
                                     actionType: .scout,
                                     isEnabled: true,
                                     activeCount: nil,
+                                    globalCooldownActive: !status.globalCooldown.ready,
                                     onAction: { performScout() }
                                 )
                                 
@@ -250,6 +309,7 @@ struct ActionsView: View {
                                     actionType: .sabotage,
                                     isEnabled: true,
                                     activeCount: nil,
+                                    globalCooldownActive: !status.globalCooldown.ready,
                                     onAction: { showSabotageTargetSelection() }
                                 )
                             } else {
@@ -640,6 +700,7 @@ struct WorkContractCard: View {
     let status: ActionStatus
     let fetchedAt: Date
     let currentTime: Date
+    let globalCooldownActive: Bool
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -649,7 +710,7 @@ struct WorkContractCard: View {
     }
     
     var isReady: Bool {
-        return status.ready || calculatedSecondsRemaining <= 0
+        return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var body: some View {
@@ -706,7 +767,15 @@ struct WorkContractCard: View {
             }
             .frame(height: 8)
             
-            if isReady {
+            if globalCooldownActive {
+                Text("Another action is on cooldown")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else if isReady {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
@@ -740,6 +809,7 @@ struct ActionCard: View {
     let actionType: ActionType
     let isEnabled: Bool
     let activeCount: Int?
+    let globalCooldownActive: Bool
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -750,7 +820,7 @@ struct ActionCard: View {
     }
     
     var isReady: Bool {
-        return status.ready || calculatedSecondsRemaining <= 0
+        return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var body: some View {
@@ -791,7 +861,15 @@ struct ActionCard: View {
                 Spacer()
             }
             
-            if isReady && isEnabled {
+            if globalCooldownActive {
+                Text("Another action is on cooldown")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
@@ -902,6 +980,7 @@ struct TrainingContractCard: View {
     let fetchedAt: Date
     let currentTime: Date
     let isEnabled: Bool
+    let globalCooldownActive: Bool
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -911,7 +990,7 @@ struct TrainingContractCard: View {
     }
     
     var isReady: Bool {
-        return status.ready || calculatedSecondsRemaining <= 0
+        return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var iconName: String {
@@ -980,7 +1059,15 @@ struct TrainingContractCard: View {
             }
             .frame(height: 8)
             
-            if isReady && isEnabled {
+            if globalCooldownActive {
+                Text("Another action is on cooldown")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
