@@ -13,6 +13,8 @@ struct MapView: View {
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 0.0
     @State private var showAPIDebug = false
+    @State private var showActivity = false
+    @State private var notificationBadgeCount = 0
     
     var body: some View {
         ZStack {
@@ -214,6 +216,32 @@ struct MapView: View {
                                 .background(KingdomTheme.Colors.buttonSuccess)
                                 .cornerRadius(6)
                         }
+                        
+                        // Activity (icon only)
+                        Button(action: {
+                            showActivity = true
+                        }) {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "person.2.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(KingdomTheme.Colors.buttonSuccess)
+                                    .cornerRadius(6)
+                                
+                                if notificationBadgeCount > 0 {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 16, height: 16)
+                                        .overlay(
+                                            Text("\(notificationBadgeCount)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                        )
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 14)
@@ -316,6 +344,28 @@ struct MapView: View {
         }
         .sheet(isPresented: $showAPIDebug) {
             APIDebugView()
+        }
+        .sheet(isPresented: $showActivity) {
+            ActivityView()
+        }
+        .task {
+            await loadNotificationBadge()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            Task {
+                await loadNotificationBadge()
+            }
+        }
+    }
+    
+    private func loadNotificationBadge() async {
+        do {
+            let summary = try await viewModel.apiService.notifications.getSummary()
+            await MainActor.run {
+                notificationBadgeCount = summary.unreadNotifications
+            }
+        } catch {
+            print("❌ Failed to load notification badge: \(error)")
         }
     }
 }

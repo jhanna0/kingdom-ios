@@ -593,5 +593,33 @@ class ActionsAPI {
         let request = client.request(endpoint: "/actions/sabotage/\(contractId)", method: "POST")
         return try await client.execute(request)
     }
+    
+    // MARK: - Coups
+    
+    func joinCoup(coupId: Int, side: String) async throws -> CoupJoinResponse {
+        struct JoinRequest: Codable {
+            let side: String
+        }
+        
+        let body = JoinRequest(side: side)
+        let request = try client.request(endpoint: "/coups/\(coupId)/join", method: "POST", body: body)
+        return try await client.execute(request)
+    }
+}
+
+// MARK: - Coup Response Models
+
+struct CoupJoinResponse: Codable {
+    let success: Bool
+    let message: String
+    let side: String
+    let attackerCount: Int
+    let defenderCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, side
+        case attackerCount = "attacker_count"
+        case defenderCount = "defender_count"
+    }
 }
 

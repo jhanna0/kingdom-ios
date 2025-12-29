@@ -21,6 +21,7 @@ class KingdomAPIService: ObservableObject {
     let city = CityAPI()
     let contract = ContractAPI()
     let actions = ActionsAPI()
+    let notifications: NotificationsAPI
     
     // MARK: - Shared Client
     private let client = APIClient.shared
@@ -41,6 +42,9 @@ class KingdomAPIService: ObservableObject {
     // MARK: - Initialization
     
     private init() {
+        // Initialize notifications API with shared client
+        self.notifications = NotificationsAPI(client: client)
+        
         // Forward state from APIClient
         client.$isConnected
             .receive(on: DispatchQueue.main)

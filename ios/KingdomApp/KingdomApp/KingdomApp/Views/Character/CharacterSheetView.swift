@@ -229,57 +229,81 @@ struct CharacterSheetView: View {
                 .cornerRadius(8)
             }
             
-            Text("Purchase training sessions, then perform them in the Actions page (2 hour cooldown)")
+            Text("Purchase training sessions here, then perform them in the Actions page")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
             Divider()
             
-            // Attack Power
-            statRowWithTraining(
-                iconName: "bolt.fill",
-                name: "Attack Power",
-                value: player.attackPower,
-                description: "Offensive strength in coups",
-                cost: player.attackTrainingCost,
-                trainingType: "attack"
-            )
-            
-            Divider()
-            
-            // Defense Power
-            statRowWithTraining(
-                iconName: "shield.fill",
-                name: "Defense Power",
-                value: player.defensePower,
-                description: "Defend against coups",
-                cost: player.defenseTrainingCost,
-                trainingType: "defense"
-            )
-            
-            Divider()
-            
-            // Leadership
-            statRowWithTraining(
-                iconName: "crown.fill",
-                name: "Leadership",
-                value: player.leadership,
-                description: "Bonus to vote weight",
-                cost: player.leadershipTrainingCost,
-                trainingType: "leadership"
-            )
-            
-            Divider()
-            
-            // Building Skill
-            statRowWithTraining(
-                iconName: "hammer.fill",
-                name: "Building Skill",
-                value: player.buildingSkill,
-                description: "\(Int(player.getBuildingCostDiscount() * 100))% cost reduction",
-                cost: player.buildingTrainingCost,
-                trainingType: "building"
-            )
+            VStack(spacing: 8) {
+                // Attack Power
+                NavigationLink(destination: SkillDetailView(
+                    player: player,
+                    skillType: "attack",
+                    trainingContracts: trainingContracts,
+                    onPurchase: {
+                        purchaseTraining(type: "attack")
+                    }
+                )) {
+                    skillNavButton(
+                        iconName: "bolt.fill",
+                        displayName: "Attack Power",
+                        tier: player.attackPower,
+                        description: getSkillDescription(type: "attack", tier: player.attackPower)
+                    )
+                }
+                
+                // Defense Power
+                NavigationLink(destination: SkillDetailView(
+                    player: player,
+                    skillType: "defense",
+                    trainingContracts: trainingContracts,
+                    onPurchase: {
+                        purchaseTraining(type: "defense")
+                    }
+                )) {
+                    skillNavButton(
+                        iconName: "shield.fill",
+                        displayName: "Defense Power",
+                        tier: player.defensePower,
+                        description: getSkillDescription(type: "defense", tier: player.defensePower)
+                    )
+                }
+                
+                // Leadership
+                NavigationLink(destination: SkillDetailView(
+                    player: player,
+                    skillType: "leadership",
+                    trainingContracts: trainingContracts,
+                    onPurchase: {
+                        purchaseTraining(type: "leadership")
+                    }
+                )) {
+                    skillNavButton(
+                        iconName: "crown.fill",
+                        displayName: "Leadership",
+                        tier: player.leadership,
+                        description: getSkillDescription(type: "leadership", tier: player.leadership)
+                    )
+                }
+                
+                // Building Skill
+                NavigationLink(destination: SkillDetailView(
+                    player: player,
+                    skillType: "building",
+                    trainingContracts: trainingContracts,
+                    onPurchase: {
+                        purchaseTraining(type: "building")
+                    }
+                )) {
+                    skillNavButton(
+                        iconName: "hammer.fill",
+                        displayName: "Building Skill",
+                        tier: player.buildingSkill,
+                        description: getSkillDescription(type: "building", tier: player.buildingSkill)
+                    )
+                }
+            }
         }
         .padding()
         .background(KingdomTheme.Colors.parchmentLight)
@@ -316,6 +340,48 @@ struct CharacterSheetView: View {
     
     // MARK: - Helper Views
     
+    private func getSkillDescription(type: String, tier: Int) -> String {
+        switch type {
+        case "attack":
+            return "Tier \(tier) - Increases coup damage"
+        case "defense":
+            return "Tier \(tier) - Increases coup resistance"
+        case "leadership":
+            switch tier {
+            case 1:
+                return "Vote weight: 1.0"
+            case 2:
+                return "Vote weight: 1.2 • +50% ruler rewards"
+            case 3:
+                return "Vote weight: 1.5 • Can propose coups"
+            case 4:
+                return "Vote weight: 1.8 • +100% ruler rewards"
+            case 5:
+                return "Vote weight: 2.0 • -50% coup cost"
+            default:
+                return "Vote weight: \(1.0 + (Double(tier - 1) * 0.2)) • Enhanced influence"
+            }
+        case "building":
+            let discount = Int(player.getBuildingCostDiscount() * 100)
+            switch tier {
+            case 1:
+                return "\(discount)% cost reduction"
+            case 2:
+                return "\(discount)% cost reduction • +10% coin rewards"
+            case 3:
+                return "\(discount)% cost reduction • +20% coins • +1 daily Assist"
+            case 4:
+                return "\(discount)% cost reduction • +30% coins • 10% cooldown refund"
+            case 5:
+                return "\(discount)% cost reduction • +40% coins • 25% double progress"
+            default:
+                return "\(discount)% cost reduction"
+            }
+        default:
+            return "Combat skill"
+        }
+    }
+    
     private func abilityRow(icon: String, text: String, unlocked: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
@@ -335,89 +401,48 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func statRowWithTraining(
+    private func skillNavButton(
         iconName: String,
-        name: String,
-        value: Int,
-        description: String,
-        cost: Int,
-        trainingType: String
+        displayName: String,
+        tier: Int,
+        description: String
     ) -> some View {
-        let hasActiveTraining = trainingContracts.contains { $0.status != "completed" }
-        let canAfford = player.gold >= cost
-        let isEnabled = canAfford && !hasActiveTraining && !isLoadingContracts
-        
-        return VStack(spacing: 8) {
-            // Main stat row
-            HStack(spacing: 12) {
-                Image(systemName: iconName)
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
-                    .frame(width: 30)
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.title3)
+                .foregroundColor(KingdomTheme.Colors.gold)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayName)
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.subheadline.bold())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                Text("\(value)")
-                    .font(.title2.bold().monospacedDigit())
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                    .lineLimit(2)
             }
             
-            // Training purchase button
-            Button(action: {
-                purchaseTraining(type: trainingType)
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(isEnabled ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled)
-                    
-                    if hasActiveTraining {
-                        Text("Complete current training first")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                    } else if !canAfford {
-                        Text("Insufficient gold")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    } else {
-                        Text("Train for")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 4) {
-                        Text("\(cost)")
-                            .font(.caption.bold().monospacedDigit())
-                            .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
-                        
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 4))
-                            .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(isEnabled ? KingdomTheme.Colors.buttonPrimary.opacity(0.1) : KingdomTheme.Colors.inkDark.opacity(0.05))
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(isEnabled ? KingdomTheme.Colors.buttonPrimary.opacity(0.3) : KingdomTheme.Colors.disabled.opacity(0.2), lineWidth: 1)
-                )
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Text("T\(tier)")
+                    .font(.title3.bold().monospacedDigit())
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
             }
-            .disabled(!isEnabled)
         }
+        .padding()
+        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 1)
+        )
     }
     
     private func purchaseTraining(type: String) {

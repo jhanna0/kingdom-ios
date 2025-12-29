@@ -16,7 +16,8 @@ from schemas.coup import (
     CoupEventResponse,
     CoupResolveResponse,
     CoupParticipant,
-    ActiveCoupsResponse
+    ActiveCoupsResponse,
+    InitiatorStats
 )
 from routers.auth import get_current_user
 
@@ -60,6 +61,29 @@ def _get_kingdom_reputation(state: PlayerState, kingdom_id: str) -> int:
     if not state.kingdom_reputation:
         return 0
     return state.kingdom_reputation.get(kingdom_id, 0)
+
+
+def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> InitiatorStats:
+    """Get comprehensive stats about the coup initiator"""
+    user = db.query(User).filter(User.id == initiator_id).first()
+    if not user:
+        return None
+    
+    state = _get_player_state(db, user)
+    kingdom_rep = _get_kingdom_reputation(state, kingdom_id)
+    
+    return InitiatorStats(
+        reputation=state.reputation,
+        kingdom_reputation=kingdom_rep,
+        attack_power=state.attack_power,
+        defense_power=state.defense_power,
+        leadership=state.leadership,
+        building_skill=state.building_skill,
+        intelligence=state.intelligence,
+        contracts_completed=state.contracts_completed,
+        total_work_contributed=state.total_work_contributed,
+        level=state.level
+    )
 
 
 def _calculate_combat_strength(
@@ -555,12 +579,16 @@ def get_active_coups(
             coup.is_voting_open
         )
         
+        # Get initiator stats
+        initiator_stats = _get_initiator_stats(db, coup.initiator_id, coup.kingdom_id)
+        
         coup_responses.append(CoupEventResponse(
             id=coup.id,
             kingdom_id=coup.kingdom_id,
             kingdom_name=kingdom.name if kingdom else None,
             initiator_id=coup.initiator_id,
             initiator_name=coup.initiator_name,
+            initiator_stats=initiator_stats,
             status=coup.status,
             start_time=coup.start_time,
             end_time=coup.end_time,
@@ -621,12 +649,16 @@ def get_coup_details(
         coup.is_voting_open
     )
     
+    # Get initiator stats
+    initiator_stats = _get_initiator_stats(db, coup.initiator_id, coup.kingdom_id)
+    
     return CoupEventResponse(
         id=coup.id,
         kingdom_id=coup.kingdom_id,
         kingdom_name=kingdom.name if kingdom else None,
         initiator_id=coup.initiator_id,
         initiator_name=coup.initiator_name,
+        initiator_stats=initiator_stats,
         status=coup.status,
         start_time=coup.start_time,
         end_time=coup.end_time,

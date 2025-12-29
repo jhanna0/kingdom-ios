@@ -27,6 +27,23 @@ class CoupParticipant(BaseModel):
         from_attributes = True
 
 
+class InitiatorStats(BaseModel):
+    """Stats about the coup initiator"""
+    reputation: int
+    kingdom_reputation: int
+    attack_power: int
+    defense_power: int
+    leadership: int
+    building_skill: int
+    intelligence: int
+    contracts_completed: int
+    total_work_contributed: int
+    level: int
+    
+    class Config:
+        from_attributes = True
+
+
 class CoupEventResponse(BaseModel):
     """Response for coup event details"""
     id: int
@@ -34,6 +51,7 @@ class CoupEventResponse(BaseModel):
     kingdom_name: Optional[str] = None
     initiator_id: int
     initiator_name: str
+    initiator_stats: Optional[InitiatorStats] = None  # Stats of the coup initiator
     status: str
     
     # Timing

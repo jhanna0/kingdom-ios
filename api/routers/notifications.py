@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
-from db import get_db, User, PlayerState, Contract, Kingdom, UserKingdom
+from db import get_db, User, PlayerState, Contract, Kingdom, UserKingdom, CoupEvent
 from routers.auth import get_current_user
 from config import DEV_MODE
 
@@ -48,159 +48,164 @@ def get_user_updates(
     state = get_player_state(db, current_user)
     notifications = []
     
-    # ===== Check for completed contracts =====
-    # Find contracts where user has contributed
-    all_contracts = db.query(Contract).filter(
-        Contract.status.in_(["open", "in_progress"])
-    ).all()
-    
-    user_id_str = str(current_user.id)
-    active_contracts = [c for c in all_contracts if user_id_str in (c.action_contributions or {})]
-    
-    ready_to_complete = []
-    in_progress = []
-    
-    for contract in active_contracts:
-        # Check if contract is complete based on actions
-        if contract.actions_completed >= contract.total_actions_required:
-            user_actions = contract.action_contributions.get(user_id_str, 0)
-            total_actions = sum(contract.action_contributions.values())
-            proportional_reward = int((user_actions / total_actions) * contract.reward_pool) if total_actions > 0 else 0
-            
-            ready_to_complete.append({
-                "id": contract.id,
-                "kingdom_name": contract.kingdom_name,
-                "building_type": contract.building_type,
-                "building_level": contract.building_level,
-                "reward": proportional_reward
-            })
-            
-            notifications.append({
-                "type": "contract_ready",
-                "priority": "high",
-                "title": "Contract Complete!",
-                "message": f"{contract.building_type} in {contract.kingdom_name} is ready",
-                "action": "complete_contract",
-                "action_id": contract.id,
-                "created_at": datetime.utcnow().isoformat()
-            })
-        else:
-            # Use action-based progress
-            progress = contract.actions_completed / contract.total_actions_required if contract.total_actions_required > 0 else 0
-            actions_remaining = contract.total_actions_required - contract.actions_completed
-            
-            in_progress.append({
-                "id": contract.id,
-                "kingdom_name": contract.kingdom_name,
-                "building_type": contract.building_type,
-                "progress": min(progress, 1.0),
-                "actions_remaining": actions_remaining,
-                "actions_completed": contract.actions_completed,
-                "total_actions_required": contract.total_actions_required
-            })
-    
-    # ===== Check kingdoms you rule =====
-    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
-    
-    kingdom_updates = []
-    for kingdom in ruled_kingdoms:
-        # Check for open contracts in your kingdoms
-        open_contracts_count = db.query(Contract).filter(
-            Contract.kingdom_id == kingdom.id,
-            Contract.status == "open"
-        ).count()
-        
-        # Check treasury
-        kingdom_updates.append({
-            "id": kingdom.id,
-            "name": kingdom.name,
-            "level": kingdom.level,
-            "population": kingdom.population,
-            "treasury": kingdom.treasury_gold,
-            "open_contracts": open_contracts_count
-        })
-        
-        # Notify if treasury is high
-        if kingdom.treasury_gold > 1000:
-            notifications.append({
-                "type": "treasury_full",
-                "priority": "medium",
-                "title": f"{kingdom.name} Treasury",
-                "message": f"Treasury has {kingdom.treasury_gold} gold available",
-                "action": "view_kingdom",
-                "action_id": kingdom.id,
-                "created_at": datetime.utcnow().isoformat()
-            })
-    
-    # ===== Check for level up available =====
-    xp_needed = 100 * (2 ** (state.level - 1))
-    if state.experience >= xp_needed:
-        notifications.append({
-            "type": "level_up",
-            "priority": "high",
-            "title": "Level Up Available!",
-            "message": f"You have enough XP to reach level {state.level + 1}",
-            "action": "level_up",
-            "action_id": None,
-            "created_at": datetime.utcnow().isoformat()
-        })
-    
-    # ===== Check for available skill points =====
-    if state.skill_points > 0:
-        notifications.append({
-            "type": "skill_points",
-            "priority": "medium",
-            "title": "Skill Points Available",
-            "message": f"You have {state.skill_points} skill points to spend",
-            "action": "view_character",
-            "action_id": None,
-            "created_at": datetime.utcnow().isoformat()
-        })
     
     # ===== Check for check-in availability =====
-    if state.current_kingdom_id:
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == current_user.id,
-            UserKingdom.kingdom_id == state.current_kingdom_id
-        ).first()
-        
-        if user_kingdom and user_kingdom.last_checkin:
-            cooldown = timedelta(minutes=5) if DEV_MODE else timedelta(hours=1)
-            time_since = datetime.utcnow() - user_kingdom.last_checkin
-            
-            if time_since >= cooldown:
-                notifications.append({
-                    "type": "checkin_ready",
-                    "priority": "low",
-                    "title": "Check-in Available",
-                    "message": "You can check in to earn rewards",
-                    "action": "checkin",
-                    "action_id": state.current_kingdom_id,
-                    "created_at": datetime.utcnow().isoformat()
-                })
+    # REMOVED - check-in is not an event, it's just status
     
-    # ===== Summary stats =====
-    summary = {
-        "gold": state.gold,
-        "level": state.level,
-        "experience": state.experience,
-        "xp_to_next_level": xp_needed - state.experience,
-        "skill_points": state.skill_points,
-        "reputation": state.reputation,
-        "kingdoms_ruled": len(ruled_kingdoms),
-        "active_contracts": len(in_progress),
-        "ready_contracts": len(ready_to_complete)
-    }
+    # ===== Check for active coups =====
+    # Find all active coups where user can participate
+    active_coups = db.query(CoupEvent).filter(
+        CoupEvent.status == 'voting'
+    ).all()
+    
+    coup_notifications = []
+    for coup in active_coups:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+        if not kingdom:
+            continue
+        
+        # Get initiator stats
+        initiator = db.query(User).filter(User.id == coup.initiator_id).first()
+        initiator_state = db.query(PlayerState).filter(PlayerState.user_id == coup.initiator_id).first()
+        
+        initiator_stats = None
+        if initiator and initiator_state:
+            kingdom_rep = initiator_state.kingdom_reputation.get(coup.kingdom_id, 0) if initiator_state.kingdom_reputation else 0
+            initiator_stats = {
+                "reputation": initiator_state.reputation,
+                "kingdom_reputation": kingdom_rep,
+                "attack_power": initiator_state.attack_power,
+                "defense_power": initiator_state.defense_power,
+                "leadership": initiator_state.leadership,
+                "building_skill": initiator_state.building_skill,
+                "intelligence": initiator_state.intelligence,
+                "contracts_completed": initiator_state.contracts_completed,
+                "total_work_contributed": initiator_state.total_work_contributed,
+                "level": initiator_state.level
+            }
+        
+        attacker_ids = coup.get_attacker_ids()
+        defender_ids = coup.get_defender_ids()
+        
+        # Check if user has already joined
+        user_has_joined = current_user.id in attacker_ids or current_user.id in defender_ids
+        
+        # Check if user can join (must be checked in)
+        can_join = (
+            state.current_kingdom_id == coup.kingdom_id and
+            not user_has_joined and
+            coup.is_voting_open
+        )
+        
+        # Create notification based on user's situation
+        if can_join:
+            # User can vote - HIGH priority
+            notifications.append({
+                "type": "coup_vote_needed",
+                "priority": "high",
+                "title": f"Coup in {kingdom.name}!",
+                "message": f"{coup.initiator_name} is attempting to overthrow the ruler. Choose your side!",
+                "action": "vote_coup",
+                "action_id": coup.id,
+                "created_at": coup.start_time.isoformat(),
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom.name,
+                    "initiator_name": coup.initiator_name,
+                    "initiator_stats": initiator_stats,
+                    "time_remaining_seconds": coup.time_remaining_seconds,
+                    "attacker_count": len(attacker_ids),
+                    "defender_count": len(defender_ids),
+                    "can_join": True
+                }
+            })
+        elif user_has_joined:
+            # User already joined - MEDIUM priority (keep them updated)
+            user_side = 'attackers' if current_user.id in attacker_ids else 'defenders'
+            notifications.append({
+                "type": "coup_in_progress",
+                "priority": "medium",
+                "title": f"Coup Ongoing in {kingdom.name}",
+                "message": f"You joined the {user_side}. {coup.time_remaining_seconds // 60} minutes remaining.",
+                "action": "view_coup",
+                "action_id": coup.id,
+                "created_at": coup.start_time.isoformat(),
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom.name,
+                    "initiator_name": coup.initiator_name,
+                    "initiator_stats": initiator_stats,
+                    "time_remaining_seconds": coup.time_remaining_seconds,
+                    "attacker_count": len(attacker_ids),
+                    "defender_count": len(defender_ids),
+                    "user_side": user_side,
+                    "can_join": False
+                }
+            })
+        elif kingdom.ruler_id == current_user.id:
+            # User is the ruler being targeted - CRITICAL priority
+            notifications.append({
+                "type": "coup_against_you",
+                "priority": "critical",
+                "title": f"⚔️ COUP AGAINST YOU!",
+                "message": f"{coup.initiator_name} is trying to overthrow you in {kingdom.name}!",
+                "action": "view_coup",
+                "action_id": coup.id,
+                "created_at": coup.start_time.isoformat(),
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom.name,
+                    "initiator_name": coup.initiator_name,
+                    "initiator_stats": initiator_stats,
+                    "time_remaining_seconds": coup.time_remaining_seconds,
+                    "attacker_count": len(attacker_ids),
+                    "defender_count": len(defender_ids),
+                    "can_join": False
+                }
+            })
+    
+    # ===== Check for recently resolved coups user was part of =====
+    recently_resolved_coups = db.query(CoupEvent).filter(
+        CoupEvent.status == 'resolved',
+        CoupEvent.resolved_at >= datetime.utcnow() - timedelta(hours=24)
+    ).all()
+    
+    for coup in recently_resolved_coups:
+        attacker_ids = coup.get_attacker_ids()
+        defender_ids = coup.get_defender_ids()
+        
+        if current_user.id in attacker_ids or current_user.id in defender_ids:
+            kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+            
+            user_was_attacker = current_user.id in attacker_ids
+            user_won = (user_was_attacker and coup.attacker_victory) or (not user_was_attacker and not coup.attacker_victory)
+            
+            notifications.append({
+                "type": "coup_resolved",
+                "priority": "high",
+                "title": f"Coup Resolved in {kingdom.name if kingdom else 'Kingdom'}",
+                "message": "You won!" if user_won else "You lost.",
+                "action": "view_coup_results",
+                "action_id": coup.id,
+                "created_at": coup.resolved_at.isoformat(),
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom.name if kingdom else None,
+                    "attacker_victory": coup.attacker_victory,
+                    "user_won": user_won
+                }
+            })
+    
+    # Sort by timestamp (most recent first)
+    sorted_notifications = sorted(notifications, key=lambda x: x.get("created_at", ""), reverse=True)
     
     return {
         "success": True,
-        "summary": summary,
-        "notifications": sorted(notifications, key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["priority"]]),
-        "contracts": {
-            "ready_to_complete": ready_to_complete,
-            "in_progress": in_progress
-        },
-        "kingdoms": kingdom_updates,
+        "notifications": sorted_notifications,
         "server_time": datetime.utcnow().isoformat()
     }
 
@@ -214,25 +219,21 @@ def get_quick_summary(
     Quick summary for app badge/widget
     Returns counts only, no detailed data
     """
+    # Count active coups where user can participate or is involved
     state = get_player_state(db, current_user)
+    active_coups = db.query(CoupEvent).filter(CoupEvent.status == 'voting').all()
     
-    # Count ready contracts where user has contributed
-    all_contracts = db.query(Contract).filter(
-        Contract.status.in_(["open", "in_progress"])
-    ).all()
-    
-    user_id_str = str(current_user.id)
-    active_contracts = [c for c in all_contracts if user_id_str in (c.action_contributions or {})]
-    
-    ready_count = 0
-    for contract in active_contracts:
-        if contract.actions_completed >= contract.total_actions_required:
-            ready_count += 1
+    relevant_coups = 0
+    for coup in active_coups:
+        attacker_ids = coup.get_attacker_ids()
+        defender_ids = coup.get_defender_ids()
+        user_involved = current_user.id in attacker_ids or current_user.id in defender_ids
+        can_join = state.current_kingdom_id == coup.kingdom_id and not user_involved
+        
+        if user_involved or can_join:
+            relevant_coups += 1
     
     return {
-        "ready_contracts": ready_count,
-        "active_contracts": len(active_contracts),
-        "skill_points": state.skill_points,
-        "unread_notifications": ready_count + (1 if state.skill_points > 0 else 0)
+        "unread_notifications": relevant_coups
     }
 
