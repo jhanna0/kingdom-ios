@@ -34,9 +34,10 @@ struct WorkActionResponse: Codable {
     let yourContribution: Int
     let isComplete: Bool
     let nextWorkAvailableAt: Date
+    let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
-        case success, message
+        case success, message, rewards
         case contractId = "contract_id"
         case actionsCompleted = "actions_completed"
         case totalActionsRequired = "total_actions_required"
@@ -51,9 +52,10 @@ struct PatrolActionResponse: Codable {
     let success: Bool
     let message: String
     let expiresAt: Date
+    let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
-        case success, message
+        case success, message, rewards
         case expiresAt = "expires_at"
     }
 }
@@ -64,9 +66,10 @@ struct MineActionResponse: Codable {
     let ironGained: Int
     let totalIron: Int
     let nextMineAvailableAt: Date
+    let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
-        case success, message
+        case success, message, rewards
         case ironGained = "iron_gained"
         case totalIron = "total_iron"
         case nextMineAvailableAt = "next_mine_available_at"
@@ -102,11 +105,18 @@ struct ScoutActionResponse: Codable {
     let message: String
     let intelligence: KingdomIntelligence
     let nextScoutAvailableAt: Date
+    let rewards: ActionRewards?
     
     enum CodingKeys: String, CodingKey {
-        case success, message, intelligence
+        case success, message, intelligence, rewards
         case nextScoutAvailableAt = "next_scout_available_at"
     }
+}
+
+struct ActionRewards: Codable {
+    let gold: Int?
+    let reputation: Int?
+    let iron: Int?
 }
 
 // MARK: - Actions API

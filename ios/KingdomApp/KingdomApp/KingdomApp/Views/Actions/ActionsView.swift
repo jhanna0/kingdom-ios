@@ -6,8 +6,8 @@ struct ActionsView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var showSuccess = false
-    @State private var successMessage = ""
+    @State private var showReward = false
+    @State private var currentReward: Reward?
     @State private var refreshTimer: Timer?
     
     var currentKingdom: Kingdom? {
@@ -197,30 +197,10 @@ struct ActionsView: View {
         } message: {
             Text(errorMessage)
         }
-        .overlay(alignment: .top) {
-            if showSuccess {
-                VStack {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.white)
-                        Text(successMessage)
-                            .foregroundColor(.white)
-                            .font(KingdomTheme.Typography.body())
-                    }
-                    .padding()
-                    .background(Color.green)
-                    .cornerRadius(12)
-                    .shadow(radius: 4)
-                    .padding()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation {
-                            showSuccess = false
-                        }
-                    }
-                }
+        .overlay {
+            if showReward, let reward = currentReward {
+                RewardDisplayView(reward: reward, isShowing: $showReward)
+                    .transition(.opacity)
             }
         }
     }
@@ -251,11 +231,21 @@ struct ActionsView: View {
             do {
                 let response = try await KingdomAPIService.shared.actions.workOnContract(contractId: contractId)
                 await MainActor.run {
-                    successMessage = response.message
-                    showSuccess = true
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            gold: rewards.gold,
+                            reputation: rewards.reputation,
+                            iron: rewards.iron,
+                            message: response.message
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
                 }
                 await loadActionStatus()
                 await viewModel.loadContracts()
+                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -270,10 +260,20 @@ struct ActionsView: View {
             do {
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
                 await MainActor.run {
-                    successMessage = response.message
-                    showSuccess = true
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            gold: rewards.gold,
+                            reputation: rewards.reputation,
+                            iron: rewards.iron,
+                            message: response.message
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
                 }
                 await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -288,10 +288,20 @@ struct ActionsView: View {
             do {
                 let response = try await KingdomAPIService.shared.actions.mineResources()
                 await MainActor.run {
-                    successMessage = response.message
-                    showSuccess = true
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            gold: rewards.gold,
+                            reputation: rewards.reputation,
+                            iron: rewards.iron,
+                            message: response.message
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
                 }
                 await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -308,10 +318,20 @@ struct ActionsView: View {
             do {
                 let response = try await KingdomAPIService.shared.actions.scoutKingdom(kingdomId: kingdomId)
                 await MainActor.run {
-                    successMessage = response.message
-                    showSuccess = true
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            gold: rewards.gold,
+                            reputation: rewards.reputation,
+                            iron: rewards.iron,
+                            message: response.message
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
                 }
                 await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription

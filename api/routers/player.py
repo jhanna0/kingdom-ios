@@ -67,8 +67,6 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         # Check-in tracking
         check_in_history=state.check_in_history or {},
         last_check_in=state.last_check_in,
-        last_check_in_lat=state.last_check_in_lat,
-        last_check_in_lon=state.last_check_in_lon,
         last_daily_check_in=state.last_daily_check_in,
         
         # Activity tracking
@@ -142,9 +140,7 @@ def apply_state_update(state: DBPlayerState, update: PlayerStateUpdate) -> None:
 def get_player_state(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    kingdom_id: Optional[str] = None,
-    lat: Optional[float] = None,
-    lon: Optional[float] = None
+    kingdom_id: Optional[str] = None
 ):
     """
     Get current player state
@@ -152,12 +148,12 @@ def get_player_state(
     Returns the complete player state for the authenticated user.
     Use this to load player data on app launch.
     
-    If kingdom_id + lat/lon provided, auto-checks in to that kingdom.
+    If kingdom_id provided, auto-checks in to that kingdom.
     """
     state = get_or_create_player_state(db, current_user)
     
     # Auto check-in if kingdom_id provided
-    if kingdom_id and lat is not None and lon is not None:
+    if kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
         if kingdom:
             # Check cooldown
@@ -189,8 +185,6 @@ def get_player_state(
                 state.total_checkins += 1
                 state.current_kingdom_id = kingdom.id
                 state.last_check_in = datetime.utcnow()
-                state.last_check_in_lat = lat
-                state.last_check_in_lon = lon
                 
                 # Update check-in history
                 check_in_history = state.check_in_history or {}

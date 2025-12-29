@@ -41,8 +41,6 @@ struct APIPlayerState: Codable {
     // Check-in tracking
     let check_in_history: [String: Int]?
     let last_check_in: String?
-    let last_check_in_lat: Double?
-    let last_check_in_lon: Double?
     let last_daily_check_in: String?
     
     // Activity tracking

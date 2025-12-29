@@ -47,8 +47,6 @@ class PlayerState(BaseModel):
     # Check-in tracking
     check_in_history: Dict[str, int] = {}
     last_check_in: Optional[datetime] = None
-    last_check_in_lat: Optional[float] = None
-    last_check_in_lon: Optional[float] = None
     last_daily_check_in: Optional[datetime] = None
     
     # Activity tracking
@@ -151,8 +149,6 @@ class PlayerStateUpdate(BaseModel):
     # Check-in tracking
     check_in_history: Optional[Dict[str, int]] = None
     last_check_in: Optional[datetime] = None
-    last_check_in_lat: Optional[float] = None
-    last_check_in_lon: Optional[float] = None
     last_daily_check_in: Optional[datetime] = None
     
     # Activity tracking

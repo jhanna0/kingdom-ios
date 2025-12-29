@@ -7,22 +7,15 @@ class PlayerAPI {
     // MARK: - State Management
     
     /// Load player state from server (with optional auto check-in)
-    func loadState(kingdomId: String? = nil, lat: Double? = nil, lon: Double? = nil) async throws -> APIPlayerState {
+    func loadState(kingdomId: String? = nil) async throws -> APIPlayerState {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
         
         var endpoint = "/player/state"
-        var queryParams: [String] = []
         
-        if let kingdomId = kingdomId, let lat = lat, let lon = lon {
-            queryParams.append("kingdom_id=\(kingdomId)")
-            queryParams.append("lat=\(lat)")
-            queryParams.append("lon=\(lon)")
-        }
-        
-        if !queryParams.isEmpty {
-            endpoint += "?" + queryParams.joined(separator: "&")
+        if let kingdomId = kingdomId {
+            endpoint += "?kingdom_id=\(kingdomId)"
         }
         
         let request = client.request(endpoint: endpoint)

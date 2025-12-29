@@ -666,8 +666,6 @@ class Player: ObservableObject {
             state["last_check_in"] = ISO8601DateFormatter().string(from: lastCheckIn)
         }
         if let location = lastCheckInLocation {
-            state["last_check_in_lat"] = location.latitude
-            state["last_check_in_lon"] = location.longitude
         }
         if let lastDaily = lastDailyCheckIn {
             state["last_daily_check_in"] = ISO8601DateFormatter().string(from: lastDaily)
@@ -735,9 +733,6 @@ class Player: ObservableObject {
         checkInHistory = apiState.check_in_history ?? [:]
         if let lastCheckInStr = apiState.last_check_in {
             lastCheckIn = ISO8601DateFormatter().date(from: lastCheckInStr)
-        }
-        if let lat = apiState.last_check_in_lat, let lon = apiState.last_check_in_lon {
-            lastCheckInLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
         if let lastDailyStr = apiState.last_daily_check_in {
             lastDailyCheckIn = ISO8601DateFormatter().date(from: lastDailyStr)

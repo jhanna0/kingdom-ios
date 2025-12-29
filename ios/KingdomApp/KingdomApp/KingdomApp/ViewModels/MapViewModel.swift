@@ -167,8 +167,7 @@ class MapViewModel: ObservableObject {
             Task {
                 do {
                     let updatedState = try await apiService.loadPlayerState(
-                        kingdomId: current.id,
-                        location: location
+                        kingdomId: current.id
                     )
                     
                     await MainActor.run {
@@ -702,7 +701,7 @@ class MapViewModel: ObservableObject {
     }
     
     /// Refresh player data from backend
-    private func refreshPlayerFromBackend() async {
+    func refreshPlayerFromBackend() async {
         do {
             let apiPlayerState = try await apiService.loadPlayerState()
             

@@ -30,6 +30,30 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     return R * c
 
 
+def _is_point_in_polygon(lat: float, lon: float, polygon: List[List[float]]) -> bool:
+    """
+    Check if a point is inside a polygon using ray-casting algorithm
+    polygon: List of [lat, lon] pairs
+    """
+    x, y = lat, lon
+    n = len(polygon)
+    inside = False
+    
+    p1x, p1y = polygon[0]
+    for i in range(1, n + 1):
+        p2x, p2y = polygon[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    
+    return inside
+
+
 def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) -> dict:
     """
     Get or create kingdoms for cities.
@@ -123,13 +147,16 @@ async def get_cities_near_location(
     db: Session,
     lat: float,
     lon: float,
-    radius: float = 30.0
+    radius: float = 30.0,
+    check_current: bool = True
 ) -> List[CityBoundaryResponse]:
     """
     Fetch neighboring cities from OSM.
     
     Uses fast shared-boundary query (finds cities that border the user's city).
     No in-memory caching - the OSM query should be <2 seconds now.
+    
+    If check_current=True, marks which kingdom the user is currently inside.
     """
     print(f"🔍 City lookup request: lat={lat}, lon={lon}, radius={radius}km")
     
@@ -142,7 +169,25 @@ async def get_cities_near_location(
         return []
     
     # For each city ID, check if we have boundary in DB, else fetch it
-    return await _process_city_ids(db, city_ids)
+    cities = await _process_city_ids(db, city_ids)
+    
+    # Check which kingdom the user is currently inside (if any)
+    if check_current:
+        for city in cities:
+            if _is_point_in_polygon(lat, lon, city.boundary):
+                city.is_current = True
+                print(f"📍 User is inside: {city.name}")
+                break
+    
+    return cities
+    if check_current:
+        for city in cities:
+            if _is_point_in_polygon(lat, lon, city.boundary):
+                city.is_current = True
+                print(f"📍 User is inside: {city.name}")
+                break
+    
+    return cities
 
 
 async def _fetch_cities_fallback(

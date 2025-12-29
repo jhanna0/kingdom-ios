@@ -88,11 +88,13 @@ class KingdomAPIService: ObservableObject {
         }
     }
     
-    /// Load player state from server
-    func loadPlayerState(kingdomId: String? = nil, location: CLLocationCoordinate2D? = nil) async throws -> APIPlayerState {
-        if let kingdomId = kingdomId, let location = location {
-            return try await player.loadState(kingdomId: kingdomId, lat: location.latitude, lon: location.longitude)
+    /// Load player state from server (with optional auto check-in)
+    func loadPlayerState(kingdomId: String? = nil) async throws -> APIPlayerState {
+        if let kingdomId = kingdomId {
+            // Check-in with kingdom_id only (no location tracking)
+            return try await player.loadState(kingdomId: kingdomId)
         } else {
+            // Just load state without check-in
             return try await player.loadState()
         }
     }

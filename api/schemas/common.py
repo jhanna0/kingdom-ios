@@ -49,5 +49,6 @@ class CityBoundaryResponse(BaseModel):
     boundary: List[List[float]]  # Array of [lat, lon] pairs
     radius_meters: float
     cached: bool
+    is_current: bool = False  # True if user is currently inside this kingdom
     kingdom: Optional[KingdomData] = None  # NULL if unclaimed
 

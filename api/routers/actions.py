@@ -211,6 +211,14 @@ def work_on_contract(
     progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
     user_contribution = contributions.get(user_id_str, 0)
     
+    # Calculate rewards for this action (only if contract completed)
+    gold_earned = 0
+    rep_earned = 0
+    if is_complete:
+        # User's proportional reward
+        gold_earned = int((user_contribution / sum(contributions.values())) * contract.reward_pool)
+        rep_earned = 100 if DEV_MODE else 10
+    
     return {
         "success": True,
         "message": "Work action completed! +1 action" + (" - Contract complete!" if is_complete else ""),
@@ -220,7 +228,12 @@ def work_on_contract(
         "progress_percent": progress_percent,
         "your_contribution": user_contribution,
         "is_complete": is_complete,
-        "next_work_available_at": datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+        "next_work_available_at": datetime.utcnow() + timedelta(minutes=cooldown_minutes),
+        "rewards": {
+            "gold": gold_earned if gold_earned > 0 else None,
+            "reputation": rep_earned if rep_earned > 0 else None,
+            "iron": None
+        } if is_complete else None
     }
 
 
@@ -266,15 +279,21 @@ def start_patrol(
     state.last_patrol_action = datetime.utcnow()
     state.patrol_expires_at = datetime.utcnow() + timedelta(minutes=10)
     
-    # Award reputation for completing patrol
+    # Award gold and reputation for patrol
+    state.gold += 5
     state.reputation += 5
     
     db.commit()
     
     return {
         "success": True,
-        "message": "Patrol started! Guard duty for 10 minutes. +5 reputation",
-        "expires_at": state.patrol_expires_at
+        "message": "Patrol started! Guard duty for 10 minutes.",
+        "expires_at": state.patrol_expires_at,
+        "rewards": {
+            "gold": 5,
+            "reputation": 5,
+            "iron": None
+        }
     }
 
 
@@ -329,10 +348,15 @@ def mine_resources(
     
     return {
         "success": True,
-        "message": f"Mined {base_iron} iron!",
+        "message": f"Mining complete!",
         "iron_gained": base_iron,
         "total_iron": state.iron,
-        "next_mine_available_at": datetime.utcnow() + timedelta(hours=24)
+        "next_mine_available_at": datetime.utcnow() + timedelta(hours=24),
+        "rewards": {
+            "gold": None,
+            "reputation": None,
+            "iron": base_iron
+        }
     }
 
 
@@ -379,6 +403,9 @@ def scout_kingdom(
     # Update player state
     state.last_scout_action = datetime.utcnow()
     
+    # Give gold reward for successful scouting
+    state.gold += 10
+    
     db.commit()
     
     # Return intelligence
@@ -396,6 +423,11 @@ def scout_kingdom(
             "checked_in_players": kingdom.checked_in_players,
             "population": kingdom.population
         },
-        "next_scout_available_at": datetime.utcnow() + timedelta(hours=24)
+        "next_scout_available_at": datetime.utcnow() + timedelta(hours=24),
+        "rewards": {
+            "gold": 10,  # Small reward for scouting
+            "reputation": None,
+            "iron": None
+        }
     }
 
