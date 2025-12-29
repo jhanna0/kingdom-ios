@@ -7,6 +7,8 @@ struct CharacterSheetView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var trainingContracts: [TrainingContract] = []
+    @State private var isLoadingContracts = true
     
     var body: some View {
         ScrollView {
@@ -259,6 +261,27 @@ struct CharacterSheetView: View {
                 }
             }
             
+            // Show active training contract if exists
+            if let activeContract = trainingContracts.first(where: { $0.status != "completed" }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hourglass")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        
+                        Text("Training In Progress: \(activeContract.type.capitalized)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    }
+                    
+                    Text("Complete your current training (\(activeContract.actionsCompleted)/\(activeContract.actionsRequired)) before starting a new one")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .padding()
+                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
             Text("Purchase training sessions here, then perform them in the Actions page (2 hour cooldown per training)")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
@@ -320,10 +343,27 @@ struct CharacterSheetView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
         )
+        .task {
+            await loadTrainingContracts()
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+    }
+    
+    private func loadTrainingContracts() async {
+        do {
+            let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            await MainActor.run {
+                trainingContracts = status.trainingContracts
+                isLoadingContracts = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingContracts = false
+            }
         }
     }
     
@@ -380,21 +420,35 @@ struct CharacterSheetView: View {
         cost: Int,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let hasActiveTraining = trainingContracts.contains { $0.status != "completed" }
+        let canAfford = player.gold >= cost
+        let isEnabled = canAfford && !hasActiveTraining && !isLoadingContracts
+        
+        return Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: iconName)
                     .font(.title3)
-                    .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(statName) Training")
                         .font(.subheadline.bold())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .foregroundColor(isEnabled ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
                     
-                    Text("Current: \(currentValue)")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                    if hasActiveTraining {
+                        Text("Complete current training first")
+                            .font(.caption)
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    } else if !canAfford {
+                        Text("Insufficient gold")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    } else {
+                        Text("Current: \(currentValue)")
+                            .font(.caption)
+                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                    }
                 }
                 
                 Spacer()
@@ -402,22 +456,22 @@ struct CharacterSheetView: View {
                 HStack(spacing: 4) {
                     Text("\(cost)")
                         .font(.subheadline.bold().monospacedDigit())
-                        .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : .red)
+                        .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                     
                     Image(systemName: "circle.fill")
                         .font(.system(size: 6))
-                        .foregroundColor(player.gold >= cost ? KingdomTheme.Colors.gold : .red)
+                        .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                 }
             }
             .padding()
-            .background(player.gold >= cost ? KingdomTheme.Colors.inkDark.opacity(0.05) : KingdomTheme.Colors.inkDark.opacity(0.02))
+            .background(isEnabled ? KingdomTheme.Colors.inkDark.opacity(0.05) : KingdomTheme.Colors.inkDark.opacity(0.02))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(player.gold >= cost ? KingdomTheme.Colors.inkDark.opacity(0.3) : .red.opacity(0.3), lineWidth: 1)
+                    .stroke(isEnabled ? KingdomTheme.Colors.inkDark.opacity(0.3) : KingdomTheme.Colors.disabled.opacity(0.3), lineWidth: 1)
             )
         }
-        .disabled(player.gold < cost)
+        .disabled(!isEnabled)
     }
     
     private func purchaseTraining(type: String) {
@@ -430,6 +484,10 @@ struct CharacterSheetView: View {
                 
                 // Refresh player state from backend to get updated gold
                 let playerState = try await KingdomAPIService.shared.player.loadState()
+                
+                // Reload training contracts to show the new one
+                await loadTrainingContracts()
+                
                 await MainActor.run {
                     player.updateFromAPIState(playerState)
                     

@@ -150,13 +150,14 @@ def purchase_training(
             detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
         )
     
-    # Check if already have a contract for this type
+    # Check if already have ANY active training contract
     training_contracts = state.training_contracts or []
     for contract in training_contracts:
-        if contract.get("type") == training_type and contract.get("status") != "completed":
+        if contract.get("status") != "completed":
+            active_type = contract.get("type")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Already have an active {training_type} training contract"
+                detail=f"You must complete your current {active_type} training before starting a new one"
             )
     
     # Create training contract

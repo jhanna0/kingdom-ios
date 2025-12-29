@@ -31,6 +31,9 @@ class Player: ObservableObject {
     @Published var totalWorkContributed: Int = 0
     @Published var totalTrainingPurchases: Int = 0  // Global training counter for cost scaling
     
+    // Training contracts (active training)
+    @Published var trainingContracts: [TrainingContractData] = []
+    
     // Training costs (from backend)
     @Published var attackTrainingCost: Int = 100
     @Published var defenseTrainingCost: Int = 100
@@ -283,6 +286,34 @@ class Player: ObservableObject {
     
     enum SkillStat {
         case attack, defense, leadership, building
+    }
+    
+    struct TrainingContractData: Codable, Identifiable {
+        let id: String
+        let type: String
+        let actionsRequired: Int
+        let actionsCompleted: Int
+        let costPaid: Int
+        let createdAt: String
+        let status: String
+        
+        enum CodingKeys: String, CodingKey {
+            case id, type, status
+            case actionsRequired = "actions_required"
+            case actionsCompleted = "actions_completed"
+            case costPaid = "cost_paid"
+            case createdAt = "created_at"
+        }
+    }
+    
+    /// Check if there's an active training contract
+    func hasActiveTrainingContract() -> Bool {
+        return trainingContracts.contains { $0.status != "completed" }
+    }
+    
+    /// Get the active training contract if any
+    func getActiveTrainingContract() -> TrainingContractData? {
+        return trainingContracts.first { $0.status != "completed" }
     }
     
     // Training costs are now provided by the backend in player state
@@ -710,6 +741,9 @@ class Player: ObservableObject {
         } else {
             print("⚠️ No training costs in API response")
         }
+        
+        // Training contracts from backend (Note: this comes from action status, not player state)
+        // The trainingContracts will be updated when action status is fetched
         
         // Rewards
         totalRewardsReceived = apiState.total_rewards_received

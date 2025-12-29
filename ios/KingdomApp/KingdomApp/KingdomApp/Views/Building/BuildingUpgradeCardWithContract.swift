@@ -7,6 +7,7 @@ struct BuildingUpgradeCardWithContract: View {
     let maxLevel: Int
     let benefit: String
     let hasActiveContract: Bool
+    let hasAnyActiveContract: Bool  // Kingdom has ANY active contract
     let kingdom: Kingdom
     let onCreateContract: () -> Void
     
@@ -59,7 +60,7 @@ struct BuildingUpgradeCardWithContract: View {
                     .padding(.vertical, 4)
                 
                 if hasActiveContract {
-                    // Show active contract indicator
+                    // Show active contract indicator for THIS building
                     HStack(spacing: 6) {
                         Image(systemName: "doc.text.fill")
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
@@ -70,6 +71,19 @@ struct BuildingUpgradeCardWithContract: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
                     .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(8)
+                } else if hasAnyActiveContract {
+                    // Show warning that another building has an active contract
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        Text("Complete current contract before starting a new one")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
                     .cornerRadius(8)
                 } else {
                     // Show contract cost prominently
@@ -121,7 +135,7 @@ struct BuildingUpgradeCardWithContract: View {
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.medieval(color: canAfford ? KingdomTheme.Colors.buttonWarning : .gray, fullWidth: true))
-                        .disabled(!canAfford)
+                        .disabled(!canAfford)  // Button is already disabled by hasAnyActiveContract check above
                     }
                     .padding(12)
                     .background(KingdomTheme.Colors.parchmentDark.opacity(0.3))

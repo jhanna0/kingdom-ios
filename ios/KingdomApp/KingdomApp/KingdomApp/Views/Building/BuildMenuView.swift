@@ -36,6 +36,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: mineIncomeBenefit(kingdom.mineLevel + 1),
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Mine"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .mine
@@ -50,6 +51,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Market"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .market
@@ -78,6 +80,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: educationBenefit(kingdom.educationLevel + 1),
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Education"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .education
@@ -106,6 +109,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Walls"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .walls
@@ -120,6 +124,7 @@ struct BuildMenuView: View {
                             maxLevel: 5,
                             benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Vault"),
+                            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
                             onCreateContract: {
                                 selectedBuildingType = .vault
@@ -193,6 +198,14 @@ struct BuildMenuView: View {
         return viewModel.availableContracts.contains { contract in
             contract.kingdomId == kingdom.id &&
             contract.buildingType == buildingType &&
+            (contract.status == .open || contract.status == .inProgress)
+        }
+    }
+    
+    /// Check if kingdom has ANY active contract (for blocking new contract creation)
+    private func hasAnyActiveContract(kingdom: Kingdom) -> Bool {
+        return viewModel.availableContracts.contains { contract in
+            contract.kingdomId == kingdom.id &&
             (contract.status == .open || contract.status == .inProgress)
         }
     }
