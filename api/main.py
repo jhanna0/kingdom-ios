@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import init_db
-from routers import cities, game, auth, player, contracts, notifications, actions
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -50,6 +50,7 @@ app.include_router(contracts.router)
 app.include_router(notifications.router)
 app.include_router(actions.router)
 app.include_router(property_router.router)
+app.include_router(intelligence.router)
 
 
 # Health check

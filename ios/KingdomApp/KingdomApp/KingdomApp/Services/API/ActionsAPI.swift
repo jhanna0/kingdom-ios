@@ -567,12 +567,14 @@ class ActionsAPI {
     
     func workOnCraft(contractId: String) async throws -> CraftingActionResponse {
         let request = client.request(endpoint: "/actions/craft/\(contractId)", method: "POST")
-        return try await client.execute(request)
+        let response: CraftingActionResponse = try await client.execute(request)
+        return response
     }
     
     func equipItem(equipmentId: String) async throws -> EquipResponse {
         let request = client.request(endpoint: "/actions/equip/\(equipmentId)", method: "POST")
-        return try await client.execute(request)
+        let response: EquipResponse = try await client.execute(request)
+        return response
     }
     
     func unequipItem(equipmentType: String) async throws -> EquipResponse {

@@ -78,6 +78,30 @@ struct KingdomDetailView: View {
                 .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
                 .padding(.horizontal)
                 
+                // Military strength / intelligence
+                MilitaryStrengthCard(
+                    strength: viewModel.militaryStrengthCache[kingdomId],
+                    kingdom: kingdom,
+                    player: player,
+                    onGatherIntel: {
+                        Task {
+                            await handleGatherIntelligence()
+                        }
+                    }
+                )
+                .padding(.horizontal)
+                .task {
+                    // Load military strength when view appears
+                    print("🎯 KingdomDetailView .task running for kingdom: \(kingdomId)")
+                    print("🎯 Cache has data: \(viewModel.militaryStrengthCache[kingdomId] != nil)")
+                    if viewModel.militaryStrengthCache[kingdomId] == nil {
+                        print("🎯 Cache is nil, fetching...")
+                        await viewModel.fetchMilitaryStrength(kingdomId: kingdomId)
+                    } else {
+                        print("🎯 Cache hit, not fetching")
+                    }
+                }
+                
                 // Buildings section
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                     Text("Fortifications")
@@ -244,6 +268,26 @@ struct KingdomDetailView: View {
         .task {
             // Refresh kingdom data with upgrade costs when sheet opens
             await viewModel.refreshKingdom(id: kingdomId)
+        }
+    }
+    
+    // MARK: - Intelligence Actions
+    
+    @MainActor
+    private func handleGatherIntelligence() async {
+        do {
+            let response = try await viewModel.gatherIntelligence(kingdomId: kingdomId)
+            
+            // Show result
+            if response.success {
+                // Success - show what we learned
+                print("✅ Successfully gathered intelligence!")
+            } else {
+                // Caught - show failure
+                print("❌ Caught gathering intelligence!")
+            }
+        } catch {
+            print("❌ Failed to gather intelligence: \(error)")
         }
     }
 }

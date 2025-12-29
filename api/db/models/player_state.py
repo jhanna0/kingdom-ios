@@ -85,6 +85,7 @@ class PlayerState(Base):
     last_patrol_action = Column(DateTime, nullable=True)
     last_sabotage_action = Column(DateTime, nullable=True)
     last_scout_action = Column(DateTime, nullable=True)
+    last_intelligence_action = Column(DateTime, nullable=True)
     patrol_expires_at = Column(DateTime, nullable=True)  # When current patrol ends
     
     # Training Actions (cooldown-based)

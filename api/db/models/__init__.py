@@ -8,6 +8,7 @@ from .contract import Contract
 from .property import Property
 from .city_boundary import CityBoundary
 from .check_in import CheckInHistory
+from .kingdom_intelligence import KingdomIntelligence
 
 __all__ = [
     "User",
@@ -18,5 +19,6 @@ __all__ = [
     "Property",
     "CityBoundary",
     "CheckInHistory",
+    "KingdomIntelligence",
 ]
 

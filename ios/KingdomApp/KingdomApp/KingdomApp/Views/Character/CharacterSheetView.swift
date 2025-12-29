@@ -21,11 +21,8 @@ struct CharacterSheetView: View {
                 // Reputation section
                 reputationCard
                 
-                // Combat stats section
-                combatStatsCard
-                
-                // Info card about training
-                trainingInfoCard
+                // Combined combat stats and training
+                combatAndTrainingCard
                 
                 // Crafting section
                 craftingInfoCard
@@ -189,67 +186,12 @@ struct CharacterSheetView: View {
         )
     }
     
-    // MARK: - Combat Stats Card
+    // MARK: - Combined Combat & Training Card
     
-    private var combatStatsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Combat & Skills")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            statRow(
-                iconName: "bolt.fill",
-                name: "Attack Power",
-                value: player.attackPower,
-                description: "Offensive strength in coups"
-            )
-            
-            Divider()
-            
-            statRow(
-                iconName: "shield.fill",
-                name: "Defense Power",
-                value: player.defensePower,
-                description: "Defend against coups"
-            )
-            
-            Divider()
-            
-            statRow(
-                iconName: "crown.fill",
-                name: "Leadership",
-                value: player.leadership,
-                description: "Bonus to vote weight"
-            )
-            
-            Divider()
-            
-            statRow(
-                iconName: "hammer.fill",
-                name: "Building Skill",
-                value: player.buildingSkill,
-                description: "\(Int(player.getBuildingCostDiscount() * 100))% cost reduction"
-            )
-        }
-        .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
-    }
-    
-    // MARK: - Training Info Card
-    
-    private var trainingInfoCard: some View {
+    private var combatAndTrainingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
-                
-                Text("Character Progression")
+                Text("Combat & Skills")
                     .font(.headline)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
@@ -287,59 +229,57 @@ struct CharacterSheetView: View {
                 .cornerRadius(8)
             }
             
-            Text("Purchase training sessions here, then perform them in the Actions page (2 hour cooldown per training)")
+            Text("Purchase training sessions, then perform them in the Actions page (2 hour cooldown)")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
             Divider()
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Purchase Training Sessions")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("Buy training to perform in Actions page")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                
-                VStack(spacing: 8) {
-                    purchaseTrainingButton(
-                        iconName: "bolt.fill",
-                        statName: "Attack",
-                        currentValue: player.attackPower,
-                        cost: player.attackTrainingCost
-                    ) {
-                        purchaseTraining(type: "attack")
-                    }
-                    
-                    purchaseTrainingButton(
-                        iconName: "shield.fill",
-                        statName: "Defense",
-                        currentValue: player.defensePower,
-                        cost: player.defenseTrainingCost
-                    ) {
-                        purchaseTraining(type: "defense")
-                    }
-                    
-                    purchaseTrainingButton(
-                        iconName: "crown.fill",
-                        statName: "Leadership",
-                        currentValue: player.leadership,
-                        cost: player.leadershipTrainingCost
-                    ) {
-                        purchaseTraining(type: "leadership")
-                    }
-                    
-                    purchaseTrainingButton(
-                        iconName: "hammer.fill",
-                        statName: "Building",
-                        currentValue: player.buildingSkill,
-                        cost: player.buildingTrainingCost
-                    ) {
-                        purchaseTraining(type: "building")
-                    }
-                }
-            }
+            // Attack Power
+            statRowWithTraining(
+                iconName: "bolt.fill",
+                name: "Attack Power",
+                value: player.attackPower,
+                description: "Offensive strength in coups",
+                cost: player.attackTrainingCost,
+                trainingType: "attack"
+            )
+            
+            Divider()
+            
+            // Defense Power
+            statRowWithTraining(
+                iconName: "shield.fill",
+                name: "Defense Power",
+                value: player.defensePower,
+                description: "Defend against coups",
+                cost: player.defenseTrainingCost,
+                trainingType: "defense"
+            )
+            
+            Divider()
+            
+            // Leadership
+            statRowWithTraining(
+                iconName: "crown.fill",
+                name: "Leadership",
+                value: player.leadership,
+                description: "Bonus to vote weight",
+                cost: player.leadershipTrainingCost,
+                trainingType: "leadership"
+            )
+            
+            Divider()
+            
+            // Building Skill
+            statRowWithTraining(
+                iconName: "hammer.fill",
+                name: "Building Skill",
+                value: player.buildingSkill,
+                description: "\(Int(player.getBuildingCostDiscount() * 100))% cost reduction",
+                cost: player.buildingTrainingCost,
+                trainingType: "building"
+            )
         }
         .padding()
         .background(KingdomTheme.Colors.parchmentLight)
@@ -395,53 +335,51 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func statRow(iconName: String, name: String, value: Int, description: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(.title2)
-                .foregroundColor(KingdomTheme.Colors.gold)
-                .frame(width: 30)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            }
-            
-            Spacer()
-            
-            Text("\(value)")
-                .font(.title2.bold().monospacedDigit())
-                .foregroundColor(KingdomTheme.Colors.gold)
-        }
-    }
-    
-    private func purchaseTrainingButton(
+    private func statRowWithTraining(
         iconName: String,
-        statName: String,
-        currentValue: Int,
+        name: String,
+        value: Int,
+        description: String,
         cost: Int,
-        action: @escaping () -> Void
+        trainingType: String
     ) -> some View {
         let hasActiveTraining = trainingContracts.contains { $0.status != "completed" }
         let canAfford = player.gold >= cost
         let isEnabled = canAfford && !hasActiveTraining && !isLoadingContracts
         
-        return Button(action: action) {
+        return VStack(spacing: 8) {
+            // Main stat row
             HStack(spacing: 12) {
                 Image(systemName: iconName)
-                    .font(.title3)
-                    .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
-                    .frame(width: 24)
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .frame(width: 30)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(statName) Training")
+                    Text(name)
                         .font(.subheadline.bold())
-                        .foregroundColor(isEnabled ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Text("\(value)")
+                    .font(.title2.bold().monospacedDigit())
+                    .foregroundColor(KingdomTheme.Colors.gold)
+            }
+            
+            // Training purchase button
+            Button(action: {
+                purchaseTraining(type: trainingType)
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(isEnabled ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled)
                     
                     if hasActiveTraining {
                         Text("Complete current training first")
@@ -452,33 +390,34 @@ struct CharacterSheetView: View {
                             .font(.caption)
                             .foregroundColor(.red)
                     } else {
-                        Text("Current: \(currentValue)")
+                        Text("Train for")
                             .font(.caption)
                             .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                     }
-                }
-                
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Text("\(cost)")
-                        .font(.subheadline.bold().monospacedDigit())
-                        .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                     
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 6))
-                        .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        Text("\(cost)")
+                            .font(.caption.bold().monospacedDigit())
+                            .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                        
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 4))
+                            .foregroundColor(isEnabled ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isEnabled ? KingdomTheme.Colors.buttonPrimary.opacity(0.1) : KingdomTheme.Colors.inkDark.opacity(0.05))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isEnabled ? KingdomTheme.Colors.buttonPrimary.opacity(0.3) : KingdomTheme.Colors.disabled.opacity(0.2), lineWidth: 1)
+                )
             }
-            .padding()
-            .background(isEnabled ? KingdomTheme.Colors.inkDark.opacity(0.05) : KingdomTheme.Colors.inkDark.opacity(0.02))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isEnabled ? KingdomTheme.Colors.inkDark.opacity(0.3) : KingdomTheme.Colors.disabled.opacity(0.3), lineWidth: 1)
-            )
+            .disabled(!isEnabled)
         }
-        .disabled(!isEnabled)
     }
     
     private func purchaseTraining(type: String) {

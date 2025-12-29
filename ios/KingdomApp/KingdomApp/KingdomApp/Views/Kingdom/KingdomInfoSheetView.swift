@@ -339,6 +339,33 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
+                // Military Strength / Intelligence
+                MilitaryStrengthCard(
+                    strength: viewModel.militaryStrengthCache[kingdom.id],
+                    kingdom: kingdom,
+                    player: player,
+                    onGatherIntel: {
+                        Task {
+                            do {
+                                _ = try await viewModel.gatherIntelligence(kingdomId: kingdom.id)
+                            } catch {
+                                print("❌ Failed to gather intelligence: \(error)")
+                            }
+                        }
+                    }
+                )
+                .padding(.horizontal)
+                .task {
+                    // Load military strength when sheet opens
+                    print("🎯 KingdomInfoSheet loading strength for: \(kingdom.id)")
+                    if viewModel.militaryStrengthCache[kingdom.id] == nil {
+                        print("🎯 Cache miss, fetching...")
+                        await viewModel.fetchMilitaryStrength(kingdomId: kingdom.id)
+                    } else {
+                        print("🎯 Cache hit!")
+                    }
+                }
+                
                 // Active Contract Section
                 if let contract = kingdom.activeContract {
                     VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {

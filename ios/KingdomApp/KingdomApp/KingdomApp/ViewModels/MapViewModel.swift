@@ -15,6 +15,7 @@ class MapViewModel: ObservableObject {
     @Published var player: Player
     @Published var playerResources: PlayerResources  // Equipment, resources, properties
     @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
+    @Published var militaryStrengthCache: [String: MilitaryStrength] = [:]  // kingdomId -> strength data
     
     // API Service - connects to backend server
     var apiService = KingdomAPIService.shared
@@ -634,6 +635,38 @@ class MapViewModel: ObservableObject {
         } catch {
             print("❌ Failed to refresh player state: \(error)")
         }
+    }
+    
+    /// Fetch military strength for a kingdom
+    func fetchMilitaryStrength(kingdomId: String) async {
+        print("🔍 FETCHING military strength for kingdom: \(kingdomId)")
+        do {
+            let response = try await APIClient.shared.getMilitaryStrength(kingdomId: kingdomId)
+            print("🔍 GOT RESPONSE from API")
+            
+            await MainActor.run {
+                let strength = MilitaryStrength(from: response)
+                militaryStrengthCache[kingdomId] = strength
+                print("✅ Loaded military strength for \(response.kingdomName)")
+            }
+        } catch {
+            print("❌ Failed to load military strength: \(error)")
+        }
+    }
+    
+    /// Gather intelligence on an enemy kingdom
+    func gatherIntelligence(kingdomId: String) async throws -> GatherIntelligenceResponse {
+        let response = try await APIClient.shared.gatherIntelligence(kingdomId: kingdomId)
+        
+        // Refresh player state (gold was deducted)
+        await refreshPlayerFromBackend()
+        
+        // Refresh military strength to show new intel
+        if response.success {
+            await fetchMilitaryStrength(kingdomId: kingdomId)
+        }
+        
+        return response
     }
     
     /// Get all available contracts (from API)
