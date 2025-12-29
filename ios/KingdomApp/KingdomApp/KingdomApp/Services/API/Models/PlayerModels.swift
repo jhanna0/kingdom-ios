@@ -112,6 +112,9 @@ struct APIEquipmentItem: Codable {
     let id: String
     let type: String
     let tier: Int
+    let attack_bonus: Int?
+    let defense_bonus: Int?
+    let crafted_at: String?
     let craft_start_time: String?
     let craft_duration: Double?
 }

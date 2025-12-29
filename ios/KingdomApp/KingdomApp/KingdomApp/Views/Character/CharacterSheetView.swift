@@ -8,6 +8,8 @@ struct CharacterSheetView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var trainingContracts: [TrainingContract] = []
+    @State private var craftingQueue: [CraftingContract] = []
+    @State private var craftingCosts: CraftingCosts?
     @State private var isLoadingContracts = true
     
     var body: some View {
@@ -24,6 +26,9 @@ struct CharacterSheetView: View {
                 
                 // Info card about training
                 trainingInfoCard
+                
+                // Crafting section
+                craftingInfoCard
             }
             .padding()
         }
@@ -358,6 +363,8 @@ struct CharacterSheetView: View {
             let status = try await KingdomAPIService.shared.actions.getActionStatus()
             await MainActor.run {
                 trainingContracts = status.trainingContracts
+                craftingQueue = status.craftingQueue
+                craftingCosts = status.craftingCosts
                 isLoadingContracts = false
             }
         } catch {
@@ -496,6 +503,207 @@ struct CharacterSheetView: View {
                     generator.notificationOccurred(.success)
                     
                     print("✅ Purchased \(type) training contract: \(response.actionsRequired) actions required")
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    
+                    // Haptic feedback for error
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Crafting Info Card
+    
+    private var craftingInfoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "hammer.fill")
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("Equipment Crafting")
+                    .font(.headline)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            
+            // Resources row
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Image(systemName: "cube.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text("\(player.iron)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "cube.fill")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("\(player.steel)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 6))
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    
+                    Text("\(player.gold)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+            }
+            
+            // Show active crafting contract if exists
+            if let activeContract = craftingQueue.first(where: { $0.status != "completed" }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hourglass")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        
+                        Text("Crafting In Progress: Tier \(activeContract.tier) \(activeContract.equipmentType.capitalized)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    }
+                    
+                    Text("Complete your current craft (\(activeContract.actionsCompleted)/\(activeContract.actionsRequired)) before starting a new one")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .padding()
+                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            Text("Purchase crafting sessions here, then work on them in the Actions page")
+                .font(.caption)
+                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+            
+            Divider()
+            
+            VStack(spacing: 8) {
+                // Weapon
+                NavigationLink(destination: CraftingDetailView(
+                    player: player,
+                    equipmentType: "weapon",
+                    craftingCosts: craftingCosts,
+                    craftingQueue: craftingQueue,
+                    onPurchase: { tier in
+                        purchaseCraft(equipmentType: "weapon", tier: tier)
+                    }
+                )) {
+                    craftNavButton(
+                        iconName: "bolt.fill",
+                        displayName: "Weapon",
+                        equipped: player.equippedWeapon,
+                        isWeapon: true
+                    )
+                }
+                
+                // Armor
+                NavigationLink(destination: CraftingDetailView(
+                    player: player,
+                    equipmentType: "armor",
+                    craftingCosts: craftingCosts,
+                    craftingQueue: craftingQueue,
+                    onPurchase: { tier in
+                        purchaseCraft(equipmentType: "armor", tier: tier)
+                    }
+                )) {
+                    craftNavButton(
+                        iconName: "shield.fill",
+                        displayName: "Armor",
+                        equipped: player.equippedArmor,
+                        isWeapon: false
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
+        )
+    }
+    
+    private func craftNavButton(
+        iconName: String,
+        displayName: String,
+        equipped: Player.EquipmentData?,
+        isWeapon: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.title3)
+                .foregroundColor(KingdomTheme.Colors.gold)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(displayName) Crafting")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                if let item = equipped {
+                    Text("Equipped: Tier \(item.tier) (+\(isWeapon ? item.attackBonus : item.defenseBonus))")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                } else {
+                    Text("No \(displayName.lowercased()) equipped")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+        }
+        .padding()
+        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    
+    private func purchaseCraft(equipmentType: String, tier: Int) {
+        Task {
+            do {
+                let api = KingdomAPIService.shared.actions
+                
+                // Purchase the crafting contract
+                let response = try await api.purchaseCraft(equipmentType: equipmentType, tier: tier)
+                
+                // Refresh player state from backend to get updated resources
+                let playerState = try await KingdomAPIService.shared.player.loadState()
+                
+                // Reload crafting queue to show the new one
+                await loadTrainingContracts()
+                
+                await MainActor.run {
+                    player.updateFromAPIState(playerState)
+                    
+                    // Haptic feedback for success
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    
+                    print("✅ Purchased tier \(tier) \(equipmentType) craft: \(response.actionsRequired) actions required")
                 }
             } catch {
                 await MainActor.run {

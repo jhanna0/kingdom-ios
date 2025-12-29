@@ -40,6 +40,18 @@ class Player: ObservableObject {
     @Published var leadershipTrainingCost: Int = 100
     @Published var buildingTrainingCost: Int = 100
     
+    // Resources
+    @Published var iron: Int = 0
+    @Published var steel: Int = 0
+    
+    // Crafting contracts (active crafting)
+    @Published var craftingQueue: [CraftingContractData] = []
+    
+    // Equipment
+    @Published var equippedWeapon: EquipmentData?
+    @Published var equippedArmor: EquipmentData?
+    @Published var inventory: [EquipmentData] = []
+    
     // Stats
     @Published var coupsWon: Int = 0
     @Published var coupsFailed: Int = 0
@@ -306,6 +318,50 @@ class Player: ObservableObject {
         }
     }
     
+    struct CraftingContractData: Codable, Identifiable {
+        let id: String
+        let equipmentType: String
+        let tier: Int
+        let actionsRequired: Int
+        let actionsCompleted: Int
+        let goldPaid: Int
+        let ironPaid: Int
+        let steelPaid: Int
+        let createdAt: String
+        let status: String
+        
+        enum CodingKeys: String, CodingKey {
+            case id, tier, status
+            case equipmentType = "equipment_type"
+            case actionsRequired = "actions_required"
+            case actionsCompleted = "actions_completed"
+            case goldPaid = "gold_paid"
+            case ironPaid = "iron_paid"
+            case steelPaid = "steel_paid"
+            case createdAt = "created_at"
+        }
+        
+        var progress: Double {
+            return Double(actionsCompleted) / Double(actionsRequired)
+        }
+    }
+    
+    struct EquipmentData: Codable, Identifiable {
+        let id: String
+        let type: String
+        let tier: Int
+        let attackBonus: Int
+        let defenseBonus: Int
+        let craftedAt: String
+        
+        enum CodingKeys: String, CodingKey {
+            case id, type, tier
+            case attackBonus = "attack_bonus"
+            case defenseBonus = "defense_bonus"
+            case craftedAt = "crafted_at"
+        }
+    }
+    
     /// Check if there's an active training contract
     func hasActiveTrainingContract() -> Bool {
         return trainingContracts.contains { $0.status != "completed" }
@@ -314,6 +370,26 @@ class Player: ObservableObject {
     /// Get the active training contract if any
     func getActiveTrainingContract() -> TrainingContractData? {
         return trainingContracts.first { $0.status != "completed" }
+    }
+    
+    /// Check if there's an active crafting contract
+    func hasActiveCraftingContract() -> Bool {
+        return craftingQueue.contains { $0.status != "completed" }
+    }
+    
+    /// Get the active crafting contract if any
+    func getActiveCraftingContract() -> CraftingContractData? {
+        return craftingQueue.first { $0.status != "completed" }
+    }
+    
+    /// Get total attack power including equipment
+    func getTotalAttackPower() -> Int {
+        return attackPower + (equippedWeapon?.attackBonus ?? 0)
+    }
+    
+    /// Get total defense power including equipment
+    func getTotalDefensePower() -> Int {
+        return defensePower + (equippedArmor?.defenseBonus ?? 0)
     }
     
     // Training costs are now provided by the backend in player state
@@ -744,6 +820,29 @@ class Player: ObservableObject {
         
         // Training contracts from backend (Note: this comes from action status, not player state)
         // The trainingContracts will be updated when action status is fetched
+        
+        // Resources
+        iron = apiState.iron
+        steel = apiState.steel
+        
+        // Equipment
+        if let weaponData = apiState.equipped_weapon {
+            equippedWeapon = try? JSONDecoder().decode(EquipmentData.self, from: JSONEncoder().encode(weaponData))
+        } else {
+            equippedWeapon = nil
+        }
+        
+        if let armorData = apiState.equipped_armor {
+            equippedArmor = try? JSONDecoder().decode(EquipmentData.self, from: JSONEncoder().encode(armorData))
+        } else {
+            equippedArmor = nil
+        }
+        
+        if let inventoryData = apiState.inventory {
+            inventory = inventoryData.compactMap { item in
+                try? JSONDecoder().decode(EquipmentData.self, from: JSONEncoder().encode(item))
+            }
+        }
         
         // Rewards
         totalRewardsReceived = apiState.total_rewards_received

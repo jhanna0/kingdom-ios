@@ -9,6 +9,7 @@ from db import get_db, User, PlayerState, Contract
 from routers.auth import get_current_user
 from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
 from .training import calculate_training_cost
+from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus
 
 
 router = APIRouter()
@@ -62,6 +63,17 @@ def get_action_status(
         training_cooldown
     )
     
+    # Get crafting costs for all tiers
+    crafting_costs = {}
+    for tier in range(1, 6):
+        crafting_costs[f"tier_{tier}"] = {
+            "gold": get_craft_cost(tier),
+            "iron": get_iron_required(tier),
+            "steel": get_steel_required(tier),
+            "actions_required": get_actions_required(tier),
+            "stat_bonus": get_stat_bonus(tier)
+        }
+    
     return {
         "global_cooldown": global_cooldown,  # NEW: Global action lock
         "work": {
@@ -86,6 +98,10 @@ def get_action_status(
             **check_cooldown(state.last_training_action, training_cooldown),
             "cooldown_minutes": training_cooldown
         },
+        "crafting": {
+            **check_cooldown(state.last_crafting_action, work_cooldown),  # Same cooldown as building work
+            "cooldown_minutes": work_cooldown
+        },
         "training_contracts": state.training_contracts or [],
         "training_costs": {
             "attack": calculate_training_cost(state.attack_power),
@@ -93,6 +109,8 @@ def get_action_status(
             "leadership": calculate_training_cost(state.leadership),
             "building": calculate_training_cost(state.building_skill)
         },
+        "crafting_queue": state.crafting_queue or [],
+        "crafting_costs": crafting_costs,
         "contracts": contracts
     }
 
