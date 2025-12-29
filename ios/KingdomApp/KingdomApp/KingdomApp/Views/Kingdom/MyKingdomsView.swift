@@ -117,7 +117,7 @@ struct MyKingdomsView: View {
             .navigationTitle("My Kingdoms")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $selectedKingdom) { kingdom in
-                KingdomDetailView(kingdom: kingdom, player: player, viewModel: viewModel)
+                KingdomDetailView(kingdomId: kingdom.id, player: player, viewModel: viewModel)
             }
         }
     }

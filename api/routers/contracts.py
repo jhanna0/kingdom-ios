@@ -47,6 +47,13 @@ def calculate_actions_required(building_type: str, building_level: int, populati
     return int(base_actions * population_multiplier)
 
 
+def calculate_suggested_reward(actions_required: int, building_level: int) -> int:
+    """Calculate suggested reward pool based on actions and level"""
+    base_reward = 100 * building_level
+    actions_bonus = int(actions_required * 0.1)
+    return base_reward + actions_bonus
+
+
 def contract_to_response(contract: Contract) -> ContractResponse:
     """Convert Contract model to response schema"""
     return ContractResponse(

@@ -9,9 +9,11 @@ struct SubjectRewardCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                Text("💎 Subject Rewards")
+                Image(systemName: "gift.fill")
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                Text("Subject Rewards")
                     .font(KingdomTheme.Typography.title3())
-                    .foregroundColor(KingdomTheme.Colors.parchment)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
@@ -38,8 +40,8 @@ struct SubjectRewardCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(KingdomTheme.Colors.parchmentDark)
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
     }
     
@@ -81,7 +83,7 @@ struct SubjectRewardCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Merit Score: \(merit)")
                     .font(KingdomTheme.Typography.headline())
-                    .foregroundColor(KingdomTheme.Colors.parchment)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack {
                     Text("├─ Reputation: \(rep)")
@@ -119,7 +121,7 @@ struct SubjectRewardCard: View {
                     
                     Text("Your estimated share: ~\(kingdom.dailyRewardPool)g/day")
                         .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.parchment)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                         .italic()
                     
                     Text("(In multiplayer, share based on merit vs other subjects)")

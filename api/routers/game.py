@@ -107,7 +107,9 @@ def list_kingdoms(
 
 @router.get("/kingdoms/{kingdom_id}")
 def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
-    """Get kingdom details"""
+    """Get kingdom details with building upgrade costs"""
+    from routers.contracts import calculate_actions_required, calculate_suggested_reward
+    
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
     if not kingdom:
@@ -116,7 +118,64 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
             detail="Kingdom not found"
         )
     
-    return kingdom
+    # Get ruler name from User if kingdom has a ruler
+    ruler_name = None
+    if kingdom.ruler_id:
+        ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
+        if ruler:
+            ruler_name = ruler.display_name
+    
+    # Convert to dict and add calculated upgrade costs
+    kingdom_dict = {
+        "id": kingdom.id,
+        "name": kingdom.name,
+        "ruler_id": kingdom.ruler_id,
+        "ruler_name": ruler_name,
+        "city_boundary_osm_id": kingdom.city_boundary_osm_id,
+        "population": kingdom.population,
+        "level": kingdom.level,
+        "treasury_gold": kingdom.treasury_gold,
+        "checked_in_players": kingdom.checked_in_players,
+        "wall_level": kingdom.wall_level,
+        "vault_level": kingdom.vault_level,
+        "mine_level": kingdom.mine_level,
+        "market_level": kingdom.market_level,
+        "farm_level": kingdom.farm_level,
+        "education_level": kingdom.education_level,
+        "tax_rate": kingdom.tax_rate,
+        "subject_reward_rate": kingdom.subject_reward_rate,
+        "total_income_collected": kingdom.total_income_collected,
+        "total_rewards_distributed": kingdom.total_rewards_distributed,
+        "allies": kingdom.allies or [],
+        "enemies": kingdom.enemies or [],
+        "created_at": kingdom.created_at,
+        "updated_at": kingdom.updated_at
+    }
+    
+    # Calculate upgrade costs for each building
+    building_types = [
+        ("wall", kingdom.wall_level),
+        ("vault", kingdom.vault_level),
+        ("mine", kingdom.mine_level),
+        ("market", kingdom.market_level),
+        ("farm", kingdom.farm_level),
+        ("education", kingdom.education_level)
+    ]
+    
+    for building_name, current_level in building_types:
+        if current_level < 5:  # Max level is 5
+            next_level = current_level + 1
+            actions = calculate_actions_required(building_name.capitalize(), next_level, kingdom.checked_in_players)
+            reward = calculate_suggested_reward(actions, next_level)
+            kingdom_dict[f"{building_name}_upgrade_cost"] = {
+                "actions_required": actions,
+                "suggested_reward": reward,
+                "can_afford": kingdom.treasury_gold >= reward
+            }
+        else:
+            kingdom_dict[f"{building_name}_upgrade_cost"] = None
+    
+    return kingdom_dict
 
 
 @router.post("/kingdoms", status_code=status.HTTP_201_CREATED)

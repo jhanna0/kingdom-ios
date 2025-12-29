@@ -17,6 +17,13 @@ class Kingdom(BaseModel):
     created_at: Optional[datetime] = None
 
 
+class BuildingUpgradeCost(BaseModel):
+    """Cost information for upgrading a building"""
+    actions_required: int
+    suggested_reward: int
+    can_afford: bool
+
+
 class KingdomState(BaseModel):
     """Complete kingdom state"""
     id: str
@@ -40,6 +47,14 @@ class KingdomState(BaseModel):
     market_level: int = 0
     farm_level: int = 0
     education_level: int = 0
+    
+    # Building upgrade costs (calculated)
+    wall_upgrade_cost: Optional[BuildingUpgradeCost] = None
+    vault_upgrade_cost: Optional[BuildingUpgradeCost] = None
+    mine_upgrade_cost: Optional[BuildingUpgradeCost] = None
+    market_upgrade_cost: Optional[BuildingUpgradeCost] = None
+    farm_upgrade_cost: Optional[BuildingUpgradeCost] = None
+    education_upgrade_cost: Optional[BuildingUpgradeCost] = None
     
     # Tax & Income
     tax_rate: int = 10

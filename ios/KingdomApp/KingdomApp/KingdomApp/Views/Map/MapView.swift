@@ -297,7 +297,7 @@ struct MapView: View {
         .sheet(item: $kingdomToShow) { kingdom in
             NavigationStack {
                 KingdomDetailView(
-                    kingdom: kingdom,
+                    kingdomId: kingdom.id,
                     player: viewModel.player,
                     viewModel: viewModel
                 )

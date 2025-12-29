@@ -9,26 +9,23 @@ struct BuildingUpgradeCardWithContract: View {
     let hasActiveContract: Bool
     let hasAnyActiveContract: Bool  // Kingdom has ANY active contract
     let kingdom: Kingdom
+    let upgradeCost: BuildingUpgradeCost?  // From backend
     let onCreateContract: () -> Void
     
     var isMaxLevel: Bool {
         currentLevel >= maxLevel
     }
     
-    // Calculate contract cost right here
+    private var actionsRequired: Int {
+        return upgradeCost?.actionsRequired ?? 0
+    }
+    
     private var contractCost: Int {
-        let nextLevel = currentLevel + 1
-        let baseHours = 2.0 * pow(2.0, Double(nextLevel - 1))
-        let populationMultiplier = 1.0 + (Double(kingdom.checkedInPlayers) / 30.0)
-        let estimatedHours = baseHours * populationMultiplier
-        
-        let baseReward = 100 * nextLevel
-        let timeBonus = Int(estimatedHours * 10.0)
-        return baseReward + timeBonus
+        return upgradeCost?.suggestedReward ?? 0
     }
     
     private var canAfford: Bool {
-        kingdom.treasuryGold >= contractCost
+        return upgradeCost?.canAfford ?? false
     }
     
     var body: some View {
@@ -63,27 +60,27 @@ struct BuildingUpgradeCardWithContract: View {
                     // Show active contract indicator for THIS building
                     HStack(spacing: 6) {
                         Image(systemName: "doc.text.fill")
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .foregroundColor(KingdomTheme.Colors.gold)
                         Text("Contract active for this building")
                             .font(KingdomTheme.Typography.caption())
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(KingdomTheme.Colors.parchmentDark)
+                    .background(KingdomTheme.Colors.parchmentRich)
                     .cornerRadius(8)
                 } else if hasAnyActiveContract {
                     // Show warning that another building has an active contract
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text("Complete current contract before starting a new one")
                             .font(KingdomTheme.Typography.caption())
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                    .background(KingdomTheme.Colors.parchmentRich)
                     .cornerRadius(8)
                 } else {
                     // Show contract cost prominently
@@ -126,24 +123,46 @@ struct BuildingUpgradeCardWithContract: View {
                             }
                         }
                         
-                        // Post contract button
-                        Button(action: onCreateContract) {
-                            HStack {
-                                Image(systemName: "doc.badge.plus")
-                                Text(canAfford ? "Post Contract" : "Insufficient Funds")
+                        // Actions and button on same row
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Actions Required")
+                                    .font(KingdomTheme.Typography.caption2())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "hammer.fill")
+                                        .font(.caption)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    Text("\(actionsRequired)")
+                                        .font(KingdomTheme.Typography.headline())
+                                        .fontWeight(.bold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                }
                             }
-                            .frame(maxWidth: .infinity)
+                            
+                            Spacer()
+                            
+                            Button(action: onCreateContract) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "doc.badge.plus")
+                                        .font(.system(size: 12))
+                                    Text("Post Contract")
+                                        .font(KingdomTheme.Typography.caption())
+                                        .fontWeight(.semibold)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(canAfford ? KingdomTheme.Colors.buttonWarning : Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                            }
+                            .disabled(!canAfford)
                         }
-                        .buttonStyle(.medieval(color: canAfford ? KingdomTheme.Colors.buttonWarning : .gray, fullWidth: true))
-                        .disabled(!canAfford)  // Button is already disabled by hasAnyActiveContract check above
                     }
                     .padding(12)
-                    .background(KingdomTheme.Colors.parchmentDark.opacity(0.3))
+                    .background(KingdomTheme.Colors.parchmentRich)
                     .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(canAfford ? KingdomTheme.Colors.gold.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
-                    )
                 }
             } else {
                 Text("Maximum level reached")

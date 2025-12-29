@@ -1,6 +1,19 @@
 import Foundation
 import CoreLocation
 
+// Building upgrade cost information
+struct BuildingUpgradeCost: Codable, Hashable {
+    let actionsRequired: Int
+    let suggestedReward: Int
+    let canAfford: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case actionsRequired = "actions_required"
+        case suggestedReward = "suggested_reward"
+        case canAfford = "can_afford"
+    }
+}
+
 // Income record for tracking city revenue
 struct IncomeRecord: Identifiable, Codable, Hashable {
     let id: UUID
@@ -75,6 +88,14 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var farmLevel: Int  // Speeds up contract completion
     var educationLevel: Int  // Reduces training actions required
     
+    // Building upgrade costs (calculated by backend)
+    var wallUpgradeCost: BuildingUpgradeCost?
+    var vaultUpgradeCost: BuildingUpgradeCost?
+    var mineUpgradeCost: BuildingUpgradeCost?
+    var marketUpgradeCost: BuildingUpgradeCost?
+    var farmUpgradeCost: BuildingUpgradeCost?
+    var educationUpgradeCost: BuildingUpgradeCost?
+    
     // Tax system (0-100%)
     var taxRate: Int  // Percentage of mined resources going to treasury
     
@@ -143,6 +164,14 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.lastRewardDistribution = Date().addingTimeInterval(-86400) // Start 1 day ago
         self.totalRewardsDistributed = 0
         self.distributionHistory = []
+        
+        // Upgrade costs will be populated by API
+        self.wallUpgradeCost = nil
+        self.vaultUpgradeCost = nil
+        self.mineUpgradeCost = nil
+        self.marketUpgradeCost = nil
+        self.farmUpgradeCost = nil
+        self.educationUpgradeCost = nil
     }
     
     /// Check if a point is inside this kingdom's territory

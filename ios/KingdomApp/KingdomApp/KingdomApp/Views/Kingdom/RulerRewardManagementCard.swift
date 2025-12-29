@@ -5,15 +5,16 @@ struct RulerRewardManagementCard: View {
     @Binding var kingdom: Kingdom
     @ObservedObject var viewModel: MapViewModel
     
-    @State private var showingDistributionAlert = false
-    @State private var lastDistributionResult: String = ""
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
-            Text("👑 Subject Reward Pool")
-                .font(KingdomTheme.Typography.title3())
-                .foregroundColor(KingdomTheme.Colors.parchment)
+            HStack {
+                Image(systemName: "crown.fill")
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                Text("Subject Reward Pool")
+                    .font(KingdomTheme.Typography.title3())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
             
             // Distribution Rate Slider
             VStack(alignment: .leading, spacing: 8) {
@@ -65,7 +66,7 @@ struct RulerRewardManagementCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 statsRow(label: "Daily Income:", value: "\(kingdom.dailyIncome)g")
                 statsRow(label: "Daily Pool:", value: "\(kingdom.dailyRewardPool)g", valueColor: KingdomTheme.Colors.gold)
-                statsRow(label: "You Keep:", value: "\(kingdom.dailyIncome - kingdom.dailyRewardPool)g", valueColor: .green)
+                statsRow(label: "You Keep:", value: "\(kingdom.dailyIncome - kingdom.dailyRewardPool)g", valueColor: KingdomTheme.Colors.goldLight)
                 
                 if kingdom.pendingRewardPool > 0 {
                     Divider()
@@ -100,40 +101,19 @@ struct RulerRewardManagementCard: View {
                 
                 if !kingdom.canDistributeRewards {
                     let timeUntilNext = getTimeUntilNextDistribution()
-                    Text("Next distribution: \(timeUntilNext)")
+                    Text("Next auto-distribution: \(timeUntilNext)")
                         .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(.orange)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 } else {
-                    Text("Ready to distribute!")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(.green)
-                }
-            }
-            
-            // Distribution Button
-            Button(action: {
-                distributeRewards()
-            }) {
-                HStack {
-                    Text(kingdom.canDistributeRewards ? "Distribute Now" : "Distribution on Cooldown")
-                        .font(KingdomTheme.Typography.body())
-                    
-                    if kingdom.pendingRewardPool > 0 {
-                        Text("(\(kingdom.pendingRewardPool)g)")
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Text("Auto-distribution ready")
                             .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.gold)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    kingdom.canDistributeRewards && kingdom.pendingRewardPool > 0
-                        ? KingdomTheme.Colors.gold
-                        : Color.gray
-                )
-                .foregroundColor(.black)
-                .cornerRadius(8)
             }
-            .disabled(!kingdom.canDistributeRewards || kingdom.pendingRewardPool == 0)
             
             // Last Distribution Info
             if let lastDistribution = kingdom.distributionHistory.first {
@@ -168,14 +148,9 @@ struct RulerRewardManagementCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(KingdomTheme.Colors.parchmentDark)
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
-        .alert("Distribution Complete", isPresented: $showingDistributionAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(lastDistributionResult)
-        }
     }
     
     private func statsRow(label: String, value: String, valueColor: Color = KingdomTheme.Colors.parchment) -> some View {
@@ -190,24 +165,6 @@ struct RulerRewardManagementCard: View {
                 .font(KingdomTheme.Typography.body())
                 .foregroundColor(valueColor)
         }
-    }
-    
-    private func distributeRewards() {
-        guard let distribution = viewModel.distributeSubjectRewards(for: kingdom.id) else {
-            lastDistributionResult = "No rewards distributed. Check eligibility and treasury."
-            showingDistributionAlert = true
-            return
-        }
-        
-        // Update local kingdom reference
-        if let index = viewModel.kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-            kingdom = viewModel.kingdoms[index]
-        }
-        
-        // Show success message
-        let recipientNames = distribution.recipients.map { "\($0.playerName): \($0.goldReceived)g" }.joined(separator: "\n")
-        lastDistributionResult = "Distributed \(distribution.totalPool)g to \(distribution.recipientCount) subjects:\n\n\(recipientNames)"
-        showingDistributionAlert = true
     }
     
     private func getTimeUntilNextDistribution() -> String {

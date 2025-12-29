@@ -48,7 +48,7 @@ struct MyKingdomsSheet: View {
             .toolbarColorScheme(.light, for: .navigationBar)
             .navigationDestination(for: Kingdom.self) { kingdom in
                 KingdomDetailView(
-                    kingdom: kingdom,
+                    kingdomId: kingdom.id,
                     player: player,
                     viewModel: viewModel
                 )

@@ -7,12 +7,17 @@ enum KingdomDetailDestination: Hashable {
 }
 
 struct KingdomDetailView: View {
-    let kingdom: Kingdom
+    let kingdomId: String
     @ObservedObject var player: Player
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
     
     @State private var decreeText = ""
+    
+    // Get the live kingdom from viewModel
+    private var kingdom: Kingdom {
+        viewModel.kingdoms.first(where: { $0.id == kingdomId }) ?? viewModel.kingdoms.first!
+    }
     
     var isRuler: Bool {
         kingdom.rulerId == player.playerId
@@ -70,7 +75,7 @@ struct KingdomDetailView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
-                .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentDark, hasShadow: false)
+                .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
                 .padding(.horizontal)
                 
                 // Buildings section
@@ -235,6 +240,10 @@ struct KingdomDetailView: View {
             case .decree:
                 DecreeInputView(kingdom: kingdom, decreeText: $decreeText)
             }
+        }
+        .task {
+            // Refresh kingdom data with upgrade costs when sheet opens
+            await viewModel.refreshKingdom(id: kingdomId)
         }
     }
 }

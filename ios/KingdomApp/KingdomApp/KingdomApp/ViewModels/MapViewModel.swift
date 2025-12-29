@@ -570,7 +570,7 @@ class MapViewModel: ObservableObject {
     
     
     /// Refresh a specific kingdom from backend
-    private func refreshKingdomFromBackend(kingdomId: String) async {
+    func refreshKingdom(id kingdomId: String) async {
         do {
             let apiKingdom = try await apiService.kingdom.getKingdom(id: kingdomId)
             
@@ -583,6 +583,26 @@ class MapViewModel: ObservableObject {
                     kingdoms[index].marketLevel = apiKingdom.market_level
                     kingdoms[index].checkedInPlayers = apiKingdom.population
                     kingdoms[index].activeContract = nil // Clear completed contract
+                    
+                    // Update building upgrade costs
+                    kingdoms[index].wallUpgradeCost = apiKingdom.wall_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].vaultUpgradeCost = apiKingdom.vault_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].mineUpgradeCost = apiKingdom.mine_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].marketUpgradeCost = apiKingdom.market_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].farmUpgradeCost = apiKingdom.farm_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].educationUpgradeCost = apiKingdom.education_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                    }
                     
                     // Update currentKingdomInside if it's the same kingdom
                     if currentKingdomInside?.id == kingdomId {

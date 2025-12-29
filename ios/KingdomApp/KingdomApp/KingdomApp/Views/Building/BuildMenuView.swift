@@ -17,10 +17,14 @@ struct BuildMenuView: View {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         // Economic Buildings Section
                         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                            Text("💰 Economic Buildings")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                            HStack(spacing: 8) {
+                                Image(systemName: "dollarsign.circle.fill")
+                                    .foregroundColor(KingdomTheme.Colors.gold)
+                                Text("Economic Buildings")
+                                    .font(KingdomTheme.Typography.title3())
+                                    .fontWeight(.bold)
+                                    .foregroundColor(KingdomTheme.Colors.gold)
+                            }
                             
                             Text("Generate passive income for the city treasury")
                                 .font(KingdomTheme.Typography.caption())
@@ -38,6 +42,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Mine"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.mineUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .mine
                             }
@@ -53,6 +58,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Market"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.marketUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .market
                             }
@@ -68,6 +74,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Farm"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.farmUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .farm
                             }
@@ -75,10 +82,14 @@ struct BuildMenuView: View {
                         
                         // Civic Buildings Section
                         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                            Text("📚 Civic Buildings")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            HStack(spacing: 8) {
+                                Image(systemName: "building.columns.fill")
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                Text("Civic Buildings")
+                                    .font(KingdomTheme.Typography.title3())
+                                    .fontWeight(.bold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                            }
                             
                             Text("Support your citizens' development")
                                 .font(KingdomTheme.Typography.caption())
@@ -97,6 +108,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Education"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.educationUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .education
                             }
@@ -104,10 +116,14 @@ struct BuildMenuView: View {
                         
                         // Defensive Buildings Section
                         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                            Text("🛡️ Defensive Buildings")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            HStack(spacing: 8) {
+                                Image(systemName: "shield.fill")
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                Text("Defensive Buildings")
+                                    .font(KingdomTheme.Typography.title3())
+                                    .fontWeight(.bold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                            }
                             
                             Text("Protect your kingdom from coups")
                                 .font(KingdomTheme.Typography.caption())
@@ -126,6 +142,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Walls"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.wallUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .walls
                             }
@@ -141,6 +158,7 @@ struct BuildMenuView: View {
                             hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Vault"),
                             hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                             kingdom: kingdom,
+                            upgradeCost: kingdom.vaultUpgradeCost,
                             onCreateContract: {
                                 selectedBuildingType = .vault
                             }

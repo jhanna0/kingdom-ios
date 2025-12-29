@@ -2,6 +2,12 @@ import Foundation
 
 // MARK: - Kingdom Models
 
+struct APIBuildingUpgradeCost: Codable {
+    let actions_required: Int
+    let suggested_reward: Int
+    let can_afford: Bool
+}
+
 struct APIKingdom: Codable {
     let id: String
     let name: String
@@ -24,6 +30,14 @@ struct APIKingdom: Codable {
     let enemies: [String]?
     let created_at: String?
     let updated_at: String?
+    
+    // Building upgrade costs
+    let wall_upgrade_cost: APIBuildingUpgradeCost?
+    let vault_upgrade_cost: APIBuildingUpgradeCost?
+    let mine_upgrade_cost: APIBuildingUpgradeCost?
+    let market_upgrade_cost: APIBuildingUpgradeCost?
+    let farm_upgrade_cost: APIBuildingUpgradeCost?
+    let education_upgrade_cost: APIBuildingUpgradeCost?
 }
 
 struct APIKingdomSimple: Codable {

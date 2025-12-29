@@ -25,13 +25,15 @@ struct DecreeInputView: View {
                 
                 TextEditor(text: $decreeText)
                     .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .scrollContentBackground(.hidden)
                     .frame(height: 150)
-                    .padding(8)
-                    .background(KingdomTheme.Colors.parchmentLight)
+                    .padding(12)
+                    .background(Color.white)
                     .cornerRadius(KingdomTheme.CornerRadius.large)
                     .overlay(
                         RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                            .stroke(KingdomTheme.Colors.border, lineWidth: KingdomTheme.BorderWidth.thin)
+                            .stroke(KingdomTheme.Colors.inkLight.opacity(0.3), lineWidth: KingdomTheme.BorderWidth.thin)
                     )
                     .padding(.horizontal)
                 

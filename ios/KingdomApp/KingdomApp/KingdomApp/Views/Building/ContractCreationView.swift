@@ -33,36 +33,27 @@ struct ContractCreationView: View {
         }
     }
     
+    private var upgradeCost: BuildingUpgradeCost? {
+        switch buildingType {
+        case .walls: return kingdom.wallUpgradeCost
+        case .vault: return kingdom.vaultUpgradeCost
+        case .mine: return kingdom.mineUpgradeCost
+        case .market: return kingdom.marketUpgradeCost
+        case .farm: return kingdom.farmUpgradeCost
+        case .education: return kingdom.educationUpgradeCost
+        }
+    }
+    
     private var nextLevel: Int {
         currentLevel + 1
     }
     
-    private var estimatedHours: Double {
-        // Estimate based on the contract creation formula
-        let baseHours = 2.0 * pow(2.0, Double(nextLevel - 1))
-        let populationMultiplier = 1.0 + (Double(kingdom.checkedInPlayers) / 30.0)
-        return baseHours * populationMultiplier
+    private var actionsRequired: Int {
+        return upgradeCost?.actionsRequired ?? 0
     }
     
     private var autoReward: Int {
-        // Auto-calculate based on time and level
-        // Higher level = higher reward
-        let baseReward = 100 * nextLevel
-        let timeBonus = Int(estimatedHours * 10.0)
-        return baseReward + timeBonus
-    }
-    
-    private func formatTime(_ hours: Double) -> String {
-        if hours < 1 {
-            let minutes = Int(hours * 60)
-            return "\(minutes) minutes"
-        } else if hours < 24 {
-            return String(format: "%.1f hours", hours)
-        } else {
-            let days = Int(hours / 24)
-            let remainingHours = Int(hours.truncatingRemainder(dividingBy: 24))
-            return "\(days)d \(remainingHours)h"
-        }
+        return upgradeCost?.suggestedReward ?? 0
     }
     
     var body: some View {
@@ -98,12 +89,17 @@ struct ContractCreationView: View {
                             Spacer()
                         }
                         
-                        Text("Estimated time: ~\(formatTime(estimatedHours)) with 3 workers")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        HStack(spacing: 4) {
+                            Image(systemName: "hammer.fill")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("\(actionsRequired) actions required")
+                                .font(KingdomTheme.Typography.body())
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
                         
-                        Text("Time scales with population (\(kingdom.checkedInPlayers) in city)")
-                            .font(KingdomTheme.Typography.caption2())
+                        Text("Actions scale with population (\(kingdom.checkedInPlayers) in city)")
+                            .font(KingdomTheme.Typography.caption())
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
                     .padding()
@@ -181,18 +177,24 @@ struct ContractCreationView: View {
                     
                     // Create button
                     Button(action: createContract) {
-                        HStack {
+                        HStack(spacing: 8) {
                             if isCreating {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 Text("Posting...")
+                                    .fontWeight(.medium)
                             } else {
                                 Image(systemName: "doc.badge.plus")
-                                Text("Post Contract for \(autoReward)g")
+                                Text("Post Contract")
+                                    .fontWeight(.medium)
                             }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(autoReward <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonWarning : Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
-                    .buttonStyle(.medieval(color: autoReward <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonSuccess : .gray, fullWidth: true))
                     .disabled(autoReward > kingdom.treasuryGold || isCreating)
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
