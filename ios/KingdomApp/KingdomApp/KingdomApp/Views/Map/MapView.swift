@@ -291,24 +291,30 @@ struct MapView: View {
                 viewModel.updateUserLocation(location)
             }
         }
-        .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
-            // Show card when entering a new kingdom
-            if let kingdom = newValue, oldValue?.id != newValue?.id {
-                // Show travel fee notification
-                let isRuler = kingdom.rulerId == viewModel.player.playerId
-                // TODO: Check if owns property (need to implement property ownership check)
-                let ownsProperty = false
-                
-                if isRuler {
-                    travelFeeMessage = "Free Travel - You rule \(kingdom.name)"
-                    travelFeeIcon = "crown.fill"
+        .onChange(of: viewModel.latestTravelEvent) { oldValue, newValue in
+            // Show travel notification based on what the BACKEND tells us
+            if let event = newValue, event.entered_kingdom {
+                // Backend told us we entered a kingdom - display appropriate message
+                if let reason = event.free_travel_reason {
+                    // Free travel
+                    switch reason {
+                    case "ruler":
+                        travelFeeMessage = "Free Travel - You rule \(event.kingdom_name)"
+                        travelFeeIcon = "crown.fill"
+                    case "property_owner":
+                        travelFeeMessage = "Free Travel - You own property in \(event.kingdom_name)"
+                        travelFeeIcon = "house.fill"
+                    case "allied":
+                        travelFeeMessage = "Free Travel - Allied kingdom"
+                        travelFeeIcon = "handshake.fill"
+                    default:
+                        travelFeeMessage = "Free Travel to \(event.kingdom_name)"
+                        travelFeeIcon = "checkmark.circle.fill"
+                    }
                     showTravelFeeToast = true
-                } else if ownsProperty {
-                    travelFeeMessage = "Free Travel - You own property in \(kingdom.name)"
-                    travelFeeIcon = "house.fill"
-                    showTravelFeeToast = true
-                } else if kingdom.travelFee > 0 {
-                    travelFeeMessage = "Paid \(kingdom.travelFee)g to enter \(kingdom.name)"
+                } else if event.travel_fee_paid > 0 {
+                    // Paid travel fee
+                    travelFeeMessage = "Paid \(event.travel_fee_paid)g to enter \(event.kingdom_name)"
                     travelFeeIcon = "dollarsign.circle.fill"
                     showTravelFeeToast = true
                 }

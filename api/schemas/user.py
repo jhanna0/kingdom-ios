@@ -8,6 +8,14 @@ from datetime import datetime
 from .equipment import EquipmentItem, PropertyItem
 
 
+class TravelEvent(BaseModel):
+    """Information about a kingdom entry/travel event"""
+    entered_kingdom: bool  # Whether this was a new kingdom entry
+    kingdom_name: str
+    travel_fee_paid: int  # Amount paid (0 if free)
+    free_travel_reason: Optional[str] = None  # "ruler", "property_owner", "allied", or None
+    
+    
 class PlayerState(BaseModel):
     """Complete player state for sync"""
     # Identity
@@ -111,6 +119,9 @@ class PlayerState(BaseModel):
     
     # Training costs (calculated dynamically)
     training_costs: Optional[dict] = None
+    
+    # Travel event (only present when kingdom_id is provided to /player/state)
+    travel_event: Optional[TravelEvent] = None
     
     class Config:
         from_attributes = True

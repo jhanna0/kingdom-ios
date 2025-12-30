@@ -1,5 +1,14 @@
 import Foundation
 
+// MARK: - Travel Event
+
+struct TravelEvent: Codable, Equatable {
+    let entered_kingdom: Bool
+    let kingdom_name: String
+    let travel_fee_paid: Int
+    let free_travel_reason: String?
+}
+
 // MARK: - Player State Models
 
 /// Complete player state from API
@@ -16,6 +25,7 @@ struct APIPlayerState: Codable {
     let home_kingdom_id: String?
     let current_kingdom_id: String?
     let fiefs_ruled: [String]?
+    let travel_event: TravelEvent?
     
     // Core Stats
     let gold: Int

@@ -30,7 +30,7 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
     return user.player_state
 
 
-def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
+def player_state_to_response(user: User, state: DBPlayerState, travel_event=None) -> PlayerState:
     """Convert PlayerState model to PlayerState schema"""
     # Calculate training costs based on current stats and total purchases
     total_trainings = state.total_training_purchases or 0
@@ -136,6 +136,9 @@ def player_state_to_response(user: User, state: DBPlayerState) -> PlayerState:
         
         # Training costs (dynamically calculated)
         training_costs=training_costs,
+        
+        # Travel event (if provided)
+        travel_event=travel_event,
     )
 
 
@@ -167,6 +170,7 @@ def get_player_state(
     If kingdom_id provided, auto-checks in to that kingdom.
     """
     state = get_or_create_player_state(db, current_user)
+    travel_event = None
     
     # Auto check-in if kingdom_id provided
     if kingdom_id:
@@ -174,6 +178,9 @@ def get_player_state(
         if kingdom:
             # Check if entering a NEW kingdom (for travel fee)
             is_entering_new_kingdom = state.current_kingdom_id != kingdom.id
+            
+            travel_fee_paid = 0
+            free_travel_reason = None
             
             # Charge travel fee if entering new kingdom (not ruler or property owner)
             if is_entering_new_kingdom and kingdom.travel_fee > 0:
@@ -195,10 +202,13 @@ def get_player_state(
                 )
                 
                 if is_ruler:
+                    free_travel_reason = "ruler"
                     print(f"👑 {current_user.display_name} rules {kingdom.name} - no travel fee")
                 elif owns_property:
+                    free_travel_reason = "property_owner"
                     print(f"🏠 {current_user.display_name} owns property in {kingdom.name} - no travel fee")
                 elif is_allied:
+                    free_travel_reason = "allied"
                     print(f"🤝 {current_user.display_name} is from allied empire - no travel fee in {kingdom.name}")
                 else:
                     # Check if player has enough gold
@@ -209,72 +219,42 @@ def get_player_state(
                         )
                     
                     # Charge travel fee
+                    travel_fee_paid = kingdom.travel_fee
                     state.gold -= kingdom.travel_fee
                     kingdom.treasury_gold += kingdom.travel_fee
                     print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
             
-            # Check cooldown
-            can_checkin = True
-            if state.current_kingdom_id == kingdom.id and state.last_check_in:
-                time_since_last = datetime.utcnow() - state.last_check_in
-                cooldown = timedelta(minutes=5) if DEV_MODE else timedelta(hours=1)
-                can_checkin = time_since_last >= cooldown
-            
-            if can_checkin:
-                # Calculate rewards
-                base_gold = 10
-                base_xp = 5
-                
-                if DEV_MODE:
-                    base_gold *= 10
-                    base_xp *= 10
-                
-                if kingdom.ruler_id == current_user.id:
-                    base_gold *= 2
-                    base_xp *= 2
-                
-                gold_reward = base_gold * kingdom.level
-                xp_reward = base_xp * kingdom.level
-                
-                # Update state
-                state.gold += gold_reward
-                state.experience += xp_reward
-                state.total_checkins += 1
+            # Update current kingdom IMMEDIATELY (even if on cooldown)
+            # This prevents charging travel fee multiple times
+            if is_entering_new_kingdom:
                 state.current_kingdom_id = kingdom.id
                 state.last_check_in = datetime.utcnow()
                 
-                # Update check-in history
+                # Update check-in history for tracking purposes
                 check_in_history = state.check_in_history or {}
                 check_in_history[kingdom.id] = check_in_history.get(kingdom.id, 0) + 1
                 state.check_in_history = check_in_history
+                state.total_checkins += 1
                 
-                # Update hometown
-                # DISABLED FOR TESTING: Allow manual hometown setting for espionage testing
-                # most_visited = max(check_in_history.items(), key=lambda x: x[1])
-                # if most_visited[0] == kingdom.id:
-                #     state.hometown_kingdom_id = kingdom.id
-                
-                # Level up
-                while True:
-                    xp_needed = 100 * (2 ** (state.level - 1))
-                    if state.experience >= xp_needed:
-                        state.experience -= xp_needed
-                        state.level += 1
-                        state.skill_points += 3
-                        state.gold += 50
-                    else:
-                        break
-                
-                # Update kingdom
-                kingdom.treasury_gold += gold_reward // 10
+                # Update kingdom activity
                 kingdom.last_activity = datetime.utcnow()
                 
-                db.commit()
-                db.refresh(state)
+                print(f"📍 {current_user.display_name} entered {kingdom.name}")
                 
-                print(f"✅ Auto-checked in {current_user.display_name} to {kingdom.name} (+{gold_reward}g, +{xp_reward} XP)")
+                # Create travel event for response
+                from schemas.user import TravelEvent
+                travel_event = TravelEvent(
+                    entered_kingdom=True,
+                    kingdom_name=kingdom.name,
+                    travel_fee_paid=travel_fee_paid,
+                    free_travel_reason=free_travel_reason
+                )
+            
+            # Commit changes (travel fee and/or current_kingdom_id update)
+            db.commit()
+            db.refresh(state)
     
-    return player_state_to_response(current_user, state)
+    return player_state_to_response(current_user, state, travel_event)
 
 
 @router.put("/state", response_model=PlayerState)

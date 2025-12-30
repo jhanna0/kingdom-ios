@@ -15,6 +15,7 @@ class MapViewModel: ObservableObject {
     @Published var player: Player
     @Published var playerResources: PlayerResources  // Equipment, resources, properties
     @Published var currentKingdomInside: Kingdom?  // Kingdom player is currently inside
+    @Published var latestTravelEvent: TravelEvent?  // Travel event from last kingdom entry
     @Published var militaryStrengthCache: [String: MilitaryStrength] = [:]  // kingdomId -> strength data
     
     // API Service - connects to backend server
@@ -164,6 +165,9 @@ class MapViewModel: ObservableObject {
                         player.updateFromAPIState(updatedState)
                         player.currentKingdom = current.name
                         player.saveToUserDefaults()
+                        
+                        // Store travel event from backend
+                        latestTravelEvent = updatedState.travel_event
                         
                         print("✅ Auto-checked in to \(current.name)")
                     }
