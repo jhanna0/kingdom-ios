@@ -38,4 +38,12 @@ Thumbs.db
 *.swo
 *~
 
+# Node
+node_modules/
+package-lock.json
 
+# Serverless
+.serverless/
+.serverless_plugins/
+.requirements.zip
+.requirements/

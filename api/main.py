@@ -97,3 +97,8 @@ def test_database():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# Lambda handler (for AWS Lambda deployment)
+from mangum import Mangum
+handler = Mangum(app, lifespan="off")

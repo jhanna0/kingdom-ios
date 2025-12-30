@@ -1,0 +1,10 @@
+{
+  "name": "kingdom-api",
+  "version": "1.0.0",
+  "description": "Kingdom Game API",
+  "dependencies": {},
+  "devDependencies": {
+    "serverless-python-requirements": "^6.1.0"
+  }
+}
+

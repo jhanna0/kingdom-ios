@@ -1,0 +1,41 @@
+service: kingdom-api
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  profile: dev
+  memorySize: 512
+  timeout: 30
+  stackName: kingdom-api-stack
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource: 
+            - arn:aws:secretsmanager:us-east-1:*:secret:kingdom/*
+  environment:
+    DATABASE_URL: ${param:database-url, 'postgresql://postgres:CHANGEME@kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com:5432/kingdom'}
+    JWT_SECRET_KEY: ${param:jwt-secret, 'temp-secret-change-me'}
+    DEV_MODE: 'True'
+
+functions:
+  api:
+    handler: main.handler
+    events:
+      - httpApi: '*'
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!.git/**'
+    - '!__pycache__/**'
+    - '!*.pyc'
+
