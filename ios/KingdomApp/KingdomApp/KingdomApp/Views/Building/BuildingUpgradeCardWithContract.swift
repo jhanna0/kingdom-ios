@@ -29,150 +29,204 @@ struct BuildingUpgradeCardWithContract: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.goldWarm)
+        VStack(alignment: .leading, spacing: 14) {
+            // View all levels button
+            NavigationLink(destination: BuildingLevelsView(
+                buildingName: name,
+                icon: icon,
+                currentLevel: currentLevel,
+                maxLevel: maxLevel,
+                benefitForLevel: { level in benefit },
+                costForLevel: { level in constructionCost }
+            )) {
+                HStack {
+                    Image(systemName: "list.number")
+                        .font(.caption)
+                    Text("View All Levels")
+                        .font(.caption.bold())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                }
+                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(KingdomTheme.Colors.buttonPrimary.opacity(0.1))
+                .cornerRadius(6)
+            }
+            
+            // Header with icon, name, and level
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(name)
-                        .font(KingdomTheme.Typography.title3())
-                        .fontWeight(.bold)
+                        .font(.headline)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text("Level \(currentLevel)/\(maxLevel)")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    HStack(spacing: 8) {
+                        // Level indicator
+                        HStack(spacing: 4) {
+                            ForEach(1...maxLevel, id: \.self) { level in
+                                Circle()
+                                    .fill(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.2))
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        
+                        Text("Level \(currentLevel)/\(maxLevel)")
+                            .font(.caption2)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
                 
                 Spacer()
             }
             
             if !isMaxLevel {
+                Divider()
+                
                 // Benefit
-                Text(benefit)
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .padding(.vertical, 4)
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.gold.opacity(0.7))
+                    Text(benefit)
+                        .font(.subheadline)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
                 
                 if hasActiveContract {
-                    // Show active contract indicator for THIS building
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.text.fill")
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("Contract active for this building")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    // Active contract indicator
+                    HStack(spacing: 8) {
+                        Image(systemName: "hourglass")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        Text("Contract in progress")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
-                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
                     .padding(.horizontal, 12)
-                    .background(KingdomTheme.Colors.parchmentRich)
+                    .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
                     .cornerRadius(8)
                 } else if hasAnyActiveContract {
-                    // Show warning that another building has an active contract
-                    HStack(spacing: 6) {
+                    // Blocked by another contract
+                    HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Text("Complete current contract before starting a new one")
-                            .font(KingdomTheme.Typography.caption())
+                        Text("Complete current contract first")
+                            .font(.caption)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(KingdomTheme.Colors.parchmentRich)
+                    .background(KingdomTheme.Colors.inkDark.opacity(0.05))
                     .cornerRadius(8)
                 } else {
-                    // Show construction cost
-                    VStack(spacing: 8) {
-                        // Cost display
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Construction Cost")
-                                    .font(KingdomTheme.Typography.caption2())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "hammer.fill")
-                                        .font(.caption)
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                    Text("\(constructionCost)g")
-                                        .font(KingdomTheme.Typography.headline())
-                                        .fontWeight(.bold)
-                                        .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            // Treasury display
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("Treasury")
-                                    .font(KingdomTheme.Typography.caption2())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    // Cost and action button
+                    VStack(spacing: 10) {
+                        HStack(spacing: 16) {
+                            // Cost
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("COST")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
                                 
                                 HStack(spacing: 4) {
                                     Image(systemName: "building.columns.fill")
                                         .font(.caption)
-                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : .red)
-                                    Text("\(kingdom.treasuryGold)g")
-                                        .font(KingdomTheme.Typography.caption())
-                                        .fontWeight(.semibold)
+                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                    Text("\(constructionCost)g")
+                                        .font(.subheadline.bold().monospacedDigit())
                                         .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : .red)
                                 }
                             }
-                        }
-                        
-                        // Actions and button on same row
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Actions Required")
-                                    .font(KingdomTheme.Typography.caption2())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            // Actions
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("ACTIONS")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
                                 
                                 HStack(spacing: 4) {
-                                    Image(systemName: "hammer.fill")
+                                    Image(systemName: "figure.walk")
                                         .font(.caption)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                                     Text("\(actionsRequired)")
-                                        .font(KingdomTheme.Typography.headline())
-                                        .fontWeight(.bold)
+                                        .font(.subheadline.bold().monospacedDigit())
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                 }
                             }
                             
                             Spacer()
                             
-                            Button(action: onCreateContract) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "doc.badge.plus")
-                                        .font(.system(size: 12))
-                                    Text("Post Contract")
-                                        .font(KingdomTheme.Typography.caption())
-                                        .fontWeight(.semibold)
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(canAfford ? KingdomTheme.Colors.buttonWarning : Color.gray)
-                                .foregroundColor(.white)
-                                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                            // Treasury balance
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("TREASURY")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
+                                
+                                Text("\(kingdom.treasuryGold)g")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : .red)
                             }
-                            .disabled(!canAfford)
                         }
+                        
+                        // Post Contract button
+                        Button(action: onCreateContract) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.badge.plus")
+                                Text("Post Contract")
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(canAfford ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled)
+                            .cornerRadius(10)
+                        }
+                        .disabled(!canAfford)
                     }
-                    .padding(12)
-                    .background(KingdomTheme.Colors.parchmentRich)
-                    .cornerRadius(8)
                 }
             } else {
-                Text("Maximum level reached")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                    .italic()
+                // Max level reached
+                HStack(spacing: 8) {
+                    Image(systemName: "crown.fill")
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    Text("Maximum Level Reached")
+                        .font(.subheadline.bold())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(KingdomTheme.Colors.gold.opacity(0.1))
+                .cornerRadius(8)
             }
         }
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+        .padding(16)
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 

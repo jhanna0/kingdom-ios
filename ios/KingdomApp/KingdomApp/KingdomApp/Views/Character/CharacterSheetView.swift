@@ -99,78 +99,43 @@ struct CharacterSheetView: View {
                 .cornerRadius(8)
             }
             
-            Text("Purchase training sessions here, then perform them in the Actions page")
+            Text("Tap a skill to view all tiers and purchase training")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
             Divider()
             
-            VStack(spacing: 8) {
-                // Attack Power
-                NavigationLink(destination: SkillDetailView(
-                    player: player,
-                    skillType: "attack",
-                    trainingContracts: trainingContracts,
-                    onPurchase: {
-                        purchaseTraining(type: "attack")
-                    }
-                )) {
-                    skillNavButton(
+            // Skills grid - 2x2 layout for cleaner design
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    skillGridButton(
                         iconName: "bolt.fill",
-                        displayName: "Attack Power",
+                        displayName: "Attack",
                         tier: player.attackPower,
-                        description: getSkillDescription(type: "attack", tier: player.attackPower)
+                        skillType: "attack"
                     )
-                }
-                
-                // Defense Power
-                NavigationLink(destination: SkillDetailView(
-                    player: player,
-                    skillType: "defense",
-                    trainingContracts: trainingContracts,
-                    onPurchase: {
-                        purchaseTraining(type: "defense")
-                    }
-                )) {
-                    skillNavButton(
+                    
+                    skillGridButton(
                         iconName: "shield.fill",
-                        displayName: "Defense Power",
+                        displayName: "Defense",
                         tier: player.defensePower,
-                        description: getSkillDescription(type: "defense", tier: player.defensePower)
+                        skillType: "defense"
                     )
                 }
                 
-                // Leadership
-                NavigationLink(destination: SkillDetailView(
-                    player: player,
-                    skillType: "leadership",
-                    trainingContracts: trainingContracts,
-                    onPurchase: {
-                        purchaseTraining(type: "leadership")
-                    }
-                )) {
-                    skillNavButton(
+                HStack(spacing: 10) {
+                    skillGridButton(
                         iconName: "crown.fill",
                         displayName: "Leadership",
                         tier: player.leadership,
-                        description: getSkillDescription(type: "leadership", tier: player.leadership)
+                        skillType: "leadership"
                     )
-                }
-                
-                // Building Skill
-                NavigationLink(destination: SkillDetailView(
-                    player: player,
-                    skillType: "building",
-                    trainingContracts: trainingContracts,
-                    onPurchase: {
-                        purchaseTraining(type: "building")
-                    }
-                )) {
-                    skillNavButton(
+                    
+                    skillGridButton(
                         iconName: "hammer.fill",
-                        displayName: "Building Skill",
+                        displayName: "Building",
                         tier: player.buildingSkill,
-                        description: getSkillDescription(type: "building", tier: player.buildingSkill)
+                        skillType: "building"
                     )
                 }
             }
@@ -252,48 +217,68 @@ struct CharacterSheetView: View {
         }
     }
     
-    private func skillNavButton(
+    private func skillGridButton(
         iconName: String,
         displayName: String,
         tier: Int,
-        description: String
+        skillType: String
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(.title3)
-                .foregroundColor(KingdomTheme.Colors.gold)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    .lineLimit(2)
+        NavigationLink(destination: SkillDetailView(
+            player: player,
+            skillType: skillType,
+            trainingContracts: trainingContracts,
+            onPurchase: {
+                purchaseTraining(type: skillType)
             }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Text("T\(tier)")
-                    .font(.title3.bold().monospacedDigit())
-                    .foregroundColor(KingdomTheme.Colors.gold)
+        )) {
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    // Icon background
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                    
+                    Image(systemName: iconName)
+                        .font(.title2)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .frame(width: 60, height: 60)
+                    
+                    // Tier badge
+                    Text("\(tier)")
+                        .font(.caption2.bold().monospacedDigit())
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .background(KingdomTheme.Colors.buttonPrimary)
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
                 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+                VStack(spacing: 2) {
+                    Text(displayName)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Tier \(tier)/5")
+                        .font(.caption2)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
+            )
         }
-        .padding()
-        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
     
     private func purchaseTraining(type: String) {
@@ -400,48 +385,29 @@ struct CharacterSheetView: View {
                 .cornerRadius(8)
             }
             
-            Text("Purchase crafting sessions here, then work on them in the Actions page")
+            Text("Tap equipment to view all tiers and start crafting")
                 .font(.caption)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
             Divider()
             
-            VStack(spacing: 8) {
-                // Weapon
-                NavigationLink(destination: CraftingDetailView(
-                    player: player,
+            // Equipment grid
+            HStack(spacing: 10) {
+                craftGridButton(
+                    iconName: "bolt.fill",
+                    displayName: "Weapon",
                     equipmentType: "weapon",
-                    craftingCosts: craftingCosts,
-                    craftingQueue: craftingQueue,
-                    onPurchase: { tier in
-                        purchaseCraft(equipmentType: "weapon", tier: tier)
-                    }
-                )) {
-                    craftNavButton(
-                        iconName: "bolt.fill",
-                        displayName: "Weapon",
-                        equipped: player.equippedWeapon,
-                        isWeapon: true
-                    )
-                }
+                    equipped: player.equippedWeapon,
+                    bonus: player.equippedWeapon?.attackBonus ?? 0
+                )
                 
-                // Armor
-                NavigationLink(destination: CraftingDetailView(
-                    player: player,
+                craftGridButton(
+                    iconName: "shield.fill",
+                    displayName: "Armor",
                     equipmentType: "armor",
-                    craftingCosts: craftingCosts,
-                    craftingQueue: craftingQueue,
-                    onPurchase: { tier in
-                        purchaseCraft(equipmentType: "armor", tier: tier)
-                    }
-                )) {
-                    craftNavButton(
-                        iconName: "shield.fill",
-                        displayName: "Armor",
-                        equipped: player.equippedArmor,
-                        isWeapon: false
-                    )
-                }
+                    equipped: player.equippedArmor,
+                    bonus: player.equippedArmor?.defenseBonus ?? 0
+                )
             }
         }
         .padding()
@@ -453,47 +419,78 @@ struct CharacterSheetView: View {
         )
     }
     
-    private func craftNavButton(
+    private func craftGridButton(
         iconName: String,
         displayName: String,
+        equipmentType: String,
         equipped: Player.EquipmentData?,
-        isWeapon: Bool
+        bonus: Int
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(.title3)
-                .foregroundColor(KingdomTheme.Colors.gold)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(displayName) Crafting")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if let item = equipped {
-                    Text("Equipped: Tier \(item.tier) (+\(isWeapon ? item.attackBonus : item.defenseBonus))")
-                        .font(.caption)
+        NavigationLink(destination: CraftingDetailView(
+            player: player,
+            equipmentType: equipmentType,
+            craftingCosts: craftingCosts,
+            craftingQueue: craftingQueue,
+            onPurchase: { tier in
+                purchaseCraft(equipmentType: equipmentType, tier: tier)
+            }
+        )) {
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    // Icon background
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                    
+                    Image(systemName: iconName)
+                        .font(.title2)
                         .foregroundColor(KingdomTheme.Colors.gold)
-                } else {
-                    Text("No \(displayName.lowercased()) equipped")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .frame(width: 60, height: 60)
+                    
+                    // Tier badge
+                    if let item = equipped {
+                        Text("\(item.tier)")
+                            .font(.caption2.bold().monospacedDigit())
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(KingdomTheme.Colors.buttonPrimary)
+                            .clipShape(Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
+                
+                VStack(spacing: 2) {
+                    Text(displayName)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    if equipped != nil {
+                        Text("+\(bonus)")
+                            .font(.caption.bold())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                    } else {
+                        Text("Not equipped")
+                            .font(.caption2)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
             }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
+            )
         }
-        .padding()
-        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
     
     

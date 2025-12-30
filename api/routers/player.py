@@ -30,7 +30,7 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
     return user.player_state
 
 
-def player_state_to_response(user: User, state: DBPlayerState, travel_event=None) -> PlayerState:
+def player_state_to_response(user: User, state: DBPlayerState, db: Session, travel_event=None) -> PlayerState:
     """Convert PlayerState model to PlayerState schema"""
     # Calculate training costs based on current stats and total purchases
     total_trainings = state.total_training_purchases or 0
@@ -41,6 +41,19 @@ def player_state_to_response(user: User, state: DBPlayerState, travel_event=None
         "building": calculate_training_cost(state.building_skill, total_trainings),
         "intelligence": calculate_training_cost(state.intelligence, total_trainings)
     }
+    
+    # 🔥 CALCULATE is_ruler and fiefs_ruled DYNAMICALLY from Kingdom table (SOURCE OF TRUTH)
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
+    fiefs_ruled = [kingdom.id for kingdom in ruled_kingdoms]
+    is_ruler = len(fiefs_ruled) > 0
+    kingdoms_ruled_count = len(fiefs_ruled)
+    
+    # Update state in database to keep it in sync
+    if state.fiefs_ruled != fiefs_ruled or state.is_ruler != is_ruler or state.kingdoms_ruled != kingdoms_ruled_count:
+        state.fiefs_ruled = fiefs_ruled
+        state.is_ruler = is_ruler
+        state.kingdoms_ruled = kingdoms_ruled_count
+        print(f"👑 Synced ruler status for {user.display_name}: is_ruler={is_ruler}, fiefs={fiefs_ruled}")
     
     return PlayerState(
         id=user.id,
@@ -53,7 +66,7 @@ def player_state_to_response(user: User, state: DBPlayerState, travel_event=None
         origin_kingdom_id=state.origin_kingdom_id,
         home_kingdom_id=state.home_kingdom_id,
         current_kingdom_id=state.current_kingdom_id,
-        fiefs_ruled=state.fiefs_ruled or [],
+        fiefs_ruled=fiefs_ruled,
         
         # Core Stats
         gold=state.gold,
@@ -85,7 +98,7 @@ def player_state_to_response(user: User, state: DBPlayerState, travel_event=None
         # Activity tracking
         total_checkins=state.total_checkins,
         total_conquests=state.total_conquests,
-        kingdoms_ruled=state.kingdoms_ruled,
+        kingdoms_ruled=kingdoms_ruled_count,
         coups_won=state.coups_won,
         coups_failed=state.coups_failed,
         times_executed=state.times_executed,
@@ -125,7 +138,7 @@ def player_state_to_response(user: User, state: DBPlayerState, travel_event=None
         
         # Status
         is_alive=state.is_alive,
-        is_ruler=state.is_ruler,
+        is_ruler=is_ruler,
         is_premium=user.is_premium,
         is_verified=user.is_verified,
         
@@ -254,7 +267,7 @@ def get_player_state(
             db.commit()
             db.refresh(state)
     
-    return player_state_to_response(current_user, state, travel_event)
+    return player_state_to_response(current_user, state, db, travel_event)
 
 
 @router.put("/state", response_model=PlayerState)
@@ -274,7 +287,7 @@ def update_player_state(
     db.commit()
     db.refresh(state)
     
-    return player_state_to_response(current_user, state)
+    return player_state_to_response(current_user, state, db)
 
 
 @router.post("/sync", response_model=SyncResponse)
@@ -303,7 +316,7 @@ def sync_player_state(
     return SyncResponse(
         success=True,
         message="State synced successfully",
-        player_state=player_state_to_response(current_user, state),
+        player_state=player_state_to_response(current_user, state, db),
         server_time=datetime.utcnow()
     )
 
@@ -383,7 +396,7 @@ def reset_player_state(
     return {
         "success": True,
         "message": "Player state reset to defaults",
-        "player_state": player_state_to_response(current_user, state)
+        "player_state": player_state_to_response(current_user, state, db)
     }
 
 

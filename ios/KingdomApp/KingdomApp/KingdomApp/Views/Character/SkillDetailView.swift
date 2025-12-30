@@ -13,158 +13,123 @@ struct SkillDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Tier selector
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Select Tier")
-                            .font(.system(.title3, design: .default).bold())
+                // Unified tier selector
+                TierSelectorCard(
+                    currentTier: currentTier,
+                    selectedTier: $selectedTier
+                ) { tier in
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Tier name
+                        Text("Tier \(tier)")
+                            .font(.headline)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        Spacer()
+                        // Benefits
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader(icon: "star.fill", title: "Benefits")
+                            
+                            ForEach(getTierBenefits(tier: tier), id: \.self) { benefit in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
+                                        .font(.subheadline)
+                                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .frame(width: 20)
+                                    
+                                    Text(benefit)
+                                        .font(.subheadline)
+                                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
                         
-                        // Current tier badge
-                        Text("Current: T\(currentTier)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                        Divider()
+                        
+                        // Requirements - ALWAYS SHOW
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader(icon: "hourglass", title: "Requirements")
+                            
+                                HStack {
+                                    Image(systemName: "figure.walk")
+                                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                        .frame(width: 20)
+                                    Text("\(getActionsRequired(tier: tier)) actions")
+                                        .font(.subheadline)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    Spacer()
+                                    Text("2 hr cooldown")
+                                        .font(.caption)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                }
+                        }
+                        
+                        Divider()
+                        
+                        // Cost - ALWAYS SHOW
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+                            
+                            ResourceRow(
+                                icon: "circle.fill",
+                                iconColor: KingdomTheme.Colors.gold,
+                                label: "Gold",
+                                required: getCost(tier: tier),
+                                available: player.gold
+                            )
+                        }
+                        
+                        // Action button or status - always visible, no collapsing
+                        if tier <= currentTier {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.subheadline)
+                                Text("Unlocked")
+                                    .font(.subheadline.bold())
+                            }
                             .foregroundColor(KingdomTheme.Colors.gold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(KingdomTheme.Colors.gold.opacity(0.1))
-                            .cornerRadius(4)
-                    }
-                    
-                    Picker("Tier", selection: $selectedTier) {
-                        ForEach(1...5, id: \.self) { tier in
-                            Text("T\(tier)").tag(tier)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                .padding()
-                .background(KingdomTheme.Colors.parchmentLight)
-                .cornerRadius(12)
-                
-                // Tier details
-                VStack(alignment: .leading, spacing: 16) {
-                    // Benefits
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Benefits")
-                            .font(.headline)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        ForEach(getTierBenefits(tier: selectedTier), id: \.self) { benefit in
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: selectedTier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
-                                    .font(.body)
-                                    .foregroundColor(selectedTier <= currentTier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
-                                
-                                Text(benefit)
-                                    .font(.body)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Requirements
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Requirements")
-                            .font(.headline)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        HStack {
-                            Text("\(getActionsRequired(tier: selectedTier)) actions")
-                                .font(.body)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            Spacer()
-                            Text("(2 hour cooldown)")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Cost
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Cost")
-                            .font(.headline)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        HStack {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                            Text("\(getCost(tier: selectedTier)) Gold")
-                                .font(.body)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            Spacer()
-                            Text("Have: \(player.gold)")
-                                .font(.body)
-                                .foregroundColor(canAffordSelectedTier ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                        }
-                    }
-                    
-                    // Purchase button - only show if this is the next tier
-                    if selectedTier == currentTier + 1 && currentTier < 5 {
-                        Button(action: {
-                            onPurchase()
-                            dismiss()
-                        }) {
-                            HStack {
-                                Image(systemName: "person.fill.checkmark")
-                                Text("Start Training")
-                                    .font(.headline)
-                            }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isEnabled ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled)
-                            .foregroundColor(KingdomTheme.Colors.parchmentLight)
-                            .cornerRadius(12)
-                        }
-                        .disabled(!isEnabled)
-                        
-                        if hasActiveTraining {
-                            Text("Complete your current training first")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        } else if !canAffordSelectedTier {
-                            Text("Insufficient gold")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                    } else if selectedTier <= currentTier {
-                        Text("Already unlocked")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    } else if selectedTier > currentTier + 1 {
-                        Text("Complete Tier \(currentTier + 1) first")
-                            .font(.caption)
+                            .padding(.vertical, 12)
+                            .background(KingdomTheme.Colors.gold.opacity(0.1))
+                            .cornerRadius(10)
+                        } else if tier == currentTier + 1 && currentTier < 5 {
+                            UnifiedActionButton(
+                                title: "Start Training",
+                                subtitle: nil,
+                                icon: "person.fill.checkmark",
+                                isEnabled: isEnabled,
+                                statusMessage: statusMessage,
+                                action: {
+                                    onPurchase()
+                                    dismiss()
+                                }
+                            )
+                        } else if tier > currentTier + 1 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.fill")
+                                    .font(.subheadline)
+                                Text("Complete Tier \(currentTier + 1) first")
+                                    .font(.subheadline)
+                            }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    } else if currentTier >= 5 {
-                        HStack(spacing: 8) {
-                            Image(systemName: "crown.fill")
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                            Text("Maximum tier reached!")
-                                .font(.body.bold())
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+                            .cornerRadius(10)
+                        } else if currentTier >= 5 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "crown.fill")
+                                    .font(.subheadline)
+                                Text("Maximum Tier Reached!")
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(KingdomTheme.Colors.gold.opacity(0.1))
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(KingdomTheme.Colors.gold.opacity(0.1))
-                        .cornerRadius(12)
                     }
                 }
-                .padding()
-                .background(KingdomTheme.Colors.parchmentLight)
-                .cornerRadius(12)
             }
             .padding()
         }
@@ -176,6 +141,19 @@ struct SkillDetailView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
         .onAppear {
             selectedTier = min(currentTier + 1, 5)
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sectionHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(KingdomTheme.Colors.gold)
+            Text(title)
+                .font(.subheadline.bold())
+                .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }
     
@@ -231,6 +209,15 @@ struct SkillDetailView: View {
     
     private var isEnabled: Bool {
         return canAffordSelectedTier && !hasActiveTraining && selectedTier == currentTier + 1 && currentTier < 5
+    }
+    
+    private var statusMessage: String? {
+        if hasActiveTraining {
+            return "Complete your current training first"
+        } else if !canAffordSelectedTier {
+            return "Insufficient gold"
+        }
+        return nil
     }
     
     private func getTierBenefits(tier: Int) -> [String] {

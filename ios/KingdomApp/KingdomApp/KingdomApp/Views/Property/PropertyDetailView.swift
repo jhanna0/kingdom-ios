@@ -39,19 +39,31 @@ struct PropertyDetailView: View {
                 // Location info
                 locationCard
                 
-                // Current benefits
-                benefitsCard
+                // View all tiers button
+                NavigationLink(destination: PropertyTiersView(player: player, property: property)) {
+                    HStack {
+                        Image(systemName: "list.number")
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("View All Tiers")
+                                .font(.headline)
+                            Text("See upgrade path & benefits")
+                                .font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(KingdomTheme.Colors.buttonPrimary)
+                    .cornerRadius(12)
+                }
                 
                 // Upgrade section
                 if property.tier < 5 {
                     upgradeCard
                 } else {
                     maxLevelCard
-                }
-                
-                // Future tier benefits preview
-                if property.tier < 5 {
-                    futureBenefitsCard
                 }
             }
             .padding()
@@ -210,10 +222,6 @@ struct PropertyDetailView: View {
     
     private var locationCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Location")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
             HStack(spacing: 8) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.title2)
@@ -221,118 +229,19 @@ struct PropertyDetailView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(property.kingdomName)
-                        .font(.subheadline.bold())
+                        .font(.headline)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text("Kingdom")
+                    Text("Purchased \(formatDate(property.purchasedAt))")
                         .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
                 }
                 
                 Spacer()
-                
-                Button(action: {
-                    // TODO: Implement fast travel
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "airplane")
-                        Text("Travel")
-                    }
-                }
-                .buttonStyle(.medievalSubtle(color: KingdomTheme.Colors.buttonPrimary))
-            }
-            
-            Text("Purchased \(formatDate(property.purchasedAt))")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
-        }
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    // MARK: - Benefits Card
-    
-    private var benefitsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Active Benefits")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            if property.currentBenefits.isEmpty {
-                Text("No benefits at this tier")
-                    .font(.subheadline)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(property.currentBenefits, id: \.self) { benefit in
-                        benefitRow(benefit: benefit, active: true)
-                    }
-                }
-            }
-            
-            // Show locked benefits
-            let lockedBenefits = getLockedBenefits()
-            if !lockedBenefits.isEmpty {
-                Divider()
-                    .padding(.vertical, 4)
-                
-                Text("Locked Benefits")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(lockedBenefits, id: \.benefit) { item in
-                        benefitRow(benefit: item.benefit, active: false, unlockTier: item.tier)
-                    }
-                }
             }
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func benefitRow(benefit: String, active: Bool, unlockTier: Int? = nil) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: active ? "checkmark.circle.fill" : "lock.fill")
-                .font(.body)
-                .foregroundColor(active ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
-                .frame(width: 20)
-            
-            Text(benefit)
-                .font(.subheadline)
-                .foregroundColor(active ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
-            
-            Spacer()
-            
-            if let tier = unlockTier {
-                Text("T\(tier)")
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(KingdomTheme.Colors.inkDark.opacity(0.4))
-                    .cornerRadius(4)
-            }
-        }
-    }
-    
-    private func getLockedBenefits() -> [(benefit: String, tier: Int)] {
-        var locked: [(String, Int)] = []
-        
-        if property.tier < 2 {
-            locked.append(("Residence", 2))
-        }
-        if property.tier < 3 {
-            locked.append(("Crafting", 3))
-        }
-        if property.tier < 4 {
-            locked.append(("No taxes", 4))
-        }
-        if property.tier < 5 {
-            locked.append(("Conquest protection", 5))
-        }
-        
-        return locked
     }
     
     
@@ -532,51 +441,6 @@ struct PropertyDetailView: View {
         )
     }
     
-    // MARK: - Future Benefits Card
-    
-    private var futureBenefitsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Upgrade Path")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Text("What you'll unlock at higher tiers:")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach((property.tier + 1)...5, id: \.self) { tier in
-                    futureTierRow(tier: tier)
-                }
-            }
-        }
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func futureTierRow(tier: Int) -> some View {
-        HStack(spacing: 12) {
-            Text("T\(tier)")
-                .font(.caption.bold())
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(KingdomTheme.Colors.gold)
-                .cornerRadius(4)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tierNameFor(tier))
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(tierBenefitsFor(tier))
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-            }
-            
-            Spacer()
-        }
-    }
     
     private func tierNameFor(_ tier: Int) -> String {
         switch tier {
