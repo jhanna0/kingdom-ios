@@ -109,22 +109,22 @@ extension MapViewModel {
                     
                     // Update building upgrade costs
                     kingdoms[index].wallUpgradeCost = apiKingdom.wall_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].vaultUpgradeCost = apiKingdom.vault_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].mineUpgradeCost = apiKingdom.mine_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].marketUpgradeCost = apiKingdom.market_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].farmUpgradeCost = apiKingdom.farm_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].educationUpgradeCost = apiKingdom.education_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, suggestedReward: $0.suggested_reward, canAfford: $0.can_afford)
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     
                     // Update currentKingdomInside if it's the same kingdom

@@ -5,13 +5,11 @@ import CoreLocation
 struct BuildingUpgradeCost: Codable, Hashable {
     let actionsRequired: Int
     let constructionCost: Int
-    let suggestedReward: Int
     let canAfford: Bool
     
     enum CodingKeys: String, CodingKey {
         case actionsRequired = "actions_required"
         case constructionCost = "construction_cost"
-        case suggestedReward = "suggested_reward"
         case canAfford = "can_afford"
     }
 }

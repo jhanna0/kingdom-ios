@@ -20,8 +20,8 @@ struct BuildingUpgradeCardWithContract: View {
         return upgradeCost?.actionsRequired ?? 0
     }
     
-    private var contractCost: Int {
-        return upgradeCost?.suggestedReward ?? 0
+    private var constructionCost: Int {
+        return upgradeCost?.constructionCost ?? 0
     }
     
     private var canAfford: Bool {
@@ -83,20 +83,20 @@ struct BuildingUpgradeCardWithContract: View {
                     .background(KingdomTheme.Colors.parchmentRich)
                     .cornerRadius(8)
                 } else {
-                    // Show contract cost prominently
+                    // Show construction cost
                     VStack(spacing: 8) {
                         // Cost display
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Contract Cost")
+                                Text("Construction Cost")
                                     .font(KingdomTheme.Typography.caption2())
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 
                                 HStack(spacing: 4) {
-                                    Image(systemName: "crown.fill")
+                                    Image(systemName: "hammer.fill")
                                         .font(.caption)
                                         .foregroundColor(KingdomTheme.Colors.gold)
-                                    Text("\(contractCost)g")
+                                    Text("\(constructionCost)g")
                                         .font(KingdomTheme.Typography.headline())
                                         .fontWeight(.bold)
                                         .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)

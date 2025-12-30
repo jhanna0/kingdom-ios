@@ -16,6 +16,20 @@ from config import DEV_MODE
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
 
+# ===== SCALING CONSTANTS =====
+# Adjust these to tune difficulty progression
+
+# Cost scaling
+BASE_CONSTRUCTION_COST = 1000  # Base gold cost for level 1
+LEVEL_COST_EXPONENT = 1.7  # How much cost increases per level (1.5 = +50% per level)
+POPULATION_COST_DIVISOR = 50  # Higher = less population impact on cost
+
+# Action scaling
+BASE_ACTIONS_REQUIRED = 100  # Base actions for level 1
+LEVEL_ACTIONS_EXPONENT = 1.7  # How much actions increase per level (1.5 = +50% per level)
+POPULATION_ACTIONS_DIVISOR = 30  # Higher = less population impact on actions
+
+
 def calculate_base_hours(building_type: str, building_level: int, population: int) -> float:
     """Calculate base hours required based on building type, level, and population"""
     # Base time with 3 ideal workers:
@@ -32,17 +46,18 @@ def calculate_construction_cost(building_level: int, population: int) -> int:
     """Calculate upfront construction cost based on building level and population
     
     This is what the RULER pays from treasury to START the building project.
-    Separate from reward_pool which is distributed to workers.
     
-    Formula: 1000 * 2^(level-1) * (1 + population/50)
+    Formula: BASE_CONSTRUCTION_COST * LEVEL_COST_EXPONENT^(level-1) * (1 + population/POPULATION_COST_DIVISOR)
     
-    Examples:
-    - Level 1, 10 people: 1000 * 1 * 1.2 = 1,200g
-    - Level 3, 100 people: 1000 * 4 * 3.0 = 12,000g
-    - Level 5, 500 people: 1000 * 16 * 11.0 = 176,000g
+    Examples (1000 people, defaults):
+    - Level 1: 1000 * 1.0 * 21 = 21,000g
+    - Level 2: 1000 * 1.5 * 21 = 31,500g
+    - Level 3: 1000 * 2.25 * 21 = 47,250g
+    - Level 4: 1000 * 3.375 * 21 = 70,875g
+    - Level 5: 1000 * 5.063 * 21 = 106,312g
     """
-    base_cost = 1000 * math.pow(2.0, building_level - 1)
-    population_multiplier = 1.0 + (population / 50.0)
+    base_cost = BASE_CONSTRUCTION_COST * math.pow(LEVEL_COST_EXPONENT, building_level - 1)
+    population_multiplier = 1.0 + (population / POPULATION_COST_DIVISOR)
     return int(base_cost * population_multiplier)
 
 
@@ -51,29 +66,22 @@ def calculate_actions_required(building_type: str, building_level: int, populati
     
     Small towns need fewer actions, big cities need many more!
     
-    Formula: 100 * 2^(level-1) * (1 + population/30)
+    Formula: BASE_ACTIONS_REQUIRED * LEVEL_ACTIONS_EXPONENT^(level-1) * (1 + population/POPULATION_ACTIONS_DIVISOR)
     
-    Examples:
-    - Level 1, 10 people: 100 * 1 * 1.33 = ~133 actions
-    - Level 3, 100 people: 100 * 4 * 4.33 = ~1,733 actions
-    - Level 5, 500 people: 100 * 16 * 17.67 = ~28,267 actions
+    Examples (1000 people, defaults):
+    - Level 1: 100 * 1.0 * 34.33 = ~3,433 actions
+    - Level 2: 100 * 1.5 * 34.33 = ~5,150 actions
+    - Level 3: 100 * 2.25 * 34.33 = ~7,724 actions
+    - Level 4: 100 * 3.375 * 34.33 = ~11,586 actions
+    - Level 5: 100 * 5.063 * 34.33 = ~17,379 actions
     """
-    # Base actions: 100 * 2^(level-1)
-    # Level 1: 100, Level 2: 200, Level 3: 400, Level 4: 800, Level 5: 1600
-    base_actions = 100 * math.pow(2.0, building_level - 1)
-    
-    # Population multiplier: +33% actions per 10 people
-    # Same scaling as time - bigger cities need proportionally more work
-    population_multiplier = 1.0 + (population / 30.0)
+    base_actions = BASE_ACTIONS_REQUIRED * math.pow(LEVEL_ACTIONS_EXPONENT, building_level - 1)
+    population_multiplier = 1.0 + (population / POPULATION_ACTIONS_DIVISOR)
     
     return int(base_actions * population_multiplier)
 
 
-def calculate_suggested_reward(actions_required: int, building_level: int) -> int:
-    """Calculate suggested reward pool based on actions and level"""
-    base_reward = 100 * building_level
-    actions_bonus = int(actions_required * 0.1)
-    return base_reward + actions_bonus
+# REMOVED: Reward pool is outdated - rewards are now given per action, not as a pool
 
 
 def contract_to_response(contract: Contract) -> ContractResponse:
@@ -203,15 +211,15 @@ def create_contract(
     construction_cost = calculate_construction_cost(data.building_level, data.base_population)
     total_cost = construction_cost + data.reward_pool
     
-    # Check if kingdom has enough gold in treasury
-    if kingdom.treasury_gold < total_cost:
+    # Check if kingdom has enough gold in treasury for construction
+    if kingdom.treasury_gold < construction_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient treasury funds. Need {total_cost}g (construction: {construction_cost}g + rewards: {data.reward_pool}g). Have: {kingdom.treasury_gold}g"
+            detail=f"Insufficient treasury funds. Need {construction_cost}g for construction. Have: {kingdom.treasury_gold}g"
         )
     
-    # Deduct gold from kingdom treasury (both construction cost and reward pool)
-    kingdom.treasury_gold -= total_cost
+    # Deduct construction cost from kingdom treasury
+    kingdom.treasury_gold -= construction_cost
     
     # Calculate base hours required
     base_hours = calculate_base_hours(
@@ -241,7 +249,7 @@ def create_contract(
         actions_completed=0,
         action_contributions={},
         construction_cost=construction_cost,
-        reward_pool=data.reward_pool,
+        reward_pool=0,  # Deprecated - rewards given per action now
         created_by=current_user.id,
         status="open"
     )

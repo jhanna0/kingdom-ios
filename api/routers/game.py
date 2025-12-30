@@ -108,7 +108,7 @@ def list_kingdoms(
 @router.get("/kingdoms/{kingdom_id}")
 def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     """Get kingdom details with building upgrade costs"""
-    from routers.contracts import calculate_actions_required, calculate_suggested_reward, calculate_construction_cost
+    from routers.contracts import calculate_actions_required, calculate_construction_cost
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -163,18 +163,19 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         ("education", kingdom.education_level)
     ]
     
+    # TEMPORARY: Fake 1000 population for testing cost scaling
+    fake_population = 1000
+    
     for building_name, current_level in building_types:
         if current_level < 5:  # Max level is 5
             next_level = current_level + 1
-            actions = calculate_actions_required(building_name.capitalize(), next_level, kingdom.checked_in_players)
-            construction_cost = calculate_construction_cost(next_level, kingdom.checked_in_players)
-            reward = calculate_suggested_reward(actions, next_level)
-            total_cost = construction_cost + reward
+            actions = calculate_actions_required(building_name.capitalize(), next_level, fake_population)
+            construction_cost = calculate_construction_cost(next_level, fake_population)
+            # No more reward pool - rewards given per action now
             kingdom_dict[f"{building_name}_upgrade_cost"] = {
                 "actions_required": actions,
                 "construction_cost": construction_cost,
-                "suggested_reward": reward,
-                "can_afford": kingdom.treasury_gold >= total_cost
+                "can_afford": kingdom.treasury_gold >= construction_cost
             }
         else:
             kingdom_dict[f"{building_name}_upgrade_cost"] = None

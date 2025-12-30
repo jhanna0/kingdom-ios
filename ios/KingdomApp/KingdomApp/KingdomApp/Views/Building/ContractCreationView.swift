@@ -53,15 +53,7 @@ struct ContractCreationView: View {
     }
     
     private var constructionCost: Int {
-        return upgradeCost?.constructionCost ?? 0  // Kingdom building contracts have construction cost
-    }
-    
-    private var autoReward: Int {
-        return upgradeCost?.suggestedReward ?? 0
-    }
-    
-    private var totalCost: Int {
-        return constructionCost + autoReward
+        return upgradeCost?.constructionCost ?? 0
     }
     
     var body: some View {
@@ -116,58 +108,20 @@ struct ContractCreationView: View {
                     
                     // Cost summary
                     VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Contract Cost")
+                        Text("Construction Cost")
                             .font(KingdomTheme.Typography.headline())
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        // Construction Cost
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Construction Cost")
+                                Text("From Treasury")
                                     .font(KingdomTheme.Typography.caption())
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 
                                 HStack(spacing: 6) {
                                     Image(systemName: "hammer.fill")
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .foregroundColor(KingdomTheme.Colors.gold)
                                     Text("\(constructionCost)g")
-                                        .font(KingdomTheme.Typography.title3())
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("Reward Pool")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                
-                                HStack(spacing: 6) {
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(KingdomTheme.Colors.goldLight)
-                                    Text("\(autoReward)g")
-                                        .font(KingdomTheme.Typography.title3())
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                }
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        // Total Cost vs Treasury
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Total Cost")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                
-                                HStack(spacing: 6) {
-                                    Image(systemName: "dollarsign.circle.fill")
-                                        .foregroundColor(KingdomTheme.Colors.gold)
-                                    Text("\(totalCost)g")
                                         .font(KingdomTheme.Typography.title2())
                                         .fontWeight(.bold)
                                         .foregroundColor(KingdomTheme.Colors.gold)
@@ -183,16 +137,16 @@ struct ContractCreationView: View {
                                 
                                 HStack(spacing: 4) {
                                     Image(systemName: "building.columns.fill")
-                                        .foregroundColor(totalCost <= kingdom.treasuryGold ? KingdomTheme.Colors.gold : .red)
+                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.gold : .red)
                                     Text("\(kingdom.treasuryGold)g")
                                         .font(KingdomTheme.Typography.title3())
                                         .fontWeight(.semibold)
-                                        .foregroundColor(totalCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkDark : .red)
+                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkDark : .red)
                                 }
                             }
                         }
                         
-                        if totalCost > kingdom.treasuryGold {
+                        if constructionCost > kingdom.treasuryGold {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.red)
@@ -212,10 +166,10 @@ struct ContractCreationView: View {
                             .font(KingdomTheme.Typography.headline())
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        BenefitRow(icon: "doc.text.fill", text: "Workers accept and it completes automatically")
+                        BenefitRow(icon: "doc.text.fill", text: "Workers contribute actions to complete")
                         BenefitRow(icon: "person.2.fill", text: "More workers = faster completion")
-                        BenefitRow(icon: "crown.fill", text: "Rewards split equally among all workers")
-                        BenefitRow(icon: "building.2.fill", text: "Building upgrades when timer finishes")
+                        BenefitRow(icon: "crown.fill", text: "Workers earn rewards per action")
+                        BenefitRow(icon: "building.2.fill", text: "Building upgrades when all actions complete")
                     }
                     .padding()
                     .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentRich)
@@ -237,11 +191,11 @@ struct ContractCreationView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(totalCost <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonWarning : Color.gray)
+                        .background(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonWarning : Color.gray)
                         .foregroundColor(.white)
                         .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
-                    .disabled(totalCost > kingdom.treasuryGold || isCreating)
+                    .disabled(constructionCost > kingdom.treasuryGold || isCreating)
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
                 }
@@ -261,10 +215,8 @@ struct ContractCreationView: View {
     }
     
     private func createContract() {
-        let reward = autoReward
-        
-        if totalCost > kingdom.treasuryGold {
-            errorMessage = "Insufficient treasury funds. Have: \(kingdom.treasuryGold)g, Need: \(totalCost)g (Construction: \(constructionCost)g + Rewards: \(reward)g)"
+        if constructionCost > kingdom.treasuryGold {
+            errorMessage = "Insufficient treasury funds. Have: \(kingdom.treasuryGold)g, Need: \(constructionCost)g"
             showError = true
             return
         }
@@ -274,7 +226,7 @@ struct ContractCreationView: View {
         // Call the create contract method asynchronously
         Task {
             do {
-                _ = try await viewModel.createContract(kingdom: kingdom, buildingType: buildingType, rewardPool: reward)
+                _ = try await viewModel.createContract(kingdom: kingdom, buildingType: buildingType, rewardPool: 0)  // Reward pool deprecated
                 
                 // Success! Dismiss and call success handler
                 await MainActor.run {
