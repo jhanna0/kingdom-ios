@@ -59,48 +59,48 @@ struct PropertyUpgradeContractCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
-                        .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+                        .fill(KingdomTheme.Colors.parchmentDark)
                         .frame(height: 8)
-                        .cornerRadius(4)
                     
-                    Rectangle()
-                        .fill(KingdomTheme.Colors.gold)
-                        .frame(width: geometry.size.width * contract.progress, height: 8)
-                        .cornerRadius(4)
+                    ZStack {
+                        Rectangle()
+                            .fill(KingdomTheme.Colors.gold)
+                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                        
+                        // Animated diagonal stripes
+                        AnimatedStripes()
+                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                            .mask(
+                                Rectangle()
+                                    .frame(width: geometry.size.width * contract.progress, height: 8)
+                            )
+                    }
                 }
+                .cornerRadius(4)
             }
             .frame(height: 8)
             
-            // Action button
-            Button(action: onAction) {
-                HStack {
-                    Image(systemName: "hammer.fill")
-                    Text("Work on Property")
-                }
-            }
-            .buttonStyle(.medieval(
-                color: isReady ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled,
-                fullWidth: true
-            ))
-            .disabled(!isReady)
-            
             if globalCooldownActive {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock.fill")
-                        .font(.caption)
-                    Text("Complete \(blockingAction ?? "current action") first")
-                        .font(KingdomTheme.Typography.caption())
+                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
+                Text("You are already \(blockingActionDisplay)")
+                    .font(KingdomTheme.Typography.caption())
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(KingdomTheme.Colors.parchmentDark)
+                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+            } else if isReady {
+                Button(action: onAction) {
+                    HStack {
+                        Image(systemName: "hammer.fill")
+                        Text("Work on Property")
+                    }
                 }
-                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(KingdomTheme.CornerRadius.medium)
-        .overlay(
-            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .parchmentCard()
         .padding(.horizontal)
     }
 }

@@ -15,6 +15,11 @@ struct ActionsView: View {
     @State private var showSabotageTargets = false
     @State private var sabotageTargets: SabotageTargetsResponse?
     
+    // Cache kingdom status to avoid recalculating on every render
+    @State private var isInHomeKingdom: Bool = false
+    @State private var isInEnemyKingdom: Bool = false
+    @State private var cachedKingdomId: String?
+    
     var currentKingdom: Kingdom? {
         guard let currentKingdomName = viewModel.player.currentKingdom else { return nil }
         return viewModel.kingdoms.first { $0.name == currentKingdomName }
@@ -23,16 +28,6 @@ struct ActionsView: View {
     var availableContractsInKingdom: [Contract] {
         guard let kingdom = currentKingdom else { return [] }
         return viewModel.availableContracts.filter { $0.kingdomId == kingdom.id }
-    }
-    
-    var isInHomeKingdom: Bool {
-        guard let kingdom = currentKingdom else { return false }
-        return viewModel.isHomeKingdom(kingdom)
-    }
-    
-    var isInEnemyKingdom: Bool {
-        guard let kingdom = currentKingdom else { return false }
-        return !viewModel.isHomeKingdom(kingdom)
     }
     
     var body: some View {
@@ -58,7 +53,12 @@ struct ActionsView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
         .task {
             await loadActionStatus()
+            updateKingdomStatus()
             startUIUpdateTimer()
+        }
+        .onChange(of: currentKingdom?.id) { oldValue, newValue in
+            // Only recalculate when kingdom actually changes
+            updateKingdomStatus()
         }
         .onDisappear {
             stopUIUpdateTimer()
@@ -195,7 +195,12 @@ struct ActionsView: View {
     private func globalCooldownWarning(status: AllActionStatus) -> some View {
         let blockingAction = status.globalCooldown.blockingAction
         let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-        let remaining = status.globalCooldown.secondsRemaining
+        
+        // Calculate remaining time accounting for elapsed time since fetch
+        let elapsed = currentTime.timeIntervalSince(statusFetchedAt ?? Date())
+        let calculatedRemaining = max(0, Double(status.globalCooldown.secondsRemaining) - elapsed)
+        let remaining = Int(calculatedRemaining)
+        
         let hours = remaining / 3600
         let minutes = (remaining % 3600) / 60
         let seconds = remaining % 60
@@ -701,7 +706,7 @@ extension ActionsView {
     }
 }
 
-// MARK: - Timer
+// MARK: - Timer & Kingdom Status
 
 extension ActionsView {
     private func startUIUpdateTimer() {
@@ -712,6 +717,23 @@ extension ActionsView {
     
     private func stopUIUpdateTimer() {
         // Timer will be deallocated when view disappears
+    }
+    
+    private func updateKingdomStatus() {
+        guard let kingdom = currentKingdom else {
+            isInHomeKingdom = false
+            isInEnemyKingdom = false
+            cachedKingdomId = nil
+            return
+        }
+        
+        // Only recalculate if kingdom changed
+        if cachedKingdomId != kingdom.id {
+            cachedKingdomId = kingdom.id
+            isInHomeKingdom = viewModel.isHomeKingdom(kingdom)
+            isInEnemyKingdom = !isInHomeKingdom
+            print("♻️ Updated kingdom status cache for \(kingdom.name)")
+        }
     }
 }
 

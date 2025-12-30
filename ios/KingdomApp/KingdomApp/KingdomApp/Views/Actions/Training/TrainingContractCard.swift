@@ -80,9 +80,19 @@ struct TrainingContractCard: View {
                         .fill(KingdomTheme.Colors.parchmentDark)
                         .frame(height: 8)
                     
-                    Rectangle()
-                        .fill(KingdomTheme.Colors.gold)
-                        .frame(width: geometry.size.width * contract.progress, height: 8)
+                    ZStack {
+                        Rectangle()
+                            .fill(KingdomTheme.Colors.gold)
+                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                        
+                        // Animated diagonal stripes
+                        AnimatedStripes()
+                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                            .mask(
+                                Rectangle()
+                                    .frame(width: geometry.size.width * contract.progress, height: 8)
+                            )
+                    }
                 }
                 .cornerRadius(4)
             }
@@ -114,7 +124,10 @@ struct TrainingContractCard: View {
                     .background(KingdomTheme.Colors.parchmentDark)
                     .cornerRadius(KingdomTheme.CornerRadius.medium)
             } else {
-                CooldownTimer(secondsRemaining: calculatedSecondsRemaining)
+                CooldownTimer(
+                    secondsRemaining: calculatedSecondsRemaining,
+                    totalSeconds: Int(status.cooldownMinutes * 60)
+                )
             }
         }
         .padding()

@@ -4,6 +4,18 @@ import SwiftUI
 
 struct CooldownTimer: View {
     let secondsRemaining: Int
+    let totalSeconds: Int?
+    
+    init(secondsRemaining: Int, totalSeconds: Int? = nil) {
+        self.secondsRemaining = secondsRemaining
+        self.totalSeconds = totalSeconds
+    }
+    
+    var progress: Double {
+        guard let total = totalSeconds, total > 0 else { return 0 }
+        let elapsed = Double(total - secondsRemaining)
+        return min(max(elapsed / Double(total), 0), 1.0)
+    }
     
     var formattedTime: String {
         let hours = secondsRemaining / 3600
@@ -20,13 +32,39 @@ struct CooldownTimer: View {
     }
     
     var body: some View {
-        HStack {
-            Image(systemName: "clock.fill")
-                .foregroundColor(KingdomTheme.Colors.disabled)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "clock.fill")
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                
+                Text("In Progress")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                Text(formattedTime)
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .fontWeight(.medium)
+            }
             
-            Text("Available in \(formattedTime)")
-                .font(KingdomTheme.Typography.body())
-                .foregroundColor(KingdomTheme.Colors.textMuted)
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.parchmentDark)
+                        .frame(height: 8)
+                    
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.buttonWarning)
+                        .frame(width: geometry.size.width * progress, height: 8)
+                        .animation(.linear(duration: 0.5), value: progress)
+                }
+                .cornerRadius(4)
+            }
+            .frame(height: 8)
         }
         .frame(maxWidth: .infinity)
         .padding()

@@ -96,7 +96,10 @@ struct ActionCard: View {
                     .background(KingdomTheme.Colors.parchmentDark)
                     .cornerRadius(KingdomTheme.CornerRadius.medium)
             } else {
-                CooldownTimer(secondsRemaining: calculatedSecondsRemaining)
+                CooldownTimer(
+                    secondsRemaining: calculatedSecondsRemaining,
+                    totalSeconds: Int(status.cooldownMinutes * 60)
+                )
             }
         }
         .padding()
