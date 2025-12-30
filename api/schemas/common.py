@@ -44,7 +44,7 @@ class KingdomData(BaseModel):
 
 
 class CityBoundaryResponse(BaseModel):
-    """City boundary from OSM"""
+    """City boundary from OSM - full response with boundary polygon"""
     osm_id: str
     name: str
     admin_level: int
@@ -55,4 +55,31 @@ class CityBoundaryResponse(BaseModel):
     cached: bool
     is_current: bool = False  # True if user is currently inside this kingdom
     kingdom: Optional[KingdomData] = None  # NULL if unclaimed
+
+
+class CityQuickResponse(BaseModel):
+    """
+    Fast city response - centers only, no boundaries.
+    Used for initial app load to show city markers quickly.
+    Boundaries can be loaded lazily via /cities/{osm_id}/boundary
+    """
+    osm_id: str
+    name: str
+    admin_level: int = 8
+    center_lat: float
+    center_lon: float
+    radius_meters: float = 5000.0  # Default estimate if not cached
+    distance_meters: float = 0.0  # Distance from query point
+    is_current: bool = False  # True if user is currently inside this city
+    has_boundary_cached: bool = False  # True if full boundary is in DB
+    kingdom: Optional[KingdomData] = None
+
+
+class BoundaryResponse(BaseModel):
+    """Lazy-loaded boundary polygon for a city"""
+    osm_id: str
+    name: str
+    boundary: List[List[float]]  # Array of [lat, lon] pairs
+    radius_meters: float
+    from_cache: bool  # True if served from DB, False if fetched from OSM
 

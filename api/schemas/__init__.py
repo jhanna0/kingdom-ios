@@ -28,6 +28,8 @@ from .common import (
     CheckInRewards,
     CheckInResponse,
     CityBoundaryResponse,
+    CityQuickResponse,
+    BoundaryResponse,
     KingdomData,
 )
 from .coup import (
@@ -92,6 +94,8 @@ __all__ = [
     "CheckInRewards",
     "CheckInResponse",
     "CityBoundaryResponse",
+    "CityQuickResponse",
+    "BoundaryResponse",
     "KingdomData",
     # Coup
     "CoupInitiateRequest",

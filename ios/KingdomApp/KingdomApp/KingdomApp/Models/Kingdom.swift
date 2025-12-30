@@ -37,9 +37,13 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     let name: String
     var rulerName: String
     var rulerId: Int?  // Player ID of ruler (nil if unclaimed) - PostgreSQL auto-generated
-    let territory: Territory
+    var territory: Territory  // var so we can update boundary after lazy load
     let color: KingdomColor
     var canClaim: Bool  // Backend determines if current user can claim
+    
+    // Loading state
+    var isCurrentCity: Bool  // True if user is currently inside this city (from API)
+    var hasBoundaryCached: Bool  // True if full boundary polygon is loaded
     
     // Game stats
     var treasuryGold: Int
@@ -102,6 +106,8 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.territory = territory
         self.color = color
         self.canClaim = canClaim
+        self.isCurrentCity = false  // Set by CityAPI after fetch
+        self.hasBoundaryCached = true  // Assume true, CityAPI sets false if needed
         self.treasuryGold = Int.random(in: 100...500)
         self.wallLevel = Int.random(in: 0...3)
         self.vaultLevel = Int.random(in: 0...2)
@@ -128,6 +134,17 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.marketUpgradeCost = nil
         self.farmUpgradeCost = nil
         self.educationUpgradeCost = nil
+    }
+    
+    /// Update boundary after lazy loading from API
+    mutating func updateBoundary(_ newBoundary: [CLLocationCoordinate2D], radiusMeters: Double) {
+        self.territory = Territory(
+            center: territory.center,
+            radiusMeters: radiusMeters,
+            boundary: newBoundary,
+            osmId: territory.osmId
+        )
+        self.hasBoundaryCached = true
     }
     
     /// Check if a point is inside this kingdom's territory

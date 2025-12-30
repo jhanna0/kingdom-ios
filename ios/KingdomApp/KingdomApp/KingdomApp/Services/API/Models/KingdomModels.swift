@@ -80,10 +80,35 @@ struct CityBoundaryResponse: Codable {
     let admin_level: Int
     let center_lat: Double
     let center_lon: Double
-    let boundary: [[Double]]  // Array of [lat, lon] pairs
+    let boundary: [[Double]]  // Array of [lat, lon] pairs (may be empty for neighbors)
     let radius_meters: Double
     let cached: Bool
+    let is_current: Bool  // True if user is currently inside this city
     let kingdom: CityKingdomData?  // NULL if unclaimed
+    
+    // Default is_current to false for backward compatibility
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        osm_id = try container.decode(String.self, forKey: .osm_id)
+        name = try container.decode(String.self, forKey: .name)
+        admin_level = try container.decode(Int.self, forKey: .admin_level)
+        center_lat = try container.decode(Double.self, forKey: .center_lat)
+        center_lon = try container.decode(Double.self, forKey: .center_lon)
+        boundary = try container.decode([[Double]].self, forKey: .boundary)
+        radius_meters = try container.decode(Double.self, forKey: .radius_meters)
+        cached = try container.decode(Bool.self, forKey: .cached)
+        is_current = try container.decodeIfPresent(Bool.self, forKey: .is_current) ?? false
+        kingdom = try container.decodeIfPresent(CityKingdomData.self, forKey: .kingdom)
+    }
+}
+
+/// Lazy-loaded boundary response (for filling in neighbor polygons)
+struct BoundaryResponse: Codable {
+    let osm_id: String
+    let name: String
+    let boundary: [[Double]]  // Array of [lat, lon] pairs
+    let radius_meters: Double
+    let from_cache: Bool  // True if from DB, false if fetched from OSM
 }
 
 // MARK: - Check-in Models

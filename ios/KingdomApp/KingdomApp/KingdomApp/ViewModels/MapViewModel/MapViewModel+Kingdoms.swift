@@ -5,54 +5,129 @@ import CoreLocation
 // MARK: - Kingdom Loading & Refreshing
 extension MapViewModel {
     
-    /// Load real town data from backend API
-    /// Backend handles caching and ensures all clients get consistent city boundaries
+    /// Load real town data from backend API - TWO STEP for speed
+    /// Step 1: Load current city FAST (< 2s) - unblock UI
+    /// Step 2: Load neighbors in background
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
         
         isLoading = true
-        loadingStatus = "Consulting the kingdom cartographers..."
+        loadingStatus = "Finding your kingdom..."
         errorMessage = nil
         
         Task {
-            // Fetch directly from backend API (no local cache)
             do {
-                // Fetch cities from backend API (which handles OSM fetching and DB caching)
-                let foundKingdoms = try await apiService.fetchCities(
+                // STEP 1: Get current city FAST (< 2 seconds)
+                let currentCity = try await apiService.city.fetchCurrentCity(
                     lat: location.latitude,
-                    lon: location.longitude,
-                    radiusKm: loadRadiusMiles * 1.60934  // Convert miles to km
+                    lon: location.longitude
                 )
                 
-                if foundKingdoms.isEmpty {
-                    loadingStatus = "The realm lies shrouded in fog..."
-                    errorMessage = "No cities found in this area."
-                    print("❌ No towns found from API")
-                    isLoading = false
-                } else {
-                    // Backend is the source of truth - just use it directly
-                    kingdoms = foundKingdoms
-                    
-                    // Sync player's fiefsRuled with kingdoms they rule
-                    syncPlayerKingdoms()
-                    
-                    print("✅ Loaded \(foundKingdoms.count) towns from backend API")
-                    
-                    // Re-check location now that kingdoms are loaded
-                    if let currentLocation = userLocation {
-                        checkKingdomLocation(currentLocation)
+                // Convert to Kingdom and show immediately
+                let kingdom = convertCityToKingdom(currentCity, index: 0)
+                
+                await MainActor.run {
+                    if let kingdom = kingdom {
+                        kingdoms = [kingdom]
+                        syncPlayerKingdoms()
+                        
+                        // Check location
+                        if let currentLocation = userLocation {
+                            checkKingdomLocation(currentLocation)
+                        }
+                        
+                        print("✅ Current city loaded: \(kingdom.name)")
                     }
                     
-                    // Done loading
+                    // UI IS NOW READY - user can interact
+                    isLoading = false
+                    loadingStatus = "Loading nearby kingdoms..."
+                }
+                
+                // STEP 2: Load neighbors in background (can be slower)
+                let neighbors = try await apiService.city.fetchNeighbors(
+                    lat: location.latitude,
+                    lon: location.longitude,
+                    radiusKm: loadRadiusMiles * 1.60934
+                )
+                
+                let neighborKingdoms = neighbors.enumerated().compactMap { index, city in
+                    convertCityToKingdom(city, index: index + 1)
+                }
+                
+                await MainActor.run {
+                    // Add neighbors to kingdoms list
+                    kingdoms.append(contentsOf: neighborKingdoms)
+                    syncPlayerKingdoms()
+                    
+                    let withBoundary = kingdoms.filter { $0.hasBoundaryCached }.count
+                    print("✅ Total: \(kingdoms.count) kingdoms (\(withBoundary) with boundaries)")
+                    loadingStatus = ""
+                }
+                
+                // Load missing boundaries in background
+                await loadMissingBoundaries()
+                
+            } catch {
+                await MainActor.run {
+                    loadingStatus = "The royal cartographers have failed..."
+                    errorMessage = "API Error: \(error.localizedDescription)"
+                    print("❌ Failed to load cities: \(error.localizedDescription)")
                     isLoading = false
                 }
-            } catch {
-                loadingStatus = "The royal cartographers have failed..."
-                errorMessage = "API Error: \(error.localizedDescription)"
-                print("❌ Failed to fetch cities from API: \(error.localizedDescription)")
-                isLoading = false
             }
         }
+    }
+    
+    /// Convert CityBoundaryResponse to Kingdom object
+    private func convertCityToKingdom(_ city: CityBoundaryResponse, index: Int) -> Kingdom? {
+        let colors = KingdomColor.allCases
+        
+        let boundary = city.boundary.map { coord in
+            CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
+        }
+        
+        let center = CLLocationCoordinate2D(latitude: city.center_lat, longitude: city.center_lon)
+        
+        let territory = Territory(
+            center: center,
+            radiusMeters: city.radius_meters,
+            boundary: boundary,
+            osmId: city.osm_id
+        )
+        
+        let color = colors[index % colors.count]
+        let rulerName = city.kingdom?.ruler_name ?? "Unclaimed"
+        let rulerId = city.kingdom?.ruler_id
+        let canClaim = city.kingdom?.can_claim ?? false
+        
+        guard var kingdom = Kingdom(
+            name: city.name,
+            rulerName: rulerName,
+            rulerId: rulerId,
+            territory: territory,
+            color: color,
+            canClaim: canClaim
+        ) else {
+            return nil
+        }
+        
+        kingdom.isCurrentCity = city.is_current
+        kingdom.hasBoundaryCached = !city.boundary.isEmpty
+        
+        if let kingdomData = city.kingdom {
+            kingdom.treasuryGold = kingdomData.treasury_gold
+            kingdom.wallLevel = kingdomData.wall_level
+            kingdom.vaultLevel = kingdomData.vault_level
+            kingdom.mineLevel = kingdomData.mine_level
+            kingdom.marketLevel = kingdomData.market_level
+            kingdom.farmLevel = kingdomData.farm_level
+            kingdom.educationLevel = kingdomData.education_level
+            kingdom.travelFee = kingdomData.travel_fee
+            kingdom.checkedInPlayers = kingdomData.population
+        }
+        
+        return kingdom
     }
     
     /// Refresh kingdoms - try again with real data
@@ -153,6 +228,66 @@ extension MapViewModel {
         } catch {
             print("❌ Failed to refresh player state: \(error)")
         }
+    }
+    
+    /// Lazy-load boundary for a kingdom that doesn't have one cached
+    /// Called when user taps on a neighbor kingdom marker
+    func loadKingdomBoundary(kingdomId: String) async {
+        guard let index = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
+            print("⚠️ Kingdom \(kingdomId) not found")
+            return
+        }
+        
+        // Skip if already has boundary
+        guard !kingdoms[index].hasBoundaryCached else {
+            print("✅ Kingdom \(kingdomId) already has boundary")
+            return
+        }
+        
+        do {
+            print("🌐 Lazy-loading boundary for \(kingdoms[index].name)...")
+            let boundaryResponse = try await apiService.city.fetchBoundary(osmId: kingdomId)
+            
+            // Convert to CLLocationCoordinate2D array
+            let boundary = boundaryResponse.boundary.map { coord in
+                CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
+            }
+            
+            await MainActor.run {
+                // Update the kingdom with the new boundary
+                kingdoms[index].updateBoundary(boundary, radiusMeters: boundaryResponse.radius_meters)
+                
+                // Update currentKingdomInside if it's the same kingdom
+                if currentKingdomInside?.id == kingdomId {
+                    currentKingdomInside = kingdoms[index]
+                }
+                
+                print("✅ Loaded boundary for \(kingdoms[index].name) (\(boundary.count) points)")
+            }
+        } catch {
+            print("❌ Failed to load boundary for \(kingdomId): \(error)")
+        }
+    }
+    
+    /// Lazy-load all missing boundaries in background
+    /// Call this after initial load to fill in neighbor polygons
+    func loadMissingBoundaries() async {
+        let missingIds = kingdoms.filter { !$0.hasBoundaryCached }.map { $0.id }
+        
+        if missingIds.isEmpty {
+            print("✅ All boundaries already loaded")
+            return
+        }
+        
+        print("🌐 Loading \(missingIds.count) missing boundaries...")
+        
+        for osmId in missingIds {
+            await loadKingdomBoundary(kingdomId: osmId)
+            // Small delay to avoid overwhelming the API
+            try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 second
+        }
+        
+        print("✅ Finished loading all boundaries")
     }
 }
 

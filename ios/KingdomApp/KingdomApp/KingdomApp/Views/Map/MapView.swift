@@ -25,37 +25,47 @@ struct MapView: View {
             Map(position: $viewModel.cameraPosition) {
                 // Add territory overlays
                 ForEach(viewModel.kingdoms) { kingdom in
-                    // Territory polygon - hand-drawn medieval style
-                    MapPolygon(coordinates: kingdom.territory.boundary)
-                        .foregroundStyle(
-                            Color(
-                                red: kingdom.color.rgba.red,
-                                green: kingdom.color.rgba.green,
-                                blue: kingdom.color.rgba.blue,
-                                opacity: kingdom.color.rgba.alpha * mapOpacity
+                    // Only draw polygon if boundary is cached (not empty)
+                    // Neighbors without boundaries just show markers
+                    if kingdom.hasBoundaryCached {
+                        // Territory polygon - hand-drawn medieval style
+                        MapPolygon(coordinates: kingdom.territory.boundary)
+                            .foregroundStyle(
+                                Color(
+                                    red: kingdom.color.rgba.red,
+                                    green: kingdom.color.rgba.green,
+                                    blue: kingdom.color.rgba.blue,
+                                    opacity: kingdom.color.rgba.alpha * mapOpacity
+                                )
                             )
-                        )
-                        .stroke(
-                            Color(
-                                red: kingdom.color.strokeRGBA.red,
-                                green: kingdom.color.strokeRGBA.green,
-                                blue: kingdom.color.strokeRGBA.blue,
-                                opacity: kingdom.color.strokeRGBA.alpha * mapOpacity
-                            ),
-                            style: StrokeStyle(
-                                lineWidth: 2,
-                                lineCap: .round,
-                                lineJoin: .round,
-                                dash: [8, 3]  // Dashed style for hand-drawn feel
+                            .stroke(
+                                Color(
+                                    red: kingdom.color.strokeRGBA.red,
+                                    green: kingdom.color.strokeRGBA.green,
+                                    blue: kingdom.color.strokeRGBA.blue,
+                                    opacity: kingdom.color.strokeRGBA.alpha * mapOpacity
+                                ),
+                                style: StrokeStyle(
+                                    lineWidth: 2,
+                                    lineCap: .round,
+                                    lineJoin: .round,
+                                    dash: [8, 3]  // Dashed style for hand-drawn feel
+                                )
                             )
-                        )
+                    }
                     
-                    // Kingdom marker (castle icon)
+                    // Kingdom marker (castle icon) - always shown
                     Annotation(kingdom.name, coordinate: kingdom.territory.center) {
                         KingdomMarker(kingdom: kingdom)
                             .opacity(mapOpacity)
                             .onTapGesture {
                                 kingdomForInfoSheet = kingdom
+                                // Lazy-load boundary if not cached
+                                if !kingdom.hasBoundaryCached {
+                                    Task {
+                                        await viewModel.loadKingdomBoundary(kingdomId: kingdom.id)
+                                    }
+                                }
                             }
                     }
                 }

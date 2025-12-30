@@ -43,6 +43,10 @@ class CityBoundary(Base):
     # Usage tracking
     access_count = Column(Integer, default=0, nullable=False)
     
+    # Neighbor caching - avoids slow OSM queries for neighbor lists
+    neighbor_ids = Column(JSONB, nullable=True)  # List of neighboring city OSM IDs
+    neighbors_updated_at = Column(DateTime, nullable=True)  # When neighbors were last fetched
+    
     # Optional: Store original OSM data for reference
     osm_metadata = Column(JSONB, nullable=True)
     
