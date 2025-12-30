@@ -17,6 +17,8 @@ struct APIContract: Codable {
     let actions_completed: Int
     let action_contributions: [String: Int]
     
+    // Costs & Rewards
+    let construction_cost: Int?  // Optional - only for kingdom building contracts
     let reward_pool: Int
     let created_by: Int  // Changed from String to Int - backend uses integer user ID
     let created_at: String

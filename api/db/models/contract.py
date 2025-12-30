@@ -35,8 +35,9 @@ class Contract(Base):
     actions_completed = Column(Integer, default=0)
     action_contributions = Column(JSONB, default=dict)  # {user_id: action_count}
     
-    # Rewards
-    reward_pool = Column(Integer, default=0)
+    # Costs & Rewards
+    construction_cost = Column(Integer, default=0)  # What ruler pays upfront to START building
+    reward_pool = Column(Integer, default=0)  # Distributed to workers who complete actions
     
     # Status
     created_by = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)

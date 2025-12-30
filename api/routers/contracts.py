@@ -28,13 +28,35 @@ def calculate_base_hours(building_type: str, building_level: int, population: in
     return base_hours * population_multiplier
 
 
+def calculate_construction_cost(building_level: int, population: int) -> int:
+    """Calculate upfront construction cost based on building level and population
+    
+    This is what the RULER pays from treasury to START the building project.
+    Separate from reward_pool which is distributed to workers.
+    
+    Formula: 1000 * 2^(level-1) * (1 + population/50)
+    
+    Examples:
+    - Level 1, 10 people: 1000 * 1 * 1.2 = 1,200g
+    - Level 3, 100 people: 1000 * 4 * 3.0 = 12,000g
+    - Level 5, 500 people: 1000 * 16 * 11.0 = 176,000g
+    """
+    base_cost = 1000 * math.pow(2.0, building_level - 1)
+    population_multiplier = 1.0 + (population / 50.0)
+    return int(base_cost * population_multiplier)
+
+
 def calculate_actions_required(building_type: str, building_level: int, population: int) -> int:
     """Calculate total actions required based on building type, level, and population
     
     Small towns need fewer actions, big cities need many more!
-    Example:
-    - Level 3 Walls, 10 people: 400 * 1.33 = ~533 actions
-    - Level 3 Walls, 1000 people: 400 * 34.33 = ~13,732 actions
+    
+    Formula: 100 * 2^(level-1) * (1 + population/30)
+    
+    Examples:
+    - Level 1, 10 people: 100 * 1 * 1.33 = ~133 actions
+    - Level 3, 100 people: 100 * 4 * 4.33 = ~1,733 actions
+    - Level 5, 500 people: 100 * 16 * 17.67 = ~28,267 actions
     """
     # Base actions: 100 * 2^(level-1)
     # Level 1: 100, Level 2: 200, Level 3: 400, Level 4: 800, Level 5: 1600
@@ -68,6 +90,7 @@ def contract_to_response(contract: Contract) -> ContractResponse:
         total_actions_required=contract.total_actions_required,
         actions_completed=contract.actions_completed or 0,
         action_contributions=contract.action_contributions or {},
+        construction_cost=contract.construction_cost or 0,
         reward_pool=contract.reward_pool,
         created_by=contract.created_by,
         created_at=contract.created_at,
@@ -176,15 +199,19 @@ def create_contract(
             detail=f"Kingdom already has an active contract for {existing_contract.building_type}"
         )
     
+    # Calculate construction cost based on population and level
+    construction_cost = calculate_construction_cost(data.building_level, data.base_population)
+    total_cost = construction_cost + data.reward_pool
+    
     # Check if kingdom has enough gold in treasury
-    if kingdom.treasury_gold < data.reward_pool:
+    if kingdom.treasury_gold < total_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient treasury funds. Have: {kingdom.treasury_gold}, Need: {data.reward_pool}"
+            detail=f"Insufficient treasury funds. Need {total_cost}g (construction: {construction_cost}g + rewards: {data.reward_pool}g). Have: {kingdom.treasury_gold}g"
         )
     
-    # Deduct gold from kingdom treasury
-    kingdom.treasury_gold -= data.reward_pool
+    # Deduct gold from kingdom treasury (both construction cost and reward pool)
+    kingdom.treasury_gold -= total_cost
     
     # Calculate base hours required
     base_hours = calculate_base_hours(
@@ -213,6 +240,7 @@ def create_contract(
         total_actions_required=total_actions,
         actions_completed=0,
         action_contributions={},
+        construction_cost=construction_cost,
         reward_pool=data.reward_pool,
         created_by=current_user.id,
         status="open"

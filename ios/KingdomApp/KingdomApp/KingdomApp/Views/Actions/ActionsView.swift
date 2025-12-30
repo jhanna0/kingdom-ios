@@ -441,6 +441,7 @@ extension ActionsView {
                         totalActionsRequired: apiContract.total_actions_required,
                         actionsCompleted: apiContract.actions_completed,
                         actionContributions: apiContract.action_contributions,
+                        constructionCost: apiContract.construction_cost ?? 0,  // Default to 0 for old contracts
                         rewardPool: apiContract.reward_pool,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),

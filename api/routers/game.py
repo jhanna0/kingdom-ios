@@ -108,7 +108,7 @@ def list_kingdoms(
 @router.get("/kingdoms/{kingdom_id}")
 def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     """Get kingdom details with building upgrade costs"""
-    from routers.contracts import calculate_actions_required, calculate_suggested_reward
+    from routers.contracts import calculate_actions_required, calculate_suggested_reward, calculate_construction_cost
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -167,11 +167,14 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         if current_level < 5:  # Max level is 5
             next_level = current_level + 1
             actions = calculate_actions_required(building_name.capitalize(), next_level, kingdom.checked_in_players)
+            construction_cost = calculate_construction_cost(next_level, kingdom.checked_in_players)
             reward = calculate_suggested_reward(actions, next_level)
+            total_cost = construction_cost + reward
             kingdom_dict[f"{building_name}_upgrade_cost"] = {
                 "actions_required": actions,
+                "construction_cost": construction_cost,
                 "suggested_reward": reward,
-                "can_afford": kingdom.treasury_gold >= reward
+                "can_afford": kingdom.treasury_gold >= total_cost
             }
         else:
             kingdom_dict[f"{building_name}_upgrade_cost"] = None

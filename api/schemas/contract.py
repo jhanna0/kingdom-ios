@@ -33,6 +33,8 @@ class ContractResponse(BaseModel):
     actions_completed: int = 0
     action_contributions: dict = {}  # {user_id: action_count}
     
+    # Costs & Rewards
+    construction_cost: int = 0  # What ruler paid upfront to START building
     reward_pool: int
     created_by: int
     created_at: datetime

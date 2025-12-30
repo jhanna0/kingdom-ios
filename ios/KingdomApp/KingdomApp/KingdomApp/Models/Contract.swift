@@ -22,8 +22,9 @@ struct Contract: Identifiable, Codable, Hashable {
     var actionsCompleted: Int // Current action progress
     var actionContributions: [String: Int] // user_id: action_count
     
-    // Rewards
-    let rewardPool: Int // Total gold to distribute equally
+    // Costs & Rewards
+    let constructionCost: Int? // What ruler paid upfront to START building (kingdom contracts only)
+    let rewardPool: Int // Total gold to distribute to workers
     
     // Status
     let createdBy: Int // Ruler's player ID (PostgreSQL auto-generated)
@@ -133,8 +134,16 @@ struct Contract: Identifiable, Codable, Hashable {
         let populationMultiplier = 1.0 + (Double(population) / 30.0)
         let totalHours = baseHours * populationMultiplier
         
-        // Calculate action requirements: 100 * 2^(level-1)
-        let totalActions = Int(100 * pow(2.0, Double(buildingLevel - 1)))
+        // Calculate action requirements: 100 * 2^(level-1) * (1 + population/30)
+        let baseActions = 100.0 * pow(2.0, Double(buildingLevel - 1))
+        let populationActionMultiplier = 1.0 + (Double(population) / 30.0)
+        let totalActions = Int(baseActions * populationActionMultiplier)
+        
+        // Calculate construction cost: 1000 * 2^(level-1) * (1 + population/50)
+        // Only for kingdom building contracts
+        let baseCost = 1000.0 * pow(2.0, Double(buildingLevel - 1))
+        let populationCostMultiplier = 1.0 + (Double(population) / 50.0)
+        let constructionCostValue = Int(baseCost * populationCostMultiplier)
         
         return Contract(
             id: id,
@@ -148,6 +157,7 @@ struct Contract: Identifiable, Codable, Hashable {
             totalActionsRequired: totalActions,
             actionsCompleted: 0,
             actionContributions: [:],
+            constructionCost: constructionCostValue,
             rewardPool: rewardPool,
             createdBy: createdBy,
             createdAt: Date(),

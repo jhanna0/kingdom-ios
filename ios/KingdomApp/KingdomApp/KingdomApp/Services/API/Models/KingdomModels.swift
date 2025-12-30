@@ -4,6 +4,7 @@ import Foundation
 
 struct APIBuildingUpgradeCost: Codable {
     let actions_required: Int
+    let construction_cost: Int
     let suggested_reward: Int
     let can_afford: Bool
 }
