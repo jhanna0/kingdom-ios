@@ -3,13 +3,10 @@ runtime: python311
 build:
   commands:
     build:
-      - cd api && pip install --no-cache-dir -r requirements.txt
+      - python3 -m pip install --no-cache-dir -r requirements.txt
 run:
   runtime-version: 3.11
-  command: cd api && python -m uvicorn main:app --host 0.0.0.0 --port 8000
+  command: python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
   network:
     port: 8000
-  env:
-    - name: PYTHONPATH
-      value: /app/api
 
