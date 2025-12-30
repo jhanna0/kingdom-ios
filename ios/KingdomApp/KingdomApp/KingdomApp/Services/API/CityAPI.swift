@@ -53,6 +53,7 @@ class CityAPI {
             // Use kingdom data from backend if available
             let rulerName = city.kingdom?.ruler_name ?? "Unclaimed"
             let rulerId = city.kingdom?.ruler_id
+            let canClaim = city.kingdom?.can_claim ?? false
             
             // Create kingdom with backend data
             guard var kingdom = Kingdom(
@@ -60,7 +61,8 @@ class CityAPI {
                 rulerName: rulerName,
                 rulerId: rulerId,
                 territory: territory,
-                color: color
+                color: color,
+                canClaim: canClaim
             ) else {
                 return nil
             }

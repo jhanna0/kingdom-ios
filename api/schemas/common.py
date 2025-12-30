@@ -40,6 +40,7 @@ class KingdomData(BaseModel):
     farm_level: int = 0
     education_level: int = 0
     travel_fee: int = 10
+    can_claim: bool = False  # Backend determines if current user can claim this kingdom
 
 
 class CityBoundaryResponse(BaseModel):

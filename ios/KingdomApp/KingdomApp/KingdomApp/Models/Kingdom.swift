@@ -75,6 +75,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var rulerId: Int?  // Player ID of ruler (nil if unclaimed) - PostgreSQL auto-generated
     let territory: Territory
     let color: KingdomColor
+    var canClaim: Bool  // Backend determines if current user can claim
     
     // Game stats
     var treasuryGold: Int
@@ -130,7 +131,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -142,6 +143,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.rulerId = rulerId
         self.territory = territory
         self.color = color
+        self.canClaim = canClaim
         self.treasuryGold = Int.random(in: 100...500)
         self.wallLevel = Int.random(in: 0...3)
         self.vaultLevel = Int.random(in: 0...2)

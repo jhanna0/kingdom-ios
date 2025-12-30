@@ -171,6 +171,9 @@ class MapViewModel: ObservableObject {
                         
                         print("✅ Auto-checked in to \(current.name)")
                     }
+                    
+                    // Refresh this specific kingdom's data from backend
+                    await refreshKingdom(id: current.id)
                 } catch {
                     print("⚠️ Failed to auto check-in: \(error.localizedDescription)")
                 }
@@ -322,79 +325,42 @@ class MapViewModel: ObservableObject {
         return true
     }
     
-    /// Claim the current kingdom (if unclaimed)
-    func claimKingdom() -> Bool {
+    /// Claim the current kingdom - backend validates and returns success/error
+    /// Throws error if: not inside kingdom, someone else claimed it first, you already rule a kingdom, etc.
+    func claimKingdom() async throws {
         guard let kingdom = currentKingdomInside else {
-            print("❌ Cannot claim - not inside a kingdom")
-            return false
+            throw NSError(domain: "MapViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not inside a kingdom"])
         }
         
-        guard kingdom.isUnclaimed else {
-            print("❌ Cannot claim - kingdom already has a ruler")
-            return false
+        guard let osmId = kingdom.territory.osmId else {
+            throw NSError(domain: "MapViewModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "Kingdom has no OSM ID"])
         }
         
-        guard player.isCheckedIn() else {
-            print("❌ Cannot claim - must check in first")
-            return false
-        }
+        // Call backend - it validates everything (unclaimed, user doesn't rule others, etc.)
+        // This will throw an error if claim fails for any reason
+        let kingdomAPI = KingdomAPI()
+        let apiKingdom = try await kingdomAPI.createKingdom(
+            name: kingdom.name,
+            osmId: osmId
+        )
         
-        // Claim kingdom via API
-        Task {
-            do {
-                let kingdomAPI = KingdomAPI()
+        // SUCCESS! Backend confirmed the claim. Update local state.
+        await MainActor.run {
+            if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
+                kingdoms[index].rulerId = apiKingdom.ruler_id
+                kingdoms[index].rulerName = player.name
+                kingdoms[index].canClaim = false  // Can't claim anymore
+                player.claimKingdom(kingdom.name)
                 
-                guard let osmId = kingdom.territory.osmId else {
-                    print("❌ Cannot claim - kingdom has no OSM ID")
-                    return
-                }
+                // Update currentKingdomInside to reflect the change
+                currentKingdomInside = kingdoms[index]
                 
-                guard osmId == kingdom.id else {
-                    print("❌ Kingdom ID mismatch! id=\(kingdom.id), osmId=\(osmId)")
-                    return
-                }
+                // Sync player kingdoms to ensure UI updates everywhere
+                syncPlayerKingdoms()
                 
-                // Claim the kingdom (kingdoms already exist from /cities call)
-                let apiKingdom = try await kingdomAPI.createKingdom(
-                    name: kingdom.name,
-                    osmId: osmId
-                )
-                
-                // Update local state with the server response
-                await MainActor.run {
-                    if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-                        kingdoms[index].rulerId = apiKingdom.ruler_id
-                        kingdoms[index].rulerName = player.name
-                        player.claimKingdom(kingdom.name)
-                        
-                        // Update currentKingdomInside to reflect the change
-                        currentKingdomInside = kingdoms[index]
-                        
-                        // Sync player kingdoms to ensure UI updates everywhere
-                        syncPlayerKingdoms()
-                        
-                        print("👑 Successfully claimed \(kingdom.name)")
-                    }
-                }
-            } catch {
-                print("❌ Failed to claim kingdom: \(error.localizedDescription)")
-                // Still update local state as fallback for offline mode
-                await MainActor.run {
-                    if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-                        kingdoms[index].setRuler(playerId: player.playerId, playerName: player.name)
-                        player.claimKingdom(kingdom.name)
-                        currentKingdomInside = kingdoms[index]
-                        
-                        // Sync player kingdoms to ensure UI updates everywhere
-                        syncPlayerKingdoms()
-                        
-                        print("⚠️ Claimed locally only - will sync when connection available")
-                    }
-                }
+                print("👑 Successfully claimed \(kingdom.name)")
             }
         }
-        
-        return true
     }
     
     // MARK: - Ruler Actions

@@ -122,11 +122,17 @@ struct KingdomInfoSheetView: View {
                         }
                     }
                     .padding(.horizontal)
-                } else if isPlayerInside && kingdom.isUnclaimed && player.isCheckedIn() && player.currentKingdom == kingdom.name {
-                    // Can claim!
+                } else if kingdom.canClaim {
+                    // Backend says we can claim!
                     Button(action: {
-                        _ = viewModel.claimKingdom()
-                        dismiss()
+                        Task {
+                            do {
+                                try await viewModel.claimKingdom()
+                                dismiss()
+                            } catch {
+                                print("❌ Failed to claim: \(error.localizedDescription)")
+                            }
+                        }
                     }) {
                         HStack(spacing: 8) {
                             Image(systemName: "flag.fill")

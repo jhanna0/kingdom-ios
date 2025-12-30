@@ -3,11 +3,13 @@ City boundary endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from db import get_db
+from db.models import User
 from schemas import CityBoundaryResponse
 from services import city_service
+from routers.auth import get_current_user_optional
 
 
 router = APIRouter(prefix="/cities", tags=["cities"])
@@ -18,7 +20,8 @@ async def get_cities(
     lat: float,
     lon: float,
     radius: float = 30.0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     SMART city boundary lookup with accurate boundaries.
@@ -39,7 +42,7 @@ async def get_cities(
     Returns:
     - List of city boundaries with accurate coordinates
     """
-    cities = await city_service.get_cities_near_location(db, lat, lon, radius)
+    cities = await city_service.get_cities_near_location(db, lat, lon, radius, current_user)
     
     if not cities:
         raise HTTPException(status_code=404, detail="No cities found in this area")

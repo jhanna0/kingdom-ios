@@ -54,12 +54,14 @@ def _is_point_in_polygon(lat: float, lon: float, polygon: List[List[float]]) -> 
     return inside
 
 
-def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) -> dict:
+def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary], current_user=None) -> dict:
     """
     Get or create kingdoms for cities.
     Creates unclaimed kingdoms for any cities that don't have one yet.
     Returns dict of osm_id -> KingdomData
     """
+    from db.models import UserKingdom
+    
     osm_ids = [city.osm_id for city in cities]
     kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
     existing_kingdom_ids = {k.id for k in kingdoms}
@@ -81,6 +83,15 @@ def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) 
     
     db.commit()
     
+    # Check if current user can claim kingdoms (doesn't currently rule any)
+    user_can_claim = False
+    if current_user:
+        current_kingdoms = db.query(UserKingdom).filter(
+            UserKingdom.user_id == current_user.id,
+            UserKingdom.is_ruler == True
+        ).count()
+        user_can_claim = (current_kingdoms == 0)
+    
     # Build result map
     result = {}
     for kingdom in kingdoms:
@@ -90,6 +101,9 @@ def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) 
             ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
             if ruler:
                 ruler_name = ruler.display_name
+        
+        # Can claim if: kingdom is unclaimed AND user doesn't currently rule any kingdoms
+        can_claim = (kingdom.ruler_id is None) and user_can_claim
         
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
@@ -104,7 +118,8 @@ def _get_or_create_kingdoms_for_cities(db: Session, cities: List[CityBoundary]) 
             market_level=kingdom.market_level,
             farm_level=kingdom.farm_level,
             education_level=kingdom.education_level,
-            travel_fee=kingdom.travel_fee
+            travel_fee=kingdom.travel_fee,
+            can_claim=can_claim
         )
     
     return result
@@ -151,6 +166,7 @@ async def get_cities_near_location(
     lat: float,
     lon: float,
     radius: float = 30.0,
+    current_user = None,
     check_current: bool = True
 ) -> List[CityBoundaryResponse]:
     """
@@ -169,7 +185,7 @@ async def get_cities_near_location(
         return []
     
     # For each city ID, check if we have boundary in DB, else fetch it
-    cities = await _process_city_ids(db, city_ids)
+    cities = await _process_city_ids(db, city_ids, current_user)
     
     # Check which kingdom the user is currently inside (if any)
     if check_current:
@@ -194,7 +210,8 @@ async def _fetch_cities_fallback(
     db: Session,
     lat: float,
     lon: float,
-    radius: float
+    radius: float,
+    current_user = None
 ) -> List[CityBoundaryResponse]:
     """Fallback method - fetch all cities at once from OSM"""
     osm_cities = await fetch_cities_from_osm(lat, lon, radius, admin_levels="8")
@@ -231,7 +248,7 @@ async def _fetch_cities_fallback(
     db.commit()
     
     # Get or create kingdoms for all cities
-    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities)
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities, current_user)
     
     return [
         CityBoundaryResponse(
@@ -251,7 +268,8 @@ async def _fetch_cities_fallback(
 
 async def _process_city_ids(
     db: Session,
-    city_ids: List[dict]
+    city_ids: List[dict],
+    current_user = None
 ) -> List[CityBoundaryResponse]:
     """Process city IDs - fetch boundaries only for cities we don't have"""
     print(f"📦 Processing {len(city_ids)} cities...")
@@ -319,7 +337,7 @@ async def _process_city_ids(
     print(f"✅ Returning {len(result_cities)} cities ({cached_count} cached, {new_count} newly fetched)")
     
     # Get or create kingdoms for all cities
-    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities)
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, result_cities, current_user)
     
     return [
         CityBoundaryResponse(
@@ -350,7 +368,7 @@ def get_city_by_id(db: Session, osm_id: str) -> CityBoundaryResponse:
     db.commit()
     
     # Get or create kingdom data
-    kingdoms_map = _get_or_create_kingdoms_for_cities(db, [city])
+    kingdoms_map = _get_or_create_kingdoms_for_cities(db, [city], None)
     
     return CityBoundaryResponse(
         osm_id=city.osm_id,

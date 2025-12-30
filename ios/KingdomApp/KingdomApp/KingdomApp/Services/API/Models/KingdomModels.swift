@@ -71,6 +71,7 @@ struct CityKingdomData: Codable {
     let farm_level: Int
     let education_level: Int
     let travel_fee: Int
+    let can_claim: Bool  // Backend determines if current user can claim
 }
 
 struct CityBoundaryResponse: Codable {

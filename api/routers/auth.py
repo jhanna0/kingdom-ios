@@ -14,6 +14,7 @@ This ensures:
 - Database is single source of truth for all user data
 - Token contains only stable identifier (apple_user_id), not mutable data
 """
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -89,6 +90,34 @@ def get_current_user(
         )
     
     return user
+
+
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
+) -> Optional[User]:
+    """
+    Optional authentication - returns User if authenticated, None if not
+    Use for endpoints that behave differently for authenticated users but don't require auth
+    """
+    if not credentials:
+        return None
+    
+    try:
+        token = credentials.credentials
+        payload = decode_access_token(token)
+        apple_user_id = payload.get("sub")
+        
+        if not apple_user_id:
+            return None
+        
+        user = db.query(User).filter(User.apple_user_id == apple_user_id).first()
+        if not user or not user.is_active:
+            return None
+        
+        return user
+    except:
+        return None
 
 
 # ===== Apple Sign In =====
