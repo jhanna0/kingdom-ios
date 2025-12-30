@@ -8,6 +8,8 @@ struct MapHUD: View {
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
     @Binding var showAPIDebug: Bool
+    @EnvironmentObject var musicService: MusicService
+    @State private var showMusicSettings = false
     let notificationBadgeCount: Int
     
     var body: some View {
@@ -44,6 +46,15 @@ struct MapHUD: View {
                         }
                     }
                     
+                    // Music Control Button
+                    Button {
+                        showMusicSettings = true
+                    } label: {
+                        Image(systemName: musicService.isMusicEnabled ? "music.note" : "music.note.slash")
+                            .font(.system(size: 14))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    
                     // API Status Indicator
                     Button {
                         showAPIDebug = true
@@ -52,6 +63,10 @@ struct MapHUD: View {
                             .fill(viewModel.apiService.isConnected ? Color.green : Color.gray.opacity(0.4))
                             .frame(width: 8, height: 8)
                     }
+                }
+                .sheet(isPresented: $showMusicSettings) {
+                    MusicSettingsView()
+                        .environmentObject(musicService)
                 }
                 
                 // Divider

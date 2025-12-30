@@ -233,21 +233,36 @@ async def get_current_city(
             kingdom=kingdoms.get(osm_id)
         )
     
-    # Cache it
-    new_city = CityBoundary(
-        osm_id=osm_id,
-        name=boundary_data["name"],
-        admin_level=boundary_data["admin_level"],
-        center_lat=boundary_data["center_lat"],
-        center_lon=boundary_data["center_lon"],
-        boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
-        radius_meters=boundary_data["radius_meters"],
-        boundary_points_count=len(boundary_data["boundary"]),
-        access_count=1,
-        osm_metadata=boundary_data.get("osm_tags", {})
-    )
-    db.add(new_city)
-    db.commit()
+    # Cache it (with race condition protection)
+    try:
+        new_city = CityBoundary(
+            osm_id=osm_id,
+            name=boundary_data["name"],
+            admin_level=boundary_data["admin_level"],
+            center_lat=boundary_data["center_lat"],
+            center_lon=boundary_data["center_lon"],
+            boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+            radius_meters=boundary_data["radius_meters"],
+            boundary_points_count=len(boundary_data["boundary"]),
+            access_count=1,
+            osm_metadata=boundary_data.get("osm_tags", {})
+        )
+        db.add(new_city)
+        db.commit()
+    except Exception as e:
+        # Race condition - another request already cached it
+        db.rollback()
+        if "duplicate key" in str(e).lower():
+            print(f"   ⏭️  {osm_id} already cached by another request")
+            # Fetch from DB to get the existing record
+            cached = db.query(CityBoundary).filter(CityBoundary.osm_id == osm_id).first()
+            if cached:
+                cached.access_count += 1
+                cached.last_accessed = datetime.utcnow()
+                db.commit()
+        else:
+            # Some other error - re-raise
+            raise
     
     _ensure_kingdom_exists(db, osm_id, boundary_data["name"])
     kingdoms = _get_kingdom_data(db, [osm_id], current_user)
@@ -431,20 +446,36 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
     if not boundary_data:
         return None
     
-    new_city = CityBoundary(
-        osm_id=osm_id,
-        name=boundary_data["name"],
-        admin_level=boundary_data["admin_level"],
-        center_lat=boundary_data["center_lat"],
-        center_lon=boundary_data["center_lon"],
-        boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
-        radius_meters=boundary_data["radius_meters"],
-        boundary_points_count=len(boundary_data["boundary"]),
-        access_count=1,
-        osm_metadata=boundary_data.get("osm_tags", {})
-    )
-    db.add(new_city)
-    db.commit()
+    # Cache it (with race condition protection)
+    try:
+        new_city = CityBoundary(
+            osm_id=osm_id,
+            name=boundary_data["name"],
+            admin_level=boundary_data["admin_level"],
+            center_lat=boundary_data["center_lat"],
+            center_lon=boundary_data["center_lon"],
+            boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+            radius_meters=boundary_data["radius_meters"],
+            boundary_points_count=len(boundary_data["boundary"]),
+            access_count=1,
+            osm_metadata=boundary_data.get("osm_tags", {})
+        )
+        db.add(new_city)
+        db.commit()
+    except Exception as e:
+        # Race condition - another request already cached it
+        db.rollback()
+        if "duplicate key" in str(e).lower():
+            print(f"   ⏭️  {osm_id} already cached by another request")
+            # Fetch from DB to get the existing record
+            cached = db.query(CityBoundary).filter(CityBoundary.osm_id == osm_id).first()
+            if cached:
+                cached.access_count += 1
+                cached.last_accessed = datetime.utcnow()
+                db.commit()
+        else:
+            # Some other error - re-raise
+            raise
     
     return BoundaryResponse(
         osm_id=osm_id,

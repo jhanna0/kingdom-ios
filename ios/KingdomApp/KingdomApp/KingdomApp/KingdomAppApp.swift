@@ -11,6 +11,7 @@ import SwiftUI
 struct KingdomAppApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var appInit = AppInitService()
+    @StateObject private var musicService = MusicService.shared
     
     var body: some Scene {
         WindowGroup {
@@ -21,13 +22,20 @@ struct KingdomAppApp: App {
                     AuthenticatedView()
                         .environmentObject(authManager)
                         .environmentObject(appInit)
+                        .environmentObject(musicService)
                 } else if authManager.needsOnboarding {
                     OnboardingView()
                         .environmentObject(authManager)
+                        .environmentObject(musicService)
                 } else if !authManager.isCheckingAuth {
                     AuthView()
                         .environmentObject(authManager)
+                        .environmentObject(musicService)
                 }
+            }
+            .onAppear {
+                // Start background music when app launches
+                musicService.playBackgroundMusic(filename: "ambient_background.mp3", volume: 0.25)
             }
         }
     }
