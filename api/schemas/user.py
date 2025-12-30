@@ -62,6 +62,7 @@ class PlayerState(BaseModel):
     total_checkins: int = 0
     total_conquests: int = 0
     kingdoms_ruled: int = 0
+    has_claimed_starting_city: bool = False
     coups_won: int = 0
     coups_failed: int = 0
     times_executed: int = 0
@@ -171,6 +172,7 @@ class PlayerStateUpdate(BaseModel):
     total_checkins: Optional[int] = None
     total_conquests: Optional[int] = None
     kingdoms_ruled: Optional[int] = None
+    has_claimed_starting_city: Optional[bool] = None
     coups_won: Optional[int] = None
     coups_failed: Optional[int] = None
     times_executed: Optional[int] = None

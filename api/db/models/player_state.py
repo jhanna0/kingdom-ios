@@ -59,6 +59,7 @@ class PlayerState(Base):
     total_checkins = Column(Integer, default=0)
     total_conquests = Column(Integer, default=0)
     kingdoms_ruled = Column(Integer, default=0)
+    has_claimed_starting_city = Column(Boolean, default=False)  # One-time initial claim flag
     coups_won = Column(Integer, default=0)
     coups_failed = Column(Integer, default=0)
     times_executed = Column(Integer, default=0)

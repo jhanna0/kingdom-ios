@@ -189,11 +189,24 @@ def create_kingdom(
     """
     DEPRECATED: Use /checkin instead - it auto-creates kingdoms
     
-    Create a new kingdom
+    Create a new kingdom / Claim an unclaimed city
     
     User automatically becomes the ruler of the new kingdom
     Coordinates are stored in the CityBoundary, not duplicated here
+    
+    RESTRICTION: Users can only claim ONE starting city via this endpoint.
+    This prevents spam. Military conquest is still allowed after initial claim.
     """
+    # Get player state to check if they've already claimed a starting city
+    state = _get_or_create_player_state(db, current_user)
+    
+    # Check if user has already used their one-time city claim
+    if state.has_claimed_starting_city:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already claimed your starting city. Use military conquest to expand your territory."
+        )
+    
     # Check if kingdom with this OSM ID already exists
     existing = db.query(Kingdom).filter(
         Kingdom.city_boundary_osm_id == city_boundary_osm_id
@@ -216,10 +229,10 @@ def create_kingdom(
             )
             db.add(user_kingdom)
             
-            # Update user stats
-            state = _get_or_create_player_state(db, current_user)
+            # Update user stats and mark that they've claimed their starting city
             state.kingdoms_ruled += 1
             state.total_conquests += 1
+            state.has_claimed_starting_city = True  # Mark as claimed
             
             db.commit()
             db.refresh(existing)
@@ -261,10 +274,10 @@ def create_kingdom(
     
     db.add(user_kingdom)
     
-    # Update user stats
-    state = _get_or_create_player_state(db, current_user)
+    # Update user stats and mark that they've claimed their starting city
     state.kingdoms_ruled += 1
     state.total_conquests += 1
+    state.has_claimed_starting_city = True  # Mark as claimed
     
     db.commit()
     
