@@ -44,6 +44,21 @@ class UpgradePropertyRequest(BaseModel):
 
 # ===== Helper Functions =====
 
+def get_tier_name(tier: int) -> str:
+    """
+    Get the display name for a property tier.
+    Single source of truth for tier names!
+    """
+    tier_names = {
+        1: "Land",
+        2: "House", 
+        3: "Workshop",
+        4: "Beautiful Property",
+        5: "Estate"
+    }
+    return tier_names.get(tier, f"Tier {tier}")
+
+
 def calculate_land_price(population: int) -> int:
     """Calculate land purchase price based on kingdom population"""
     base_price = 500
@@ -274,7 +289,6 @@ def start_property_upgrade(
     
     # Create upgrade contract
     contract_id = str(uuid.uuid4())
-    tier_names = {1: "House", 2: "Workshop", 3: "Beautiful Property", 4: "Estate"}
     next_tier = property.tier + 1
     
     new_contract = {
@@ -282,7 +296,7 @@ def start_property_upgrade(
         "property_id": property_id,
         "from_tier": property.tier,
         "to_tier": next_tier,
-        "target_tier_name": tier_names.get(next_tier, f"Tier {next_tier}"),
+        # NOTE: target_tier_name is NOT stored - it's computed on read from to_tier
         "actions_required": actions_required,
         "actions_completed": 0,
         "cost": upgrade_cost,
@@ -297,9 +311,12 @@ def start_property_upgrade(
     
     db.commit()
     
+    # Compute tier name on the fly (not stored in DB)
+    tier_name = get_tier_name(next_tier)
+    
     return {
         "success": True,
-        "message": f"Started upgrade to {new_contract['target_tier_name']}! Complete {actions_required} actions to finish.",
+        "message": f"Started upgrade to {tier_name}! Complete {actions_required} actions to finish.",
         "contract_id": contract_id,
         "property_id": property_id,
         "from_tier": property.tier,

@@ -8,6 +8,7 @@ import json
 
 from db import get_db, User, PlayerState, Contract
 from routers.auth import get_current_user
+from routers.property import get_tier_name  # Import tier name helper
 from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
 from .training import calculate_training_cost
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus
@@ -82,6 +83,12 @@ def get_action_status(
             "stat_bonus": get_stat_bonus(tier)
         }
     
+    # Load property upgrade contracts and add computed tier names
+    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    for contract in property_contracts:
+        # Compute target_tier_name from to_tier (not stored in DB!)
+        contract["target_tier_name"] = get_tier_name(contract["to_tier"])
+    
     return {
         "global_cooldown": global_cooldown,  # NEW: Global action lock
         "work": {
@@ -119,7 +126,7 @@ def get_action_status(
         },
         "crafting_queue": state.crafting_queue or [],
         "crafting_costs": crafting_costs,
-        "property_upgrade_contracts": json.loads(state.property_upgrade_contracts or "[]"),
+        "property_upgrade_contracts": property_contracts,
         "contracts": contracts
     }
 

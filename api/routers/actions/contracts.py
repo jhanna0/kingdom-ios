@@ -230,7 +230,7 @@ def work_on_property_upgrade(
         "contract_id": contract_id,
         "property_id": contract_data["property_id"],
         "actions_completed": contract_data["actions_completed"],
-        "total_actions_required": contract_data["actions_required"],
+        "actions_required": contract_data["actions_required"],
         "progress_percent": progress_percent,
         "is_complete": is_complete,
         "new_tier": contract_data["to_tier"] if is_complete else None,
