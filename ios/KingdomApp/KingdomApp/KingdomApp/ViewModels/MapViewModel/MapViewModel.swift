@@ -39,9 +39,9 @@ class MapViewModel: ObservableObject {
     
     // MARK: - Initialization
     init() {
-        // Initialize player (loads from UserDefaults automatically)
+        // Initialize player - Backend is source of truth!
         self.player = Player()
-        self.playerResources = PlayerResources.load()
+        self.playerResources = PlayerResources()
         
         // Start with default location - will be replaced when user location arrives
         let center = SampleData.defaultCenter
@@ -89,7 +89,7 @@ class MapViewModel: ObservableObject {
             await MainActor.run {
                 player.playerId = userData.id  // Integer from Postgres auto-increment
                 player.name = userData.display_name
-                player.saveToUserDefaults()
+                // Backend is source of truth - no local caching
                 
                 print("✅ Synced player ID with backend: \(userData.id)")
                 
@@ -119,7 +119,7 @@ class MapViewModel: ObservableObject {
         // Update player's fiefsRuled to match reality
         player.fiefsRuled = updatedFiefs
         player.isRuler = !updatedFiefs.isEmpty
-        player.saveToUserDefaults()
+        // Backend is source of truth - no local caching
         
         if !updatedFiefs.isEmpty {
             print("🔄 Synced player kingdoms: \(updatedFiefs.joined(separator: ", "))")

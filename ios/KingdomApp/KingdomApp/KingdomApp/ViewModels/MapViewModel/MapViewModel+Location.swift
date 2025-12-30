@@ -55,7 +55,7 @@ extension MapViewModel {
                         // Update player from backend response (includes check-in rewards and ALL player data)
                         player.updateFromAPIState(updatedState)
                         player.currentKingdom = current.name
-                        player.saveToUserDefaults()
+                        // Backend is source of truth - no local caching
                         
                         // Store travel event from backend
                         latestTravelEvent = updatedState.travel_event
@@ -72,7 +72,7 @@ extension MapViewModel {
         } else if previousKingdom != nil && currentKingdomInside == nil {
             print("🚪 Left \(previousKingdom!.name)")
             player.currentKingdom = nil
-            player.saveToUserDefaults()
+            // Backend is source of truth - no local caching
         }
     }
     

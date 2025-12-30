@@ -100,8 +100,8 @@ class Player: ObservableObject {
         self.playerId = playerId
         self.name = name
         
-        // Load saved data if exists
-        loadFromUserDefaults()
+        // NO LOCAL CACHING - Backend is source of truth!
+        // All state will be loaded from API on app init
     }
     
     // MARK: - Reputation System
@@ -166,7 +166,7 @@ class Player: ObservableObject {
             }
         }
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Check if can vote on coups (150+ rep in kingdom)
@@ -208,7 +208,7 @@ class Player: ObservableObject {
             levelUp()
         }
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Level up!
@@ -222,7 +222,7 @@ class Player: ObservableObject {
         gold += 50  // Bonus gold per level
         
         print("🎉 Level up! Now level \(level)")
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     // MARK: - Training
@@ -246,7 +246,7 @@ class Player: ObservableObject {
             buildingSkill += 1
         }
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
         return true
     }
     
@@ -386,7 +386,7 @@ class Player: ObservableObject {
         addReputation(5, inKingdom: currentKingdom)  // 5 rep
         addGold(50)  // 50g bonus
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
         print("📅 Daily check-in: +50g, +5 rep")
         return true
     }
@@ -461,7 +461,7 @@ class Player: ObservableObject {
         // Update home kingdom (where they check in most)
         updateHomeKingdom()
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Update home kingdom based on check-in frequency
@@ -495,7 +495,7 @@ class Player: ObservableObject {
         fiefsRuled.insert(kingdom)
         isRuler = true
         currentKingdom = kingdom
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
         print("👑 Claimed \(kingdom)")
     }
     
@@ -505,7 +505,7 @@ class Player: ObservableObject {
         if fiefsRuled.isEmpty {
             isRuler = false
         }
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     // MARK: - Coup System
@@ -525,7 +525,7 @@ class Player: ObservableObject {
         } else {
             coupsFailed += 1
         }
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     // MARK: - Combat Debuffs
@@ -540,7 +540,7 @@ class Player: ObservableObject {
     func applyWoundDebuff(attackLoss: Int, durationHours: Double) {
         attackDebuff = attackLoss
         debuffExpires = Date().addingTimeInterval(durationHours * 3600)
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Clear debuffs if they've expired
@@ -550,7 +550,7 @@ class Player: ObservableObject {
         if Date() >= expires {
             attackDebuff = 0
             debuffExpires = nil
-            saveToUserDefaults()
+            // Backend is source of truth - no local caching
         }
     }
     
@@ -582,7 +582,7 @@ class Player: ObservableObject {
         // 4. Mark as traitor (badge)
         // TODO: Add badge system
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Apply catastrophic penalty for overthrown ruler who failed to flee
@@ -605,7 +605,7 @@ class Player: ObservableObject {
         fiefsRuled.removeAll()
         isRuler = false
         
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     // MARK: - Economy
@@ -613,14 +613,14 @@ class Player: ObservableObject {
     /// Add gold to player
     func addGold(_ amount: Int) {
         gold += amount
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
     
     /// Try to spend gold
     func spendGold(_ amount: Int) -> Bool {
         guard gold >= amount else { return false }
         gold -= amount
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
         return true
     }
     
@@ -802,8 +802,7 @@ class Player: ObservableObject {
         // Status
         isAlive = apiState.is_alive
         
-        // Also save locally as backup
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
         
         print("✅ Player state updated from API")
     }
@@ -847,8 +846,7 @@ class Player: ObservableObject {
             print("✅ Player loaded from API")
         } catch {
             print("❌ Failed to load player from API: \(error)")
-            // Fall back to local data
-            loadFromUserDefaults()
+            // Backend is source of truth - no fallback to local cache
         }
     }
     
@@ -857,8 +855,7 @@ class Player: ObservableObject {
         let api = KingdomAPIService.shared
         guard api.isAuthenticated else {
             print("⚠️ Cannot save to API - not authenticated")
-            // Still save locally
-            saveToUserDefaults()
+            // Backend is source of truth - cannot save without authentication
             return
         }
         
@@ -872,169 +869,13 @@ class Player: ObservableObject {
             print("✅ Player saved to API")
         } catch {
             print("❌ Failed to save player to API: \(error)")
-            // Still save locally as backup
-            saveToUserDefaults()
+            // Backend is source of truth - no fallback to local storage
         }
     }
     
-    // MARK: - Local Persistence (Backup/Offline)
-    
-    func saveToUserDefaults() {
-        let defaults = UserDefaults.standard
-        defaults.set(playerId, forKey: "playerId")  // Saves as integer
-        defaults.set(name, forKey: "playerName")
-        defaults.set(isAlive, forKey: "isAlive")
-        defaults.set(gold, forKey: "gold")
-        defaults.set(currentKingdom, forKey: "currentKingdom")
-        defaults.set(lastCheckIn, forKey: "lastCheckIn")
-        defaults.set(hometownKingdomId, forKey: "hometownKingdomId")
-        defaults.set(homeKingdomId, forKey: "homeKingdomId")
-        defaults.set(originKingdomId, forKey: "originKingdomId")
-        
-        // Check-in history (stored as JSON)
-        if let jsonData = try? JSONEncoder().encode(checkInHistory) {
-            defaults.set(jsonData, forKey: "checkInHistory")
-        }
-        defaults.set(Array(fiefsRuled), forKey: "fiefsRuled")
-        defaults.set(isRuler, forKey: "isRuler")
-        defaults.set(contractsCompleted, forKey: "contractsCompleted")
-        defaults.set(totalWorkContributed, forKey: "totalWorkContributed")
-        defaults.set(totalTrainingPurchases, forKey: "totalTrainingPurchases")
-        defaults.set(coupsWon, forKey: "coupsWon")
-        defaults.set(coupsFailed, forKey: "coupsFailed")
-        defaults.set(timesExecuted, forKey: "timesExecuted")
-        defaults.set(executionsOrdered, forKey: "executionsOrdered")
-        defaults.set(lastCoupAttempt, forKey: "lastCoupAttempt")
-        defaults.set(lastDailyCheckIn, forKey: "lastDailyCheckIn")
-        defaults.set(attackDebuff, forKey: "attackDebuff")
-        defaults.set(debuffExpires, forKey: "debuffExpires")
-        
-        // Progression
-        defaults.set(reputation, forKey: "reputation")
-        defaults.set(level, forKey: "level")
-        defaults.set(experience, forKey: "experience")
-        defaults.set(skillPoints, forKey: "skillPoints")
-        
-        // Combat stats
-        defaults.set(attackPower, forKey: "attackPower")
-        defaults.set(defensePower, forKey: "defensePower")
-        defaults.set(leadership, forKey: "leadership")
-        defaults.set(buildingSkill, forKey: "buildingSkill")
-        
-        // Save training costs
-        defaults.set(attackTrainingCost, forKey: "attackTrainingCost")
-        defaults.set(defenseTrainingCost, forKey: "defenseTrainingCost")
-        defaults.set(leadershipTrainingCost, forKey: "leadershipTrainingCost")
-        defaults.set(buildingTrainingCost, forKey: "buildingTrainingCost")
-        
-        // Kingdom reputation (stored as JSON)
-        if let jsonData = try? JSONEncoder().encode(kingdomReputation) {
-            defaults.set(jsonData, forKey: "kingdomReputation")
-        }
-        
-        if let location = lastCheckInLocation {
-            defaults.set(location.latitude, forKey: "lastCheckInLat")
-            defaults.set(location.longitude, forKey: "lastCheckInLon")
-        }
-    }
-    
-    private func loadFromUserDefaults() {
-        let defaults = UserDefaults.standard
-        
-        let savedId = defaults.integer(forKey: "playerId")
-        if savedId != 0 {
-            playerId = savedId
-        }
-        if let savedName = defaults.string(forKey: "playerName") {
-            name = savedName
-        }
-        
-        isAlive = defaults.object(forKey: "isAlive") as? Bool ?? true
-        
-        // Check if this is first launch
-        if !defaults.bool(forKey: "hasLoadedBefore") {
-            gold = 100  // Default starting gold for new players
-            defaults.set(true, forKey: "hasLoadedBefore")
-            saveToUserDefaults()  // Save the initial state
-        } else {
-            gold = defaults.integer(forKey: "gold")
-            
-            // Fix for players who got stuck with 0 gold due to earlier bug
-            if gold == 0 && fiefsRuled.isEmpty && (coupsWon + coupsFailed + timesExecuted + executionsOrdered) == 0 {
-                print("⚠️ Detected new player with 0 gold - giving starting gold")
-                gold = 100
-                saveToUserDefaults()
-            }
-        }
-        
-        currentKingdom = defaults.string(forKey: "currentKingdom")
-        lastCheckIn = defaults.object(forKey: "lastCheckIn") as? Date
-        hometownKingdomId = defaults.string(forKey: "hometownKingdomId")
-        homeKingdomId = defaults.string(forKey: "homeKingdomId")
-        originKingdomId = defaults.string(forKey: "originKingdomId")
-        
-        // Check-in history
-        if let jsonData = defaults.data(forKey: "checkInHistory"),
-           let decoded = try? JSONDecoder().decode([String: Int].self, from: jsonData) {
-            checkInHistory = decoded
-        }
-        
-        if let lat = defaults.object(forKey: "lastCheckInLat") as? Double,
-           let lon = defaults.object(forKey: "lastCheckInLon") as? Double {
-            lastCheckInLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-        }
-        
-        if let fiefs = defaults.array(forKey: "fiefsRuled") as? [String] {
-            fiefsRuled = Set(fiefs)
-        }
-        
-        // Ensure isRuler stays in sync with fiefsRuled
-        isRuler = defaults.bool(forKey: "isRuler") || !fiefsRuled.isEmpty
-        contractsCompleted = defaults.integer(forKey: "contractsCompleted")
-        totalWorkContributed = defaults.integer(forKey: "totalWorkContributed")
-        totalTrainingPurchases = defaults.integer(forKey: "totalTrainingPurchases")
-        coupsWon = defaults.integer(forKey: "coupsWon")
-        coupsFailed = defaults.integer(forKey: "coupsFailed")
-        timesExecuted = defaults.integer(forKey: "timesExecuted")
-        executionsOrdered = defaults.integer(forKey: "executionsOrdered")
-        lastCoupAttempt = defaults.object(forKey: "lastCoupAttempt") as? Date
-        lastDailyCheckIn = defaults.object(forKey: "lastDailyCheckIn") as? Date
-        attackDebuff = defaults.integer(forKey: "attackDebuff")
-        debuffExpires = defaults.object(forKey: "debuffExpires") as? Date
-        
-        // Progression
-        reputation = defaults.integer(forKey: "reputation")
-        level = defaults.integer(forKey: "level")
-        if level == 0 { level = 1 }  // Default to level 1
-        experience = defaults.integer(forKey: "experience")
-        skillPoints = defaults.integer(forKey: "skillPoints")
-        
-        // Combat stats
-        attackPower = defaults.integer(forKey: "attackPower")
-        if attackPower == 0 { attackPower = 1 }  // Default to 1
-        defensePower = defaults.integer(forKey: "defensePower")
-        if defensePower == 0 { defensePower = 1 }
-        leadership = defaults.integer(forKey: "leadership")
-        if leadership == 0 { leadership = 1 }
-        buildingSkill = defaults.integer(forKey: "buildingSkill")
-        if buildingSkill == 0 { buildingSkill = 1 }
-        
-        // Load training costs (fallback to 100 if not set)
-        attackTrainingCost = defaults.integer(forKey: "attackTrainingCost")
-        if attackTrainingCost == 0 { attackTrainingCost = 100 }
-        defenseTrainingCost = defaults.integer(forKey: "defenseTrainingCost")
-        if defenseTrainingCost == 0 { defenseTrainingCost = 100 }
-        leadershipTrainingCost = defaults.integer(forKey: "leadershipTrainingCost")
-        if leadershipTrainingCost == 0 { leadershipTrainingCost = 100 }
-        buildingTrainingCost = defaults.integer(forKey: "buildingTrainingCost")
-        if buildingTrainingCost == 0 { buildingTrainingCost = 100 }
-        
-        // Kingdom reputation
-        if let jsonData = defaults.data(forKey: "kingdomReputation"),
-           let decoded = try? JSONDecoder().decode([String: Int].self, from: jsonData) {
-            kingdomReputation = decoded
-        }
-    }
+    // MARK: - NO LOCAL CACHING
+    // Backend is the single source of truth for all player state!
+    // All data is loaded via loadFromAPI() and saved via saveToAPI()
     
     /// Reset player data (for testing/debugging)
     func reset() {
@@ -1049,7 +890,7 @@ class Player: ObservableObject {
         timesExecuted = 0
         executionsOrdered = 0
         lastCoupAttempt = nil
-        saveToUserDefaults()
+        // Backend is source of truth - no local caching
     }
 }
 

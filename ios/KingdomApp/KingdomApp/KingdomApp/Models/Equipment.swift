@@ -275,7 +275,7 @@ class PlayerResources: ObservableObject, Codable {
         iron += ironMined
         steel += steelMined
         
-        save()
+        // Backend is source of truth - no local caching
         
         return (ironMined, steelMined, taxAmount)
     }
@@ -300,7 +300,7 @@ class PlayerResources: ObservableObject, Codable {
         craftingQueue.append(equipment)
         craftingProgress[equipment.id.uuidString] = 0
         
-        save()
+        // Backend is source of truth - no local caching
         return equipment
     }
     
@@ -326,7 +326,7 @@ class PlayerResources: ObservableObject, Codable {
             }
         }
         
-        save()
+        // Backend is source of truth - no local caching
         return true
     }
     
@@ -356,7 +356,7 @@ class PlayerResources: ObservableObject, Codable {
         }
         
         inventory.removeAll { $0.id == equipment.id }
-        save()
+        // Backend is source of truth - no local caching
         return true
     }
     
@@ -378,7 +378,7 @@ class PlayerResources: ObservableObject, Codable {
                 equippedShield = nil
             }
         }
-        save()
+        // Backend is source of truth - no local caching
     }
     
     /// Total attack bonus from equipment
@@ -394,7 +394,7 @@ class PlayerResources: ObservableObject, Codable {
     /// Lose weapon (from failed battle)
     func loseWeapon() {
         equippedWeapon = nil
-        save()
+        // Backend is source of truth - no local caching
     }
     
     /// Lose all equipment (from failed coup)
@@ -402,7 +402,7 @@ class PlayerResources: ObservableObject, Codable {
         equippedWeapon = nil
         equippedArmor = nil
         equippedShield = nil
-        save()
+        // Backend is source of truth - no local caching
     }
     
     // MARK: - Properties
@@ -417,26 +417,12 @@ class PlayerResources: ObservableObject, Codable {
     
     func addProperty(_ property: Property) {
         properties.append(property)
-        save()
+        // Backend is source of truth - no local caching
     }
     
-    // MARK: - Persistence
-    
-    private static let storageKey = "playerResources"
-    
-    func save() {
-        if let encoded = try? JSONEncoder().encode(self) {
-            UserDefaults.standard.set(encoded, forKey: PlayerResources.storageKey)
-        }
-    }
-    
-    static func load() -> PlayerResources {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode(PlayerResources.self, from: data) else {
-            return PlayerResources()
-        }
-        return decoded
-    }
+    // MARK: - NO LOCAL CACHING
+    // Backend is the single source of truth for all player resources!
+    // All data is loaded from and saved to the API
 }
 
 // MARK: - Kingdom Resource Production
