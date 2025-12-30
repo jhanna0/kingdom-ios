@@ -224,18 +224,22 @@ struct SkillDetailView: View {
         switch skillType {
         case "attack":
             return [
-                "Tier \(tier) combat damage",
-                "Increases coup attack power"
+                "+\(tier) Attack Power in coups",
+                "Increases coup success chance",
+                "Stacks with equipment bonuses"
             ]
         case "defense":
             return [
-                "Tier \(tier) combat resistance",
-                "Increases coup defense power"
+                "+\(tier) Defense Power in coups",
+                "Reduces coup damage taken",
+                "Helps defend your kingdom"
             ]
         case "leadership":
             return getLeadershipBenefits(tier: tier)
         case "building":
             return getBuildingBenefits(tier: tier)
+        case "intelligence":
+            return getIntelligenceBenefits(tier: tier)
         default:
             return []
         }
@@ -245,23 +249,18 @@ struct SkillDetailView: View {
         var benefits: [String] = []
         
         let voteWeight = 1.0 + (Double(tier - 1) * 0.2)
-        benefits.append("Vote weight: \(String(format: "%.1f", voteWeight))")
+        benefits.append("Vote weight: +\(String(format: "%.1f", voteWeight))")
         
         switch tier {
         case 1:
-            benefits.append("Can vote on coups")
+            benefits.append("Can vote on coups (with rep)")
         case 2:
-            benefits.append("Can vote on coups")
             benefits.append("+50% rewards from ruler distributions")
         case 3:
-            benefits.append("Can propose coups")
-            benefits.append("+50% rewards from ruler")
+            benefits.append("Can propose coups (300+ rep)")
         case 4:
-            benefits.append("Can propose coups")
             benefits.append("+100% rewards from ruler")
         case 5:
-            benefits.append("Can propose coups")
-            benefits.append("+100% rewards from ruler")
             benefits.append("-50% coup cost (500g instead of 1000g)")
         default:
             break
@@ -274,24 +273,38 @@ struct SkillDetailView: View {
         var benefits: [String] = []
         
         let discount = tier * 5
-        benefits.append("\(discount)% property cost reduction")
+        benefits.append("-\(discount)% property upgrade costs")
         
         switch tier {
         case 1:
-            benefits.append("Normal build action (2h cooldown)")
+            benefits.append("Work on contracts & properties")
         case 2:
-            benefits.append("+10% coin reward for building")
+            benefits.append("+10% gold from building contracts")
         case 3:
-            benefits.append("+20% coin reward for building")
-            benefits.append("+1 daily Assist (instant +3 progress)")
+            benefits.append("+20% gold from contracts")
+            benefits.append("+1 daily Assist action (instant +3 progress)")
         case 4:
-            benefits.append("+30% coin reward for building")
-            benefits.append("10% chance to refund cooldown")
+            benefits.append("+30% gold from contracts")
+            benefits.append("10% chance to refund action cooldown")
         case 5:
-            benefits.append("+40% coin reward for building")
-            benefits.append("25% chance to double progress")
+            benefits.append("+40% gold from contracts")
+            benefits.append("25% chance to double contract progress")
         default:
             break
+        }
+        
+        return benefits
+    }
+    
+    private func getIntelligenceBenefits(tier: Int) -> [String] {
+        var benefits: [String] = []
+        
+        let sabotageBonus = tier * 2
+        benefits.append("-\(sabotageBonus)% detection when sabotaging")
+        benefits.append("+\(sabotageBonus)% catch chance when patrolling")
+        
+        if tier >= 5 {
+            benefits.append("Vault Heist: Steal 10% of enemy vault (1000g cost)")
         }
         
         return benefits

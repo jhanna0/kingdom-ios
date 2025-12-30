@@ -37,7 +37,8 @@ struct BuildingUpgradeCardWithContract: View {
                 currentLevel: currentLevel,
                 maxLevel: maxLevel,
                 benefitForLevel: { level in benefit },
-                costForLevel: { level in constructionCost }
+                costForLevel: { level in constructionCost },
+                detailedBenefits: getDetailedBenefitsForBuilding(name: name)
             )) {
                 HStack {
                     Image(systemName: "list.number")
@@ -227,6 +228,80 @@ struct BuildingUpgradeCardWithContract: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
         )
+    }
+    
+    private func getDetailedBenefitsForBuilding(name: String) -> ((Int) -> [String])? {
+        switch name {
+        case "Mine":
+            return { level in
+                switch level {
+                case 1: return ["Unlock Stone mining", "+5 Stone/day"]
+                case 2: return ["+10 Stone/day", "+5 Iron/day"]
+                case 3: return ["+15 Stone/day", "+10 Iron/day", "+5 Steel/day"]
+                case 4: return ["+20 Stone/day", "+15 Iron/day", "+10 Steel/day"]
+                case 5: return ["All materials at 2x quantity", "Maximum production"]
+                default: return []
+                }
+            }
+        case "Market":
+            return { level in
+                switch level {
+                case 1: return ["+15g/day passive income", "Basic trade routes"]
+                case 2: return ["+35g/day passive income", "Improved merchants"]
+                case 3: return ["+65g/day passive income", "Regional trade hub"]
+                case 4: return ["+100g/day passive income", "Major trade center"]
+                case 5: return ["+150g/day passive income", "Economic powerhouse"]
+                default: return []
+                }
+            }
+        case "Farm":
+            return { level in
+                let reduction: Int = {
+                    switch level {
+                    case 1: return 5
+                    case 2: return 10
+                    case 3: return 20
+                    case 4: return 25
+                    case 5: return 33
+                    default: return 0
+                    }
+                }()
+                return [
+                    "Citizens complete contracts \(reduction)% faster",
+                    "Speeds up all kingdom projects",
+                    "Attracts more workers"
+                ]
+            }
+        case "Education Hall":
+            return { level in
+                let reduction = level * 5
+                return [
+                    "-\(reduction)% training actions required",
+                    "Citizens train skills faster",
+                    "Knowledge hub for kingdom"
+                ]
+            }
+        case "Walls":
+            return { level in
+                let defenders = level * 2
+                return [
+                    "+\(defenders) defenders during coups",
+                    "Harder to overthrow kingdom",
+                    "Protects citizens & treasury"
+                ]
+            }
+        case "Vault":
+            return { level in
+                let protection = level * 20
+                return [
+                    "\(protection)% of treasury protected from theft",
+                    "Reduces gold loss in coups",
+                    "Deters vault heists"
+                ]
+            }
+        default:
+            return nil
+        }
     }
 }
 

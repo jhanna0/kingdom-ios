@@ -105,7 +105,7 @@ struct CharacterSheetView: View {
             
             Divider()
             
-            // Skills grid - 2x2 layout for cleaner design
+            // Skills grid - 3 rows for all skills
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     skillGridButton(
@@ -137,6 +137,19 @@ struct CharacterSheetView: View {
                         tier: player.buildingSkill,
                         skillType: "building"
                     )
+                }
+                
+                HStack(spacing: 10) {
+                    skillGridButton(
+                        iconName: "eye.fill",
+                        displayName: "Intelligence",
+                        tier: player.intelligence,
+                        skillType: "intelligence"
+                    )
+                    
+                    // Empty space for symmetry
+                    Color.clear
+                        .frame(maxWidth: .infinity)
                 }
             }
         }

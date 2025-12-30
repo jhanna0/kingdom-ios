@@ -135,11 +135,11 @@ struct PropertyTiersView: View {
     
     private func tierBenefit(_ tier: Int) -> String {
         switch tier {
-        case 1: return "Basic land ownership"
-        case 2: return "Residence"
-        case 3: return "Crafting"
-        case 4: return "No taxes"
-        case 5: return "Conquest protection"
+        case 1: return "-50% travel cost • Instant fast travel to this kingdom"
+        case 2: return "Set as personal residence • Home base for respawning"
+        case 3: return "Unlock equipment crafting • -15% crafting time"
+        case 4: return "Tax exemption • Pay 0% kingdom taxes"
+        case 5: return "Estate protection • 50% survive kingdom conquest"
         default: return ""
         }
     }

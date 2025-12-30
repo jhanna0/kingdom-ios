@@ -8,6 +8,7 @@ struct BuildingLevelsView: View {
     let maxLevel: Int
     let benefitForLevel: (Int) -> String
     let costForLevel: (Int) -> Int
+    let detailedBenefits: ((Int) -> [String])?
     @Environment(\.dismiss) var dismiss
     @State private var selectedLevel: Int = 1
     
@@ -47,16 +48,32 @@ struct BuildingLevelsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionHeader(icon: "star.fill", title: "Benefits")
                 
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
-                        .font(.subheadline)
-                        .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
-                        .frame(width: 20)
-                    
-                    Text(benefitForLevel(level))
-                        .font(.subheadline)
-                        .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
-                        .fixedSize(horizontal: false, vertical: true)
+                if let detailedBenefits = detailedBenefits {
+                    ForEach(detailedBenefits(level), id: \.self) { benefit in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
+                                .font(.subheadline)
+                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                .frame(width: 20)
+                            
+                            Text(benefit)
+                                .font(.subheadline)
+                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
+                            .font(.subheadline)
+                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                            .frame(width: 20)
+                        
+                        Text(benefitForLevel(level))
+                            .font(.subheadline)
+                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             
