@@ -3,14 +3,15 @@ City service - Business logic for city boundary lookups
 
 FAST LOADING - TWO ENDPOINTS:
 1. /cities/current - Returns ONLY the city user is in (< 2s) - UNBLOCKS FRONTEND
-2. /cities/neighbors - Returns neighbor cities (called after UI is ready)
+2. /cities/neighbors - Returns neighbor cities IMMEDIATELY, fetches boundaries in background
 """
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import datetime
 import math
+import asyncio
 
-from db import CityBoundary, Kingdom, User
+from db import CityBoundary, Kingdom, User, get_db
 from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData
 from osm_service import (
     find_user_city_fast,
@@ -276,8 +277,9 @@ async def get_neighbor_cities(
 ) -> List[CityBoundaryResponse]:
     """
     Get ALL neighbors (cities that TOUCH current city).
-    Uses permanent cached neighbor list (cities don't move!).
-    Only queries OSM once per city, then cached forever.
+    
+    Returns IMMEDIATELY with center points only.
+    Frontend should call /cities/boundaries/batch to fetch boundaries in parallel.
     """
     print(f"🏘️ Loading neighbors near ({lat:.4f}, {lon:.4f})")
     
@@ -331,48 +333,45 @@ async def get_neighbor_cities(
     osm_ids = [n["osm_id"] for n in neighbor_ids]
     cached_by_id = {c.osm_id: c for c in db.query(CityBoundary).filter(CityBoundary.osm_id.in_(osm_ids)).all()}
     
-    print(f"   💾 {len(cached_by_id)}/{len(osm_ids)} cached")
+    print(f"   💾 {len(cached_by_id)}/{len(osm_ids)} boundaries cached")
     
-    # Build result - fetch missing boundaries
+    # Build result - return immediately with what we have
     result_cities = []
+    
     for city_info in neighbor_ids:
         osm_id = city_info["osm_id"]
+        name = city_info.get("name", "Unknown")
         
-        _ensure_kingdom_exists(db, osm_id, city_info.get("name", "Unknown"))
+        _ensure_kingdom_exists(db, osm_id, name)
         
         if osm_id in cached_by_id:
-            # Have boundary cached
+            # Have boundary cached - return full data
             city = cached_by_id[osm_id]
             city.access_count += 1
             city.last_accessed = datetime.utcnow()
             result_cities.append(city)
         else:
-            # FETCH boundary from OSM
-            print(f"   🌐 Fetching boundary: {city_info['name']}")
-            boundary_data = await fetch_city_boundary_by_id(osm_id, city_info.get("name", "Unknown"))
-            
-            if boundary_data:
-                new_city = CityBoundary(
-                    osm_id=osm_id,
-                    name=boundary_data["name"],
-                    admin_level=boundary_data["admin_level"],
-                    center_lat=boundary_data["center_lat"],
-                    center_lon=boundary_data["center_lon"],
-                    boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
-                    radius_meters=boundary_data["radius_meters"],
-                    boundary_points_count=len(boundary_data["boundary"]),
-                    access_count=1,
-                    osm_metadata=boundary_data.get("osm_tags", {})
-                )
-                db.add(new_city)
-                result_cities.append(new_city)
+            # NOT cached - return center point only
+            temp_city = type('TempCity', (), {
+                'osm_id': osm_id,
+                'name': name,
+                'admin_level': city_info.get("admin_level", 8),
+                'center_lat': city_info.get("center_lat", 0.0),
+                'center_lon': city_info.get("center_lon", 0.0),
+                'boundary_geojson': {"coordinates": []},  # Empty - frontend should fetch via batch endpoint
+                'radius_meters': 5000.0,  # Estimated
+                'cached': False
+            })()
+            result_cities.append(temp_city)
     
     db.commit()
     
     # Get kingdom data
     kingdoms = _get_kingdom_data(db, [c.osm_id for c in result_cities], current_user)
     
-    print(f"   ✅ Returning {len(result_cities)} neighbors with boundaries")
+    cached_count = len(cached_by_id)
+    uncached_count = len(result_cities) - cached_count
+    print(f"   ✅ Returning {len(result_cities)} neighbors ({cached_count} with boundaries, {uncached_count} center-only)")
     
     return [
         CityBoundaryResponse(
@@ -454,6 +453,118 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
         radius_meters=boundary_data["radius_meters"],
         from_cache=False
     )
+
+
+async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[BoundaryResponse]:
+    """
+    Fetch multiple city boundaries in parallel.
+    
+    Much faster than calling get_city_boundary() sequentially.
+    Returns boundaries in same order as requested osm_ids.
+    """
+    print(f"📦 Batch loading {len(osm_ids)} boundaries...")
+    
+    # Check cache first
+    cached = db.query(CityBoundary).filter(CityBoundary.osm_id.in_(osm_ids)).all()
+    cached_by_id = {c.osm_id: c for c in cached}
+    
+    print(f"   💾 {len(cached)}/{len(osm_ids)} already cached")
+    
+    # Update access counts for cached items
+    for city in cached:
+        city.access_count += 1
+        city.last_accessed = datetime.utcnow()
+    db.commit()
+    
+    # Fetch missing ones in parallel
+    missing_ids = [osm_id for osm_id in osm_ids if osm_id not in cached_by_id]
+    
+    if missing_ids:
+        print(f"   🌐 Fetching {len(missing_ids)} from OSM in parallel...")
+        
+        # Fetch all in parallel using asyncio.gather
+        fetch_tasks = [fetch_city_boundary_by_id(osm_id) for osm_id in missing_ids]
+        boundary_results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+        
+        # Cache successful fetches
+        newly_cached = {}
+        for osm_id, boundary_data in zip(missing_ids, boundary_results):
+            # Skip exceptions and None results
+            if isinstance(boundary_data, Exception):
+                print(f"   ❌ Error fetching {osm_id}: {boundary_data}")
+                continue
+            if not boundary_data:
+                print(f"   ⚠️  No data for {osm_id}")
+                continue
+            
+            try:
+                new_city = CityBoundary(
+                    osm_id=osm_id,
+                    name=boundary_data["name"],
+                    admin_level=boundary_data["admin_level"],
+                    center_lat=boundary_data["center_lat"],
+                    center_lon=boundary_data["center_lon"],
+                    boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+                    radius_meters=boundary_data["radius_meters"],
+                    boundary_points_count=len(boundary_data["boundary"]),
+                    access_count=1,
+                    osm_metadata=boundary_data.get("osm_tags", {})
+                )
+                db.add(new_city)
+                db.flush()  # Get it into session without committing
+                newly_cached[osm_id] = new_city
+                print(f"   ✅ Cached {boundary_data['name']}")
+            except Exception as e:
+                # Race condition - another request cached it
+                db.rollback()
+                if "duplicate key" in str(e).lower():
+                    print(f"   ⏭️  {osm_id} already cached by another request")
+                    # Fetch from DB
+                    city = db.query(CityBoundary).filter(CityBoundary.osm_id == osm_id).first()
+                    if city:
+                        newly_cached[osm_id] = city
+                else:
+                    print(f"   ❌ Error caching {osm_id}: {e}")
+        
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"   ⚠️  Commit error (likely race condition): {e}")
+            # Re-fetch to get latest state
+            for osm_id in missing_ids:
+                if osm_id not in newly_cached:
+                    city = db.query(CityBoundary).filter(CityBoundary.osm_id == osm_id).first()
+                    if city:
+                        newly_cached[osm_id] = city
+        
+        # Update cached_by_id with newly cached items
+        cached_by_id.update(newly_cached)
+    
+    # Build response in same order as input
+    result = []
+    for osm_id in osm_ids:
+        if osm_id in cached_by_id:
+            city = cached_by_id[osm_id]
+            result.append(BoundaryResponse(
+                osm_id=city.osm_id,
+                name=city.name,
+                boundary=city.boundary_geojson.get("coordinates", []),
+                radius_meters=city.radius_meters,
+                from_cache=(osm_id in cached_by_id and osm_id not in missing_ids)
+            ))
+        else:
+            # Failed to fetch - return empty boundary
+            result.append(BoundaryResponse(
+                osm_id=osm_id,
+                name=f"City-{osm_id}",
+                boundary=[],
+                radius_meters=5000.0,
+                from_cache=False
+            ))
+    
+    print(f"   ✅ Batch complete: {len([r for r in result if r.boundary])} with boundaries")
+    return result
 
 
 def get_city_by_id(db: Session, osm_id: str) -> Optional[CityBoundaryResponse]:

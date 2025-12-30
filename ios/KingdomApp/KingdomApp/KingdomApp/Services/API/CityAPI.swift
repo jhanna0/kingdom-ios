@@ -37,6 +37,17 @@ class CityAPI {
         return try await client.execute(request)
     }
     
+    /// Batch fetch boundaries for multiple cities in parallel
+    /// Much faster than calling fetchBoundary() multiple times
+    func fetchBoundariesBatch(osmIds: [String]) async throws -> [BoundaryResponse] {
+        let request = try client.request(
+            endpoint: "/cities/boundaries/batch",
+            method: "POST",
+            body: osmIds
+        )
+        return try await client.execute(request)
+    }
+    
     // MARK: - Legacy (loads everything at once)
     
     /// Legacy: Fetch all cities at once (slower)

@@ -3,7 +3,7 @@ City boundary endpoints
 
 FAST LOADING - TWO ENDPOINTS:
 - GET /cities/current - ONLY the city user is in (< 2s) - UNBLOCKS FRONTEND
-- GET /cities/neighbors - Neighbor cities (call after UI is ready)
+- GET /cities/neighbors - Neighbor cities (returns immediately, fetches boundaries in background)
 - GET /cities/{osm_id}/boundary - Lazy-load single boundary
 """
 from fastapi import APIRouter, HTTPException, Depends
@@ -57,13 +57,16 @@ async def get_neighbor_cities(
     """
     Get neighbor cities (call AFTER /cities/current).
     
-    This can be slower since the UI is already showing the current city.
-    Excludes the current city from results.
+    Returns IMMEDIATELY with center points.
+    Boundaries included if cached, empty array if not.
+    
+    For missing boundaries, call POST /cities/boundaries/batch with the osm_ids
+    to fetch them all in parallel (2-3 seconds vs 15+ seconds serial).
     
     Returns:
-    - List of neighboring cities
+    - List of neighboring cities with center points
     - Full kingdom data for each
-    - Boundaries included if cached, empty array if not
+    - Boundaries included if cached, empty array otherwise
     """
     return await city_service.get_neighbor_cities(db, lat, lon, radius, current_user)
 
@@ -78,7 +81,10 @@ async def get_city_stats(db: Session = Depends(get_db)):
 async def get_city_boundary(osm_id: str, db: Session = Depends(get_db)):
     """
     Lazy-load boundary for a single city.
-    Call this to fill in neighbor polygons that weren't cached.
+    
+    Use this to fetch boundaries for neighbors returned without polygons.
+    First checks cache, then fetches from OSM if needed.
+    This may take 1-5 seconds for uncached cities.
     """
     boundary = await city_service.get_city_boundary(db, osm_id)
     
@@ -86,6 +92,30 @@ async def get_city_boundary(osm_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Could not fetch boundary for city {osm_id}")
     
     return boundary
+
+
+@router.post("/boundaries/batch", response_model=List[BoundaryResponse])
+async def get_city_boundaries_batch(
+    osm_ids: List[str],
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch multiple city boundaries in parallel.
+    
+    This is more efficient than calling /{osm_id}/boundary multiple times.
+    All cities are fetched simultaneously (2-3 seconds for 8 cities vs 15+ serially).
+    
+    Returns boundaries in same order as requested osm_ids.
+    Missing/failed cities will have empty boundary array.
+    """
+    if not osm_ids or len(osm_ids) > 50:
+        raise HTTPException(
+            status_code=400, 
+            detail="Must provide 1-50 OSM IDs"
+        )
+    
+    boundaries = await city_service.get_city_boundaries_batch(db, osm_ids)
+    return boundaries
 
 
 @router.get("/{osm_id}", response_model=CityBoundaryResponse)
@@ -113,7 +143,8 @@ async def get_cities(
     
     For faster loading, use:
     1. GET /cities/current (fast, unblocks UI)
-    2. GET /cities/neighbors (slower, loads in background)
+    2. GET /cities/neighbors (fast, returns center points)
+    3. POST /cities/boundaries/batch (parallel fetch missing boundaries)
     """
     cities = await city_service.get_cities_near_location(db, lat, lon, radius, current_user)
     

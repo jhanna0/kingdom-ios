@@ -269,25 +269,63 @@ extension MapViewModel {
         }
     }
     
-    /// Lazy-load all missing boundaries in background
+    /// Lazy-load all missing boundaries in background (PARALLEL)
     /// Call this after initial load to fill in neighbor polygons
     func loadMissingBoundaries() async {
-        let missingIds = kingdoms.filter { !$0.hasBoundaryCached }.map { $0.id }
+        let missing = kingdoms.filter { !$0.hasBoundaryCached }
+        let missingIds = missing.map { $0.id }
         
         if missingIds.isEmpty {
             print("✅ All boundaries already loaded")
             return
         }
         
-        print("🌐 Loading \(missingIds.count) missing boundaries...")
+        print("🌐 Batch loading \(missingIds.count) missing boundaries in parallel...")
         
-        for osmId in missingIds {
-            await loadKingdomBoundary(kingdomId: osmId)
-            // Small delay to avoid overwhelming the API
-            try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 second
+        do {
+            // Fetch all boundaries in parallel with one request
+            let boundaryResponses = try await apiService.city.fetchBoundariesBatch(osmIds: missingIds)
+            
+            await MainActor.run {
+                // Update each kingdom with its boundary
+                for boundaryResponse in boundaryResponses {
+                    guard let index = kingdoms.firstIndex(where: { $0.id == boundaryResponse.osm_id }) else {
+                        continue
+                    }
+                    
+                    // Skip if no boundary returned (failed fetch)
+                    if boundaryResponse.boundary.isEmpty {
+                        print("⚠️ No boundary for \(kingdoms[index].name)")
+                        continue
+                    }
+                    
+                    // Convert to CLLocationCoordinate2D array
+                    let boundary = boundaryResponse.boundary.map { coord in
+                        CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
+                    }
+                    
+                    // Update the kingdom
+                    kingdoms[index].updateBoundary(boundary, radiusMeters: boundaryResponse.radius_meters)
+                    
+                    print("✅ Loaded boundary for \(kingdoms[index].name) (\(boundary.count) points)")
+                    
+                    // Update currentKingdomInside if it's the same kingdom
+                    if currentKingdomInside?.id == kingdoms[index].id {
+                        currentKingdomInside = kingdoms[index]
+                    }
+                }
+                
+                let loaded = boundaryResponses.filter { !$0.boundary.isEmpty }.count
+                print("✅ Finished batch loading: \(loaded)/\(missingIds.count) boundaries")
+            }
+        } catch {
+            print("❌ Failed to batch load boundaries: \(error)")
+            // Fall back to individual loading if batch fails
+            print("⚠️ Falling back to individual boundary loading...")
+            for osmId in missingIds {
+                await loadKingdomBoundary(kingdomId: osmId)
+            }
         }
-        
-        print("✅ Finished loading all boundaries")
     }
 }
 
