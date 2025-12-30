@@ -4,8 +4,11 @@ import SwiftUI
 struct PropertyDetailView: View {
     @ObservedObject var player: Player
     @State private var property: Property
-    @State private var isUpgrading = false
-    @State private var showUpgradeSuccess = false
+    @State private var isPurchasing = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var propertyUpgradeContracts: [PropertyUpgradeContract] = []
+    @State private var isLoadingContracts = true
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
@@ -13,6 +16,18 @@ struct PropertyDetailView: View {
     init(player: Player, property: Property) {
         self.player = player
         self._property = State(initialValue: property)
+    }
+    
+    // Active upgrade contract for this property
+    private var activeContract: PropertyUpgradeContract? {
+        propertyUpgradeContracts.first { 
+            $0.propertyId == property.id && $0.status != "completed" 
+        }
+    }
+    
+    // Check if ANY property upgrade is in progress (block multiple upgrades)
+    private var hasAnyPropertyUpgradeInProgress: Bool {
+        propertyUpgradeContracts.contains { $0.status != "completed" }
     }
     
     var body: some View {
@@ -45,6 +60,18 @@ struct PropertyDetailView: View {
         .navigationTitle(property.tierName)
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
+        .task {
+            await loadPropertyContracts()
+        }
+        .refreshable {
+            await loadPropertyContracts()
+            await refreshProperty()
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
     }
     
     // MARK: - Header Card
@@ -331,26 +358,123 @@ struct PropertyDetailView: View {
                     .foregroundColor(player.gold >= property.upgradeCost ? KingdomTheme.Colors.gold : .red)
             }
             
-            Button(action: upgradeProperty) {
-                HStack {
-                    Image(systemName: "arrow.up.circle.fill")
-                    Text("Upgrade to Tier \(property.tier + 1)")
-                }
-            }
-            .buttonStyle(.medieval(
-                color: player.gold >= property.upgradeCost ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
-                fullWidth: true
-            ))
-            .disabled(player.gold < property.upgradeCost)
-            
-            if player.gold < property.upgradeCost {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.circle.fill")
+            // Show active contract if one exists
+            if let contract = activeContract {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hourglass")
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        
+                        Text("Upgrade In Progress")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    }
+                    
+                    // Progress bar
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Building \(contract.targetTierName)")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                            
+                            Text("\(contract.actionsCompleted) / \(contract.actionsRequired)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                        
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                Rectangle()
+                                    .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+                                    .frame(height: 8)
+                                    .cornerRadius(4)
+                                
+                                Rectangle()
+                                    .fill(KingdomTheme.Colors.buttonWarning)
+                                    .frame(width: geometry.size.width * contract.progress, height: 8)
+                                    .cornerRadius(4)
+                            }
+                        }
+                        .frame(height: 8)
+                    }
+                    
+                    Text("Complete work actions in the Actions page to finish this upgrade")
                         .font(.caption)
-                    Text("Need \(property.upgradeCost - player.gold) more gold")
-                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-                .foregroundColor(.red)
+                .padding()
+                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                .cornerRadius(8)
+                .transition(.asymmetric(
+                    insertion: .scale.combined(with: .opacity),
+                    removal: .opacity
+                ))
+            } else if isPurchasing {
+                // Show purchasing state with loading indicator
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.buttonPrimary))
+                            .scaleEffect(1.2)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Starting Upgrade...")
+                                .font(.subheadline.bold())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text("Creating contract and deducting \(property.upgradeCost) gold")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        }
+                        
+                        Spacer()
+                    }
+                }
+                .padding()
+                .background(KingdomTheme.Colors.buttonPrimary.opacity(0.1))
+                .cornerRadius(8)
+                .transition(.asymmetric(
+                    insertion: .scale.combined(with: .opacity),
+                    removal: .scale.combined(with: .opacity)
+                ))
+            } else {
+                // No active contract - show purchase button
+                Button(action: purchaseUpgrade) {
+                    HStack {
+                        Image(systemName: "hammer.fill")
+                        Text("Start Upgrade (\(property.upgradeCost)g)")
+                    }
+                }
+                .buttonStyle(.medieval(
+                    color: (player.gold >= property.upgradeCost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
+                    fullWidth: true
+                ))
+                .disabled(player.gold < property.upgradeCost || hasAnyPropertyUpgradeInProgress)
+                .transition(.opacity)
+                
+                Text("Like training, upgrades require work actions to complete")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                
+                if player.gold < property.upgradeCost {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                        Text("Need \(property.upgradeCost - player.gold) more gold")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.red)
+                } else if hasAnyPropertyUpgradeInProgress {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                        Text("You already have a property upgrade in progress")
+                            .font(.caption)
+                    }
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                }
             }
         }
         .padding()
@@ -476,32 +600,82 @@ struct PropertyDetailView: View {
     
     // MARK: - Helper Functions
     
-    private func upgradeProperty() {
+    private func loadPropertyContracts() async {
+        do {
+            let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            await MainActor.run {
+                propertyUpgradeContracts = status.propertyUpgradeContracts ?? []
+                isLoadingContracts = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingContracts = false
+            }
+        }
+    }
+    
+    private func refreshProperty() async {
+        do {
+            let updatedProperty = try await propertyAPI.getProperty(propertyId: property.id)
+            await MainActor.run {
+                property = updatedProperty
+            }
+        } catch {
+            print("Failed to refresh property: \(error)")
+        }
+    }
+    
+    private func purchaseUpgrade() {
         guard player.gold >= property.upgradeCost else { return }
+        guard !hasAnyPropertyUpgradeInProgress else {
+            errorMessage = "You already have a property upgrade in progress. Complete it before starting a new one."
+            showError = true
+            return
+        }
         
         Task {
-            isUpgrading = true
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isPurchasing = true
+                }
+            }
             
             do {
-                let upgradedProperty = try await propertyAPI.upgradeProperty(propertyId: property.id)
+                let response = try await propertyAPI.purchasePropertyUpgrade(propertyId: property.id)
+                
+                // Refresh player state to get updated gold
+                let playerState = try await KingdomAPIService.shared.player.loadState()
+                
+                // Reload contracts to show the new one
+                await loadPropertyContracts()
                 
                 await MainActor.run {
-                    // Update local state
-                    property = upgradedProperty
-                    player.gold -= property.upgradeCost
-                    isUpgrading = false
-                    showUpgradeSuccess = true
+                    player.updateFromAPIState(playerState)
                     
-                    // Hide success message after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        showUpgradeSuccess = false
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isPurchasing = false
                     }
+                    
+                    // Haptic feedback for success
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    
+                    print("✅ Started upgrade to \(response.message): \(response.actionsRequired) actions required")
                 }
             } catch {
                 await MainActor.run {
-                    isUpgrading = false
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isPurchasing = false
+                    }
+                    
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    
+                    // Haptic feedback for error
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
                 }
-                print("❌ Failed to upgrade property: \(error)")
+                print("❌ Failed to purchase upgrade: \(error)")
             }
         }
     }

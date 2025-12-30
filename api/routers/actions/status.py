@@ -4,6 +4,7 @@ Action status endpoint - Get cooldown status for all actions
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from datetime import datetime
+import json
 
 from db import get_db, User, PlayerState, Contract
 from routers.auth import get_current_user
@@ -111,6 +112,7 @@ def get_action_status(
         },
         "crafting_queue": state.crafting_queue or [],
         "crafting_costs": crafting_costs,
+        "property_upgrade_contracts": json.loads(state.property_upgrade_contracts or "[]"),
         "contracts": contracts
     }
 

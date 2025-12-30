@@ -354,7 +354,7 @@ struct MapView: View {
             }
         }
         .sheet(isPresented: $showProperties) {
-            MyPropertiesView(player: viewModel.player)
+            MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
         }
         .sheet(isPresented: $showCharacterSheet) {
             NavigationStack {

@@ -216,6 +216,37 @@ struct ActionsView: View {
                                 }
                             }
                             
+                            if let propertyContracts = status.propertyUpgradeContracts, !propertyContracts.isEmpty {
+                                Divider()
+                                    .padding(.horizontal)
+                                
+                                Text("Property Upgrades")
+                                    .font(KingdomTheme.Typography.headline())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.top, KingdomTheme.Spacing.medium)
+                                
+                                Text("Build and upgrade your properties - complete work actions to finish")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.bottom, KingdomTheme.Spacing.small)
+                                
+                                // Show property upgrade contracts
+                                ForEach(propertyContracts.filter { $0.status != "completed" }) { contract in
+                                    PropertyUpgradeContractCard(
+                                        contract: contract,
+                                        fetchedAt: statusFetchedAt ?? Date(),
+                                        currentTime: currentTime,
+                                        globalCooldownActive: !status.globalCooldown.ready,
+                                        blockingAction: status.globalCooldown.blockingAction,
+                                        onAction: { performPropertyUpgrade(contractId: contract.id) }
+                                    )
+                                }
+                            }
+                            
                             if isInHomeKingdom {
                                 // === BENEFICIAL ACTIONS (Home Kingdom) ===
                                 
@@ -641,6 +672,43 @@ struct ActionsView: View {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - Property Upgrade Actions
+    
+    private func performPropertyUpgrade(contractId: String) {
+        Task {
+            do {
+                let response = try await KingdomAPIService.shared.actions.workOnPropertyUpgrade(contractId: contractId)
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    // Show simple success message without rewards
+                    currentReward = Reward(
+                        goldReward: 0,
+                        reputationReward: 0,
+                        experienceReward: 0,
+                        message: response.message,
+                        previousGold: viewModel.player.gold,
+                        previousReputation: viewModel.player.reputation,
+                        previousExperience: viewModel.player.experience,
+                        currentGold: viewModel.player.gold,
+                        currentReputation: viewModel.player.reputation,
+                        currentExperience: viewModel.player.experience
+                    )
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showReward = true
                     }
                 }
             } catch {
@@ -1315,6 +1383,111 @@ struct SabotageTargetCard: View {
         case "vault": return "archivebox.fill"
         default: return "building.fill"
         }
+    }
+}
+
+// MARK: - Property Upgrade Contract Card
+
+struct PropertyUpgradeContractCard: View {
+    let contract: PropertyUpgradeContract
+    let fetchedAt: Date
+    let currentTime: Date
+    let globalCooldownActive: Bool
+    let blockingAction: String?
+    let onAction: () -> Void
+    
+    var isReady: Bool {
+        return !globalCooldownActive
+    }
+    
+    var iconName: String {
+        switch contract.toTier {
+        case 2: return "house.fill"
+        case 3: return "hammer.fill"
+        case 4: return "building.columns.fill"
+        case 5: return "crown.fill"
+        default: return "building.2.fill"
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: iconName)
+                    .font(.title2)
+                    .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Building \(contract.targetTierName)")
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    HStack(spacing: 4) {
+                        Text("\(contract.actionsCompleted)/\(contract.actionsRequired) actions")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("•")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("\(Int(contract.progress * 100))%")
+                            .font(KingdomTheme.Typography.caption())
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .fontWeight(.semibold)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+                        .frame(height: 8)
+                        .cornerRadius(4)
+                    
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.gold)
+                        .frame(width: geometry.size.width * contract.progress, height: 8)
+                        .cornerRadius(4)
+                }
+            }
+            .frame(height: 8)
+            
+            // Action button
+            Button(action: onAction) {
+                HStack {
+                    Image(systemName: "hammer.fill")
+                    Text("Work on Property")
+                }
+            }
+            .buttonStyle(.medieval(
+                color: isReady ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled,
+                fullWidth: true
+            ))
+            .disabled(!isReady)
+            
+            if globalCooldownActive {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption)
+                    Text("Complete \(blockingAction ?? "current action") first")
+                        .font(KingdomTheme.Typography.caption())
+                }
+                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+            }
+        }
+        .padding()
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(KingdomTheme.CornerRadius.medium)
+        .overlay(
+            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
+        )
+        .padding(.horizontal)
     }
 }
 

@@ -3,10 +3,16 @@ import SwiftUI
 /// Market view for purchasing land in the current kingdom
 struct PropertyMarketView: View {
     @ObservedObject var player: Player
+    var kingdom: Kingdom?
+    var onPurchaseComplete: (() -> Void)?
     @State private var selectedLocation: String = "north"
     @State private var showingPurchaseConfirmation = false
     @State private var landPrice: Int = 500
+    @State private var isPurchasing = false
+    @State private var purchaseError: String?
     @Environment(\.dismiss) var dismiss
+    
+    private let propertyAPI = PropertyAPI()
     
     var body: some View {
         ScrollView {
@@ -26,6 +32,12 @@ struct PropertyMarketView: View {
         .navigationTitle("Buy Land")
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
+        .onAppear {
+            // Calculate land price based on kingdom population
+            if let kingdom = kingdom {
+                landPrice = Property.purchasePrice(kingdomPopulation: kingdom.checkedInPlayers)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") {
@@ -43,6 +55,39 @@ struct PropertyMarketView: View {
             }
         } message: {
             Text("Clear the forest on the \(selectedLocation) side and claim this land for \(landPrice) gold?")
+        }
+        .alert("Error", isPresented: .constant(purchaseError != nil)) {
+            Button("OK") {
+                purchaseError = nil
+            }
+        } message: {
+            if let error = purchaseError {
+                Text(error)
+            }
+        }
+        .overlay {
+            if isPurchasing {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.5)
+                        
+                        Text("Purchasing land...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(32)
+                    .background(KingdomTheme.Colors.inkDark)
+                    .cornerRadius(16)
+                }
+            }
+        }
+        .onAppear {
+            calculateLandPrice()
         }
     }
     
@@ -166,7 +211,7 @@ struct PropertyMarketView: View {
                 .font(.title2.bold())
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            Text("Build your home in \(player.currentKingdom ?? "this kingdom")")
+            Text("Build your home in \(kingdom?.name ?? "this kingdom")")
                 .font(.body)
                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
             
@@ -186,6 +231,16 @@ struct PropertyMarketView: View {
             
             if !canPurchase {
                 VStack(alignment: .leading, spacing: 6) {
+                    if kingdom == nil {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.caption)
+                            Text("Must be inside a kingdom to purchase land")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.red)
+                    }
+                    
                     if !hasReputation {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
@@ -208,16 +263,31 @@ struct PropertyMarketView: View {
                 }
             }
             
+            if let error = purchaseError {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                    Text(error)
+                        .font(.caption)
+                }
+                .foregroundColor(.red)
+            }
+            
             Button(action: {
                 showingPurchaseConfirmation = true
             }) {
                 HStack {
-                    Image(systemName: "tree.fill")
-                    Text("Purchase Land")
+                    if isPurchasing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "tree.fill")
+                        Text("Purchase Land")
+                    }
                 }
             }
             .buttonStyle(.medieval(color: canPurchase ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3), fullWidth: true))
-            .disabled(!canPurchase)
+            .disabled(!canPurchase || isPurchasing)
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
@@ -233,7 +303,7 @@ struct PropertyMarketView: View {
     }
     
     private var canPurchase: Bool {
-        canAfford && hasReputation
+        kingdom != nil && canAfford && hasReputation
     }
     
     // MARK: - Helper Functions
@@ -241,16 +311,60 @@ struct PropertyMarketView: View {
     private func purchaseProperty() async {
         guard player.gold >= landPrice else { return }
         guard player.reputation >= 50 else { return }
+        guard let kingdom = kingdom else {
+            await MainActor.run {
+                purchaseError = "No kingdom selected"
+            }
+            return
+        }
         
-        // TODO: Call API to purchase property with location
-        // let property = try await propertyAPI.purchaseLand(kingdomId: kingdom.id, location: selectedLocation)
-        
-        // For now, just deduct gold locally
         await MainActor.run {
-            player.gold -= landPrice
-            dismiss()
+            isPurchasing = true
+            purchaseError = nil
+        }
+        
+        do {
+            let property = try await propertyAPI.purchaseLand(
+                kingdomId: kingdom.id,
+                kingdomName: kingdom.name,
+                location: selectedLocation
+            )
+            
+            print("✅ Successfully purchased property: \(property.tierName) in \(kingdom.name)")
+            
+            await MainActor.run {
+                // Update player gold from backend response
+                player.gold -= landPrice
+                isPurchasing = false
+                
+                // Dismiss to go back to MyPropertiesView
+                dismiss()
+            }
+            
+            // Small delay to let dismiss complete, then trigger reload
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            await MainActor.run {
+                // Trigger reload in parent view
+                onPurchaseComplete?()
+            }
+        } catch {
+            await MainActor.run {
+                isPurchasing = false
+                purchaseError = error.localizedDescription
+            }
+            print("❌ Failed to purchase property: \(error)")
+        }
+    }
+    
+    private func calculateLandPrice() {
+        if let kingdom = kingdom {
+            let populationMultiplier = 1.0 + (Double(kingdom.checkedInPlayers) / 50.0)
+            landPrice = Int(500.0 * populationMultiplier)
         }
     }
 }
 
-
+#Preview {
+    PropertyMarketView(player: Player(), kingdom: nil)
+}

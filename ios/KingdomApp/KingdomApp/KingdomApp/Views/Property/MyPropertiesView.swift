@@ -2,22 +2,23 @@ import SwiftUI
 
 enum PropertyDestination: Hashable {
     case detail(Property)
-    case market
-    case tierBenefits
+    case market(Kingdom?)
 }
 
 /// View showing all properties owned by the player
 struct MyPropertiesView: View {
     @ObservedObject var player: Player
+    var currentKingdom: Kingdom?
     @State private var properties: [Property] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var navigationPath = NavigationPath()
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
         ScrollView {
             VStack(spacing: 20) {
                 // Properties list
@@ -37,13 +38,22 @@ struct MyPropertiesView: View {
             switch destination {
             case .detail(let property):
                 PropertyDetailView(player: player, property: property)
-            case .market:
-                PropertyMarketView(player: player)
-            case .tierBenefits:
-                TierBenefitsView()
+            case .market(let kingdom):
+                PropertyMarketView(
+                    player: player,
+                    kingdom: kingdom,
+                    onPurchaseComplete: {
+                        // Pop back to root and reload
+                        navigationPath = NavigationPath()
+                        loadProperties()
+                    }
+                )
             }
         }
         .onAppear {
+            loadProperties()
+        }
+        .refreshable {
             loadProperties()
         }
         }
@@ -57,27 +67,11 @@ struct MyPropertiesView: View {
                 // Property overview card
                 propertyOverviewCard(property: property)
                 
-                // Benefits card
-                benefitsCard(property: property)
-                
-                // Action buttons
-                HStack(spacing: 12) {
-                    NavigationLink(value: PropertyDestination.tierBenefits) {
-                        HStack {
-                            Image(systemName: "list.bullet")
-                            Text("View All Tiers")
-                        }
-                    }
-                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSecondary, fullWidth: true))
-                    
-                    NavigationLink(value: PropertyDestination.detail(property)) {
-                        HStack {
-                            Image(systemName: "arrow.up.circle.fill")
-                            Text("Upgrade")
-                        }
-                    }
-                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
+                // Action button - navigate to detail/upgrade
+                NavigationLink(value: PropertyDestination.detail(property)) {
+                    propertyActionButton(property: property)
                 }
+                .padding(.horizontal)
             }
         }
     }
@@ -128,73 +122,67 @@ struct MyPropertiesView: View {
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
     }
     
-    private func benefitsCard(property: Property) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Your Benefits")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                // Tier 1 benefits
-                benefitRow(
-                    icon: "airplane",
-                    text: "Instant travel",
-                    isActive: property.tier >= 1
-                )
-                
-                // Tier 2 benefits
-                benefitRow(
-                    icon: "house.fill",
-                    text: "Residence",
-                    isActive: property.tier >= 2
-                )
-                
-                // Tier 3 benefits
-                benefitRow(
-                    icon: "hammer.fill",
-                    text: "Crafting",
-                    isActive: property.tier >= 3
-                )
-                
-                // Tier 4 benefits
-                benefitRow(
-                    icon: "dollarsign.circle.fill",
-                    text: "No taxes",
-                    isActive: property.tier >= 4
-                )
-                
-                // Tier 5 benefits
-                benefitRow(
-                    icon: "shield.fill",
-                    text: "Conquest protection",
-                    isActive: property.tier >= 5
-                )
-            }
-        }
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func benefitRow(icon: String, text: String, isActive: Bool) -> some View {
+    private func propertyActionButton(property: Property) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: isActive ? icon : "lock.fill")
-                .font(.body)
-                .foregroundColor(isActive ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+            Image(systemName: tierIconName(for: property.tier))
+                .font(.title3)
+                .foregroundColor(KingdomTheme.Colors.gold)
                 .frame(width: 24)
             
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(isActive ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(property.tier < 5 ? "Upgrade Property" : "View Property")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text(property.tier < 5 ? "Upgrade to Tier \(property.tier + 1): \(tierName(for: property.tier + 1))" : "Maximum tier reached")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                    .lineLimit(2)
+            }
             
             Spacer()
             
-            if isActive {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
+            HStack(spacing: 8) {
+                Text("T\(property.tier)")
+                    .font(.title3.bold().monospacedDigit())
                     .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
             }
+        }
+        .padding()
+        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private func tierName(for tier: Int) -> String {
+        switch tier {
+        case 1: return "Land"
+        case 2: return "House"
+        case 3: return "Workshop"
+        case 4: return "Beautiful Property"
+        case 5: return "Estate"
+        default: return "Property"
+        }
+    }
+    
+    private func tierIconName(for tier: Int) -> String {
+        switch tier {
+        case 1: return "rectangle.dashed"
+        case 2: return "house.fill"
+        case 3: return "hammer.fill"
+        case 4: return "building.columns.fill"
+        case 5: return "shield.fill"
+        default: return "building.fill"
         }
     }
     
@@ -274,38 +262,8 @@ struct MyPropertiesView: View {
             .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
             .padding(.horizontal)
             
-            // View Tiers Card
-            NavigationLink(value: PropertyDestination.tierBenefits) {
-                HStack(spacing: 12) {
-                    Image(systemName: "building.2.fill")
-                        .font(.title2)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .frame(width: 50, height: 50)
-                        .background(KingdomTheme.Colors.gold.opacity(0.1))
-                        .cornerRadius(8)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Property Tiers")
-                            .font(.headline)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Text("See all 5 tiers and benefits")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
-                }
-                .padding()
-                .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            }
-            .padding(.horizontal)
-            
             // Buy Land Card
-            NavigationLink(value: PropertyDestination.market) {
+            NavigationLink(value: PropertyDestination.market(currentKingdom)) {
                 HStack(spacing: 12) {
                     Image(systemName: "map.fill")
                         .font(.title2)

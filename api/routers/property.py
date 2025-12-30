@@ -249,14 +249,14 @@ def start_property_upgrade(
             detail="Property is already at maximum tier (5)"
         )
     
-    # Check if upgrade already in progress
+    # Check if ANY upgrade already in progress (only one at a time, like training)
     import json
     property_contracts = json.loads(state.property_upgrade_contracts or "[]")
     for contract in property_contracts:
-        if contract["property_id"] == property_id and contract["status"] == "in_progress":
+        if contract["status"] == "in_progress":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Upgrade already in progress for this property"
+                detail="You already have a property upgrade in progress. Complete it before starting a new one."
             )
     
     # Calculate upgrade cost

@@ -122,6 +122,38 @@ struct CraftingCosts: Codable {
     }
 }
 
+struct PropertyUpgradeContract: Codable, Identifiable {
+    let contractId: String
+    let propertyId: String
+    let fromTier: Int
+    let toTier: Int
+    let targetTierName: String
+    let actionsRequired: Int
+    let actionsCompleted: Int
+    let cost: Int
+    let status: String
+    let startedAt: String
+    
+    var id: String { contractId }
+    
+    enum CodingKeys: String, CodingKey {
+        case status
+        case contractId = "contract_id"
+        case propertyId = "property_id"
+        case fromTier = "from_tier"
+        case toTier = "to_tier"
+        case targetTierName = "target_tier_name"
+        case actionsRequired = "actions_required"
+        case actionsCompleted = "actions_completed"
+        case cost
+        case startedAt = "started_at"
+    }
+    
+    var progress: Double {
+        return Double(actionsCompleted) / Double(actionsRequired)
+    }
+}
+
 struct TrainingCostsResponse: Codable {
     let totalTrainingPurchases: Int
     let costs: TrainingCosts
@@ -167,6 +199,7 @@ struct AllActionStatus: Codable {
     let trainingCosts: TrainingCosts
     let craftingQueue: [CraftingContract]
     let craftingCosts: CraftingCosts
+    let propertyUpgradeContracts: [PropertyUpgradeContract]?  // Optional for backwards compatibility
     let contracts: [APIContract]
     
     enum CodingKeys: String, CodingKey {
@@ -176,6 +209,7 @@ struct AllActionStatus: Codable {
         case trainingCosts = "training_costs"
         case craftingQueue = "crafting_queue"
         case craftingCosts = "crafting_costs"
+        case propertyUpgradeContracts = "property_upgrade_contracts"
     }
 }
 
@@ -364,6 +398,29 @@ struct EquipResponse: Codable {
     let success: Bool
     let message: String
     let equipped: CraftingActionResponse.EquipmentReward?
+}
+
+struct PropertyUpgradeActionResponse: Codable {
+    let success: Bool
+    let message: String
+    let contractId: String
+    let propertyId: String
+    let actionsCompleted: Int
+    let actionsRequired: Int
+    let progressPercent: Int
+    let isComplete: Bool
+    let newTier: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message
+        case contractId = "contract_id"
+        case propertyId = "property_id"
+        case actionsCompleted = "actions_completed"
+        case actionsRequired = "actions_required"
+        case progressPercent = "progress_percent"
+        case isComplete = "is_complete"
+        case newTier = "new_tier"
+    }
 }
 
 // MARK: - Sabotage Models
@@ -591,6 +648,13 @@ class ActionsAPI {
     
     func sabotageContract(contractId: Int) async throws -> SabotageActionResponse {
         let request = client.request(endpoint: "/actions/sabotage/\(contractId)", method: "POST")
+        return try await client.execute(request)
+    }
+    
+    // MARK: - Property Upgrade
+    
+    func workOnPropertyUpgrade(contractId: String) async throws -> PropertyUpgradeActionResponse {
+        let request = client.request(endpoint: "/actions/work-property/\(contractId)", method: "POST")
         return try await client.execute(request)
     }
     
