@@ -4,6 +4,12 @@ Utility functions for actions system
 from datetime import datetime
 from typing import Dict
 import math
+from .constants import (
+    PATROL_COOLDOWN,
+    SABOTAGE_COOLDOWN,
+    SCOUT_COOLDOWN,
+    TRAINING_COOLDOWN
+)
 
 
 def format_datetime_iso(dt: datetime) -> str:
@@ -49,9 +55,9 @@ def check_cooldown(last_action: datetime, cooldown_minutes: float) -> Dict:
     return {"ready": False, "seconds_remaining": remaining}
 
 
-def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = 10, 
-                                  sabotage_cooldown: float = 1440,
-                                  scout_cooldown: float = 1440, training_cooldown: float = 120) -> Dict:
+def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN, 
+                                  sabotage_cooldown: float = SABOTAGE_COOLDOWN,
+                                  scout_cooldown: float = SCOUT_COOLDOWN, training_cooldown: float = TRAINING_COOLDOWN) -> Dict:
     """Check if ANY action is on cooldown (global action lock)
     
     Returns:

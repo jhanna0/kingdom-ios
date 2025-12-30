@@ -11,6 +11,13 @@ from routers.auth import get_current_user
 from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
 from .training import calculate_training_cost
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus
+from .constants import (
+    WORK_BASE_COOLDOWN,
+    PATROL_COOLDOWN,
+    SABOTAGE_COOLDOWN,
+    SCOUT_COOLDOWN,
+    TRAINING_COOLDOWN
+)
 
 
 router = APIRouter()
@@ -30,11 +37,11 @@ def get_action_status(
         )
     
     # Calculate cooldowns based on skills
-    work_cooldown = calculate_cooldown(120, state.building_skill)  # Base 2 hours
-    patrol_cooldown = 10  # Always 10 minutes
-    sabotage_cooldown = 1440  # 24 hours (once per day)
-    scout_cooldown = 1440  # 24 hours (once per day)
-    training_cooldown = 120  # 2 hours for training actions
+    work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    patrol_cooldown = PATROL_COOLDOWN
+    sabotage_cooldown = SABOTAGE_COOLDOWN
+    scout_cooldown = SCOUT_COOLDOWN
+    training_cooldown = TRAINING_COOLDOWN
     
     # Count active patrollers in current kingdom
     active_patrollers = 0

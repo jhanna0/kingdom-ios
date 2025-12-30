@@ -10,6 +10,7 @@ from db import get_db, User, PlayerState, Kingdom, Contract, Property
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import calculate_cooldown, check_cooldown, check_global_action_cooldown, format_datetime_iso
+from .constants import WORK_BASE_COOLDOWN
 
 
 router = APIRouter()
@@ -30,18 +31,11 @@ def work_on_contract(
         )
     
     # Check cooldown
-    cooldown_minutes = calculate_cooldown(120, state.building_skill)
+    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown(
-            state, 
-            work_cooldown=cooldown_minutes,
-            patrol_cooldown=10,
-            sabotage_cooldown=1440,
-            scout_cooldown=1440,
-            training_cooldown=120
-        )
+        global_cooldown = check_global_action_cooldown(state, work_cooldown=cooldown_minutes)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -156,18 +150,11 @@ def work_on_property_upgrade(
         )
     
     # Check cooldown (same as building work)
-    cooldown_minutes = calculate_cooldown(120, state.building_skill)
+    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown(
-            state, 
-            work_cooldown=cooldown_minutes,
-            patrol_cooldown=10,
-            sabotage_cooldown=1440,
-            scout_cooldown=1440,
-            training_cooldown=120
-        )
+        global_cooldown = check_global_action_cooldown(state, work_cooldown=cooldown_minutes)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]

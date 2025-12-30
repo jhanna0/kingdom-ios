@@ -10,6 +10,7 @@ from db import get_db, User, Kingdom
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .constants import WORK_BASE_COOLDOWN
 
 
 router = APIRouter()
@@ -206,15 +207,8 @@ def work_on_training(
     
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(120, state.building_skill)
-        global_cooldown = check_global_action_cooldown(
-            state, 
-            work_cooldown=work_cooldown,
-            patrol_cooldown=10,
-            sabotage_cooldown=1440,
-            scout_cooldown=1440,
-            training_cooldown=120
-        )
+        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]

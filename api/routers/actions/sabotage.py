@@ -13,6 +13,7 @@ from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .constants import WORK_BASE_COOLDOWN, SABOTAGE_COOLDOWN
 
 
 router = APIRouter()
@@ -396,15 +397,8 @@ def sabotage_contract(
     
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(120, state.building_skill)
-        global_cooldown = check_global_action_cooldown(
-            state, 
-            work_cooldown=work_cooldown,
-            patrol_cooldown=10,
-            sabotage_cooldown=1440,
-            scout_cooldown=1440,
-            training_cooldown=120
-        )
+        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -552,7 +546,7 @@ def get_sabotage_targets(
             "potential_delay": int(contract.total_actions_required * 0.1)  # Show how much delay would be added
         })
     
-    cooldown_status = check_cooldown(state.last_sabotage_action, 1440)
+    cooldown_status = check_cooldown(state.last_sabotage_action, SABOTAGE_COOLDOWN)
     
     return {
         "kingdom": {

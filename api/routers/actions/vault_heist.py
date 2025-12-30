@@ -11,35 +11,26 @@ from db import get_db, User, Kingdom, PlayerState
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .constants import (
+    WORK_BASE_COOLDOWN,
+    MIN_INTELLIGENCE_REQUIRED,
+    VAULT_HEIST_COOLDOWN_HOURS,
+    HEIST_COST,
+    HEIST_PERCENT,
+    MIN_HEIST_AMOUNT,
+    BASE_HEIST_DETECTION,
+    VAULT_LEVEL_BONUS,
+    INTELLIGENCE_REDUCTION,
+    PATROL_BONUS,
+    HEIST_REP_LOSS,
+    HEIST_BAN
+)
 
 
 router = APIRouter()
 
 
-# ==========================================
-# VAULT HEIST CONFIGURATION
-# ==========================================
-
-# Requirements
-MIN_INTELLIGENCE_REQUIRED = 5       # Must have Intelligence T5 to attempt
-VAULT_HEIST_COOLDOWN_HOURS = 168   # Once per week (7 days)
-
-# Economic balance
-HEIST_COST = 1000                   # Gold cost to attempt heist
-HEIST_PERCENT = 0.10                # Steal 10% of vault
-MIN_HEIST_AMOUNT = 500              # Minimum vault size to target
-
-# Detection mechanics
-BASE_HEIST_DETECTION = 0.3          # 30% base detection chance
-VAULT_LEVEL_BONUS = 0.05            # +5% detection per vault level
-INTELLIGENCE_REDUCTION = 0.04       # -4% detection per intelligence above 5
-PATROL_BONUS = 0.02                 # +2% detection per active patrol
-
-# Consequences
-HEIST_REP_LOSS = 500                # Reputation lost in target kingdom when caught
-HEIST_BAN = True                    # Whether to ban from kingdom when caught
-
-# ==========================================
+# All configuration constants are now in constants.py
 
 
 def calculate_heist_detection_chance(
@@ -107,15 +98,8 @@ def attempt_vault_heist(
     
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(120, state.building_skill)
-        global_cooldown = check_global_action_cooldown(
-            state, 
-            work_cooldown=work_cooldown,
-            patrol_cooldown=10,
-            sabotage_cooldown=1440,
-            scout_cooldown=1440,
-            training_cooldown=120
-        )
+        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
