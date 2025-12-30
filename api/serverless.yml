@@ -5,21 +5,30 @@ provider:
   runtime: python3.11
   region: us-east-1
   profile: dev
-  memorySize: 512
-  timeout: 30
+  memorySize: 1024
+  timeout: 60
   stackName: kingdom-api-stack
+  environment:
+    DATABASE_URL: postgresql://postgres:xlbAKC4!B*aK!J.W3tHZraA9#nVU@kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com:5432/postgres
+    JWT_SECRET_KEY: temp-secret-change-me
+    DEV_MODE: 'True'
+  vpc:
+    securityGroupIds:
+      - sg-62aae569  # Existing default security group (allows RDS access)
+    subnetIds:
+      - subnet-7547d013  # us-east-1a - routes through nat-02df60abdc19b6daa
+      - subnet-98cd50b9  # us-east-1b - routes through existing NAT
   iam:
     role:
       statements:
         - Effect: Allow
           Action:
-            - secretsmanager:GetSecretValue
-          Resource: 
-            - arn:aws:secretsmanager:us-east-1:*:secret:kingdom/*
-  environment:
-    DATABASE_URL: ${param:database-url, 'postgresql://postgres:CHANGEME@kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com:5432/kingdom'}
-    JWT_SECRET_KEY: ${param:jwt-secret, 'temp-secret-change-me'}
-    DEV_MODE: 'True'
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            - ec2:AssignPrivateIpAddresses
+            - ec2:UnassignPrivateIpAddresses
+          Resource: '*'
 
 functions:
   api:

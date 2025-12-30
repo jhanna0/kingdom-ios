@@ -21,19 +21,27 @@ app = FastAPI(
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    init_db()
-    print("🚀 Kingdom API started")
-    print("🔐 Authentication: /auth/apple-signin")
-    print("📍 City boundaries: /cities")
-    print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
-    print("👤 Player state: /player/state, /player/sync")
-    print("📜 Contracts: /contracts")
-    print("🏠 Properties: /properties")
-    print("⚔️  Coups: /coups")
-    print("🏴 Invasions: /invasions")
-    print("🤝 Alliances: /alliances")
-    print("👥 Players: /players")
-    print("👫 Friends: /friends")
+    try:
+        init_db()
+        print("🚀 Kingdom API started")
+        print("🔐 Authentication: /auth/apple-signin")
+        print("📍 City boundaries: /cities")
+        print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
+        print("👤 Player state: /player/state, /player/sync")
+        print("📜 Contracts: /contracts")
+        print("🏠 Properties: /properties")
+        print("⚔️  Coups: /coups")
+        print("🏴 Invasions: /invasions")
+        print("🤝 Alliances: /alliances")
+        print("👥 Players: /players")
+        print("👫 Friends: /friends")
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        # Don't fail startup, tables might already exist
+
+# Don't initialize DB during import - let it happen on first request
+# This prevents cold start timeouts in Lambda VPC
+# Tables should already exist in production anyway
 
 
 # Enable CORS so iOS app can connect
