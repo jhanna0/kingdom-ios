@@ -18,6 +18,10 @@ class MapViewModel: ObservableObject {
     @Published var latestTravelEvent: TravelEvent?  // Travel event from last kingdom entry
     @Published var militaryStrengthCache: [String: MilitaryStrength] = [:]  // kingdomId -> strength data
     
+    // Kingdom claim celebration
+    @Published var showClaimCelebration: Bool = false
+    @Published var claimCelebrationKingdom: String?
+    
     // API Service - connects to backend server
     var apiService = KingdomAPIService.shared
     let contractAPI = ContractAPI()
@@ -337,14 +341,14 @@ class MapViewModel: ObservableObject {
         }
         
         // Call backend - it validates everything (unclaimed, user doesn't rule others, etc.)
-        // This will throw an error if claim fails for any reason
+        // If this throws an error, the celebration won't show
         let kingdomAPI = KingdomAPI()
         let apiKingdom = try await kingdomAPI.createKingdom(
             name: kingdom.name,
             osmId: osmId
         )
         
-        // SUCCESS! Backend confirmed the claim. Update local state.
+        // SUCCESS! Backend confirmed the claim (no exception thrown). Update local state.
         await MainActor.run {
             if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
                 kingdoms[index].rulerId = apiKingdom.ruler_id
@@ -359,6 +363,10 @@ class MapViewModel: ObservableObject {
                 syncPlayerKingdoms()
                 
                 print("👑 Successfully claimed \(kingdom.name)")
+                
+                // Show celebration popup (no rewards from claim endpoint)
+                claimCelebrationKingdom = kingdom.name
+                showClaimCelebration = true
             }
         }
     }

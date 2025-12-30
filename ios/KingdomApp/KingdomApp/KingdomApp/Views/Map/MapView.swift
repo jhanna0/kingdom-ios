@@ -123,6 +123,19 @@ struct MapView: View {
                 .zIndex(999)
             }
             
+            // Kingdom claim celebration popup
+            if viewModel.showClaimCelebration,
+               let kingdomName = viewModel.claimCelebrationKingdom {
+                KingdomClaimCelebration(
+                    kingdomName: kingdomName,
+                    onDismiss: {
+                        viewModel.showClaimCelebration = false
+                        viewModel.claimCelebrationKingdom = nil
+                    }
+                )
+                .zIndex(1000)
+            }
+            
             // Modern medieval-themed HUD overlay
             MapHUD(
                 viewModel: viewModel,

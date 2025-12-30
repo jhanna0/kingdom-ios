@@ -9,6 +9,9 @@ struct KingdomInfoSheetView: View {
     let onViewKingdom: () -> Void
     
     @Environment(\.dismiss) var dismiss
+    @State private var showClaimError = false
+    @State private var claimErrorMessage = ""
+    @State private var isClaiming = false
     
     var body: some View {
         ScrollView {
@@ -125,19 +128,30 @@ struct KingdomInfoSheetView: View {
                 } else if kingdom.canClaim {
                     // Backend says we can claim!
                     Button(action: {
+                        isClaiming = true
                         Task {
                             do {
                                 try await viewModel.claimKingdom()
+                                // Dismiss sheet after short delay to let celebration popup show
+                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                                 dismiss()
                             } catch {
+                                isClaiming = false
+                                claimErrorMessage = error.localizedDescription
+                                showClaimError = true
                                 print("❌ Failed to claim: \(error.localizedDescription)")
                             }
                         }
                     }) {
                         HStack(spacing: 8) {
-                            Image(systemName: "flag.fill")
-                                .foregroundColor(.white)
-                            Text("Claim This Kingdom")
+                            if isClaiming {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "flag.fill")
+                                    .foregroundColor(.white)
+                            }
+                            Text(isClaiming ? "Claiming..." : "Claim This Kingdom")
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
@@ -146,7 +160,13 @@ struct KingdomInfoSheetView: View {
                         .foregroundColor(.white)
                         .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
+                    .disabled(isClaiming)
                     .padding(.horizontal)
+                    .alert("Claim Failed", isPresented: $showClaimError) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(claimErrorMessage)
+                    }
                 } else if isPlayerInside {
                     // Already present but someone else rules it
                     HStack(spacing: 6) {
