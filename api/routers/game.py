@@ -194,17 +194,23 @@ def create_kingdom(
     User automatically becomes the ruler of the new kingdom
     Coordinates are stored in the CityBoundary, not duplicated here
     
-    RESTRICTION: Users can only claim ONE starting city via this endpoint.
-    This prevents spam. Military conquest is still allowed after initial claim.
+    RESTRICTION: Users can only claim a city for free if they don't currently rule any kingdoms.
+    This prevents empire spam. Military conquest is required to expand once you rule a kingdom.
     """
-    # Get player state to check if they've already claimed a starting city
+    # Get player state
     state = _get_or_create_player_state(db, current_user)
     
-    # Check if user has already used their one-time city claim
-    if state.has_claimed_starting_city:
+    # Check if user currently rules any kingdoms
+    # Can only claim a free kingdom if you don't currently rule any
+    current_kingdoms = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.is_ruler == True
+    ).count()
+    
+    if current_kingdoms > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You have already claimed your starting city. Use military conquest to expand your territory."
+            detail="You already rule a kingdom. Use military conquest to expand your territory."
         )
     
     # Check if kingdom with this OSM ID already exists
@@ -218,6 +224,11 @@ def create_kingdom(
             existing.ruler_id = current_user.id
             existing.last_activity = datetime.utcnow()
             
+            # Reset empire status - this becomes a NEW independent empire
+            # (Not tied to any previous empire the player ruled)
+            existing.empire_id = existing.id
+            existing.original_kingdom_id = existing.id
+            
             # Create user-kingdom relationship
             user_kingdom = UserKingdom(
                 user_id=current_user.id,
@@ -229,10 +240,9 @@ def create_kingdom(
             )
             db.add(user_kingdom)
             
-            # Update user stats and mark that they've claimed their starting city
+            # Update user stats
             state.kingdoms_ruled += 1
             state.total_conquests += 1
-            state.has_claimed_starting_city = True  # Mark as claimed
             
             db.commit()
             db.refresh(existing)
@@ -253,6 +263,8 @@ def create_kingdom(
         name=name,
         city_boundary_osm_id=city_boundary_osm_id,
         ruler_id=current_user.id,
+        empire_id=city_boundary_osm_id,  # New independent empire
+        original_kingdom_id=city_boundary_osm_id,  # Original city identity
         population=1,
         level=1,
         treasury_gold=starting_treasury
@@ -274,10 +286,9 @@ def create_kingdom(
     
     db.add(user_kingdom)
     
-    # Update user stats and mark that they've claimed their starting city
+    # Update user stats
     state.kingdoms_ruled += 1
     state.total_conquests += 1
-    state.has_claimed_starting_city = True  # Mark as claimed
     
     db.commit()
     

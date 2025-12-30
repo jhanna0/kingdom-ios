@@ -194,6 +194,18 @@ struct MapView: View {
                 }
             }
         }
+        .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
+            // Automatically show kingdom info sheet on initial map load if player is inside a kingdom
+            if !hasShownInitialKingdom && !viewModel.isLoading && newValue != nil {
+                // Delay slightly to ensure map has fully loaded and animated in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    if let kingdom = viewModel.currentKingdomInside {
+                        kingdomForInfoSheet = kingdom
+                        hasShownInitialKingdom = true
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showMyKingdoms) {
             MyKingdomsSheet(
                 player: viewModel.player,
