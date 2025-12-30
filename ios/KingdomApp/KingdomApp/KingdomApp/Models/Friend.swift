@@ -1,0 +1,125 @@
+import Foundation
+
+// MARK: - Friend Models
+
+struct Friend: Codable, Identifiable {
+    let id: Int
+    let userId: Int
+    let friendUserId: Int
+    let friendUsername: String
+    let friendDisplayName: String
+    let status: FriendshipStatus
+    let createdAt: String
+    let updatedAt: String
+    
+    // Activity data (if accepted)
+    let isOnline: Bool?
+    let level: Int?
+    let currentKingdomId: String?
+    let currentKingdomName: String?
+    let lastSeen: String?
+    let activity: FriendActivity?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case friendUserId = "friend_user_id"
+        case friendUsername = "friend_username"
+        case friendDisplayName = "friend_display_name"
+        case status
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case isOnline = "is_online"
+        case level
+        case currentKingdomId = "current_kingdom_id"
+        case currentKingdomName = "current_kingdom_name"
+        case lastSeen = "last_seen"
+        case activity
+    }
+    
+    var displayName: String {
+        friendDisplayName
+    }
+    
+    var isAccepted: Bool {
+        status == .accepted
+    }
+}
+
+enum FriendshipStatus: String, Codable {
+    case pending
+    case accepted
+    case rejected
+    case blocked
+}
+
+struct FriendActivity: Codable {
+    let icon: String
+    let displayText: String
+    let color: String
+    
+    enum CodingKeys: String, CodingKey {
+        case icon
+        case displayText = "display_text"
+        case color
+    }
+}
+
+// MARK: - API Request/Response Models
+
+struct FriendRequest: Codable {
+    let username: String?
+    let userId: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case username
+        case userId = "user_id"
+    }
+}
+
+struct FriendListResponse: Codable {
+    let success: Bool
+    let friends: [Friend]
+    let pendingReceived: [Friend]
+    let pendingSent: [Friend]
+    
+    enum CodingKeys: String, CodingKey {
+        case success
+        case friends
+        case pendingReceived = "pending_received"
+        case pendingSent = "pending_sent"
+    }
+}
+
+struct AddFriendResponse: Codable {
+    let success: Bool
+    let message: String
+    let friend: Friend?
+}
+
+struct FriendActionResponse: Codable {
+    let success: Bool
+    let message: String
+}
+
+struct SearchUsersResponse: Codable {
+    let success: Bool
+    let users: [UserSearchResult]
+}
+
+struct UserSearchResult: Codable, Identifiable {
+    let id: Int
+    let username: String
+    let displayName: String
+    let level: Int
+    let friendshipStatus: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case displayName = "display_name"
+        case level
+        case friendshipStatus = "friendship_status"
+    }
+}
+

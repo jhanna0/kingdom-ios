@@ -134,30 +134,16 @@ struct MapHUD: View {
                             .cornerRadius(6)
                     }
                     
-                    // Activity (icon only)
+                    // Friends (icon only)
                     Button(action: {
                         showActivity = true
                     }) {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white)
-                                .frame(width: 32, height: 32)
-                                .background(KingdomTheme.Colors.buttonSuccess)
-                                .cornerRadius(6)
-                            
-                            if notificationBadgeCount > 0 {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 16, height: 16)
-                                    .overlay(
-                                        Text("\(notificationBadgeCount)")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
-                                    .offset(x: 6, y: -6)
-                            }
-                        }
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(KingdomTheme.Colors.gold)
+                            .cornerRadius(6)
                     }
                 }
             }

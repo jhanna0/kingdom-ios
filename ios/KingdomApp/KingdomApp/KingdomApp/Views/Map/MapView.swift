@@ -14,6 +14,7 @@ struct MapView: View {
     @State private var mapOpacity: Double = 0.0
     @State private var showAPIDebug = false
     @State private var showActivity = false
+    @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
     @State private var showTravelFeeToast = false
     @State private var travelFeeMessage = ""
@@ -133,6 +134,12 @@ struct MapView: View {
                 showAPIDebug: $showAPIDebug,
                 notificationBadgeCount: notificationBadgeCount
             )
+            
+            // Floating notifications button (bottom right)
+            FloatingNotificationsButton(
+                showNotifications: $showNotifications,
+                badgeCount: notificationBadgeCount
+            )
         }
         .onReceive(locationManager.$currentLocation) { location in
             if let location = location {
@@ -247,7 +254,10 @@ struct MapView: View {
             APIDebugView()
         }
         .sheet(isPresented: $showActivity) {
-            ActivityView()
+            FriendsView()
+        }
+        .sheet(isPresented: $showNotifications) {
+            NotificationsSheet()
         }
         .task {
             await loadNotificationBadge()

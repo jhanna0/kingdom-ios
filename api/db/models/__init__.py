@@ -13,6 +13,7 @@ from .coup import CoupEvent
 from .invasion import InvasionEvent
 from .kingdom_history import KingdomHistory
 from .alliance import Alliance
+from .friend import Friend
 
 __all__ = [
     "User",
@@ -28,5 +29,6 @@ __all__ = [
     "InvasionEvent",
     "KingdomHistory",
     "Alliance",
+    "Friend",
 ]
 
