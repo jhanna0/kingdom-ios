@@ -156,5 +156,42 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Player Discovery
+    
+    /// Get all players in a specific kingdom
+    func getPlayersInKingdom(_ kingdomId: String) async throws -> PlayersInKingdomResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/players/in-kingdom/\(kingdomId)")
+        return try await client.execute(request)
+    }
+    
+    /// Get recently active players
+    func getActivePlayers(kingdomId: String? = nil, limit: Int = 50) async throws -> ActivePlayersResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        var endpoint = "/players/active?limit=\(limit)"
+        if let kingdomId = kingdomId {
+            endpoint += "&kingdom_id=\(kingdomId)"
+        }
+        
+        let request = client.request(endpoint: endpoint)
+        return try await client.execute(request)
+    }
+    
+    /// Get public profile for any player
+    func getPlayerProfile(userId: Int) async throws -> PlayerPublicProfile {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/players/\(userId)/profile")
+        return try await client.execute(request)
+    }
+    
 }
 

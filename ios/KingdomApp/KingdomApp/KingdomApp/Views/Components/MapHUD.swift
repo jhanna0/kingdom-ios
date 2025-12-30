@@ -11,224 +11,168 @@ struct MapHUD: View {
     let notificationBadgeCount: Int
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
-                // Left side - Compact player badge (clickable)
-                Button(action: {
-                    showCharacterSheet = true
-                }) {
-                    HStack(spacing: 8) {
-                        // Level badge with avatar-style
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [KingdomTheme.Colors.gold, KingdomTheme.Colors.gold.opacity(0.7)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 36, height: 36)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 2)
-                                )
-                            Text("\(viewModel.player.level)")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.3), radius: 1)
-                        }
-                        
-                        // Name and gold stacked
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(viewModel.player.name)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+        VStack {
+            VStack(spacing: 8) {
+                // Top row - player and location
+                HStack(spacing: 10) {
+                    // Player badge
+                    HStack(spacing: 6) {
+                        Text(viewModel.player.isRuler ? "👑" : "⚔️")
+                            .font(.system(size: 16))
+                        Text(viewModel.player.name)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                    
+                    Spacer()
+                    
+                    // Location badge
+                    HStack(spacing: 4) {
+                        if let kingdom = viewModel.currentKingdomInside {
+                            Text("📍")
+                                .font(.system(size: 12))
+                            Text(kingdom.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .lineLimit(1)
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "bitcoinsign.circle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                                Text("\(viewModel.player.gold)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(KingdomTheme.Colors.parchment)
-                            .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .strokeBorder(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.brown.opacity(0.3),
-                                                Color.brown.opacity(0.1)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            )
-                    )
-                }
-                .padding(.leading, 12)
-                .padding(.top, 60)
-                
-                Spacer()
-                
-                // Right side - Vertical button stack (TikTok/Instagram style)
-                VStack(spacing: 14) {
-                    // My Kingdoms
-                    if viewModel.player.isRuler || !viewModel.player.fiefsRuled.isEmpty {
-                        ActionButton(
-                            icon: "crown.fill",
-                            label: "Kingdoms",
-                            color: KingdomTheme.Colors.buttonPrimary,
-                            badge: viewModel.player.fiefsRuled.count > 0 ? viewModel.player.fiefsRuled.count : nil
-                        ) {
-                            showMyKingdoms = true
+                        } else {
+                            Text("🗺️")
+                                .font(.system(size: 12))
+                            Text("Traveling")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
                         }
                     }
                     
-                    // Actions
-                    ActionButton(
-                        icon: "hammer.fill",
-                        label: "Actions",
-                        color: KingdomTheme.Colors.buttonSuccess
-                    ) {
-                        showActions = true
-                    }
-                    
-                    // Properties (Home)
-                    ActionButton(
-                        icon: "house.fill",
-                        label: "Home",
-                        color: Color(red: 0.6, green: 0.4, blue: 0.2)
-                    ) {
-                        showProperties = true
-                    }
-                    
-                    // Activity
-                    ActionButton(
-                        icon: "person.2.fill",
-                        label: "Activity",
-                        color: Color(red: 0.5, green: 0.3, blue: 0.5),
-                        badge: notificationBadgeCount > 0 ? notificationBadgeCount : nil
-                    ) {
-                        showActivity = true
-                    }
-                    
-                    // API Debug (small dot indicator)
+                    // API Status Indicator
                     Button {
                         showAPIDebug = true
                     } label: {
                         Circle()
-                            .fill(viewModel.apiService.isConnected ? Color.green : Color.gray)
-                            .frame(width: 10, height: 10)
-                            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                            .padding(6)
+                            .fill(viewModel.apiService.isConnected ? Color.green : Color.gray.opacity(0.4))
+                            .frame(width: 8, height: 8)
                     }
                 }
-                .padding(.trailing, 12)
-                .padding(.top, 60)
+                
+                // Divider
+                Rectangle()
+                    .fill(KingdomTheme.Colors.inkLight.opacity(0.2))
+                    .frame(height: 1)
+                
+                // Bottom row - actions
+                HStack(spacing: 8) {
+                    // Character button (shows level + gold)
+                    Button(action: {
+                        showCharacterSheet = true
+                    }) {
+                        HStack(spacing: 4) {
+                            // Level badge
+                            ZStack {
+                                Circle()
+                                    .fill(KingdomTheme.Colors.gold)
+                                    .frame(width: 22, height: 22)
+                                Text("\(viewModel.player.level)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            // Gold
+                            Text("\(viewModel.player.gold)")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // My Kingdoms (icon only, always show if player has kingdoms)
+                    if viewModel.player.isRuler || !viewModel.player.fiefsRuled.isEmpty {
+                        Button(action: {
+                            showMyKingdoms = true
+                        }) {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(KingdomTheme.Colors.buttonPrimary)
+                                    .cornerRadius(6)
+                                
+                                if viewModel.player.fiefsRuled.count > 0 {
+                                    Text("\(viewModel.player.fiefsRuled.count)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(3)
+                                        .background(Circle().fill(Color.red))
+                                        .offset(x: 4, y: -4)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Actions (icon only)
+                    Button(action: {
+                        showActions = true
+                    }) {
+                        Image(systemName: "hammer.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(KingdomTheme.Colors.buttonSuccess)
+                            .cornerRadius(6)
+                    }
+                    
+                    // Properties (icon only)
+                    Button(action: {
+                        showProperties = true
+                    }) {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(KingdomTheme.Colors.buttonSuccess)
+                            .cornerRadius(6)
+                    }
+                    
+                    // Activity (icon only)
+                    Button(action: {
+                        showActivity = true
+                    }) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(KingdomTheme.Colors.buttonSuccess)
+                                .cornerRadius(6)
+                            
+                            if notificationBadgeCount > 0 {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 16, height: 16)
+                                    .overlay(
+                                        Text("\(notificationBadgeCount)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                    .offset(x: 6, y: -6)
+                            }
+                        }
+                    }
+                }
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KingdomTheme.Colors.parchment)
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 2)
+            )
+            .padding(.horizontal, 12)
             
             Spacer()
         }
-    }
-}
-
-// Medieval-themed action button component
-private struct ActionButton: View {
-    let icon: String
-    let label: String
-    let color: Color
-    var badge: Int? = nil
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 4) {
-                    ZStack {
-                        // Medieval button background with gradient
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [color, color.opacity(0.7)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 48, height: 48)
-                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.3),
-                                                Color.white.opacity(0.1)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1.5
-                                    )
-                            )
-                        
-                        Image(systemName: icon)
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
-                    }
-                    
-                    Text(label)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .shadow(color: .white.opacity(0.8), radius: 2, x: 0, y: 0)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(KingdomTheme.Colors.parchment.opacity(0.9))
-                                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
-                        )
-                }
-                .frame(width: 56)
-                
-                if let badge = badge {
-                    Text("\(badge)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.red, Color.red.opacity(0.8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
-                                )
-                        )
-                        .offset(x: 8, y: -8)
-                }
-            }
-        }
+        .padding(.top, 60)
     }
 }
 

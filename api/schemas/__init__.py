@@ -59,6 +59,14 @@ from .alliance import (
     AllianceListResponse,
     PendingAlliancesResponse,
 )
+from .player import (
+    PlayerActivity,
+    PlayerEquipment,
+    PlayerPublicProfile,
+    PlayerInKingdom,
+    PlayersInKingdomResponse,
+    ActivePlayersResponse,
+)
 
 __all__ = [
     # User/Player
@@ -111,5 +119,12 @@ __all__ = [
     "AllianceResponse",
     "AllianceListResponse",
     "PendingAlliancesResponse",
+    # Player Discovery
+    "PlayerActivity",
+    "PlayerEquipment",
+    "PlayerPublicProfile",
+    "PlayerInKingdom",
+    "PlayersInKingdomResponse",
+    "ActivePlayersResponse",
 ]
 

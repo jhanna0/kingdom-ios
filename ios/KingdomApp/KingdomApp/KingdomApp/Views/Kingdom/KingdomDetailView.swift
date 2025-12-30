@@ -129,38 +129,9 @@ struct KingdomDetailView: View {
                     .padding(.horizontal)
                 }
                 
-                // Population
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                    HStack {
-                        Text("Checked In")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Spacer()
-                        
-                        Text("\(kingdom.checkedInPlayers) present")
-                            .font(KingdomTheme.Typography.subheadline())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
+                // Player Activity Feed
+                PlayerActivityFeedCard(kingdomId: kingdomId)
                     .padding(.horizontal)
-                    
-                    // Placeholder for future player list
-                    if kingdom.checkedInPlayers == 0 {
-                        Text("No one is present")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                            .italic()
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    }
-                }
-                .padding(.vertical, KingdomTheme.Spacing.medium)
-                .parchmentCard(
-                    backgroundColor: KingdomTheme.Colors.parchmentLight,
-                    borderWidth: KingdomTheme.BorderWidth.thin,
-                    hasShadow: false
-                )
-                .padding(.horizontal)
                 
                 // Reward Distribution System
                 if isRuler {

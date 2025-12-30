@@ -223,6 +223,10 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
+                // Player Activity Feed
+                PlayerActivityFeedCard(kingdomId: kingdom.id)
+                    .padding(.horizontal)
+                
                 // Treasury & Income Section
                 VStack(spacing: KingdomTheme.Spacing.small) {
                     HStack(spacing: KingdomTheme.Spacing.medium) {

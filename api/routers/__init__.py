@@ -1,5 +1,5 @@
 """
 API Routers
 """
-from . import auth, cities, game, player, contracts, notifications, coups, alliances
+from . import auth, cities, game, player, contracts, notifications, coups, alliances, players
 

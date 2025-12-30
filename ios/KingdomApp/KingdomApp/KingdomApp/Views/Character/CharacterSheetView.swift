@@ -16,10 +16,19 @@ struct CharacterSheetView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header with level and XP
-                levelCard
+                ProfileHeaderCard(
+                    displayName: player.name,
+                    level: player.level,
+                    experience: player.experience,
+                    maxExperience: player.getXPForNextLevel(),
+                    showsXPBar: true
+                )
                 
                 // Reputation section
-                reputationCard
+                ReputationStatsCard(
+                    reputation: player.reputation,
+                    showAbilities: true
+                )
                 
                 // Combined combat stats and training
                 combatAndTrainingCard
@@ -45,145 +54,6 @@ struct CharacterSheetView: View {
                 .foregroundColor(KingdomTheme.Colors.buttonPrimary)
             }
         }
-    }
-    
-    // MARK: - Level Card
-    
-    private var levelCard: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text(player.name)
-                    .font(.title2.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Level \(player.level)")
-                        .font(.headline)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
-            }
-            
-            // XP Progress Bar
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Experience")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    
-                    Spacer()
-                    
-                    Text("\(player.experience) / \(player.getXPForNextLevel()) XP")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        // Background
-                        Rectangle()
-                            .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
-                            .frame(height: 8)
-                            .cornerRadius(4)
-                        
-                        // Progress
-                        Rectangle()
-                            .fill(KingdomTheme.Colors.gold)
-                            .frame(width: geometry.size.width * player.getXPProgress(), height: 8)
-                            .cornerRadius(4)
-                    }
-                }
-                .frame(height: 8)
-            }
-        }
-        .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
-    }
-    
-    // MARK: - Reputation Card
-    
-    private var reputationCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Reputation")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(player.getReputationTier().rawValue)
-                        .font(.title3.bold())
-                        .foregroundColor(tierColor(player.getReputationTier()))
-                    
-                    Text("\(player.reputation) reputation")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                Image(systemName: tierIcon(player.getReputationTier()))
-                    .font(.system(size: 40))
-                    .foregroundColor(tierColor(player.getReputationTier()))
-            }
-            
-            Divider()
-            
-            // Abilities unlocked
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Abilities:")
-                    .font(.caption.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                
-                abilityRow(
-                    icon: "checkmark.circle.fill",
-                    text: "Accept contracts",
-                    unlocked: true
-                )
-                
-                abilityRow(
-                    icon: "house.fill",
-                    text: "Buy property",
-                    unlocked: player.reputation >= 50
-                )
-                
-                abilityRow(
-                    icon: "hand.raised.fill",
-                    text: "Vote on coups",
-                    unlocked: player.reputation >= 150
-                )
-                
-                abilityRow(
-                    icon: "flag.fill",
-                    text: "Propose coups",
-                    unlocked: player.reputation >= 300
-                )
-                
-                abilityRow(
-                    icon: "star.fill",
-                    text: "Vote counts 2x",
-                    unlocked: player.reputation >= 500
-                )
-                
-                abilityRow(
-                    icon: "crown.fill",
-                    text: "Vote counts 3x",
-                    unlocked: player.reputation >= 1000
-                )
-            }
-        }
-        .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
     }
     
     // MARK: - Combined Combat & Training Card
@@ -379,25 +249,6 @@ struct CharacterSheetView: View {
             }
         default:
             return "Combat skill"
-        }
-    }
-    
-    private func abilityRow(icon: String, text: String, unlocked: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(unlocked ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
-                .frame(width: 16)
-            
-            Text(text)
-                .font(.caption)
-                .foregroundColor(unlocked ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
-            
-            if !unlocked {
-                Image(systemName: "lock.fill")
-                    .font(.caption2)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
-            }
         }
     }
     
@@ -682,29 +533,6 @@ struct CharacterSheetView: View {
         }
     }
     
-    // MARK: - Helper Functions
-    
-    private func tierColor(_ tier: Player.ReputationTier) -> Color {
-        switch tier {
-        case .stranger: return .gray
-        case .resident: return KingdomTheme.Colors.inkDark.opacity(0.7)
-        case .citizen: return .blue
-        case .notable: return .purple
-        case .champion: return KingdomTheme.Colors.gold
-        case .legendary: return .orange
-        }
-    }
-    
-    private func tierIcon(_ tier: Player.ReputationTier) -> String {
-        switch tier {
-        case .stranger: return "person.fill"
-        case .resident: return "house.fill"
-        case .citizen: return "person.2.fill"
-        case .notable: return "star.fill"
-        case .champion: return "crown.fill"
-        case .legendary: return "sparkles"
-        }
-    }
 }
 
 // MARK: - Preview
