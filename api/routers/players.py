@@ -113,15 +113,20 @@ def _is_player_online(user: User) -> bool:
 @router.get("/in-kingdom/{kingdom_id}", response_model=PlayersInKingdomResponse)
 def get_players_in_kingdom(
     kingdom_id: str,
+    limit: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get all players currently in a kingdom with their activity status
     
-    **INTELLIGENCE REQUIRED**: You can only see player activity if:
+    **ACCESS CONTROL**: You can only see player activity if:
     - You rule this kingdom, OR
+    - This is your hometown kingdom, OR
     - You have gathered intelligence on this kingdom (Level 4+)
+    
+    Parameters:
+    - limit: Optional - max number of players to return (for efficient polling)
     
     Shows:
     - All players who have checked into this kingdom
@@ -146,9 +151,10 @@ def get_players_in_kingdom(
     
     # Check if player can see this intel
     is_ruler = kingdom.ruler_id == current_user.id
+    is_hometown = state.hometown_kingdom_id == kingdom_id
     has_intel = False
     
-    if not is_ruler:
+    if not is_ruler and not is_hometown:
         # Check if we have Level 4+ intelligence on this kingdom
         intel = db.query(KingdomIntelligence).filter(
             KingdomIntelligence.kingdom_id == kingdom_id,
@@ -159,8 +165,8 @@ def get_players_in_kingdom(
         
         has_intel = intel is not None
     
-    # If not ruler and no intel, deny access
-    if not is_ruler and not has_intel:
+    # If not ruler, not hometown, and no intel, deny access
+    if not is_ruler and not is_hometown and not has_intel:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Intelligence required. Gather Level 4+ intelligence on this kingdom to see player activity."
@@ -203,10 +209,64 @@ def get_players_in_kingdom(
     # Sort: ruler first, then online players, then by reputation
     players.sort(key=lambda p: (-p.is_ruler, -p.is_online, -p.reputation))
     
+    # 🚨 TESTING: Simulated live feed - players trickle in/out (REMOVE BEFORE PRODUCTION)
+    import random
+    import time
+    
+    # Use time-based seed so players rotate in/out gradually
+    seed = int(time.time() / 3)  # Changes every 3 seconds
+    random.seed(seed)
+    
+    fake_pool = [
+        ("Sir Reginald", "working", "Building city walls"),
+        ("Lady Beatrice", "training", "Training defense"),
+        ("Baron Testing", "patrolling", "Patrolling walls"),
+        ("Duke Lorem", "crafting", "Forging steel sword"),
+        ("Count Debug", "working", "Upgrading vault"),
+        ("Princess Sample", "training", "Training attack"),
+        ("Knight Ipsum", "scouting", "Gathering intelligence"),
+        ("Duchess Mock", "working", "Building market"),
+        ("Earl Testwell", "idle", "Resting in tavern"),
+        ("Sir Devmode", "patrolling", "Watching the gates"),
+    ]
+    
+    # Randomly select 3-6 players to be "in kingdom" right now
+    num_present = random.randint(3, 6)
+    present_fakes = random.sample(fake_pool, num_present)
+    
+    for i, (name, activity_type, activity_text) in enumerate(present_fakes):
+        players.append(PlayerInKingdom(
+            id=9000 + hash(name) % 1000,  # Consistent ID per fake
+            display_name=f"{name}",
+            avatar_url=None,
+            level=random.randint(2, 8),
+            reputation=random.randint(100, 400),
+            attack_power=random.randint(1, 8),
+            defense_power=random.randint(1, 8),
+            leadership=random.randint(1, 8),
+            activity=PlayerActivity(
+                type=activity_type,
+                details=activity_text,
+                expires_at=None
+            ),
+            is_ruler=False,
+            is_online=True  # All visible fakes are "online"
+        ))
+        online_count += 1
+    
+    # Re-sort after adding fakes
+    players.sort(key=lambda p: (-p.is_ruler, -p.is_online, -p.reputation))
+    # 🚨 END TESTING CODE
+    
+    # Apply limit if specified
+    total_players = len(players)
+    if limit and limit > 0:
+        players = players[:limit]
+    
     return PlayersInKingdomResponse(
         kingdom_id=kingdom_id,
         kingdom_name=kingdom.name,
-        total_players=len(players),
+        total_players=total_players,
         online_count=online_count,
         players=players
     )

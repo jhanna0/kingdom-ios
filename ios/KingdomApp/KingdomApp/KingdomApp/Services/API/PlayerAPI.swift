@@ -159,12 +159,17 @@ class PlayerAPI {
     // MARK: - Player Discovery
     
     /// Get all players in a specific kingdom
-    func getPlayersInKingdom(_ kingdomId: String) async throws -> PlayersInKingdomResponse {
+    func getPlayersInKingdom(_ kingdomId: String, limit: Int? = nil) async throws -> PlayersInKingdomResponse {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
         
-        let request = client.request(endpoint: "/players/in-kingdom/\(kingdomId)")
+        var endpoint = "/players/in-kingdom/\(kingdomId)"
+        if let limit = limit {
+            endpoint += "?limit=\(limit)"
+        }
+        
+        let request = client.request(endpoint: endpoint)
         return try await client.execute(request)
     }
     
