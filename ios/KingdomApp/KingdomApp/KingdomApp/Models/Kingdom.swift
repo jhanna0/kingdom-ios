@@ -31,42 +31,6 @@ struct IncomeRecord: Identifiable, Codable, Hashable {
     }
 }
 
-// Reward distribution records
-struct DistributionRecord: Identifiable, Codable, Hashable {
-    let id: UUID
-    let timestamp: Date
-    let totalPool: Int
-    let recipientCount: Int
-    let recipients: [RecipientRecord]
-    
-    init(totalPool: Int, recipients: [RecipientRecord]) {
-        self.id = UUID()
-        self.timestamp = Date()
-        self.totalPool = totalPool
-        self.recipientCount = recipients.count
-        self.recipients = recipients
-    }
-}
-
-struct RecipientRecord: Identifiable, Codable, Hashable {
-    let id: UUID
-    let playerId: Int  // PostgreSQL auto-generated integer
-    let playerName: String
-    let goldReceived: Int
-    let meritScore: Int
-    let reputation: Int
-    let skillTotal: Int
-    
-    init(playerId: Int, playerName: String, goldReceived: Int, meritScore: Int, reputation: Int, skillTotal: Int) {
-        self.id = UUID()
-        self.playerId = playerId
-        self.playerName = playerName
-        self.goldReceived = goldReceived
-        self.meritScore = meritScore
-        self.reputation = reputation
-        self.skillTotal = skillTotal
-    }
-}
 
 struct Kingdom: Identifiable, Equatable, Hashable {
     let id: String  // OSM ID - matches city_boundary_osm_id in backend
@@ -117,12 +81,6 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var totalIncomeCollected: Int  // Lifetime income collected
     var incomeHistory: [IncomeRecord]  // Recent income collections
     
-    // Subject reward distribution system
-    var subjectRewardRate: Int  // Percentage of income to distribute (0-50%)
-    var lastRewardDistribution: Date
-    var totalRewardsDistributed: Int  // Lifetime rewards given to subjects
-    var distributionHistory: [DistributionRecord]  // Recent distributions (keep last 30)
-    
     static func == (lhs: Kingdom, rhs: Kingdom) -> Bool {
         lhs.id == rhs.id
     }
@@ -162,12 +120,6 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.activeQuests = []
         self.allies = []
         self.enemies = []
-        
-        // Initialize reward distribution
-        self.subjectRewardRate = 15  // Default: 15% distribution rate
-        self.lastRewardDistribution = Date().addingTimeInterval(-86400) // Start 1 day ago
-        self.totalRewardsDistributed = 0
-        self.distributionHistory = []
         
         // Upgrade costs will be populated by API
         self.wallUpgradeCost = nil
@@ -380,30 +332,6 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     }
     
     // MARK: - Reward Distribution System
-    
-    /// Set the subject reward distribution rate (ruler only)
-    mutating func setSubjectRewardRate(_ rate: Int) {
-        subjectRewardRate = max(0, min(50, rate))  // Clamp 0-50%
-    }
-    
-    /// Calculate daily reward pool based on income and distribution rate
-    var dailyRewardPool: Int {
-        return Int(Double(dailyIncome) * Double(subjectRewardRate) / 100.0)
-    }
-    
-    /// Check if rewards are ready to distribute (24 hours since last)
-    var canDistributeRewards: Bool {
-        let elapsed = Date().timeIntervalSince(lastRewardDistribution)
-        return elapsed >= 82800 // 23 hours (allow slight early trigger)
-    }
-    
-    /// Get pending reward pool (accumulated since last distribution)
-    var pendingRewardPool: Int {
-        let elapsed = Date().timeIntervalSince(lastRewardDistribution)
-        let hoursElapsed = elapsed / 3600.0
-        let hourlyPool = dailyRewardPool / 24
-        return Int(Double(hourlyPool) * hoursElapsed)
-    }
     
     // Ray casting algorithm for point-in-polygon test
     private func isPointInPolygon(_ point: CLLocationCoordinate2D, polygon: [CLLocationCoordinate2D]) -> Bool {

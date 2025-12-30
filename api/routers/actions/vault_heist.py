@@ -258,6 +258,7 @@ def attempt_vault_heist(
             state.level += 1
             state.skill_points += 3
             state.experience -= xp_needed
+            # Level-up bonus is NOT taxed
             state.gold += 50
         
         # Record in game data

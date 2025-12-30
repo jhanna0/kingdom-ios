@@ -11,6 +11,7 @@ from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import calculate_cooldown, check_cooldown, check_global_action_cooldown, format_datetime_iso
 from .constants import WORK_BASE_COOLDOWN
+from .tax_utils import apply_kingdom_tax_with_bonus
 
 
 router = APIRouter()
@@ -83,10 +84,22 @@ def work_on_contract(
     
     # Calculate reward per action (gold per action = reward_pool / total_actions_required)
     gold_per_action = contract.reward_pool / contract.total_actions_required
-    gold_earned = int(gold_per_action)
+    base_gold = int(gold_per_action)
     
-    # Award gold only for this action
-    state.gold += gold_earned
+    # Apply building skill bonus (2% per level above 1)
+    bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
+    
+    # Apply tax AFTER bonuses
+    net_income, tax_amount, tax_rate, gross_income = apply_kingdom_tax_with_bonus(
+        db=db,
+        kingdom_id=contract.kingdom_id,
+        player_state=state,
+        base_income=base_gold,
+        bonus_multiplier=bonus_multiplier
+    )
+    
+    # Award net gold (after tax) to player
+    state.gold += net_income
     
     # Check if contract is complete
     is_complete = contract.actions_completed >= contract.total_actions_required
@@ -127,7 +140,10 @@ def work_on_contract(
         "is_complete": is_complete,
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "rewards": {
-            "gold": gold_earned,
+            "gold": net_income,
+            "gold_before_tax": gross_income,
+            "tax_amount": tax_amount,
+            "tax_rate": tax_rate,
             "experience": None,
             "reputation": None,
             "iron": None

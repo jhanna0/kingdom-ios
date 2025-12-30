@@ -167,6 +167,7 @@ def _apply_coup_victory_rewards(
     kingdom.ruler_id = initiator.id
     kingdom.last_activity = datetime.utcnow()
     
+    # Coup rewards are NOT taxed (you're taking over the kingdom!)
     initiator_state.gold += 1000
     initiator_state.reputation += 50
     initiator_state.kingdoms_ruled += 1

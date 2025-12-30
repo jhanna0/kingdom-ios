@@ -14,6 +14,7 @@ from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
 from .constants import WORK_BASE_COOLDOWN, SABOTAGE_COOLDOWN
+from .tax_utils import apply_kingdom_tax
 
 
 router = APIRouter()
@@ -217,10 +218,17 @@ def _handle_caught_saboteur(
     kingdom_rep[kingdom.id] = current_rep - REPUTATION_LOSS
     saboteur_state.kingdom_reputation = kingdom_rep
     
-    # Reward the patrol who caught them
+    # Reward the patrol who caught them (with tax applied to bounty)
     if catcher:
         catcher.reputation += PATROL_REP_REWARD
-        catcher.gold += PATROL_BOUNTY
+        # Apply tax to patrol bounty
+        net_bounty, bounty_tax, bounty_tax_rate = apply_kingdom_tax(
+            db=db,
+            kingdom_id=kingdom.id,
+            player_state=catcher,
+            gross_income=PATROL_BOUNTY
+        )
+        catcher.gold += net_bounty
     
     # Record failed sabotage
     game_data = saboteur_state.game_data or {}
@@ -324,8 +332,22 @@ def _handle_successful_sabotage(
     
     saboteur_state.game_data = game_data
     
-    # Award rewards
-    saboteur_state.gold += SABOTAGE_GOLD_REWARD
+    # Award rewards (tax applied if sabotaging in a kingdom where they're a subject)
+    # Sabotage rewards are taxed by the saboteur's hometown kingdom if they have one
+    if saboteur_state.hometown_kingdom_id:
+        net_reward, reward_tax, reward_tax_rate = apply_kingdom_tax(
+            db=db,
+            kingdom_id=saboteur_state.hometown_kingdom_id,
+            player_state=saboteur_state,
+            gross_income=SABOTAGE_GOLD_REWARD
+        )
+    else:
+        # No hometown, no tax
+        net_reward = SABOTAGE_GOLD_REWARD
+        reward_tax = 0
+        reward_tax_rate = 0
+    
+    saboteur_state.gold += net_reward
     
     # Add reputation in hometown
     if saboteur_state.hometown_kingdom_id:
@@ -362,9 +384,12 @@ def _handle_successful_sabotage(
                 "gold_paid": sabotage_cost
             },
             "rewards": {
-                "gold": SABOTAGE_GOLD_REWARD,
+                "gold": net_reward,
+                "gold_before_tax": SABOTAGE_GOLD_REWARD,
+                "tax_amount": reward_tax,
+                "tax_rate": reward_tax_rate,
                 "reputation": SABOTAGE_REP_REWARD if saboteur_state.hometown_kingdom_id else 0,
-                "net_gold": SABOTAGE_GOLD_REWARD - sabotage_cost
+                "net_gold": net_reward - sabotage_cost
             },
             "next_sabotage_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)),
             "statistics": {

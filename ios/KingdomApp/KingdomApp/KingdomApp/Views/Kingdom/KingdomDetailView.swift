@@ -133,10 +133,9 @@ struct KingdomDetailView: View {
                 PlayerActivityFeedCard(kingdomId: kingdomId)
                     .padding(.horizontal)
                 
-                // Reward Distribution System
+                // Tax Rate Management (Ruler only)
                 if isRuler {
-                    // Show ruler management card
-                    RulerRewardManagementCard(
+                    TaxRateManagementCard(
                         kingdom: Binding(
                             get: { kingdom },
                             set: { _ in }
@@ -144,10 +143,6 @@ struct KingdomDetailView: View {
                         viewModel: viewModel
                     )
                     .padding(.horizontal)
-                } else {
-                    // Show subject reward card
-                    SubjectRewardCard(kingdom: kingdom, player: player)
-                        .padding(.horizontal)
                 }
                 
                         // Ruler actions

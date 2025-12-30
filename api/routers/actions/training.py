@@ -297,6 +297,7 @@ def work_on_training(
         state.level += 1
         state.skill_points += 3
         state.experience -= xp_needed
+        # Level-up bonus is NOT taxed (it's a bonus for personal achievement)
         state.gold += 50
     
     # Update the contract in the list

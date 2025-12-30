@@ -10,6 +10,7 @@ from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
 from .constants import WORK_BASE_COOLDOWN, SCOUT_COOLDOWN, SCOUT_GOLD_REWARD
+from .tax_utils import apply_kingdom_tax
 
 
 router = APIRouter()
@@ -62,8 +63,14 @@ def scout_kingdom(
     # Update player state
     state.last_scout_action = datetime.utcnow()
     
-    # Give gold reward for successful scouting
-    state.gold += SCOUT_GOLD_REWARD
+    # Give gold reward for successful scouting (with tax)
+    net_income, tax_amount, tax_rate = apply_kingdom_tax(
+        db=db,
+        kingdom_id=kingdom_id,
+        player_state=state,
+        gross_income=SCOUT_GOLD_REWARD
+    )
+    state.gold += net_income
     
     db.commit()
     
@@ -84,7 +91,10 @@ def scout_kingdom(
         },
         "next_scout_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=SCOUT_COOLDOWN)),
         "rewards": {
-            "gold": SCOUT_GOLD_REWARD,
+            "gold": net_income,
+            "gold_before_tax": SCOUT_GOLD_REWARD,
+            "tax_amount": tax_amount,
+            "tax_rate": tax_rate,
             "reputation": None,
             "iron": None
         }

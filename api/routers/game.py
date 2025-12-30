@@ -361,8 +361,23 @@ def check_in(
         base_xp *= 2
     
     # Bonus based on kingdom level
-    gold_reward = base_gold * kingdom.level
+    gold_reward_before_tax = base_gold * kingdom.level
     xp_reward = base_xp * kingdom.level
+    
+    # Apply tax (rulers are exempt in their own kingdom)
+    if user_kingdom.is_ruler:
+        # Rulers don't pay tax in their own kingdom
+        gold_reward = gold_reward_before_tax
+        tax_amount = 0
+        tax_rate = 0
+    else:
+        # Apply kingdom tax rate
+        tax_rate = kingdom.tax_rate
+        tax_amount = int(gold_reward_before_tax * tax_rate / 100)
+        gold_reward = gold_reward_before_tax - tax_amount
+        
+        # Add tax to kingdom treasury
+        kingdom.treasury_gold += tax_amount
     
     # Update user state
     state = _get_or_create_player_state(db, current_user)
@@ -375,6 +390,7 @@ def check_in(
     if state.experience >= required_exp:
         state.level += 1
         state.experience -= required_exp
+        # Level-up bonus is NOT taxed
         state.gold += 50 * state.level
     
     # Update user-kingdom
@@ -383,8 +399,7 @@ def check_in(
     user_kingdom.gold_earned += gold_reward
     user_kingdom.local_reputation += 1
     
-    # Update kingdom
-    kingdom.treasury_gold += gold_reward // 10  # 10% tax
+    # Update kingdom activity (tax already added above)
     kingdom.last_activity = datetime.utcnow()
     
     # Record check-in history
