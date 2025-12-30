@@ -12,12 +12,14 @@ struct ActivityNotification: Codable, Identifiable {
     let actionId: String?
     let createdAt: String
     let coupData: CoupNotificationData?
+    let invasionData: InvasionNotificationData?
     
     enum CodingKeys: String, CodingKey {
         case type, priority, title, message, action
         case actionId = "action_id"
         case createdAt = "created_at"
         case coupData = "coup_data"
+        case invasionData = "invasion_data"
     }
     
     enum NotificationType: String, Codable {
@@ -30,6 +32,11 @@ struct ActivityNotification: Codable, Identifiable {
         case coupInProgress = "coup_in_progress"
         case coupAgainstYou = "coup_against_you"
         case coupResolved = "coup_resolved"
+        case invasionAgainstYou = "invasion_against_you"
+        case allyUnderAttack = "ally_under_attack"
+        case invasionDefenseNeeded = "invasion_defense_needed"
+        case invasionInProgress = "invasion_in_progress"
+        case invasionResolved = "invasion_resolved"
     }
     
     enum NotificationPriority: String, Codable {
@@ -102,6 +109,54 @@ struct CoupNotificationData: Codable, Identifiable {
         case canJoin = "can_join"
         case attackerVictory = "attacker_victory"
         case userWon = "user_won"
+    }
+    
+    var timeRemainingFormatted: String {
+        let minutes = timeRemainingSeconds / 60
+        let seconds = timeRemainingSeconds % 60
+        if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+struct InvasionNotificationData: Codable, Identifiable {
+    let id: Int
+    let targetKingdomId: String
+    let targetKingdomName: String
+    let attackingFromKingdomId: String
+    let attackingFromKingdomName: String
+    let initiatorName: String
+    let timeRemainingSeconds: Int
+    let attackerCount: Int
+    let defenderCount: Int
+    let userSide: String?
+    let canJoin: Bool
+    let attackerVictory: Bool?
+    let userWon: Bool?
+    let userWasAttacker: Bool?
+    let userIsRuler: Bool?
+    let isAllied: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case targetKingdomId = "target_kingdom_id"
+        case targetKingdomName = "target_kingdom_name"
+        case attackingFromKingdomId = "attacking_from_kingdom_id"
+        case attackingFromKingdomName = "attacking_from_kingdom_name"
+        case initiatorName = "initiator_name"
+        case timeRemainingSeconds = "time_remaining_seconds"
+        case attackerCount = "attacker_count"
+        case defenderCount = "defender_count"
+        case userSide = "user_side"
+        case canJoin = "can_join"
+        case attackerVictory = "attacker_victory"
+        case userWon = "user_won"
+        case userWasAttacker = "user_was_attacker"
+        case userIsRuler = "user_is_ruler"
+        case isAllied = "is_allied"
     }
     
     var timeRemainingFormatted: String {

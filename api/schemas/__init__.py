@@ -50,6 +50,15 @@ from .invasion import (
     InvasionParticipant,
     ActiveInvasionsResponse,
 )
+from .alliance import (
+    AllianceProposeRequest,
+    AllianceProposeResponse,
+    AllianceAcceptResponse,
+    AllianceDeclineResponse,
+    AllianceResponse,
+    AllianceListResponse,
+    PendingAlliancesResponse,
+)
 
 __all__ = [
     # User/Player
@@ -94,5 +103,13 @@ __all__ = [
     "InvasionResolveResponse",
     "InvasionParticipant",
     "ActiveInvasionsResponse",
+    # Alliance
+    "AllianceProposeRequest",
+    "AllianceProposeResponse",
+    "AllianceAcceptResponse",
+    "AllianceDeclineResponse",
+    "AllianceResponse",
+    "AllianceListResponse",
+    "PendingAlliancesResponse",
 ]
 

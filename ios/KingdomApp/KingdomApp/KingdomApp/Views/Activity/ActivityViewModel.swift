@@ -47,6 +47,20 @@ class ActivityViewModel: ObservableObject {
                 print("Coup resolved: \(coupData)")
             }
             
+        case .invasionAgainstYou, .allyUnderAttack, .invasionDefenseNeeded, .invasionInProgress:
+            // Show invasion details
+            if let invasionData = notification.invasionData {
+                // TODO: Show invasion join sheet
+                print("Invasion notification: \(invasionData)")
+            }
+            
+        case .invasionResolved:
+            // Show invasion results
+            if let invasionData = notification.invasionData {
+                // TODO: Show results modal
+                print("Invasion resolved: \(invasionData)")
+            }
+            
         case .contractReady:
             // TODO: Navigate to contract completion
             print("Navigate to contract: \(notification.actionId ?? "unknown")")

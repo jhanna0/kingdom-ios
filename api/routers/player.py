@@ -9,6 +9,7 @@ from typing import Optional
 from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
+from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from routers.actions.training import calculate_training_cost
 
@@ -185,10 +186,20 @@ def get_player_state(
                     Property.owner_id == current_user.id
                 ).first() is not None
                 
+                # Check if player's empire is allied with target kingdom's empire
+                home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first() if state.hometown_kingdom_id else None
+                is_allied = home_kingdom and are_empires_allied(
+                    db,
+                    home_kingdom.empire_id or home_kingdom.id,
+                    kingdom.empire_id or kingdom.id
+                )
+                
                 if is_ruler:
                     print(f"👑 {current_user.display_name} rules {kingdom.name} - no travel fee")
                 elif owns_property:
                     print(f"🏠 {current_user.display_name} owns property in {kingdom.name} - no travel fee")
+                elif is_allied:
+                    print(f"🤝 {current_user.display_name} is from allied empire - no travel fee in {kingdom.name}")
                 else:
                     # Check if player has enough gold
                     if state.gold < kingdom.travel_fee:

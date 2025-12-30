@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List, Dict
 
-from db import get_db, User, PlayerState, Kingdom, InvasionEvent, KingdomHistory
+from db import get_db, User, PlayerState, Kingdom, InvasionEvent, KingdomHistory, Alliance
+from routers.alliances import are_empires_allied
 from schemas.invasion import (
     InvasionDeclareRequest,
     InvasionDeclareResponse,
@@ -124,6 +125,14 @@ def declare_invasion(
     if target_kingdom.empire_id == attacking_kingdom.empire_id:
         raise HTTPException(status_code=400, detail="Cannot invade your own empire")
     
+    # Check alliance - cannot attack allies
+    if are_empires_allied(db, attacking_kingdom.empire_id or attacking_kingdom.id, 
+                          target_kingdom.empire_id or target_kingdom.id):
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot invade allied empire! Alliance must expire first."
+        )
+    
     # Check no active invasion on target
     existing = db.query(InvasionEvent).filter(
         InvasionEvent.target_kingdom_id == request.target_kingdom_id,
@@ -201,6 +210,25 @@ def join_invasion(
         # Must be checked in to target city
         if state.current_kingdom_id != invasion.target_kingdom_id:
             raise HTTPException(status_code=400, detail="Must be checked in to target city to defend")
+        
+        # Check if player can defend: must be from target kingdom, same empire, or allied empire
+        target_kingdom = db.query(Kingdom).filter(Kingdom.id == invasion.target_kingdom_id).first()
+        player_home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first() if state.hometown_kingdom_id else None
+        
+        is_local = state.hometown_kingdom_id == invasion.target_kingdom_id
+        is_same_empire = (player_home_kingdom and target_kingdom and 
+                         (player_home_kingdom.empire_id or player_home_kingdom.id) == (target_kingdom.empire_id or target_kingdom.id))
+        is_allied = (player_home_kingdom and target_kingdom and 
+                    are_empires_allied(db, 
+                                      player_home_kingdom.empire_id or player_home_kingdom.id,
+                                      target_kingdom.empire_id or target_kingdom.id))
+        
+        if not (is_local or is_same_empire or is_allied):
+            raise HTTPException(
+                status_code=400, 
+                detail="Must be from target kingdom, same empire, or allied empire to defend"
+            )
+        
         invasion.add_defender(current_user.id)
     else:
         raise HTTPException(status_code=400, detail="Side must be 'attackers' or 'defenders'")

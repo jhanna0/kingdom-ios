@@ -155,6 +155,70 @@ struct NotificationCard: View {
                         .foregroundColor(KingdomTheme.Colors.gold)
                     }
                 }
+                
+                // Invasion-specific info
+                if let invasionData = notification.invasionData {
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.fill")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            Text(invasionData.attackingFromKingdomName)
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text(invasionData.targetKingdomName)
+                                .font(KingdomTheme.Typography.caption())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                        
+                        HStack(spacing: 16) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bolt.fill")
+                                    .font(.caption)
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                Text("\(invasionData.attackerCount)")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                            }
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "shield.fill")
+                                    .font(.caption)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                Text("\(invasionData.defenderCount)")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.fill")
+                                    .font(.caption)
+                                Text(invasionData.timeRemainingFormatted)
+                                    .font(KingdomTheme.Typography.caption())
+                            }
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                        
+                        // Show alliance badge if applicable
+                        if invasionData.isAllied == true {
+                            HStack(spacing: 4) {
+                                Image(systemName: "handshake.fill")
+                                    .font(.caption)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                Text("Allied Empire")
+                                    .font(KingdomTheme.Typography.caption())
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            }
+                        }
+                    }
+                }
             }
             .padding()
             .parchmentCard()
@@ -172,6 +236,14 @@ struct NotificationCard: View {
         case .coupVoteNeeded, .coupInProgress, .coupAgainstYou:
             return "crown.fill"
         case .coupResolved:
+            return "flag.checkered"
+        case .invasionAgainstYou:
+            return "exclamationmark.shield.fill"
+        case .allyUnderAttack:
+            return "handshake.fill"
+        case .invasionDefenseNeeded, .invasionInProgress:
+            return "shield.fill"
+        case .invasionResolved:
             return "flag.checkered"
         case .contractReady:
             return "checkmark.circle.fill"

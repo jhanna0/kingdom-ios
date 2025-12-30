@@ -14,6 +14,7 @@ import random
 from db.base import get_db
 from db.models import User, Kingdom, PlayerState, KingdomIntelligence
 from routers.auth import get_current_user
+from routers.alliances import are_empires_allied
 from config import DEV_MODE
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
@@ -326,6 +327,18 @@ def gather_intelligence(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kingdom not found"
+        )
+    
+    # Cannot spy on allies
+    home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+    if home_kingdom and are_empires_allied(
+        db, 
+        home_kingdom.empire_id or home_kingdom.id,
+        kingdom.empire_id or kingdom.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot spy on allies! This would violate your alliance."
         )
     
     # Deduct gold (always paid upfront)

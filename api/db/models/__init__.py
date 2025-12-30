@@ -12,6 +12,7 @@ from .kingdom_intelligence import KingdomIntelligence
 from .coup import CoupEvent
 from .invasion import InvasionEvent
 from .kingdom_history import KingdomHistory
+from .alliance import Alliance
 
 __all__ = [
     "User",
@@ -26,5 +27,6 @@ __all__ = [
     "CoupEvent",
     "InvasionEvent",
     "KingdomHistory",
+    "Alliance",
 ]
 

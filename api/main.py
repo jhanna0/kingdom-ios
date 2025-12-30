@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import init_db
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -31,6 +31,7 @@ async def startup_event():
     print("🏠 Properties: /properties")
     print("⚔️  Coups: /coups")
     print("🏴 Invasions: /invasions")
+    print("🤝 Alliances: /alliances")
 
 
 # Enable CORS so iOS app can connect
@@ -55,6 +56,7 @@ app.include_router(property_router.router)
 app.include_router(intelligence.router)
 app.include_router(coups.router)
 app.include_router(invasions.router)
+app.include_router(alliances.router)
 
 
 # Health check

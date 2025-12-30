@@ -10,6 +10,7 @@ import math
 
 from db import get_db, User, Kingdom, Contract, PlayerState
 from routers.auth import get_current_user
+from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
 
@@ -464,6 +465,18 @@ def sabotage_contract(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kingdom not found"
+        )
+    
+    # Cannot sabotage allies
+    home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+    if home_kingdom and are_empires_allied(
+        db,
+        home_kingdom.empire_id or home_kingdom.id,
+        kingdom.empire_id or kingdom.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot sabotage allies! This would violate your alliance."
         )
     
     # Deduct gold cost (always paid upfront)

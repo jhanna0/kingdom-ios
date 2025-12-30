@@ -14,6 +14,7 @@ from .models import (
     CoupEvent,
     InvasionEvent,
     KingdomHistory,
+    Alliance,
 )
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "CoupEvent",
     "InvasionEvent",
     "KingdomHistory",
+    "Alliance",
 ]
 
