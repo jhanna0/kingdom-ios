@@ -1,0 +1,421 @@
+"""
+Player Activity Feed - Aggregate activity from existing tables
+"""
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_, desc
+from typing import List, Optional
+from datetime import datetime, timedelta
+
+from db.base import get_db
+from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, CheckInHistory
+from routers.auth import get_current_user
+from schemas.activity import ActivityLogEntry, PlayerActivityResponse
+
+
+router = APIRouter(prefix="/activity", tags=["activity"])
+
+
+def _get_contract_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get building/construction activities from contracts"""
+    activities = []
+    
+    # Find all contracts where user has contributed
+    user_id_str = str(user_id)
+    contracts = db.query(Contract).filter(
+        Contract.action_contributions.contains({user_id_str: 1})  # User has at least 1 action
+    ).order_by(desc(Contract.created_at)).limit(limit).all()
+    
+    for contract in contracts:
+        contributions = contract.action_contributions.get(user_id_str, 0) if contract.action_contributions else 0
+        if contributions > 0:
+            activities.append(ActivityLogEntry(
+                id=contract.id,
+                user_id=user_id,
+                action_type="build",
+                action_category="kingdom",
+                description=f"Contributed {contributions} actions to {contract.building_type} L{contract.building_level}",
+                kingdom_id=contract.kingdom_id,
+                kingdom_name=contract.kingdom_name,
+                amount=contributions,
+                details={
+                    "contract_id": contract.id,
+                    "building_type": contract.building_type,
+                    "building_level": contract.building_level,
+                    "actions_contributed": contributions,
+                    "status": contract.status
+                },
+                created_at=contract.work_started_at or contract.created_at
+            ))
+    
+    return activities
+
+
+def _get_coup_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get voting activities from coup events"""
+    activities = []
+    
+    # Find coups where user participated
+    coups = db.query(CoupEvent).filter(
+        or_(
+            CoupEvent.attackers.contains([user_id]),
+            CoupEvent.defenders.contains([user_id])
+        )
+    ).order_by(desc(CoupEvent.created_at)).limit(limit).all()
+    
+    for coup in coups:
+        # Determine which side they voted for
+        side = "attacker" if user_id in (coup.attackers or []) else "defender"
+        
+        # Get kingdom info
+        kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else coup.kingdom_id
+        
+        activities.append(ActivityLogEntry(
+            id=coup.id + 1000000,  # Offset to avoid ID collision with contracts
+            user_id=user_id,
+            action_type="vote",
+            action_category="combat",
+            description=f"Voted as {side} in coup against {coup.initiator_name}",
+            kingdom_id=coup.kingdom_id,
+            kingdom_name=kingdom_name,
+            details={
+                "coup_id": coup.id,
+                "side": side,
+                "initiator": coup.initiator_name,
+                "status": coup.status,
+                "victory": coup.attacker_victory if coup.status == 'resolved' else None
+            },
+            created_at=coup.start_time
+        ))
+    
+    return activities
+
+
+def _get_invasion_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get invasion participation activities"""
+    activities = []
+    
+    invasions = db.query(InvasionEvent).filter(
+        or_(
+            InvasionEvent.attackers.contains([user_id]),
+            InvasionEvent.defenders.contains([user_id])
+        )
+    ).order_by(desc(InvasionEvent.created_at)).limit(limit).all()
+    
+    for invasion in invasions:
+        side = "attacker" if user_id in (invasion.attackers or []) else "defender"
+        
+        # Get kingdom names
+        target_kingdom = db.query(Kingdom).filter(Kingdom.id == invasion.target_kingdom_id).first()
+        attacking_kingdom = db.query(Kingdom).filter(Kingdom.id == invasion.attacking_from_kingdom_id).first()
+        
+        target_name = target_kingdom.name if target_kingdom else invasion.target_kingdom_id
+        attacking_name = attacking_kingdom.name if attacking_kingdom else invasion.attacking_from_kingdom_id
+        
+        description = f"Joined invasion as {side}"
+        if side == "attacker":
+            description += f" from {attacking_name} to {target_name}"
+        else:
+            description += f" defending {target_name}"
+        
+        activities.append(ActivityLogEntry(
+            id=invasion.id + 2000000,  # Offset to avoid ID collision
+            user_id=user_id,
+            action_type="invasion",
+            action_category="combat",
+            description=description,
+            kingdom_id=invasion.target_kingdom_id,
+            kingdom_name=target_name,
+            amount=invasion.cost_per_attacker if side == "attacker" else None,
+            details={
+                "invasion_id": invasion.id,
+                "side": side,
+                "attacking_from": attacking_name,
+                "target": target_name,
+                "status": invasion.status,
+                "victory": invasion.attacker_victory if invasion.status == 'resolved' else None
+            },
+            created_at=invasion.declared_at
+        ))
+    
+    return activities
+
+
+def _get_property_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get property purchase/upgrade activities"""
+    activities = []
+    
+    properties = db.query(Property).filter(
+        Property.owner_id == user_id
+    ).order_by(desc(Property.purchased_at)).limit(limit).all()
+    
+    for prop in properties:
+        # Property purchase
+        activities.append(ActivityLogEntry(
+            id=hash(prop.id) % 1000000 + 3000000,  # Offset to avoid ID collision
+            user_id=user_id,
+            action_type="property_purchase",
+            action_category="economy",
+            description=f"Purchased T{prop.tier} property in {prop.kingdom_name}",
+            kingdom_id=prop.kingdom_id,
+            kingdom_name=prop.kingdom_name,
+            details={
+                "property_id": prop.id,
+                "tier": prop.tier,
+                "location": prop.location
+            },
+            created_at=prop.purchased_at
+        ))
+        
+        # Property upgrades (if upgraded)
+        if prop.last_upgraded and prop.tier > 1:
+            activities.append(ActivityLogEntry(
+                id=hash(prop.id) % 1000000 + 4000000,  # Offset to avoid ID collision
+                user_id=user_id,
+                action_type="property_upgrade",
+                action_category="economy",
+                description=f"Upgraded property to T{prop.tier} in {prop.kingdom_name}",
+                kingdom_id=prop.kingdom_id,
+                kingdom_name=prop.kingdom_name,
+                details={
+                    "property_id": prop.id,
+                    "tier": prop.tier,
+                    "location": prop.location
+                },
+                created_at=prop.last_upgraded
+            ))
+    
+    return activities
+
+
+def _get_training_activities(db: Session, user_id: int, state: PlayerState, limit: int = 20) -> List[ActivityLogEntry]:
+    """Get training activities from player state"""
+    activities = []
+    
+    # Check training contracts
+    if state.training_contracts:
+        for idx, contract in enumerate(state.training_contracts):
+            training_type = contract.get('type', 'unknown')
+            cost = contract.get('cost_paid', 0)
+            actions_completed = contract.get('actionsCompleted', 0)
+            actions_required = contract.get('actionsRequired', 0)
+            
+            # Use created_at if available, otherwise last_training_action
+            created_at = state.last_training_action or datetime.utcnow()
+            if 'created_at' in contract:
+                try:
+                    created_at = datetime.fromisoformat(contract['created_at'].replace('Z', '+00:00'))
+                except:
+                    pass
+            
+            status = "completed" if actions_completed >= actions_required else "in_progress"
+            
+            activities.append(ActivityLogEntry(
+                id=hash(f"{user_id}_{training_type}_{idx}") % 1000000 + 5000000,
+                user_id=user_id,
+                action_type="train",
+                action_category="combat",
+                description=f"Training {training_type.capitalize()} ({actions_completed}/{actions_required})",
+                kingdom_id=state.current_kingdom_id,
+                kingdom_name=None,  # Could look up if needed
+                amount=cost,
+                details={
+                    "training_type": training_type,
+                    "cost": cost,
+                    "progress": f"{actions_completed}/{actions_required}",
+                    "status": status
+                },
+                created_at=created_at
+            ))
+    
+    return activities
+
+
+def _get_checkin_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get check-in activities"""
+    activities = []
+    
+    checkins = db.query(CheckInHistory).filter(
+        CheckInHistory.user_id == user_id
+    ).order_by(desc(CheckInHistory.checked_in_at)).limit(limit).all()
+    
+    for checkin in checkins:
+        # Get kingdom info
+        kingdom = db.query(Kingdom).filter(Kingdom.id == checkin.kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else checkin.kingdom_id
+        
+        # Build description
+        rewards = []
+        if checkin.gold_earned > 0:
+            rewards.append(f"+{checkin.gold_earned}g")
+        if checkin.experience_earned > 0:
+            rewards.append(f"+{checkin.experience_earned} XP")
+        
+        reward_text = f" ({', '.join(rewards)})" if rewards else ""
+        
+        activities.append(ActivityLogEntry(
+            id=checkin.id + 6000000,  # Offset to avoid ID collision
+            user_id=user_id,
+            action_type="checkin",
+            action_category="kingdom",
+            description=f"Checked in to {kingdom_name}{reward_text}",
+            kingdom_id=checkin.kingdom_id,
+            kingdom_name=kingdom_name,
+            amount=checkin.gold_earned if checkin.gold_earned > 0 else None,
+            details={
+                "gold_earned": checkin.gold_earned,
+                "experience_earned": checkin.experience_earned
+            },
+            created_at=checkin.checked_in_at
+        ))
+    
+    return activities
+
+
+@router.get("/my-activities", response_model=PlayerActivityResponse)
+def get_my_activities(
+    limit: int = 50,
+    days: Optional[int] = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get my own activity history
+    
+    Shows:
+    - Building contributions
+    - Coup votes
+    - Invasion participation
+    - Property purchases/upgrades
+    - Training sessions
+    - Check-ins
+    
+    Parameters:
+    - limit: Max activities to return (default 50)
+    - days: Filter to activities within last N days (default 7, use 0 for all time)
+    """
+    user_id = current_user.id
+    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+    
+    if not state:
+        raise HTTPException(status_code=404, detail="Player state not found")
+    
+    # Collect all activities
+    all_activities = []
+    
+    # Get activities from different sources
+    all_activities.extend(_get_contract_activities(db, user_id, limit))
+    all_activities.extend(_get_coup_activities(db, user_id, limit))
+    all_activities.extend(_get_invasion_activities(db, user_id, limit))
+    all_activities.extend(_get_property_activities(db, user_id, limit))
+    all_activities.extend(_get_training_activities(db, user_id, state, limit))
+    all_activities.extend(_get_checkin_activities(db, user_id, limit))
+    
+    # Filter by date if specified
+    if days and days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        all_activities = [a for a in all_activities if a.created_at >= cutoff]
+    
+    # Sort by date (most recent first)
+    all_activities.sort(key=lambda x: x.created_at, reverse=True)
+    
+    # Limit results
+    all_activities = all_activities[:limit]
+    
+    return PlayerActivityResponse(
+        success=True,
+        total=len(all_activities),
+        activities=all_activities
+    )
+
+
+@router.get("/friend-activities", response_model=PlayerActivityResponse)
+def get_friend_activities(
+    limit: int = 50,
+    days: Optional[int] = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get activity feed for all my friends
+    
+    Shows combined activity from all accepted friends
+    
+    Parameters:
+    - limit: Max activities to return (default 50)
+    - days: Filter to activities within last N days (default 7)
+    """
+    from db.models import Friend
+    
+    user_id = current_user.id
+    
+    # Get all accepted friendships
+    friendships = db.query(Friend).filter(
+        or_(
+            Friend.user_id == user_id,
+            Friend.friend_user_id == user_id
+        ),
+        Friend.status == 'accepted'
+    ).all()
+    
+    # Get friend user IDs
+    friend_ids = []
+    for friendship in friendships:
+        friend_id = friendship.friend_user_id if friendship.user_id == user_id else friendship.user_id
+        friend_ids.append(friend_id)
+    
+    if not friend_ids:
+        return PlayerActivityResponse(
+            success=True,
+            total=0,
+            activities=[]
+        )
+    
+    # Collect activities from all friends
+    all_activities = []
+    
+    for friend_id in friend_ids:
+        # Get friend info
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+        if not friend_user:
+            continue
+        
+        friend_state = db.query(PlayerState).filter(PlayerState.user_id == friend_id).first()
+        if not friend_state:
+            continue
+        
+        # Get activities from different sources
+        friend_activities = []
+        friend_activities.extend(_get_contract_activities(db, friend_id, 20))
+        friend_activities.extend(_get_coup_activities(db, friend_id, 20))
+        friend_activities.extend(_get_invasion_activities(db, friend_id, 20))
+        friend_activities.extend(_get_property_activities(db, friend_id, 20))
+        friend_activities.extend(_get_training_activities(db, friend_id, friend_state, 10))
+        friend_activities.extend(_get_checkin_activities(db, friend_id, 20))
+        
+        # Add user info to activities
+        for activity in friend_activities:
+            activity.username = friend_user.username
+            activity.display_name = friend_user.display_name or friend_user.username
+            activity.user_level = friend_state.level
+        
+        all_activities.extend(friend_activities)
+    
+    # Filter by date if specified
+    if days and days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        all_activities = [a for a in all_activities if a.created_at >= cutoff]
+    
+    # Sort by date (most recent first)
+    all_activities.sort(key=lambda x: x.created_at, reverse=True)
+    
+    # Limit results
+    all_activities = all_activities[:limit]
+    
+    return PlayerActivityResponse(
+        success=True,
+        total=len(all_activities),
+        activities=all_activities
+    )
+

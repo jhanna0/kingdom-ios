@@ -8,6 +8,8 @@ class FriendsViewModel: ObservableObject {
     @Published var friends: [Friend] = []
     @Published var pendingReceived: [Friend] = []
     @Published var pendingSent: [Friend] = []
+    @Published var myActivities: [ActivityLogEntry] = []
+    @Published var friendActivities: [ActivityLogEntry] = []
     @Published var errorMessage: String?
     
     private let api = KingdomAPIService.shared
@@ -59,6 +61,28 @@ class FriendsViewModel: ObservableObject {
         } catch {
             print("❌ Failed to remove friend: \(error)")
             errorMessage = "Failed to remove friend"
+        }
+    }
+    
+    func loadMyActivity() async {
+        do {
+            let response = try await api.friends.getMyActivities(limit: 50, days: 7)
+            myActivities = response.activities
+            print("✅ Loaded \(myActivities.count) activities")
+        } catch {
+            print("❌ Failed to load my activity: \(error)")
+            // Don't show error to user for activity, just fail silently
+        }
+    }
+    
+    func loadFriendActivity() async {
+        do {
+            let response = try await api.friends.getFriendActivities(limit: 50, days: 7)
+            friendActivities = response.activities
+            print("✅ Loaded \(friendActivities.count) friend activities")
+        } catch {
+            print("❌ Failed to load friend activity: \(error)")
+            // Don't show error to user for activity, just fail silently
         }
     }
 }

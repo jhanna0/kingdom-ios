@@ -5,6 +5,13 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @State private var showAddFriend = false
     @State private var selectedFriend: Friend?
+    @State private var selectedTab: Tab = .friends
+    
+    enum Tab {
+        case friends
+        case myActivity
+        case friendActivity
+    }
     
     var body: some View {
         NavigationStack {
@@ -12,28 +19,120 @@ struct FriendsView: View {
                 KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: KingdomTheme.Spacing.large) {
-                        // Header with add button
-                        HStack {
-                            Image(systemName: "person.2.fill")
-                                .font(.title2)
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                            
-                            Text("Friends")
-                                .font(KingdomTheme.Typography.title2())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Spacer()
-                            
-                            Button(action: { showAddFriend = true }) {
-                                Image(systemName: "person.badge.plus")
-                                    .font(.title3)
-                                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                VStack(spacing: 0) {
+                    // Tab selector
+                    HStack(spacing: 0) {
+                        TabButton(title: "Friends", icon: "person.2.fill", isSelected: selectedTab == .friends) {
+                            selectedTab = .friends
+                        }
+                        
+                        TabButton(title: "My Activity", icon: "list.bullet.clipboard", isSelected: selectedTab == .myActivity) {
+                            selectedTab = .myActivity
+                        }
+                        
+                        TabButton(title: "Friend Activity", icon: "person.3", isSelected: selectedTab == .friendActivity) {
+                            selectedTab = .friendActivity
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, KingdomTheme.Spacing.small)
+                    
+                    // Content
+                    ScrollView {
+                        VStack(spacing: KingdomTheme.Spacing.large) {
+                            switch selectedTab {
+                            case .friends:
+                                friendsContent
+                            case .myActivity:
+                                myActivityContent
+                            case .friendActivity:
+                                friendActivityContent
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, KingdomTheme.Spacing.small)
+                        .padding(.vertical)
+                    }
+                }
+                
+                if viewModel.isLoading {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    MedievalLoadingView(status: "Loading...")
+                }
+            }
+            .navigationTitle("Social")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if selectedTab == .friends {
+                        Button(action: { showAddFriend = true }) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.title3)
+                                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(KingdomTheme.Typography.headline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                }
+            }
+            .task {
+                await viewModel.loadFriends()
+                await viewModel.loadMyActivity()
+                await viewModel.loadFriendActivity()
+            }
+            .sheet(isPresented: $showAddFriend) {
+                AddFriendView(onAdded: {
+                    showAddFriend = false
+                    Task {
+                        await viewModel.loadFriends()
+                    }
+                })
+            }
+            .sheet(item: $selectedFriend) { friend in
+                NavigationStack {
+                    PlayerProfileView(userId: friend.friendUserId)
+                }
+            }
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Friends Content
+    
+    @ViewBuilder
+    private var friendsContent: some View {
+        VStack(spacing: KingdomTheme.Spacing.large) {
+            // Header with add button (moved to content for this tab)
+            HStack {
+                Image(systemName: "person.2.fill")
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("Friends")
+                    .font(KingdomTheme.Typography.title2())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, KingdomTheme.Spacing.small)
                         
                         // Friend requests received
                         if !viewModel.pendingReceived.isEmpty {
@@ -116,56 +215,218 @@ struct FriendsView: View {
                                 }
                             }
                         }
+        }
+    }
+    
+    // MARK: - My Activity Content
+    
+    @ViewBuilder
+    private var myActivityContent: some View {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+            // Header
+            HStack {
+                Image(systemName: "list.bullet.clipboard")
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("My Activity")
+                    .font(KingdomTheme.Typography.title2())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            if viewModel.myActivities.isEmpty {
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 60))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    Text("No Recent Activity")
+                        .font(KingdomTheme.Typography.title2())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Your actions will appear here")
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .padding(.top, 60)
+            } else {
+                ForEach(viewModel.myActivities) { activity in
+                    ActivityCard(activity: activity, showUser: false)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Friend Activity Content
+    
+    @ViewBuilder
+    private var friendActivityContent: some View {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+            // Header
+            HStack {
+                Image(systemName: "person.3")
+                    .font(.title2)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("Friend Activity")
+                    .font(KingdomTheme.Typography.title2())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            if viewModel.friendActivities.isEmpty {
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    Image(systemName: "person.2.slash")
+                        .font(.system(size: 60))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    Text("No Friend Activity")
+                        .font(KingdomTheme.Typography.title2())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Add friends to see what they're doing!")
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .padding(.top, 60)
+            } else {
+                ForEach(viewModel.friendActivities) { activity in
+                    ActivityCard(activity: activity, showUser: true)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Tab Button
+
+struct TabButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                
+                Text(title)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .foregroundColor(isSelected ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkMedium)
+            .background(
+                isSelected ? KingdomTheme.Colors.buttonPrimary.opacity(0.1) : Color.clear
+            )
+            .cornerRadius(8)
+        }
+    }
+}
+
+// MARK: - Activity Card
+
+struct ActivityCard: View {
+    let activity: ActivityLogEntry
+    let showUser: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                // Icon
+                Image(systemName: activity.icon)
+                    .font(.title3)
+                    .foregroundColor(activityColor(activity.color))
+                    .frame(width: 32, height: 32)
+                    .background(activityColor(activity.color).opacity(0.1))
+                    .cornerRadius(8)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    // User name if showing friend activity
+                    if showUser, let displayName = activity.displayName {
+                        HStack(spacing: 4) {
+                            Text(displayName)
+                                .font(.caption.bold())
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            if let level = activity.userLevel {
+                                Text("Lv\(level)")
+                                    .font(.caption2)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
+                        }
                     }
-                    .padding(.vertical)
+                    
+                    // Description
+                    Text(activity.description)
+                        .font(.subheadline)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    HStack(spacing: 8) {
+                        // Time
+                        Text(activity.timeAgo)
+                            .font(.caption)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        // Kingdom
+                        if let kingdomName = activity.kingdomName {
+                            Text("•")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.circle")
+                                    .font(.caption2)
+                                Text(kingdomName)
+                                    .font(.caption)
+                            }
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                    }
                 }
                 
-                if viewModel.isLoading {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    MedievalLoadingView(status: "Loading...")
-                }
-            }
-            .navigationTitle("Friends")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                Spacer()
+                
+                // Amount if present
+                if let amount = activity.amount {
+                    VStack(spacing: 2) {
+                        Text("\(amount)")
+                            .font(.headline)
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        
+                        if activity.actionType == "build" {
+                            Text("actions")
+                                .font(.caption2)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else if activity.actionType.contains("property") || activity.actionType == "train" {
+                            Image(systemName: "g.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
                     }
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.semibold)
-                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
-            .task {
-                await viewModel.loadFriends()
-            }
-            .sheet(isPresented: $showAddFriend) {
-                AddFriendView(onAdded: {
-                    showAddFriend = false
-                    Task {
-                        await viewModel.loadFriends()
-                    }
-                })
-            }
-            .sheet(item: $selectedFriend) { friend in
-                NavigationStack {
-                    PlayerProfileView(userId: friend.friendUserId)
-                }
-            }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
-            }
+        }
+        .padding()
+        .parchmentCard()
+        .padding(.horizontal)
+    }
+    
+    private func activityColor(_ colorName: String) -> Color {
+        switch colorName {
+        case "green": return KingdomTheme.Colors.buttonSuccess
+        case "blue": return KingdomTheme.Colors.buttonPrimary
+        case "orange": return KingdomTheme.Colors.buttonWarning
+        case "red": return KingdomTheme.Colors.buttonDanger
+        case "yellow": return KingdomTheme.Colors.gold
+        default: return KingdomTheme.Colors.inkMedium
         }
     }
 }

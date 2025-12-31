@@ -80,5 +80,33 @@ class FriendsService {
         let request = client.request(endpoint: "/friends/search?query=\(encodedQuery)")
         return try await client.execute(request)
     }
+    
+    // MARK: - Activity
+    
+    func getMyActivities(limit: Int = 50, days: Int? = 7) async throws -> PlayerActivityResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        var endpoint = "/activity/my-activities?limit=\(limit)"
+        if let days = days {
+            endpoint += "&days=\(days)"
+        }
+        let request = client.request(endpoint: endpoint)
+        return try await client.execute(request)
+    }
+    
+    func getFriendActivities(limit: Int = 50, days: Int? = 7) async throws -> PlayerActivityResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        var endpoint = "/activity/friend-activities?limit=\(limit)"
+        if let days = days {
+            endpoint += "&days=\(days)"
+        }
+        let request = client.request(endpoint: endpoint)
+        return try await client.execute(request)
+    }
 }
 
