@@ -33,19 +33,14 @@ struct PropertyCard: View {
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("T\(property.tier)")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(tierColor)
-                            .cornerRadius(4)
-                        
-                        Text("\(property.currentValue) gold")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                    }
+                    // Tier badge
+                    Text("T\(property.tier)")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(tierColor)
+                        .cornerRadius(4)
                 }
                 
                 // Location

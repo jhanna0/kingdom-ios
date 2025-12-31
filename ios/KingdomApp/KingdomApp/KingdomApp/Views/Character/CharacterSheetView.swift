@@ -210,20 +210,21 @@ struct CharacterSheetView: View {
                 return "Vote weight: \(1.0 + (Double(tier - 1) * 0.2)) • Enhanced influence"
             }
         case "building":
-            let discount = Int(player.getBuildingCostDiscount() * 100)
+            // TODO: Backend should provide skill benefit descriptions
+            // For now, just show benefits without hardcoded percentages
             switch tier {
             case 1:
-                return "\(discount)% cost reduction"
+                return "Reduced building costs"
             case 2:
-                return "\(discount)% cost reduction • +10% coin rewards"
+                return "Reduced costs • +10% coin rewards"
             case 3:
-                return "\(discount)% cost reduction • +20% coins • +1 daily Assist"
+                return "Reduced costs • +20% coins • +1 daily Assist"
             case 4:
-                return "\(discount)% cost reduction • +30% coins • 10% cooldown refund"
+                return "Reduced costs • +30% coins • 10% cooldown refund"
             case 5:
-                return "\(discount)% cost reduction • +40% coins • 25% double progress"
+                return "Reduced costs • +40% coins • 25% double progress"
             default:
-                return "\(discount)% cost reduction"
+                return "Reduced building costs"
             }
         default:
             return "Combat skill"

@@ -1,5 +1,10 @@
 import Foundation
 
+// ⚠️ WARNING: This entire file does LOCAL validation and state updates
+// TODO: Replace ALL methods here with backend API calls
+// Backend should validate ruler ownership, treasury, building levels, etc.
+// Frontend should ONLY call API and update UI with response
+
 // MARK: - Ruler Actions (Building Upgrades & Income)
 extension MapViewModel {
     
@@ -65,50 +70,8 @@ extension MapViewModel {
         }
     }
     
-    /// Collect passive income for all kingdoms (goes to city treasury)
-    /// This should be called periodically (e.g., when app opens, when viewing kingdom)
-    func collectKingdomIncome(for kingdom: Kingdom) {
-        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
-            return
-        }
-        
-        // Collect income into the kingdom's treasury
-        let incomeEarned = kingdoms[index].pendingIncome
-        if incomeEarned > 0 {
-            kingdoms[index].collectIncome()
-            print("💰 \(kingdom.name) collected \(incomeEarned) gold (now: \(kingdoms[index].treasuryGold)g)")
-        }
-        
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdom.id {
-            currentKingdomInside = kingdoms[index]
-        }
-    }
-    
-    /// Collect income for all kingdoms the player rules
-    func collectAllRuledKingdomsIncome() {
-        let ruledKingdoms = kingdoms.filter { kingdom in
-            player.fiefsRuled.contains(kingdom.name)
-        }
-        
-        var totalCollected = 0
-        for kingdom in ruledKingdoms {
-            let pendingIncome = kingdom.pendingIncome
-            collectKingdomIncome(for: kingdom)
-            totalCollected += pendingIncome
-        }
-        
-        if totalCollected > 0 {
-            print("👑 Collected \(totalCollected) gold across \(ruledKingdoms.count) kingdoms")
-        }
-    }
-    
-    /// Auto-collect income when viewing a kingdom (convenience)
-    func autoCollectIncomeForKingdom(_ kingdom: Kingdom) {
-        if kingdom.hasIncomeToCollect {
-            collectKingdomIncome(for: kingdom)
-        }
-    }
+    // NOTE: Income collection removed - backend handles this automatically at night
+    // Kingdom treasury values come from backend API responses
     
     /// Set the kingdom tax rate (ruler only)
     func setKingdomTaxRate(_ rate: Int, for kingdomId: String) {

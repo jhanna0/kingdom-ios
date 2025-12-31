@@ -7,12 +7,14 @@ struct PropertyMarketView: View {
     var onPurchaseComplete: (() -> Void)?
     @State private var selectedLocation: String = "north"
     @State private var showingPurchaseConfirmation = false
-    @State private var landPrice: Int = 500
     @State private var isPurchasing = false
     @State private var purchaseError: String?
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
+    
+    // TODO: Add backend endpoint GET /properties/purchase-cost?kingdom_id=X to get price
+    // For now, show generic button and backend will validate/return error
     
     var body: some View {
         ScrollView {
@@ -32,12 +34,6 @@ struct PropertyMarketView: View {
         .navigationTitle("Buy Land")
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
-        .onAppear {
-            // Calculate land price based on kingdom population
-            if let kingdom = kingdom {
-                landPrice = Property.purchasePrice(kingdomPopulation: kingdom.checkedInPlayers)
-            }
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") {
@@ -54,7 +50,7 @@ struct PropertyMarketView: View {
                 }
             }
         } message: {
-            Text("Clear the forest on the \(selectedLocation) side and claim this land for \(landPrice) gold?")
+            Text("Clear the forest on the \(selectedLocation) side and claim this land? (Price determined by kingdom population)")
         }
         .alert("Error", isPresented: .constant(purchaseError != nil)) {
             Button("OK") {
@@ -85,9 +81,6 @@ struct PropertyMarketView: View {
                     .cornerRadius(16)
                 }
             }
-        }
-        .onAppear {
-            calculateLandPrice()
         }
     }
     
@@ -224,42 +217,31 @@ struct PropertyMarketView: View {
                 
                 Spacer()
                 
-                Text("\(landPrice) gold")
-                    .font(.title3.bold().monospacedDigit())
-                    .foregroundColor(canAfford ? KingdomTheme.Colors.gold : .red)
+                Text("~500g (varies by population)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
             }
             
-            if !canPurchase {
-                VStack(alignment: .leading, spacing: 6) {
-                    if kingdom == nil {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption)
-                            Text("Must be inside a kingdom to purchase land")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.red)
+            // Show helpful requirements (backend will validate)
+            VStack(alignment: .leading, spacing: 6) {
+                if kingdom == nil {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                        Text("Must be inside a kingdom to purchase land")
+                            .font(.caption)
                     }
-                    
-                    if !hasReputation {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption)
-                            Text("Need 50+ reputation")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.red)
+                    .foregroundColor(.red)
+                }
+                
+                if !hasReputation {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                        Text("Need 50+ reputation (you have \(player.reputation))")
+                            .font(.caption)
                     }
-                    
-                    if !canAfford {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption)
-                            Text("Need \(landPrice - player.gold) more gold")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.red)
-                    }
+                    .foregroundColor(.red)
                 }
             }
             
@@ -286,31 +268,25 @@ struct PropertyMarketView: View {
                     }
                 }
             }
-            .buttonStyle(.medieval(color: canPurchase ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3), fullWidth: true))
-            .disabled(!canPurchase || isPurchasing)
+            .buttonStyle(.medieval(color: (kingdom != nil && hasReputation) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3), fullWidth: true))
+            .disabled(kingdom == nil || !hasReputation || isPurchasing)
         }
         .padding()
         .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
-    private var canAfford: Bool {
-        player.gold >= landPrice
-    }
+    // Note: Backend validates gold, reputation, and all requirements
+    // No client-side validation needed - just show helpful hints
     
     private var hasReputation: Bool {
         player.reputation >= 50
     }
     
-    private var canPurchase: Bool {
-        kingdom != nil && canAfford && hasReputation
-    }
-    
     // MARK: - Helper Functions
     
     private func purchaseProperty() async {
-        guard player.gold >= landPrice else { return }
-        guard player.reputation >= 50 else { return }
+        // Backend validates everything
         guard let kingdom = kingdom else {
             await MainActor.run {
                 purchaseError = "No kingdom selected"
@@ -333,8 +309,10 @@ struct PropertyMarketView: View {
             print("✅ Successfully purchased property: \(property.tierName) in \(kingdom.name)")
             
             await MainActor.run {
-                // Update player gold from backend response
-                player.gold -= landPrice
+                // Reload player state from backend (gold already deducted by backend)
+                Task {
+                    await player.loadFromAPI()
+                }
                 isPurchasing = false
                 
                 // Dismiss to go back to MyPropertiesView
@@ -354,13 +332,6 @@ struct PropertyMarketView: View {
                 purchaseError = error.localizedDescription
             }
             print("❌ Failed to purchase property: \(error)")
-        }
-    }
-    
-    private func calculateLandPrice() {
-        if let kingdom = kingdom {
-            let populationMultiplier = 1.0 + (Double(kingdom.checkedInPlayers) / 50.0)
-            landPrice = Int(500.0 * populationMultiplier)
         }
     }
 }

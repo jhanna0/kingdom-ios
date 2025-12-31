@@ -274,23 +274,8 @@ struct KingdomInfoSheetView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, KingdomTheme.Spacing.medium)
                         
-                        // Income Rate
-                        VStack(spacing: 4) {
-                            Image(systemName: "clock.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(KingdomTheme.Colors.goldWarm)
-                            
-                            Text("\(kingdom.hourlyIncome)g/hr")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Text("Income Rate")
-                                .font(KingdomTheme.Typography.caption2())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, KingdomTheme.Spacing.medium)
+                        // TODO: Income Rate - backend should provide this in kingdom response
+                        // Removed local income calculation
                     }
                 }
                 .padding(KingdomTheme.Spacing.medium)

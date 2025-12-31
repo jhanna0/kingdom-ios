@@ -9,6 +9,8 @@ struct PropertyDetailView: View {
     @State private var errorMessage = ""
     @State private var propertyUpgradeContracts: [PropertyUpgradeContract] = []
     @State private var isLoadingContracts = true
+    @State private var upgradeStatus: PropertyAPI.PropertyUpgradeStatus?
+    @State private var isLoadingUpgradeStatus = true
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
@@ -74,10 +76,12 @@ struct PropertyDetailView: View {
         .parchmentNavigationBar()
         .task {
             await loadPropertyContracts()
+            await loadUpgradeStatus()
         }
         .refreshable {
             await loadPropertyContracts()
             await refreshProperty()
+            await loadUpgradeStatus()
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -115,11 +119,6 @@ struct PropertyDetailView: View {
             Text("Tier \(property.tier) of 5")
                 .font(.caption.bold())
                 .foregroundColor(tierColor)
-            
-            // Current value
-            Text("Estimated Value: \(property.currentValue) gold")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
         }
         .frame(maxWidth: .infinity)
         .padding()
@@ -262,9 +261,11 @@ struct PropertyDetailView: View {
                 
                 Spacer()
                 
-                Text("\(property.upgradeCost) gold")
-                    .font(.title3.bold().monospacedDigit())
-                    .foregroundColor(player.gold >= property.upgradeCost ? KingdomTheme.Colors.gold : .red)
+                if let status = upgradeStatus {
+                    Text("\(status.upgrade_cost) gold")
+                        .font(.title3.bold().monospacedDigit())
+                        .foregroundColor(player.gold >= status.upgrade_cost ? KingdomTheme.Colors.gold : .red)
+                }
             }
             
             // Show active contract if one exists
@@ -333,7 +334,7 @@ struct PropertyDetailView: View {
                                 .font(.subheadline.bold())
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
-                            Text("Creating contract and deducting \(property.upgradeCost) gold")
+                            Text("Creating contract...")
                                 .font(.caption)
                                 .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                         }
@@ -350,39 +351,44 @@ struct PropertyDetailView: View {
                 ))
             } else {
                 // No active contract - show purchase button
-                Button(action: purchaseUpgrade) {
-                    HStack {
-                        Image(systemName: "hammer.fill")
-                        Text("Start Upgrade (\(property.upgradeCost)g)")
+                if isLoadingUpgradeStatus {
+                    ProgressView()
+                        .padding()
+                } else if let status = upgradeStatus {
+                    Button(action: purchaseUpgrade) {
+                        HStack {
+                            Image(systemName: "hammer.fill")
+                            Text("Start Upgrade (\(status.upgrade_cost)g)")
+                        }
                     }
-                }
-                .buttonStyle(.medieval(
-                    color: (player.gold >= property.upgradeCost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
-                    fullWidth: true
-                ))
-                .disabled(player.gold < property.upgradeCost || hasAnyPropertyUpgradeInProgress)
-                .transition(.opacity)
-                
-                Text("Like training, upgrades require work actions to complete")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                
-                if player.gold < property.upgradeCost {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.caption)
-                        Text("Need \(property.upgradeCost - player.gold) more gold")
-                            .font(.caption)
+                    .buttonStyle(.medieval(
+                        color: (player.gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
+                        fullWidth: true
+                    ))
+                    .disabled(player.gold < status.upgrade_cost || hasAnyPropertyUpgradeInProgress)
+                    .transition(.opacity)
+                    
+                    Text("Like training, upgrades require work actions to complete")
+                        .font(.caption)
+                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                    
+                    if player.gold < status.upgrade_cost {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.caption)
+                            Text("Need \(status.upgrade_cost - player.gold) more gold")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.red)
+                    } else if hasAnyPropertyUpgradeInProgress {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                            Text("You already have a property upgrade in progress")
+                                .font(.caption)
+                        }
+                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
-                    .foregroundColor(.red)
-                } else if hasAnyPropertyUpgradeInProgress {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                        Text("You already have a property upgrade in progress")
-                            .font(.caption)
-                    }
-                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
                 }
             }
         }
@@ -489,8 +495,23 @@ struct PropertyDetailView: View {
         }
     }
     
+    private func loadUpgradeStatus() async {
+        do {
+            let status = try await propertyAPI.getPropertyUpgradeStatus(propertyId: property.id)
+            await MainActor.run {
+                upgradeStatus = status
+                isLoadingUpgradeStatus = false
+            }
+        } catch {
+            print("Failed to load upgrade status: \(error)")
+            await MainActor.run {
+                isLoadingUpgradeStatus = false
+            }
+        }
+    }
+    
     private func purchaseUpgrade() {
-        guard player.gold >= property.upgradeCost else { return }
+        // Backend will validate gold and all requirements
         guard !hasAnyPropertyUpgradeInProgress else {
             errorMessage = "You already have a property upgrade in progress. Complete it before starting a new one."
             showError = true
@@ -510,8 +531,9 @@ struct PropertyDetailView: View {
                 // Refresh player state to get updated gold
                 let playerState = try await KingdomAPIService.shared.player.loadState()
                 
-                // Reload contracts to show the new one
+                // Reload contracts and upgrade status
                 await loadPropertyContracts()
+                await loadUpgradeStatus()
                 
                 await MainActor.run {
                     player.updateFromAPIState(playerState)

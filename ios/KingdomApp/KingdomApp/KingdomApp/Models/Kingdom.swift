@@ -184,114 +184,12 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.rulerName = "Unclaimed"
     }
     
-    // MARK: - Economy & Income
-    
-    /// Calculate daily income based on city activity and buildings
-    var dailyIncome: Int {
-        // Base income - every city generates something
-        let baseIncome = 30
-        
-        // Population bonus - active cities are more valuable
-        // Each unique player who checked in this week adds 5 gold/day
-        let populationBonus = weeklyUniqueCheckIns * 5
-        
-        // Market generates passive income
-        let marketBonus: Int = {
-            switch marketLevel {
-            case 1: return 15
-            case 2: return 35
-            case 3: return 65
-            case 4: return 100
-            case 5: return 150
-            default: return 0
-            }
-        }()
-        
-        return baseIncome + populationBonus + marketBonus
-    }
-    
-    // MARK: - Material Availability
-    
-    /// Get available materials based on mine level
-    func getAvailableMaterials() -> [String] {
-        switch mineLevel {
-        case 0: return []
-        case 1: return ["stone"]
-        case 2: return ["stone", "iron"]
-        case 3: return ["stone", "iron", "steel"]
-        case 4: return ["stone", "iron", "steel", "titanium"]
-        case 5: return ["stone", "iron", "steel", "titanium"]
-        default: return []
-        }
-    }
-    
-    /// Get material cost in gold
-    func getMaterialCost(material: String) -> Int {
-        switch material.lowercased() {
-        case "stone": return 10
-        case "iron": return 25
-        case "steel": return 50
-        case "titanium": return 100
-        default: return 0
-        }
-    }
-    
-    /// Get purchase quantity multiplier based on market level
-    func getPurchaseQuantityMultiplier() -> Double {
-        switch marketLevel {
-        case 0: return 0.0  // No market = can't buy
-        case 1, 2: return 1.0
-        case 3, 4: return 1.5
-        case 5: return 2.0
-        default: return 1.0
-        }
-    }
-    
-    /// Check if materials can be purchased (requires market T1+)
-    var canPurchaseMaterials: Bool {
-        return marketLevel >= 1
-    }
-    
-    /// Calculate hourly income (for real-time display)
-    var hourlyIncome: Int {
-        return dailyIncome / 24
-    }
-    
-    /// Collect income since last collection
-    mutating func collectIncome() {
-        let now = Date()
-        let elapsed = now.timeIntervalSince(lastIncomeCollection)
-        let hoursElapsed = elapsed / 3600.0
-        
-        // Calculate income earned
-        let incomeEarned = Int(Double(hourlyIncome) * hoursElapsed)
-        
-        // Add to treasury
-        treasuryGold += incomeEarned
-        
-        // Track total income
-        totalIncomeCollected += incomeEarned
-        
-        // Record in history (keep last 20 records)
-        let record = IncomeRecord(
-            amount: incomeEarned,
-            hourlyRate: hourlyIncome,
-            dailyRate: dailyIncome
-        )
-        incomeHistory.insert(record, at: 0)
-        if incomeHistory.count > 20 {
-            incomeHistory = Array(incomeHistory.prefix(20))
-        }
-        
-        // Update last collection time
-        lastIncomeCollection = now
-    }
+    // MARK: - Note on Economy & Income
+    // All economic calculations (income, material costs, etc.) are done by backend
+    // Backend provides this data in kingdom state responses
     
     /// Check if income is available to collect
-    var hasIncomeToCollect: Bool {
-        let elapsed = Date().timeIntervalSince(lastIncomeCollection)
-        return elapsed >= 3600 // At least 1 hour has passed
-    }
+    // NOTE: Income collection removed - backend handles automatically
     
     // MARK: - Tax System
     
@@ -342,11 +240,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     }
     
     /// Get income ready to collect (without actually collecting)
-    var pendingIncome: Int {
-        let elapsed = Date().timeIntervalSince(lastIncomeCollection)
-        let hoursElapsed = elapsed / 3600.0
-        return Int(Double(hourlyIncome) * hoursElapsed)
-    }
+    // NOTE: Pending income calculation removed - backend handles automatically
     
     // MARK: - Reward Distribution System
     

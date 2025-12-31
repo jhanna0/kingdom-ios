@@ -84,29 +84,9 @@ struct Property: Identifiable, Codable, Hashable {
         return tier >= 5 ? 0.50 : 0
     }
     
-    // MARK: - Pricing
-    
-    static let baseLandPrice = 500
-    
-    var currentValue: Int {
-        // Value increases with tier
-        let tierMultiplier = Double(tier) * 1.5
-        return Int(Double(Property.baseLandPrice) * tierMultiplier)
-    }
-    
-    var upgradeCost: Int {
-        guard tier < 5 else { return 0 }
-        let nextTier = tier + 1
-        // Each tier upgrade costs exponentially more
-        // T1->T2: 500, T2->T3: 1000, T3->T4: 2000, T4->T5: 4000
-        return Property.baseLandPrice * Int(pow(2.0, Double(nextTier - 2)))
-    }
-    
-    static func purchasePrice(kingdomPopulation: Int) -> Int {
-        // T1 land price scales with kingdom size
-        let populationMultiplier = 1.0 + (Double(kingdomPopulation) / 50.0)
-        return Int(Double(baseLandPrice) * populationMultiplier)
-    }
+    // MARK: - Note on Pricing
+    // All costs are calculated by backend and returned in API responses
+    // See PropertyAPI.getPropertyUpgradeStatus() for upgrade costs
     
     // MARK: - Mutations
     

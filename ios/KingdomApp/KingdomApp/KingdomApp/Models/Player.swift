@@ -349,17 +349,8 @@ class Player: ObservableObject {
     // Training costs are now provided by the backend in player state
     // No local calculation needed!
     
-    /// Get building cost discount (percentage)
-    /// Each level of building skill reduces costs by 2%
-    func getBuildingCostDiscount() -> Double {
-        return Double(buildingSkill - 1) * 0.02  // Level 1 = 0%, Level 10 = 18%
-    }
-    
-    /// Calculate discounted building cost
-    func getDiscountedBuildingCost(_ baseCost: Int) -> Int {
-        let discount = getBuildingCostDiscount()
-        return Int(Double(baseCost) * (1.0 - discount))
-    }
+    // NOTE: Building cost discounts calculated by backend
+    // Backend accounts for building_skill when returning costs
     
     // MARK: - Rewards System (Gold + Reputation ONLY)
     
@@ -408,36 +399,7 @@ class Player: ObservableObject {
         print("🛡️ Defended coup: +200g, +25 rep")
     }
     
-    // MARK: - Purchase XP (Gold Management)
-    
-    /// Buy experience points with gold
-    /// Forces strategic choice: invest in character or save for other things?
-    func purchaseXP(amount: Int) -> Bool {
-        let cost = getXPCost(for: amount)
-        guard spendGold(cost) else { return false }
-        
-        addExperience(amount)
-        print("📚 Purchased \(amount) XP for \(cost)g")
-        return true
-    }
-    
-    /// Get cost to buy XP (1 XP = 10 gold)
-    func getXPCost(for xpAmount: Int) -> Int {
-        return xpAmount * 10  // Simple: 10g per XP
-    }
-    
-    /// Quick purchase options
-    func purchaseSmallXPBoost() -> Bool {
-        return purchaseXP(amount: 10)  // 100g for 10 XP
-    }
-    
-    func purchaseMediumXPBoost() -> Bool {
-        return purchaseXP(amount: 50)  // 500g for 50 XP
-    }
-    
-    func purchaseLargeXPBoost() -> Bool {
-        return purchaseXP(amount: 100)  // 1000g for 100 XP
-    }
+    // NOTE: XP purchase removed (dead content)
     
     // MARK: - Check-in Logic
     
@@ -448,45 +410,9 @@ class Player: ObservableObject {
         return elapsed < (checkInValidHours * 3600)
     }
     
-    /// Check in to a kingdom
-    func checkIn(to kingdom: String, at location: CLLocationCoordinate2D) {
-        currentKingdom = kingdom
-        lastCheckIn = Date()
-        lastCheckInLocation = location
-        
-        // Track check-in history
-        let currentCount = checkInHistory[kingdom] ?? 0
-        checkInHistory[kingdom] = currentCount + 1
-        
-        // Update home kingdom (where they check in most)
-        updateHomeKingdom()
-        
-        // Backend is source of truth - no local caching
-    }
-    
-    /// Update home kingdom based on check-in frequency
-    private func updateHomeKingdom() {
-        if let mostFrequent = checkInHistory.max(by: { $0.value < $1.value }) {
-            homeKingdomId = mostFrequent.key
-        }
-    }
-    
-    /// Get player's "true" kingdom (home)
-    func getTrueKingdom() -> String? {
-        // 1. If they rule a kingdom, that's their kingdom
-        if let ruledKingdom = fiefsRuled.first {
-            return ruledKingdom
-        }
-        
-        // 2. Otherwise, their home kingdom (most check-ins)
-        return homeKingdomId
-    }
-    
-    /// Check if player can check in to a location (within range)
-    func canCheckIn(to location: CLLocationCoordinate2D, from userLocation: CLLocationCoordinate2D) -> Bool {
-        let distance = calculateDistance(from: userLocation, to: location)
-        return distance <= checkInRadiusMeters
-    }
+    // NOTE: Check-in logic handled by backend
+    // Backend validates location, updates check-in history, and determines home kingdom
+    // These local methods are legacy and should use backend data instead
     
     // MARK: - Territory Management
     

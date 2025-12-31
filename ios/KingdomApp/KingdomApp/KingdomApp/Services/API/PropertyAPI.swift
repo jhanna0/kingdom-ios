@@ -93,5 +93,37 @@ class PropertyAPI {
         let response: PropertyResponse = try await client.execute(request)
         return response.toProperty()
     }
+    
+    // MARK: - Get Upgrade Status
+    
+    struct PropertyUpgradeStatus: Codable {
+        let property_id: String
+        let current_tier: Int
+        let max_tier: Int
+        let can_upgrade: Bool
+        let upgrade_cost: Int
+        let actions_required: Int
+        let active_contract: ActiveUpgradeContract?
+        let player_gold: Int
+        let player_building_skill: Int
+    }
+    
+    struct ActiveUpgradeContract: Codable {
+        let contract_id: String
+        let property_id: String
+        let from_tier: Int
+        let to_tier: Int
+        let actions_required: Int
+        let actions_completed: Int
+        let cost: Int
+        let status: String
+        let started_at: String
+    }
+    
+    func getPropertyUpgradeStatus(propertyId: String) async throws -> PropertyUpgradeStatus {
+        let request = client.request(endpoint: "/properties/\(propertyId)/upgrade/status", method: "GET")
+        let response: PropertyUpgradeStatus = try await client.execute(request)
+        return response
+    }
 }
 

@@ -1,26 +1,12 @@
 import Foundation
 import CoreLocation
 
-// MARK: - Check-in & Claiming
+// MARK: - Kingdom Claiming
+// NOTE: Check-in happens AUTOMATICALLY in MapViewModel+Location.swift
+// when user enters a kingdom via loadPlayerState(kingdomId:)
 extension MapViewModel {
     
-    /// Check in to the current kingdom
-    func checkIn() -> Bool {
-        guard let kingdom = currentKingdomInside,
-              let location = userLocation else {
-            print("❌ Cannot check in - not inside a kingdom")
-            return false
-        }
-        
-        player.checkIn(to: kingdom.name, at: location)
-        
-        // Update kingdom's checked-in count
-        if let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) {
-            kingdoms[index].checkedInPlayers += 1
-        }
-        
-        return true
-    }
+    // Check-in methods removed - backend handles automatically
     
     /// Claim the current kingdom - backend validates and returns success/error
     /// Throws error if: not inside kingdom, someone else claimed it first, you already rule a kingdom, etc.
@@ -60,41 +46,6 @@ extension MapViewModel {
                 // Show celebration popup (no rewards from claim endpoint)
                 claimCelebrationKingdom = kingdom.name
                 showClaimCelebration = true
-            }
-        }
-    }
-    
-    /// Check-in with API integration
-    func checkInWithAPI() {
-        guard let kingdom = currentKingdomInside,
-              let location = userLocation else {
-            print("❌ Cannot check in - not inside a kingdom")
-            return
-        }
-        
-        // Do local check-in first
-        let success = checkIn()
-        
-        if success {
-            // Sync to API
-            Task {
-                do {
-                    let response = try await apiService.checkIn(
-                        kingdomId: kingdom.id,
-                        location: location
-                    )
-                    
-                    print("✅ API check-in: \(response.message)")
-                    print("💰 Rewards: \(response.rewards.gold)g, \(response.rewards.experience) XP")
-                    
-                    // Update player with API rewards
-                    player.addGold(response.rewards.gold)
-                    player.addExperience(response.rewards.experience)
-                    
-                } catch {
-                    print("⚠️ API check-in failed: \(error.localizedDescription)")
-                    // Local check-in still succeeded, so this is just a warning
-                }
             }
         }
     }
