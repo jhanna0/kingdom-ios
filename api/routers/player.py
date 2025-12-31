@@ -42,18 +42,15 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         "intelligence": calculate_training_cost(state.intelligence, total_trainings)
     }
     
-    # 🔥 CALCULATE is_ruler and fiefs_ruled DYNAMICALLY from Kingdom table (SOURCE OF TRUTH)
+    # Calculate ruler status dynamically from Kingdom table (SOURCE OF TRUTH)
     ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
     fiefs_ruled = [kingdom.id for kingdom in ruled_kingdoms]
     is_ruler = len(fiefs_ruled) > 0
     kingdoms_ruled_count = len(fiefs_ruled)
     
-    # Update state in database to keep it in sync
-    if state.fiefs_ruled != fiefs_ruled or state.is_ruler != is_ruler or state.kingdoms_ruled != kingdoms_ruled_count:
-        state.fiefs_ruled = fiefs_ruled
-        state.is_ruler = is_ruler
+    # Update kingdoms_ruled count if it's out of sync
+    if state.kingdoms_ruled != kingdoms_ruled_count:
         state.kingdoms_ruled = kingdoms_ruled_count
-        print(f"👑 Synced ruler status for {user.display_name}: is_ruler={is_ruler}, fiefs={fiefs_ruled}")
     
     return PlayerState(
         id=user.id,
@@ -66,7 +63,6 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         origin_kingdom_id=state.origin_kingdom_id,
         home_kingdom_id=state.home_kingdom_id,
         current_kingdom_id=state.current_kingdom_id,
-        fiefs_ruled=fiefs_ruled,
         
         # Core Stats
         gold=state.gold,
@@ -354,9 +350,8 @@ def reset_player_state(
     state.kingdom_reputation = {}
     
     # Reset territory
-    state.fiefs_ruled = []
-    state.is_ruler = False
     state.current_kingdom_id = None
+    state.kingdoms_ruled = 0
     
     # Reset activity
     state.coups_won = 0

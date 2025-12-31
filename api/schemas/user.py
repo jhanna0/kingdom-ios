@@ -29,7 +29,6 @@ class PlayerState(BaseModel):
     origin_kingdom_id: Optional[str] = None
     home_kingdom_id: Optional[str] = None
     current_kingdom_id: Optional[str] = None
-    fiefs_ruled: List[str] = []
     
     # Core Stats
     gold: int = 100

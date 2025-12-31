@@ -81,8 +81,6 @@ def _get_or_create_user_kingdom(db: Session, user_id: int, kingdom_id: str) -> U
         user_kingdom = UserKingdom(
             user_id=user_id,
             kingdom_id=kingdom_id,
-            is_ruler=False,
-            is_subject=False,
             first_visited=datetime.utcnow()
         )
         db.add(user_kingdom)
@@ -206,9 +204,8 @@ def create_kingdom(
     
     # Check if user currently rules any kingdoms
     # Can only claim a free kingdom if you don't currently rule any
-    current_kingdoms = db.query(UserKingdom).filter(
-        UserKingdom.user_id == current_user.id,
-        UserKingdom.is_ruler == True
+    current_kingdoms = db.query(Kingdom).filter(
+        Kingdom.ruler_id == current_user.id
     ).count()
     
     if current_kingdoms > 0:
@@ -233,16 +230,9 @@ def create_kingdom(
             existing.empire_id = existing.id
             existing.original_kingdom_id = existing.id
             
-            # Create user-kingdom relationship
-            user_kingdom = UserKingdom(
-                user_id=current_user.id,
-                kingdom_id=existing.id,
-                is_ruler=True,
-                is_subject=False,
-                became_ruler_at=datetime.utcnow(),
-                times_conquered=1
-            )
-            db.add(user_kingdom)
+            # Get or create user-kingdom relationship (prevents duplicates)
+            user_kingdom = _get_or_create_user_kingdom(db, current_user.id, existing.id)
+            user_kingdom.times_conquered = (user_kingdom.times_conquered or 0) + 1
             
             # Update user stats
             state.kingdoms_ruled += 1
@@ -278,17 +268,9 @@ def create_kingdom(
     db.commit()
     db.refresh(kingdom)
     
-    # Create user-kingdom relationship
-    user_kingdom = UserKingdom(
-        user_id=current_user.id,
-        kingdom_id=kingdom.id,
-        is_ruler=True,
-        is_subject=False,
-        became_ruler_at=datetime.utcnow(),
-        times_conquered=1
-    )
-    
-    db.add(user_kingdom)
+    # Get or create user-kingdom relationship (prevents duplicates)
+    user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom.id)
+    user_kingdom.times_conquered = 1
     
     # Update user stats
     state.kingdoms_ruled += 1
@@ -355,8 +337,11 @@ def check_in(
         base_gold *= 10
         base_xp *= 10
     
+    # Check if user is the ruler
+    is_ruler = (kingdom.ruler_id == current_user.id)
+    
     # Bonus if you're the ruler
-    if user_kingdom.is_ruler:
+    if is_ruler:
         base_gold *= 2
         base_xp *= 2
     
@@ -365,7 +350,7 @@ def check_in(
     xp_reward = base_xp * kingdom.level
     
     # Apply tax (rulers are exempt in their own kingdom)
-    if user_kingdom.is_ruler:
+    if is_ruler:
         # Rulers don't pay tax in their own kingdom
         gold_reward = gold_reward_before_tax
         tax_amount = 0
@@ -455,13 +440,14 @@ def conquer_kingdom(
         )
     
     # Check if user already rules this kingdom
-    user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom_id)
-    
-    if user_kingdom.is_ruler:
+    if kingdom.ruler_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already rule this kingdom"
         )
+    
+    # Get or create user-kingdom relationship for stats tracking
+    user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom_id)
     
     # Verify location
     if not _is_user_in_kingdom(db, latitude, longitude, kingdom):
@@ -500,17 +486,8 @@ def conquer_kingdom(
             old_ruler_state.kingdoms_ruled -= 1
             old_ruler_state.reputation -= 10  # Lose reputation for losing kingdom
         
-        # Update old ruler's user_kingdom record
-        old_user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == old_ruler_id,
-            UserKingdom.kingdom_id == kingdom_id
-        ).first()
-        
-        if old_user_kingdom:
-            old_user_kingdom.is_ruler = False
-            old_user_kingdom.is_subject = True  # Becomes a subject
-            old_user_kingdom.lost_rulership_at = datetime.utcnow()
-            old_user_kingdom.times_lost += 1
+        # Note: No need to update old ruler's user_kingdom record
+        # Kingdom.ruler_id being updated is sufficient
     
     # Set new ruler
     kingdom.ruler_id = current_user.id
@@ -523,10 +500,7 @@ def conquer_kingdom(
     state.reputation += 20
     state.experience += 100 * kingdom.level
     
-    # Update user-kingdom relationship
-    user_kingdom.is_ruler = True
-    user_kingdom.is_subject = False
-    user_kingdom.became_ruler_at = datetime.utcnow()
+    # Update user-kingdom stats
     user_kingdom.times_conquered += 1
     
     db.commit()
@@ -556,26 +530,34 @@ def get_my_kingdoms(
     db: Session = Depends(get_db)
 ):
     """Get all kingdoms where current user is the ruler"""
+    from db.models import KingdomHistory
     
-    user_kingdoms = db.query(UserKingdom).filter(
-        UserKingdom.user_id == current_user.id,
-        UserKingdom.is_ruler == True
+    # Query kingdoms directly by ruler_id (source of truth)
+    ruled_kingdoms = db.query(Kingdom).filter(
+        Kingdom.ruler_id == current_user.id
     ).all()
     
     kingdoms = []
-    for uk in user_kingdoms:
-        kingdom = db.query(Kingdom).filter(Kingdom.id == uk.kingdom_id).first()
-        if kingdom:
-            kingdoms.append({
-                "id": kingdom.id,
-                "name": kingdom.name,
-                "level": kingdom.level,
-                "population": kingdom.population,
-                "treasury_gold": kingdom.treasury_gold,
-                "checkins_count": uk.checkins_count,
-                "became_ruler_at": uk.became_ruler_at,
-                "local_reputation": uk.local_reputation
-            })
+    for kingdom in ruled_kingdoms:
+        # Get user-kingdom stats if they exist
+        uk = db.query(UserKingdom).filter(
+            UserKingdom.user_id == current_user.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
+        
+        # Get current reign start time from kingdom_history
+        history = db.query(KingdomHistory).filter(
+            KingdomHistory.kingdom_id == kingdom.id,
+            KingdomHistory.ruler_id == current_user.id,
+            KingdomHistory.ended_at == None  # Current reign
+        ).first()
+        
+        kingdoms.append({
+            "id": kingdom.id,
+            "name": kingdom.name,
+            "treasury_gold": kingdom.treasury_gold,
+            "checked_in_players": kingdom.checked_in_players
+        })
     
     return kingdoms
 

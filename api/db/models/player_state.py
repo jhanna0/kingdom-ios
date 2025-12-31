@@ -24,7 +24,6 @@ class PlayerState(Base):
     origin_kingdom_id = Column(String, nullable=True)  # First kingdom where they got 300+ rep
     home_kingdom_id = Column(String, nullable=True)    # Kingdom they check in most
     current_kingdom_id = Column(String, nullable=True) # Current kingdom they're in
-    fiefs_ruled = Column(JSONB, default=list)  # List of kingdom IDs they rule
     
     # Core Stats
     gold = Column(Integer, default=100)
@@ -118,7 +117,6 @@ class PlayerState(Base):
     
     # Status
     is_alive = Column(Boolean, default=True)
-    is_ruler = Column(Boolean, default=False)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

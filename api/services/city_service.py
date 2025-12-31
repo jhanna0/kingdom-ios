@@ -67,9 +67,8 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     # Check if user can claim (doesn't rule any kingdoms)
     user_can_claim = False
     if current_user:
-        ruling_count = db.query(UserKingdom).filter(
-            UserKingdom.user_id == current_user.id,
-            UserKingdom.is_ruler == True
+        ruling_count = db.query(Kingdom).filter(
+            Kingdom.ruler_id == current_user.id
         ).count()
         user_can_claim = (ruling_count == 0)
     

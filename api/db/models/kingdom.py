@@ -1,7 +1,7 @@
 """
 Kingdom model - City/territory game state
 """
-from sqlalchemy import Column, String, Float, Text, DateTime, Integer, BigInteger, Boolean, ForeignKey
+from sqlalchemy import Column, String, Float, Text, DateTime, Integer, BigInteger, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -93,13 +93,8 @@ class UserKingdom(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=False, index=True)
     
-    # Relationship type
-    is_ruler = Column(Boolean, default=False)  # Currently ruling this kingdom
-    is_subject = Column(Boolean, default=False)  # Living in this kingdom under another ruler
-    
     # History tracking
     times_conquered = Column(Integer, default=0)
-    times_lost = Column(Integer, default=0)
     total_reign_duration_hours = Column(Float, default=0.0)
     
     # Reputation with this specific kingdom
@@ -113,13 +108,16 @@ class UserKingdom(Base):
     
     # Timestamps
     first_visited = Column(DateTime, default=datetime.utcnow)
-    became_ruler_at = Column(DateTime, nullable=True)
-    lost_rulership_at = Column(DateTime, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="kingdoms")
     kingdom = relationship("Kingdom", back_populates="user_kingdoms")
     
+    # Unique constraint: One UserKingdom record per user-kingdom pair
+    __table_args__ = (
+        UniqueConstraint('user_id', 'kingdom_id', name='unique_user_kingdom'),
+    )
+    
     def __repr__(self):
-        return f"<UserKingdom(user_id='{self.user_id}', kingdom_id='{self.kingdom_id}', is_ruler={self.is_ruler})>"
+        return f"<UserKingdom(user_id='{self.user_id}', kingdom_id='{self.kingdom_id}')>"
 

@@ -155,13 +155,6 @@ def _apply_coup_victory_rewards(
             
             # Old ruler loses rulership
             old_ruler_state.kingdoms_ruled = max(0, old_ruler_state.kingdoms_ruled - 1)
-            old_ruler_state.is_ruler = False
-            
-            # Remove from fiefs
-            if old_ruler_state.fiefs_ruled and kingdom.id in old_ruler_state.fiefs_ruled:
-                fiefs = old_ruler_state.fiefs_ruled.copy()
-                fiefs.remove(kingdom.id)
-                old_ruler_state.fiefs_ruled = fiefs
     
     # Initiator becomes ruler
     kingdom.ruler_id = initiator.id
@@ -172,13 +165,6 @@ def _apply_coup_victory_rewards(
     initiator_state.reputation += 50
     initiator_state.kingdoms_ruled += 1
     initiator_state.coups_won += 1
-    initiator_state.is_ruler = True
-    
-    # Add to fiefs
-    fiefs = initiator_state.fiefs_ruled.copy() if initiator_state.fiefs_ruled else []
-    if kingdom.id not in fiefs:
-        fiefs.append(kingdom.id)
-    initiator_state.fiefs_ruled = fiefs
     
     # Update kingdom reputation
     kingdom_rep = initiator_state.kingdom_reputation.copy() if initiator_state.kingdom_reputation else {}

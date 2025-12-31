@@ -56,8 +56,10 @@ extension MapViewModel {
                 }
                 
                 await MainActor.run {
-                    // Add neighbors to kingdoms list
-                    kingdoms.append(contentsOf: neighborKingdoms)
+                    // Add neighbors to kingdoms list, avoiding duplicates
+                    let existingIds = Set(kingdoms.map { $0.id })
+                    let newKingdoms = neighborKingdoms.filter { !existingIds.contains($0.id) }
+                    kingdoms.append(contentsOf: newKingdoms)
                     syncPlayerKingdoms()
                     
                     let withBoundary = kingdoms.filter { $0.hasBoundaryCached }.count

@@ -100,28 +100,17 @@ struct MapHUD: View {
                     
                     Spacer()
                     
-                    // My Kingdoms (icon only, always show if player has kingdoms)
-                    if viewModel.player.isRuler || !viewModel.player.fiefsRuled.isEmpty {
+                    // My Kingdoms (icon only, show if player is a ruler)
+                    if viewModel.player.isRuler {
                         Button(action: {
                             showMyKingdoms = true
                         }) {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.white)
-                                    .frame(width: 32, height: 32)
-                                    .background(KingdomTheme.Colors.buttonPrimary)
-                                    .cornerRadius(6)
-                                
-                                if viewModel.player.fiefsRuled.count > 0 {
-                                    Text("\(viewModel.player.fiefsRuled.count)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(3)
-                                        .background(Circle().fill(Color.red))
-                                        .offset(x: 4, y: -4)
-                                }
-                            }
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(KingdomTheme.Colors.buttonPrimary)
+                                .cornerRadius(6)
                         }
                     }
                     

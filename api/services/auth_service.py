@@ -182,37 +182,39 @@ def user_to_private_response(user: User) -> dict:
 
 def get_user_kingdoms(db: Session, user_id: int) -> dict:
     """Get all kingdoms associated with a user"""
+    from db.models import Kingdom
     
+    # Get all user-kingdom records (visit history and stats)
     user_kingdoms = db.query(UserKingdom).filter(UserKingdom.user_id == user_id).all()
     
+    # Get kingdoms where user is the ruler (source of truth)
+    ruled_kingdom_ids = {
+        k.id for k in db.query(Kingdom).filter(Kingdom.ruler_id == user_id).all()
+    }
+    
     ruled = []
-    subject = []
     visited = []
     
     for uk in user_kingdoms:
+        is_ruler = uk.kingdom_id in ruled_kingdom_ids
+        
         kingdom_info = {
             "kingdom_id": uk.kingdom_id,
             "kingdom_name": uk.kingdom.name if uk.kingdom else "Unknown",
-            "is_ruler": uk.is_ruler,
-            "is_subject": uk.is_subject,
             "times_conquered": uk.times_conquered,
             "local_reputation": uk.local_reputation,
             "checkins_count": uk.checkins_count,
             "last_checkin": uk.last_checkin,
             "first_visited": uk.first_visited,
-            "became_ruler_at": uk.became_ruler_at,
         }
         
-        if uk.is_ruler:
+        if is_ruler:
             ruled.append(kingdom_info)
-        elif uk.is_subject:
-            subject.append(kingdom_info)
         else:
             visited.append(kingdom_info)
     
     return {
         "ruled_kingdoms": ruled,
-        "subject_kingdoms": subject,
         "visited_kingdoms": visited,
     }
 

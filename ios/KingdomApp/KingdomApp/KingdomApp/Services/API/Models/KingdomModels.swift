@@ -151,14 +151,10 @@ struct ConquestRewards: Codable {
 
 // MARK: - My Kingdoms Response
 
-struct MyKingdomResponse: Codable {
+struct MyKingdomResponse: Codable, Identifiable {
     let id: String
     let name: String
-    let level: Int
-    let population: Int
     let treasury_gold: Int
-    let checkins_count: Int
-    let became_ruler_at: String?
-    let local_reputation: Int
+    let checked_in_players: Int
 }
 
