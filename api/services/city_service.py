@@ -56,6 +56,7 @@ def _is_point_in_polygon(lat: float, lon: float, polygon: List[List[float]]) -> 
 def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dict[str, KingdomData]:
     """Get or create kingdom data for cities. Returns dict of osm_id -> KingdomData"""
     from db.models import UserKingdom
+    from db.models import PlayerState
     
     if not osm_ids:
         return {}
@@ -64,13 +65,20 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
     existing_ids = {k.id for k in kingdoms}
     
-    # Check if user can claim (doesn't rule any kingdoms)
+    # Get user's current location (which kingdom they're in)
+    user_current_kingdom_id = None
     user_can_claim = False
     if current_user:
+        # Check if user currently rules any kingdoms
         ruling_count = db.query(Kingdom).filter(
             Kingdom.ruler_id == current_user.id
         ).count()
         user_can_claim = (ruling_count == 0)
+        
+        # Get user's current kingdom location
+        player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
+        if player_state:
+            user_current_kingdom_id = player_state.current_kingdom_id
     
     # Batch fetch ruler names
     ruler_ids = [k.ruler_id for k in kingdoms if k.ruler_id]
@@ -83,7 +91,12 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     result = {}
     for kingdom in kingdoms:
         ruler_name = rulers.get(kingdom.ruler_id) if kingdom.ruler_id else None
-        can_claim = (kingdom.ruler_id is None) and user_can_claim
+        # Can claim ONLY if: kingdom is unclaimed, user doesn't rule any kingdoms, AND user is INSIDE this kingdom
+        can_claim = (
+            kingdom.ruler_id is None and 
+            user_can_claim and 
+            user_current_kingdom_id == kingdom.id
+        )
         
         result[kingdom.id] = KingdomData(
             id=kingdom.id,

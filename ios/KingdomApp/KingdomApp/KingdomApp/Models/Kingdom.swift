@@ -108,18 +108,23 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.canClaim = canClaim
         self.isCurrentCity = false  // Set by CityAPI after fetch
         self.hasBoundaryCached = true  // Assume true, CityAPI sets false if needed
-        self.treasuryGold = Int.random(in: 100...500)
-        self.wallLevel = Int.random(in: 0...3)
-        self.vaultLevel = Int.random(in: 0...2)
-        self.checkedInPlayers = Int.random(in: 0...5)
-        self.mineLevel = Int.random(in: 0...2)
-        self.marketLevel = Int.random(in: 0...2)
-        self.farmLevel = 0  // Start at 0
-        self.educationLevel = 0  // Start at 0
-        self.taxRate = Int.random(in: 5...20)  // Random starting tax rate
-        self.travelFee = 10  // Default travel fee
-        self.lastIncomeCollection = Date().addingTimeInterval(-86400) // Start 1 day ago
-        self.weeklyUniqueCheckIns = Int.random(in: 0...10)
+        
+        // BACKEND ONLY - These will be set from API data immediately after init
+        // Setting defaults here to satisfy Swift's requirement for initialization
+        self.treasuryGold = 0
+        self.wallLevel = 0
+        self.vaultLevel = 0
+        self.checkedInPlayers = 0
+        self.mineLevel = 0
+        self.marketLevel = 0
+        self.farmLevel = 0
+        self.educationLevel = 0
+        self.taxRate = 10
+        self.travelFee = 10
+        
+        // Local-only defaults (not game-critical)
+        self.lastIncomeCollection = Date().addingTimeInterval(-86400)
+        self.weeklyUniqueCheckIns = 0
         self.totalIncomeCollected = 0
         self.incomeHistory = []
         self.activeContract = nil

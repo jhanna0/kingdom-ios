@@ -196,11 +196,20 @@ def create_kingdom(
     User automatically becomes the ruler of the new kingdom
     Coordinates are stored in the CityBoundary, not duplicated here
     
-    RESTRICTION: Users can only claim a city for free if they don't currently rule any kingdoms.
+    RESTRICTIONS: 
+    - Users can only claim a city for free if they don't currently rule any kingdoms.
+    - Users must be INSIDE the kingdom to claim it.
     This prevents empire spam. Military conquest is required to expand once you rule a kingdom.
     """
     # Get player state
     state = _get_or_create_player_state(db, current_user)
+    
+    # Check if user is currently inside this kingdom
+    if state.current_kingdom_id != city_boundary_osm_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must be inside the kingdom to claim it. Travel there first."
+        )
     
     # Check if user currently rules any kingdoms
     # Can only claim a free kingdom if you don't currently rule any

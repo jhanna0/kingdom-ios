@@ -41,7 +41,7 @@ extension MapViewModel {
                     
                     // UI IS NOW READY - user can interact
                     isLoading = false
-                    loadingStatus = "Loading nearby kingdoms..."
+                    loadingStatus = "Loading nearby kingdoms...\n(New areas take longer to map the first time)"
                 }
                 
                 // STEP 2: Load neighbors in background (can be slower)
@@ -272,59 +272,107 @@ extension MapViewModel {
     
     /// Lazy-load all missing boundaries in background (PARALLEL)
     /// Call this after initial load to fill in neighbor polygons
+    /// Retries up to 5 times for new areas that take time to map
     func loadMissingBoundaries() async {
         let missing = kingdoms.filter { !$0.hasBoundaryCached }
-        let missingIds = missing.map { $0.id }
+        var missingIds = missing.map { $0.id }
         
         if missingIds.isEmpty {
             print("✅ All boundaries already loaded")
             return
         }
         
+        // Update loading status for new areas
+        await MainActor.run {
+            loadingStatus = "Mapping new areas... (this may take a moment)"
+        }
+        
         print("🌐 Batch loading \(missingIds.count) missing boundaries in parallel...")
         
-        do {
-            // Fetch all boundaries in parallel with one request
-            let boundaryResponses = try await apiService.city.fetchBoundariesBatch(osmIds: missingIds)
+        let maxRetries = 5
+        var attempt = 0
+        
+        // Retry loop - keep trying until all boundaries are loaded or max retries reached
+        while !missingIds.isEmpty && attempt < maxRetries {
+            attempt += 1
+            print("📍 Attempt \(attempt)/\(maxRetries) - \(missingIds.count) boundaries remaining")
             
             await MainActor.run {
-                // Update each kingdom with its boundary
-                for boundaryResponse in boundaryResponses {
-                    guard let index = kingdoms.firstIndex(where: { $0.id == boundaryResponse.osm_id }) else {
-                        continue
+                if attempt > 1 {
+                    loadingStatus = "Mapping new areas... (attempt \(attempt)/\(maxRetries))"
+                }
+            }
+            
+            do {
+                // Fetch all remaining boundaries in parallel with one request
+                let boundaryResponses = try await apiService.city.fetchBoundariesBatch(osmIds: missingIds)
+                
+                var successfullyLoaded: [String] = []
+                
+                await MainActor.run {
+                    // Update each kingdom with its boundary
+                    for boundaryResponse in boundaryResponses {
+                        guard let index = kingdoms.firstIndex(where: { $0.id == boundaryResponse.osm_id }) else {
+                            continue
+                        }
+                        
+                        // Skip if no boundary returned (failed fetch)
+                        if boundaryResponse.boundary.isEmpty {
+                            print("⚠️ No boundary for \(kingdoms[index].name)")
+                            continue
+                        }
+                        
+                        // Convert to CLLocationCoordinate2D array
+                        let boundary = boundaryResponse.boundary.map { coord in
+                            CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
+                        }
+                        
+                        // Update the kingdom
+                        kingdoms[index].updateBoundary(boundary, radiusMeters: boundaryResponse.radius_meters)
+                        
+                        print("✅ Loaded boundary for \(kingdoms[index].name) (\(boundary.count) points)")
+                        successfullyLoaded.append(boundaryResponse.osm_id)
+                        
+                        // Update currentKingdomInside if it's the same kingdom
+                        if currentKingdomInside?.id == kingdoms[index].id {
+                            currentKingdomInside = kingdoms[index]
+                        }
                     }
                     
-                    // Skip if no boundary returned (failed fetch)
-                    if boundaryResponse.boundary.isEmpty {
-                        print("⚠️ No boundary for \(kingdoms[index].name)")
-                        continue
-                    }
-                    
-                    // Convert to CLLocationCoordinate2D array
-                    let boundary = boundaryResponse.boundary.map { coord in
-                        CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
-                    }
-                    
-                    // Update the kingdom
-                    kingdoms[index].updateBoundary(boundary, radiusMeters: boundaryResponse.radius_meters)
-                    
-                    print("✅ Loaded boundary for \(kingdoms[index].name) (\(boundary.count) points)")
-                    
-                    // Update currentKingdomInside if it's the same kingdom
-                    if currentKingdomInside?.id == kingdoms[index].id {
-                        currentKingdomInside = kingdoms[index]
-                    }
+                    let loaded = boundaryResponses.filter { !$0.boundary.isEmpty }.count
+                    print("✅ Batch attempt \(attempt): \(loaded)/\(missingIds.count) boundaries loaded")
                 }
                 
-                let loaded = boundaryResponses.filter { !$0.boundary.isEmpty }.count
-                print("✅ Finished batch loading: \(loaded)/\(missingIds.count) boundaries")
+                // Remove successfully loaded IDs from missing list
+                missingIds = missingIds.filter { !successfullyLoaded.contains($0) }
+                
+                // If we still have missing boundaries, wait a bit before retrying
+                if !missingIds.isEmpty && attempt < maxRetries {
+                    print("⏳ Waiting 2 seconds before retry...")
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                }
+                
+            } catch {
+                print("❌ Batch attempt \(attempt) failed: \(error)")
+                
+                // Wait before retrying on error
+                if attempt < maxRetries {
+                    print("⏳ Waiting 3 seconds before retry...")
+                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                }
             }
-        } catch {
-            print("❌ Failed to batch load boundaries: \(error)")
-            // Fall back to individual loading if batch fails
-            print("⚠️ Falling back to individual boundary loading...")
-            for osmId in missingIds {
-                await loadKingdomBoundary(kingdomId: osmId)
+        }
+        
+        await MainActor.run {
+            loadingStatus = ""
+            
+            // Check if we successfully loaded everything
+            if missingIds.isEmpty {
+                print("🎉 All boundaries successfully loaded after \(attempt) attempt(s)")
+            } else {
+                // Only show error if we failed after all retries
+                print("⚠️ Failed to load \(missingIds.count) boundaries after \(maxRetries) attempts")
+                errorMessage = "Failed to map some areas after \(maxRetries) attempts. The royal cartographers need more time."
             }
         }
     }
