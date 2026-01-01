@@ -157,3 +157,5 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
     
     return notifications
 
+
+

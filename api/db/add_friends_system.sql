@@ -43,3 +43,5 @@ CREATE TRIGGER trigger_update_friends_updated_at
 
 COMMIT;
 
+
+

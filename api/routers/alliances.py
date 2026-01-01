@@ -487,3 +487,5 @@ def get_alliance(
     
     return _alliance_to_response(alliance)
 
+
+

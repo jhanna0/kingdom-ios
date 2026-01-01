@@ -17,3 +17,5 @@ CREATE INDEX IF NOT EXISTS idx_player_state_intelligence ON player_state(intelli
 COMMENT ON COLUMN kingdoms.education_level IS 'Education building level (0-5). Reduces training actions required for citizens.';
 COMMENT ON COLUMN player_state.intelligence IS 'Intelligence skill level (1+). Improves sabotage success and patrol detection rates.';
 
+
+

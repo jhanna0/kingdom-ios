@@ -263,3 +263,5 @@ rm /Users/jad/Desktop/kingdom/API_SETUP.md
 The API is just a simple FastAPI server with in-memory storage. Check `/api/main.py` to see how it works or modify it for your needs.
 
 
+
+

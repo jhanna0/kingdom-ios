@@ -10,3 +10,5 @@ ALTER TABLE player_state DROP COLUMN IF EXISTS active_contract_id;
 -- Note: action_contributions column remains - this tracks who contributed what
 -- This is the only tracking we need for proportional reward distribution
 
+
+

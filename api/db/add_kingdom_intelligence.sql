@@ -46,3 +46,5 @@ COMMENT ON TABLE kingdom_intelligence IS 'Stores scouted military intelligence o
 COMMENT ON COLUMN kingdom_intelligence.expires_at IS 'Intelligence becomes stale after 7 days';
 COMMENT ON COLUMN kingdom_intelligence.intelligence_level IS 'Higher levels reveal more detailed information';
 
+
+

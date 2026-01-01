@@ -106,3 +106,5 @@ class Alliance(Base):
     def __repr__(self):
         return f"<Alliance(id={self.id}, {self.initiator_empire_id} <-> {self.target_empire_id}, status='{self.status}')>"
 
+
+

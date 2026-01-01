@@ -92,3 +92,5 @@ class ActivePlayersResponse(BaseModel):
     total: int
     players: list[PlayerInKingdom]
 
+
+

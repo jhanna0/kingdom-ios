@@ -363,3 +363,5 @@ The Education Building and Intelligence Skill systems add strategic depth to Kin
 
 These systems integrate seamlessly with existing game mechanics while opening new gameplay possibilities for both rulers and subjects.
 
+
+

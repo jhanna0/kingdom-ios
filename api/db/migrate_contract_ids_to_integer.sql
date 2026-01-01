@@ -49,3 +49,5 @@ CREATE INDEX idx_contracts_kingdom_id ON contracts(kingdom_id);
 CREATE INDEX idx_contracts_created_by ON contracts(created_by);
 CREATE INDEX idx_contracts_status ON contracts(status);
 
+
+

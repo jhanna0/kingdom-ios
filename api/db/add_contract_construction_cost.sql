@@ -11,3 +11,5 @@ SET construction_cost = CAST(
 )
 WHERE construction_cost = 0;
 
+
+

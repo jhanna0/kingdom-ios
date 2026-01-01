@@ -42,3 +42,5 @@ COMMENT ON COLUMN alliances.status IS 'pending=awaiting response, active=in effe
 COMMENT ON COLUMN alliances.proposal_expires_at IS 'Pending proposals expire after 7 days';
 COMMENT ON COLUMN alliances.expires_at IS 'Active alliances expire after 30 days';
 
+
+

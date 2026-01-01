@@ -74,3 +74,5 @@ class PendingAlliancesResponse(BaseModel):
     sent_count: int
     received_count: int
 
+
+

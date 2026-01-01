@@ -32,3 +32,5 @@ COMMENT ON COLUMN player_state.last_sabotage_action IS 'Last time player attempt
 COMMENT ON COLUMN player_state.last_scout_action IS 'Last time player scouted enemy kingdom';
 COMMENT ON COLUMN player_state.patrol_expires_at IS 'When current patrol duty ends (10 min duration)';
 
+
+

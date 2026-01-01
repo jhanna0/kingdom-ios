@@ -97,3 +97,5 @@ class CoupEvent(Base):
             defenders.append(player_id)
             self.defenders = defenders
 
+
+

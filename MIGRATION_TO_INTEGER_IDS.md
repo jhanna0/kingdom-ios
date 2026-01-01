@@ -125,3 +125,5 @@ If needed, revert to UUID strings:
 - `ios/.../Services/API/Models/KingdomModels.swift`
 - `ios/.../ViewModels/MapViewModel.swift`
 
+
+

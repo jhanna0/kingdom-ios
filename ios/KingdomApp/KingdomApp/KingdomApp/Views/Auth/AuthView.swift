@@ -41,6 +41,26 @@ struct AuthView: View {
                 .cornerRadius(10)
                 .padding(.horizontal, 40)
                 
+                // Developer Sign In
+                Button(action: {
+                    Task {
+                        await authManager.signInWithApple(
+                            userID: "appletest",
+                            email: "appletest@example.com",
+                            name: "Apple Reviewer"
+                        )
+                    }
+                }) {
+                    Text("Developer Sign In")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.blue.opacity(0.8))
+                        .cornerRadius(10)
+                }
+                .padding(.horizontal, 40)
+                
                 if let error = authManager.errorMessage {
                     Text(error)
                         .foregroundColor(.red)

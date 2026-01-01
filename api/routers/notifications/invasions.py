@@ -184,3 +184,5 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
     
     return notifications
 
+
+

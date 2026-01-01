@@ -15,3 +15,5 @@ ON properties(owner_id, kingdom_id);
 
 COMMIT;
 
+
+

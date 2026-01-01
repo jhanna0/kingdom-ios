@@ -10,3 +10,5 @@ UPDATE kingdoms
 SET travel_fee = 10 
 WHERE travel_fee IS NULL;
 
+
+

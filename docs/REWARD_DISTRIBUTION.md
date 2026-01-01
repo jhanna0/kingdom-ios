@@ -44,3 +44,5 @@ Carol: 100 rep + 10 skill = 105 merit → 22g
 - Low distribution = faster treasury growth
 
 
+
+

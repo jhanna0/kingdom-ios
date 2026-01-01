@@ -4,3 +4,5 @@
 ALTER TABLE player_state 
 ADD COLUMN IF NOT EXISTS property_upgrade_contracts JSONB DEFAULT '[]'::jsonb;
 
+
+

@@ -153,3 +153,5 @@ struct EquipmentStatsCard: View {
     .background(KingdomTheme.Colors.parchment)
 }
 
+
+

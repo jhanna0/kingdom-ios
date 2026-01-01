@@ -100,3 +100,5 @@ class InvasionEvent(Base):
     def __repr__(self):
         return f"<InvasionEvent(id={self.id}, {self.attacking_from_kingdom_id} -> {self.target_kingdom_id}, status='{self.status}')>"
 
+
+

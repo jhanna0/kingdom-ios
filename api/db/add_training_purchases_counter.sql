@@ -19,3 +19,5 @@ WHERE total_training_purchases = 0;
 CREATE INDEX IF NOT EXISTS idx_player_state_training_purchases 
 ON player_state(total_training_purchases);
 
+
+

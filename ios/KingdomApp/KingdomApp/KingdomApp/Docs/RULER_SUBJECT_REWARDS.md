@@ -63,3 +63,5 @@ Share = (playerMerit / totalMerit) × rewardPool
 - Fair taxation = loyalty, exploitation = rebellion risk
 
 
+
+

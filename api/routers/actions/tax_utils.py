@@ -97,3 +97,5 @@ def apply_kingdom_tax_with_bonus(
     
     return (net_income, tax_amount, tax_rate, gross_income)
 
+
+

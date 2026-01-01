@@ -53,3 +53,5 @@ Index('idx_activity_user_created', PlayerActivityLog.user_id, PlayerActivityLog.
 Index('idx_activity_kingdom_created', PlayerActivityLog.kingdom_id, PlayerActivityLog.created_at.desc())
 Index('idx_activity_type_created', PlayerActivityLog.action_type, PlayerActivityLog.created_at.desc())
 
+
+

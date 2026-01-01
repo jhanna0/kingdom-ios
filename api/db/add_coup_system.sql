@@ -57,3 +57,5 @@ COMMENT ON COLUMN coup_events.status IS 'Current status: voting (active) or reso
 COMMENT ON COLUMN coup_events.attackers IS 'Array of player IDs who joined the coup attackers';
 COMMENT ON COLUMN coup_events.defenders IS 'Array of player IDs who joined the defenders';
 
+
+

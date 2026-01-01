@@ -4,3 +4,5 @@
 ALTER TABLE properties 
 ADD COLUMN IF NOT EXISTS location VARCHAR(10);
 
+
+

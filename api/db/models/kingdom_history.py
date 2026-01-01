@@ -49,3 +49,5 @@ class KingdomHistory(Base):
     def __repr__(self):
         return f"<KingdomHistory({self.ruler_name} ruled {self.kingdom_id} via {self.event_type})>"
 
+
+

@@ -17,3 +17,5 @@ UPDATE player_state
 SET has_claimed_starting_city = TRUE
 WHERE kingdoms_ruled > 0;
 
+
+

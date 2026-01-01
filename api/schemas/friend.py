@@ -65,3 +65,5 @@ class FriendActivityUpdate(BaseModel):
     activity: Optional[dict] = None
     current_kingdom_name: Optional[str] = None
 
+
+

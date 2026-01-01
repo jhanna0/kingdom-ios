@@ -210,3 +210,5 @@ psql -U your_username -d kingdom_db -f db/add_alliance_system.sql
    - Alliance expires naturally
    - Can propose a new alliance if desired
 
+
+
