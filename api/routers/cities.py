@@ -50,12 +50,11 @@ async def get_current_city(
 async def get_neighbor_cities(
     lat: float,
     lon: float,
-    radius: float = 30.0,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
-    Get neighbor cities (call AFTER /cities/current).
+    Get cities that DIRECTLY border the current city (shared boundaries only).
     
     Returns IMMEDIATELY with center points.
     Boundaries included if cached, empty array if not.
@@ -64,11 +63,11 @@ async def get_neighbor_cities(
     to fetch them all in parallel (2-3 seconds vs 15+ seconds serial).
     
     Returns:
-    - List of neighboring cities with center points
+    - List of neighboring cities (admin_level=8 only)
     - Full kingdom data for each
     - Boundaries included if cached, empty array otherwise
     """
-    return await city_service.get_neighbor_cities(db, lat, lon, radius, current_user)
+    return await city_service.get_neighbor_cities(db, lat, lon, current_user)
 
 
 @router.get("/stats", response_model=dict)

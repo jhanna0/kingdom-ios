@@ -19,10 +19,10 @@ class CityAPI {
     }
     
     /// Step 2: Get neighbor cities (call AFTER UI is showing current city)
-    /// This can be slower since UI is already ready
-    func fetchNeighbors(lat: Double, lon: Double, radiusKm: Double = 30.0) async throws -> [CityBoundaryResponse] {
+    /// Returns cities that DIRECTLY border the current city (shared boundaries)
+    func fetchNeighbors(lat: Double, lon: Double) async throws -> [CityBoundaryResponse] {
         let request = client.request(
-            endpoint: "/cities/neighbors?lat=\(lat)&lon=\(lon)&radius=\(radiusKm)"
+            endpoint: "/cities/neighbors?lat=\(lat)&lon=\(lon)"
         )
         let cities: [CityBoundaryResponse] = try await client.execute(request)
         print("✅ Loaded \(cities.count) neighbors")

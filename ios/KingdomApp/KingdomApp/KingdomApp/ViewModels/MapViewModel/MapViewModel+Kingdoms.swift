@@ -47,8 +47,7 @@ extension MapViewModel {
                 // STEP 2: Load neighbors in background (can be slower)
                 let neighbors = try await apiService.city.fetchNeighbors(
                     lat: location.latitude,
-                    lon: location.longitude,
-                    radiusKm: loadRadiusMiles * 1.60934
+                    lon: location.longitude
                 )
                 
                 let neighborKingdoms = neighbors.enumerated().compactMap { index, city in

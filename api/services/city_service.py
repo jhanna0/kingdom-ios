@@ -286,20 +286,17 @@ async def get_neighbor_cities(
     db: Session,
     lat: float,
     lon: float,
-    radius: float = 30.0,
     current_user = None
 ) -> List[CityBoundaryResponse]:
     """
-    Get ALL neighbors (cities that TOUCH current city).
-    
-    Returns IMMEDIATELY with center points only.
-    Frontend should call /cities/boundaries/batch to fetch boundaries in parallel.
+    Get cities that DIRECTLY TOUCH the current city (shared borders only).
+    admin_level=8 ONLY (cities, not counties).
     """
-    print(f"🏘️ Loading neighbors near ({lat:.4f}, {lon:.4f})")
+    print(f"🏘️ Loading neighbors for ({lat:.4f}, {lon:.4f})")
     
-    # Step 1: Find the current city to check for cached neighbors
+    # Step 1: Find the current city
     current_city = None
-    lat_delta = 0.5  # ~55km
+    lat_delta = 0.5
     lon_delta = 0.5 / max(0.1, math.cos(math.radians(lat)))
     
     cached_cities = db.query(CityBoundary).filter(
@@ -307,26 +304,23 @@ async def get_neighbor_cities(
         CityBoundary.center_lon.between(lon - lon_delta, lon + lon_delta)
     ).all()
     
-    # Find which cached city the user is inside
     for city in cached_cities:
         boundary = city.boundary_geojson.get("coordinates", [])
         if boundary and _is_point_in_polygon(lat, lon, boundary):
             current_city = city
             break
     
-    # Step 2: Check if we have cached neighbors for this city
+    # Step 2: Check cached neighbors
     neighbor_ids = []
     if current_city and current_city.neighbor_ids is not None:
-        # Cities don't move - use cached neighbors permanently
-        print(f"   💾 Using cached neighbor list for {current_city.name}")
-        # Build neighbor_ids list from cache in the format expected by the rest of the code
+        print(f"   💾 Cached neighbors for {current_city.name}")
         osm_ids = current_city.neighbor_ids
         neighbor_ids = [{"osm_id": osm_id, "name": f"City-{osm_id}"} for osm_id in osm_ids]
     
-    # Step 3: If no cache, call OSM to get neighbor IDs (one-time only)
+    # Step 3: Fetch from OSM if not cached
     if not neighbor_ids:
-        print(f"   🌐 Fetching neighbor list from OSM...")
-        neighbor_ids = await fetch_nearby_city_ids(lat, lon, radius)
+        print(f"   🌐 Fetching neighbors from OSM...")
+        neighbor_ids = await fetch_nearby_city_ids(lat, lon)
         
         if not neighbor_ids:
             print(f"   ⚠️ No neighbors found")
@@ -409,12 +403,12 @@ async def get_cities_near_location(
     db: Session,
     lat: float,
     lon: float,
-    radius: float = 30.0,
+    radius: float = 30.0,  # Ignored - kept for backward compat with legacy endpoint
     current_user = None
 ) -> List[CityBoundaryResponse]:
     """Legacy endpoint - returns current city + neighbors together"""
     current = await get_current_city(db, lat, lon, current_user)
-    neighbors = await get_neighbor_cities(db, lat, lon, radius, current_user)
+    neighbors = await get_neighbor_cities(db, lat, lon, current_user)
     
     result = []
     if current:

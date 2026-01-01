@@ -8,6 +8,16 @@ class LocationManager: NSObject, ObservableObject {
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var currentLocation: CLLocationCoordinate2D?
     
+    // MARK: - Debug/Testing Features
+    /// Set to true to use fake location instead of real GPS
+    static var useFakeLocation = false
+    
+    /// Fake location for testing (Boston, MA)
+    static var fakeLocation = CLLocationCoordinate2D(
+        latitude: 42.3601,  // Boston Common
+        longitude: -71.0589
+    )
+    
     override init() {
         super.init()
         locationManager.delegate = self
@@ -16,12 +26,19 @@ class LocationManager: NSObject, ObservableObject {
         // Check current authorization status
         authorizationStatus = locationManager.authorizationStatus
         
-        // If already authorized, start updating location
-        if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
-            locationManager.startUpdatingLocation()
-        } else if authorizationStatus == .notDetermined {
-            // Request location permissions on init
-            requestPermissions()
+        // If using fake location, set it immediately
+        if Self.useFakeLocation {
+            print("🧪 Using FAKE location: Boston, MA (\(Self.fakeLocation.latitude), \(Self.fakeLocation.longitude))")
+            currentLocation = Self.fakeLocation
+            authorizationStatus = .authorizedWhenInUse
+        } else {
+            // If already authorized, start updating location
+            if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+                locationManager.startUpdatingLocation()
+            } else if authorizationStatus == .notDetermined {
+                // Request location permissions on init
+                requestPermissions()
+            }
         }
     }
     
@@ -47,6 +64,11 @@ extension LocationManager: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // Skip real location updates if using fake location
+        if Self.useFakeLocation {
+            return
+        }
+        
         guard let location = locations.last else { return }
         
         // Update current location

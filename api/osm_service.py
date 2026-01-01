@@ -66,16 +66,12 @@ async def find_user_city_fast(lat: float, lon: float) -> Optional[Dict]:
     return None
 
 
-async def fetch_nearby_city_ids(lat: float, lon: float, radius_km: float = 30) -> List[Dict]:
+async def fetch_nearby_city_ids(lat: float, lon: float) -> List[Dict]:
     """
-    FAST query to find cities that border the user's current city.
+    Find cities that DIRECTLY BORDER the user's current city.
     
-    Strategy: OSM cities share boundary ways with their neighbors.
-    1. Find user's city (is_in = fast point lookup)
-    2. Get boundary ways of that city
-    3. Find other cities that use those same ways = NEIGHBORS
-    
-    This is O(1) lookups, not O(n) distance calculations.
+    NOT a radius search - finds cities that share boundary ways.
+    ONLY admin_level=8 (actual cities, not counties/states).
     """
     
     # Query finds neighbors by shared boundary ways
