@@ -51,9 +51,10 @@ struct FloatingNotificationsButton: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.trailing, 20)
-                .padding(.bottom, 100) // Above the HUD buttons
+                .padding(.bottom, 20) // Position at bottom right with safe area
             }
         }
+        .ignoresSafeArea(edges: []) // Respect safe area
     }
 }
 
