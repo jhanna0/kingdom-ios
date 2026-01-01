@@ -170,8 +170,6 @@ def user_to_private_response(user: User) -> dict:
         "total_checkins": player_state.total_checkins if player_state else 0,
         "total_conquests": player_state.total_conquests if player_state else 0,
         "kingdoms_ruled": player_state.kingdoms_ruled if player_state else 0,
-        "is_premium": user.is_premium,
-        "premium_expires_at": user.premium_expires_at,
         "is_verified": user.is_verified,
         "last_login": user.last_login,
         "created_at": user.created_at,

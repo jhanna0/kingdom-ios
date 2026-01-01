@@ -68,12 +68,14 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     # Get user's current location (which kingdom they're in)
     user_current_kingdom_id = None
     user_can_claim = False
+    user_is_ruler = False
     if current_user:
         # Check if user currently rules any kingdoms
         ruling_count = db.query(Kingdom).filter(
             Kingdom.ruler_id == current_user.id
         ).count()
         user_can_claim = (ruling_count == 0)
+        user_is_ruler = (ruling_count > 0)
         
         # Get user's current kingdom location
         player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
@@ -98,6 +100,18 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             user_current_kingdom_id == kingdom.id
         )
         
+        # Can declare war / form alliance ONLY if:
+        # - User is a ruler of a different kingdom
+        # - User is INSIDE this kingdom (traveling into it)
+        # - This kingdom has a ruler
+        # - This kingdom's ruler is not the current user
+        can_interact = (
+            user_is_ruler and
+            user_current_kingdom_id == kingdom.id and
+            kingdom.ruler_id is not None and
+            kingdom.ruler_id != current_user.id if current_user else False
+        )
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
@@ -112,7 +126,9 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             farm_level=kingdom.farm_level,
             education_level=kingdom.education_level,
             travel_fee=kingdom.travel_fee,
-            can_claim=can_claim
+            can_claim=can_claim,
+            can_declare_war=can_interact,
+            can_form_alliance=can_interact
         )
     
     return result

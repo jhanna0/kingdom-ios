@@ -12,10 +12,10 @@ class LocationManager: NSObject, ObservableObject {
     /// Set to true to use fake location instead of real GPS
     static var useFakeLocation = false
     
-    /// Fake location for testing (Boston, MA)
+    /// Fake location for testing (Apple Park, Cupertino, CA)
     static var fakeLocation = CLLocationCoordinate2D(
-        latitude: 42.3601,  // Boston Common
-        longitude: -71.0589
+        latitude: 37.3349,  // Apple Park
+        longitude: -122.0090
     )
     
     override init() {
@@ -28,7 +28,7 @@ class LocationManager: NSObject, ObservableObject {
         
         // If using fake location, set it immediately
         if Self.useFakeLocation {
-            print("🧪 Using FAKE location: Boston, MA (\(Self.fakeLocation.latitude), \(Self.fakeLocation.longitude))")
+            print("🧪 Using FAKE location: Apple Park, Cupertino, CA (\(Self.fakeLocation.latitude), \(Self.fakeLocation.longitude))")
             currentLocation = Self.fakeLocation
             authorizationStatus = .authorizedWhenInUse
         } else {

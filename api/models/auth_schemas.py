@@ -62,10 +62,6 @@ class UserPrivate(BaseModel):
     total_conquests: int
     kingdoms_ruled: int
     
-    # Premium
-    is_premium: bool
-    premium_expires_at: Optional[datetime] = None
-    
     # Account
     is_verified: bool
     last_login: Optional[datetime] = None

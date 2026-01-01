@@ -109,7 +109,6 @@ class PlayerState(BaseModel):
     # Status
     is_alive: bool = True
     is_ruler: bool = False
-    is_premium: bool = False
     is_verified: bool = False
     
     # Timestamps

@@ -30,10 +30,6 @@ class User(Base):
     # Hometown - for unique display_name constraint
     hometown_kingdom_id = Column(String, nullable=True, index=True)
     
-    # Premium/Subscription
-    is_premium = Column(Boolean, default=False)
-    premium_expires_at = Column(DateTime, nullable=True)
-    
     # Account status
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)

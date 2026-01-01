@@ -87,6 +87,8 @@ class CityAPI {
         let rulerName = city.kingdom?.ruler_name ?? "Unclaimed"
         let rulerId = city.kingdom?.ruler_id
         let canClaim = city.kingdom?.can_claim ?? false
+        let canDeclareWar = city.kingdom?.can_declare_war ?? false
+        let canFormAlliance = city.kingdom?.can_form_alliance ?? false
         
         guard var kingdom = Kingdom(
             name: city.name,
@@ -94,7 +96,9 @@ class CityAPI {
             rulerId: rulerId,
             territory: territory,
             color: color,
-            canClaim: canClaim
+            canClaim: canClaim,
+            canDeclareWar: canDeclareWar,
+            canFormAlliance: canFormAlliance
         ) else {
             return nil
         }

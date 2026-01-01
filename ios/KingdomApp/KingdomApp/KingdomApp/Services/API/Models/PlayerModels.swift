@@ -109,7 +109,6 @@ struct APIPlayerState: Codable {
     // Status
     let is_alive: Bool
     let is_ruler: Bool
-    let is_premium: Bool
     let is_verified: Bool
     
     // Timestamps

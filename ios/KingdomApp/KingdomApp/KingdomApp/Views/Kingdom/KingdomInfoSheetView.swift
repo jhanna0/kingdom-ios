@@ -449,46 +449,42 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
-                // Action buttons - Medieval war council style (only if kingdom has ruler)
-                if !kingdom.isUnclaimed && kingdom.rulerId != player.playerId {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 10) {
+                // Action buttons - Medieval war council style (backend controls visibility)
+                if kingdom.canDeclareWar || kingdom.canFormAlliance {
+                    VStack(spacing: KingdomTheme.Spacing.small) {
+                        if kingdom.canDeclareWar {
                             Button(action: {
                                 // TODO: Implement declare war
                                 print("Declare war on \(kingdom.name)")
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "flame.fill")
                                         .foregroundColor(.white)
-                                        .font(.caption)
                                     Text("Declare War")
                                         .fontWeight(.semibold)
-                                        .font(KingdomTheme.Typography.caption())
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 12)
+                                .padding(KingdomTheme.Spacing.medium)
                                 .background(KingdomTheme.Colors.buttonDanger)
                                 .foregroundColor(.white)
                                 .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
-                            
+                        }
+                        
+                        if kingdom.canFormAlliance {
                             Button(action: {
                                 // TODO: Implement form alliance
                                 print("Form alliance with \(kingdom.name)")
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "hand.raised.fill")
                                         .foregroundColor(.white)
-                                        .font(.caption)
                                     Text("Form Alliance")
                                         .fontWeight(.semibold)
-                                        .font(KingdomTheme.Typography.caption())
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 12)
-                                .background(KingdomTheme.Colors.buttonSuccess)
+                                .padding(KingdomTheme.Spacing.medium)
+                                .background(KingdomTheme.Colors.gold)
                                 .foregroundColor(.white)
                                 .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
@@ -506,7 +502,7 @@ struct KingdomInfoSheetView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(KingdomTheme.Spacing.medium)
-                            .background(KingdomTheme.Colors.buttonSpecial)
+                            .background(KingdomTheme.Colors.buttonPrimary)
                             .foregroundColor(.white)
                             .cornerRadius(KingdomTheme.CornerRadius.medium)
                         }

@@ -41,6 +41,8 @@ class KingdomData(BaseModel):
     education_level: int = 0
     travel_fee: int = 10
     can_claim: bool = False  # Backend determines if current user can claim this kingdom
+    can_declare_war: bool = False  # Backend determines if current user can declare war on this kingdom
+    can_form_alliance: bool = False  # Backend determines if current user can form alliance with this kingdom
 
 
 class CityBoundaryResponse(BaseModel):

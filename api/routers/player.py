@@ -135,7 +135,6 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         # Status
         is_alive=state.is_alive,
         is_ruler=is_ruler,
-        is_premium=user.is_premium,
         is_verified=user.is_verified,
         
         # Timestamps
