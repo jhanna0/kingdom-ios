@@ -21,7 +21,7 @@ struct SkillDetailView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // Tier name
                         Text("Tier \(tier)")
-                            .font(.headline)
+                            .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         // Benefits
@@ -31,19 +31,21 @@ struct SkillDetailView: View {
                             ForEach(getTierBenefits(tier: tier), id: \.self) { benefit in
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
-                                        .font(.subheadline)
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(benefit)
-                                        .font(.subheadline)
+                                        .font(FontStyles.bodySmall)
                                         .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                         }
                         
-                        Divider()
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(height: 2)
                         
                         // Requirements - ALWAYS SHOW
                         VStack(alignment: .leading, spacing: 12) {
@@ -51,19 +53,22 @@ struct SkillDetailView: View {
                             
                                 HStack {
                                     Image(systemName: "figure.walk")
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                                         .frame(width: 20)
                                     Text("\(getActionsRequired(tier: tier)) actions")
-                                        .font(.subheadline)
+                                        .font(FontStyles.bodySmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Spacer()
                                     Text("2 hr cooldown")
-                                        .font(.caption)
+                                        .font(FontStyles.labelSmall)
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
                         }
                         
-                        Divider()
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(height: 2)
                         
                         // Cost - ALWAYS SHOW
                         VStack(alignment: .leading, spacing: 12) {
@@ -82,15 +87,14 @@ struct SkillDetailView: View {
                         if tier <= currentTier {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(.subheadline)
+                                    .font(FontStyles.iconSmall)
                                 Text("Unlocked")
-                                    .font(.subheadline.bold())
+                                    .font(FontStyles.bodyMediumBold)
                             }
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(KingdomTheme.Colors.gold.opacity(0.1))
-                            .cornerRadius(10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                         } else if tier == currentTier + 1 && currentTier < 5 {
                             UnifiedActionButton(
                                 title: "Start Training",
@@ -106,27 +110,25 @@ struct SkillDetailView: View {
                         } else if tier > currentTier + 1 {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
-                                    .font(.subheadline)
+                                    .font(FontStyles.iconSmall)
                                 Text("Complete Tier \(currentTier + 1) first")
-                                    .font(.subheadline)
+                                    .font(FontStyles.bodySmall)
                             }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-                            .cornerRadius(10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
                         } else if currentTier >= 5 {
                             HStack(spacing: 8) {
                                 Image(systemName: "crown.fill")
-                                    .font(.subheadline)
+                                    .font(FontStyles.iconSmall)
                                 Text("Maximum Tier Reached!")
-                                    .font(.subheadline.bold())
+                                    .font(FontStyles.bodyMediumBold)
                             }
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(KingdomTheme.Colors.gold.opacity(0.1))
-                            .cornerRadius(10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                         }
                     }
                 }
@@ -149,10 +151,10 @@ struct SkillDetailView: View {
     private func sectionHeader(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.subheadline)
+                .font(FontStyles.iconSmall)
                 .foregroundColor(KingdomTheme.Colors.gold)
             Text(title)
-                .font(.subheadline.bold())
+                .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }

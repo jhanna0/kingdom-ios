@@ -45,21 +45,21 @@ struct PropertyDetailView: View {
                 NavigationLink(destination: PropertyTiersView(player: player, property: property)) {
                     HStack {
                         Image(systemName: "list.number")
-                            .font(.title3)
+                            .font(FontStyles.iconMedium)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("View All Tiers")
-                                .font(.headline)
+                                .font(FontStyles.bodyMediumBold)
                             Text("See upgrade path & benefits")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
+                            .font(FontStyles.iconSmall)
                     }
                     .foregroundColor(.white)
                     .padding()
-                    .background(KingdomTheme.Colors.buttonPrimary)
-                    .cornerRadius(12)
                 }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
                 
                 // Upgrade section
                 if property.tier < 5 {
@@ -99,44 +99,46 @@ struct PropertyDetailView: View {
                 .padding(.bottom, 8)
             
             Text(property.tierName)
-                .font(.title.bold())
+                .font(FontStyles.displaySmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text(property.tierDescription)
-                .font(.subheadline)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .font(FontStyles.bodySmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
             
-            // Tier progress
+            // Tier progress with brutalist style
             HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { tier in
                     Circle()
                         .fill(tier <= property.tier ? tierColor : KingdomTheme.Colors.inkDark.opacity(0.2))
-                        .frame(width: 12, height: 12)
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: tier <= property.tier ? 1.5 : 0.5)
+                        )
                 }
             }
             
             Text("Tier \(property.tier) of 5")
-                .font(.caption.bold())
+                .font(FontStyles.labelBold)
                 .foregroundColor(tierColor)
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Tier Visual
     
     private var tierVisual: some View {
         ZStack {
-            // Background
+            // Background with brutalist style
             RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [tierColor.opacity(0.2), tierColor.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                .fill(tierColor.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.black, lineWidth: 2)
                 )
                 .frame(height: 120)
             
@@ -146,61 +148,61 @@ struct PropertyDetailView: View {
                 // T1: Empty lot
                 VStack(spacing: 8) {
                     Image(systemName: "square.dashed")
-                        .font(.system(size: 70, weight: .light))
+                        .font(.system(size: 60, weight: .regular))
                         .foregroundColor(tierColor)
                     Text("Vacant Lot")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
             case 2:
                 // T2: Simple house
                 VStack(spacing: 8) {
                     Image(systemName: "house.fill")
-                        .font(.system(size: 70))
+                        .font(.system(size: 60))
                         .foregroundColor(tierColor)
                     Text("Simple House")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
             case 3:
                 // T3: House with workshop
                 HStack(spacing: 12) {
                     Image(systemName: "house.fill")
-                        .font(.system(size: 55))
+                        .font(.system(size: 50))
                         .foregroundColor(tierColor)
                     Image(systemName: "hammer.fill")
-                        .font(.system(size: 45))
+                        .font(.system(size: 40))
                         .foregroundColor(tierColor.opacity(0.8))
-                        .offset(y: 15)
+                        .offset(y: 12)
                 }
                 
             case 4:
                 // T4: Beautiful property
                 VStack(spacing: 8) {
                     Image(systemName: "building.columns.fill")
-                        .font(.system(size: 70))
+                        .font(.system(size: 60))
                         .foregroundColor(tierColor)
                     Text("Luxurious Estate")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.5))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
             case 5:
                 // T5: Estate with crown
                 VStack(spacing: -8) {
                     Image(systemName: "crown.fill")
-                        .font(.system(size: 35))
+                        .font(.system(size: 32))
                         .foregroundColor(KingdomTheme.Colors.gold)
                     Image(systemName: "building.columns.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: 55))
                         .foregroundColor(tierColor)
                 }
                 
             default:
                 Image(systemName: "questionmark")
-                    .font(.system(size: 70))
+                    .font(.system(size: 60))
                     .foregroundColor(tierColor)
             }
         }
@@ -221,26 +223,28 @@ struct PropertyDetailView: View {
     
     private var locationCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Image(systemName: "mappin.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 40, height: 40)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(property.kingdomName)
-                        .font(.headline)
+                        .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Purchased \(formatDate(property.purchasedAt))")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Spacer()
             }
         }
         .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     
@@ -251,19 +255,19 @@ struct PropertyDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Upgrade to \(nextTierName)")
-                        .font(.headline)
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(nextTierDescription)
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Spacer()
                 
                 if let status = upgradeStatus {
                     Text("\(status.upgrade_cost) gold")
-                        .font(.title3.bold().monospacedDigit())
+                        .font(FontStyles.headingSmall)
                         .foregroundColor(player.gold >= status.upgrade_cost ? KingdomTheme.Colors.gold : .red)
                 }
             }
@@ -273,10 +277,11 @@ struct PropertyDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: "hourglass")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         
                         Text("Upgrade In Progress")
-                            .font(.subheadline.bold())
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
                     
@@ -284,13 +289,13 @@ struct PropertyDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Building \(contract.targetTierName)")
-                                .font(.caption)
+                                .font(FontStyles.labelMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Spacer()
                             
                             Text("\(contract.actionsCompleted) / \(contract.actionsRequired)")
-                                .font(.caption.monospacedDigit())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
@@ -299,24 +304,22 @@ struct PropertyDetailView: View {
                                 Rectangle()
                                     .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
                                     .frame(height: 8)
-                                    .cornerRadius(4)
+                                    .overlay(Rectangle().stroke(Color.black, lineWidth: 1))
                                 
                                 Rectangle()
                                     .fill(KingdomTheme.Colors.buttonWarning)
                                     .frame(width: geometry.size.width * contract.progress, height: 8)
-                                    .cornerRadius(4)
                             }
                         }
                         .frame(height: 8)
                     }
                     
                     Text("Complete work actions in the Actions page to finish this upgrade")
-                        .font(.caption)
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                .cornerRadius(8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15), cornerRadius: 8)
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .opacity
@@ -331,20 +334,19 @@ struct PropertyDetailView: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Starting Upgrade...")
-                                .font(.subheadline.bold())
+                                .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("Creating contract...")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                .font(FontStyles.labelMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         
                         Spacer()
                     }
                 }
                 .padding()
-                .background(KingdomTheme.Colors.buttonPrimary.opacity(0.1))
-                .cornerRadius(8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary.opacity(0.15), cornerRadius: 8)
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .scale.combined(with: .opacity)
@@ -369,23 +371,23 @@ struct PropertyDetailView: View {
                     .transition(.opacity)
                     
                     Text("Like training, upgrades require work actions to complete")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     if player.gold < status.upgrade_cost {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                             Text("Need \(status.upgrade_cost - player.gold) more gold")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                         }
                         .foregroundColor(.red)
                     } else if hasAnyPropertyUpgradeInProgress {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                             Text("You already have a property upgrade in progress")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                         }
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
@@ -393,12 +395,7 @@ struct PropertyDetailView: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private var nextTierName: String {
@@ -426,25 +423,23 @@ struct PropertyDetailView: View {
     private var maxLevelCard: some View {
         VStack(spacing: 12) {
             Image(systemName: "crown.fill")
-                .font(.system(size: 40))
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .font(FontStyles.iconExtraLarge)
+                .foregroundColor(.white)
+                .frame(width: 60, height: 60)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 16)
             
             Text("Maximum Level")
-                .font(.headline)
+                .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text("This property is fully upgraded with all benefits unlocked!")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .parchmentCard(
-            backgroundColor: KingdomTheme.Colors.gold.opacity(0.1),
-            borderColor: KingdomTheme.Colors.gold,
-            hasShadow: false
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.gold.opacity(0.1))
     }
     
     

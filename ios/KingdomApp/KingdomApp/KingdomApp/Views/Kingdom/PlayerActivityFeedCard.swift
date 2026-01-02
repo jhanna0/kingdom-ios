@@ -23,11 +23,13 @@ struct PlayerActivityFeedCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "person.3.fill")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
                 
                 Text("Player Activity")
-                    .font(.headline)
+                    .font(FontStyles.headingSmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
@@ -48,7 +50,7 @@ struct PlayerActivityFeedCard: View {
                             )
                         
                         Text("\(data.online_count) online")
-                            .font(.caption)
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
@@ -65,15 +67,15 @@ struct PlayerActivityFeedCard: View {
                 // Show intelligence required message
                 VStack(spacing: 12) {
                     Image(systemName: "eye.slash.fill")
-                        .font(.system(size: 40))
+                        .font(.system(size: 40, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                     
                     Text("Intelligence Required")
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(error)
-                        .font(.caption)
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .multilineTextAlignment(.center)
                 }
@@ -85,10 +87,10 @@ struct PlayerActivityFeedCard: View {
                         Spacer()
                         VStack(spacing: 8) {
                             Image(systemName: "person.slash")
-                                .font(.title3)
+                                .font(FontStyles.iconMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkLight)
                             Text("No players in this kingdom")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .padding()
@@ -110,7 +112,7 @@ struct PlayerActivityFeedCard: View {
                         
                         if data.players.count > 5 {
                             Text("+\(data.players.count - 5) more players")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .frame(maxWidth: .infinity)
                                 .padding(.top, 4)
@@ -122,12 +124,7 @@ struct PlayerActivityFeedCard: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .parchmentCard()
         .task {
             await loadPlayers()
         }
@@ -296,13 +293,13 @@ struct PlayerActivityRow: View {
         HStack(spacing: 12) {
             // Avatar with online indicator
             ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .fill(playerData.is_ruler ? KingdomTheme.Colors.gold.opacity(0.3) : KingdomTheme.Colors.inkDark.opacity(0.1))
+                Text(String(playerData.display_name.prefix(1)).uppercased())
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(.white)
                     .frame(width: 40, height: 40)
-                    .overlay(
-                        Text(String(playerData.display_name.prefix(1)).uppercased())
-                            .font(.subheadline.bold())
-                            .foregroundColor(playerData.is_ruler ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark)
+                    .brutalistBadge(
+                        backgroundColor: playerData.is_ruler ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium,
+                        cornerRadius: 8
                     )
                 
                 // Online indicator
@@ -321,13 +318,13 @@ struct PlayerActivityRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(playerData.display_name)
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodySmallBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .lineLimit(1)
                     
                     if playerData.is_ruler {
                         Image(systemName: "crown.fill")
-                            .font(.caption2)
+                            .font(FontStyles.iconMini)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     }
                 }
@@ -335,11 +332,11 @@ struct PlayerActivityRow: View {
                 // Activity with icon
                 HStack(spacing: 4) {
                     Image(systemName: playerData.activity.icon)
-                        .font(.caption2)
+                        .font(FontStyles.iconMini)
                         .foregroundColor(activityColor(playerData.activity.color))
                     
                     Text(playerData.activity.displayText)
-                        .font(.caption)
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .lineLimit(1)
                 }
@@ -349,17 +346,20 @@ struct PlayerActivityRow: View {
             
             // Level badge
             Text("L\(playerData.level)")
-                .font(.caption.bold().monospacedDigit())
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(KingdomTheme.Colors.inkDark.opacity(0.1))
-                .cornerRadius(4)
+                .font(FontStyles.labelSmall)
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 4)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(KingdomTheme.Colors.parchment.opacity(0.5))
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(KingdomTheme.Colors.parchment)
         .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
+        )
     }
     
     private func activityColor(_ colorName: String) -> Color {

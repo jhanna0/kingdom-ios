@@ -18,13 +18,14 @@ struct AddFriendView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: KingdomTheme.Spacing.medium) {
-                    // Search bar
+                    // Search bar with brutalist style
                     HStack {
                         Image(systemName: "magnifyingglass")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         TextField("Search by username...", text: $searchQuery)
-                            .font(KingdomTheme.Typography.body())
+                            .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -40,13 +41,13 @@ struct AddFriendView: View {
                                 searchResults = []
                             }) {
                                 Image(systemName: "xmark.circle.fill")
+                                    .font(FontStyles.iconSmall)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                         }
                     }
                     .padding()
-                    .background(KingdomTheme.Colors.parchmentLight)
-                    .cornerRadius(12)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                     .padding(.horizontal)
                     .padding(.top, KingdomTheme.Spacing.small)
                     
@@ -54,14 +55,14 @@ struct AddFriendView: View {
                     if let message = successMessage {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(.white)
                             Text(message)
-                                .font(KingdomTheme.Typography.caption())
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                .font(FontStyles.labelBold)
+                                .foregroundColor(.white)
                         }
                         .padding()
-                        .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
-                        .cornerRadius(8)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
                         .padding(.horizontal)
                     }
                     
@@ -72,15 +73,17 @@ struct AddFriendView: View {
                     } else if searchResults.isEmpty && !searchQuery.isEmpty {
                         VStack(spacing: KingdomTheme.Spacing.medium) {
                             Image(systemName: "person.crop.circle.badge.questionmark")
-                                .font(.system(size: 50))
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .font(FontStyles.iconExtraLarge)
+                                .foregroundColor(.white)
+                                .frame(width: 70, height: 70)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                             
                             Text("No players found")
-                                .font(KingdomTheme.Typography.body())
+                                .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Text("Try searching for a different username")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .multilineTextAlignment(.center)
                         }
@@ -103,15 +106,17 @@ struct AddFriendView: View {
                         // Instructions
                         VStack(spacing: KingdomTheme.Spacing.large) {
                             Image(systemName: "person.badge.plus")
-                                .font(.system(size: 60))
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(FontStyles.iconExtraLarge)
+                                .foregroundColor(.white)
+                                .frame(width: 80, height: 80)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 20)
                             
                             Text("Add Friends")
-                                .font(KingdomTheme.Typography.title2())
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("Search for players by username to send them a friend request")
-                                .font(KingdomTheme.Typography.body())
+                                .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
@@ -205,31 +210,28 @@ struct UserSearchResultCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(KingdomTheme.Colors.gold.opacity(0.2))
-                .frame(width: 45, height: 45)
-                .overlay(
-                    Text(String(user.displayName.prefix(1)).uppercased())
-                        .font(.title3.bold())
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                )
+            Text(String(user.displayName.prefix(1)).uppercased())
+                .font(FontStyles.headingSmall)
+                .foregroundColor(.white)
+                .frame(width: 48, height: 48)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.displayName)
-                    .font(KingdomTheme.Typography.headline())
+                    .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack(spacing: 4) {
                     Text("@\(user.username)")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Text("•")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                     
                     Text("Lv\(user.level)")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
@@ -241,14 +243,15 @@ struct UserSearchResultCard: View {
                 if status == "accepted" {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                         Text("Friends")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelBold)
                             .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                     }
                 } else if status == "pending" {
                     Text("Pending")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             } else {
@@ -264,7 +267,7 @@ struct UserSearchResultCard: View {
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "plus.circle.fill")
-                            .font(.title3)
+                            .font(FontStyles.iconMedium)
                             .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                     }
                 }
@@ -272,7 +275,7 @@ struct UserSearchResultCard: View {
             }
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
 }
 

@@ -15,11 +15,13 @@ struct ActivityView: View {
                         // Header
                         HStack {
                             Image(systemName: "bell.fill")
-                                .font(.title2)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                             
                             Text("Activity Feed")
-                                .font(KingdomTheme.Typography.title2())
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Spacer()
@@ -37,15 +39,17 @@ struct ActivityView: View {
                         } else if !viewModel.isLoading {
                             VStack(spacing: KingdomTheme.Spacing.large) {
                                 Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                    .font(FontStyles.iconExtraLarge)
+                                    .foregroundColor(.white)
+                                    .frame(width: 80, height: 80)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 20)
                                 
                                 Text("All Caught Up")
-                                    .font(KingdomTheme.Typography.title2())
+                                    .font(FontStyles.headingLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 Text("No new activity")
-                                    .font(KingdomTheme.Typography.body())
+                                    .font(FontStyles.bodyMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             .padding(.top, 60)
@@ -100,16 +104,18 @@ struct NotificationCard: View {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                 HStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: iconForNotification)
-                        .font(.title2)
-                        .foregroundColor(iconColor)
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .brutalistBadge(backgroundColor: iconColor, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(notification.title)
-                            .font(KingdomTheme.Typography.headline())
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         Text(notification.message)
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .lineLimit(3)
                     }
@@ -117,30 +123,32 @@ struct NotificationCard: View {
                     Spacer()
                     
                     Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 
                 // Coup-specific info
                 if let coupData = notification.coupData {
-                    Divider()
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 1)
                     
                     HStack(spacing: 16) {
                         HStack(spacing: 4) {
                             Image(systemName: "bolt.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                             Text("\(coupData.attackerCount)")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
                         HStack(spacing: 4) {
                             Image(systemName: "shield.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                             Text("\(coupData.defenderCount)")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
@@ -148,9 +156,9 @@ struct NotificationCard: View {
                         
                         HStack(spacing: 4) {
                             Image(systemName: "clock.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                             Text(coupData.timeRemainingFormatted)
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelBold)
                         }
                         .foregroundColor(KingdomTheme.Colors.gold)
                     }
@@ -158,40 +166,42 @@ struct NotificationCard: View {
                 
                 // Invasion-specific info
                 if let invasionData = notification.invasionData {
-                    Divider()
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 1)
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "flag.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                             Text(invasionData.attackingFromKingdomName)
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             Image(systemName: "arrow.right")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                             Text(invasionData.targetKingdomName)
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
                         HStack(spacing: 16) {
                             HStack(spacing: 4) {
                                 Image(systemName: "bolt.fill")
-                                    .font(.caption)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.buttonDanger)
                                 Text("\(invasionData.attackerCount)")
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelBold)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                             }
                             
                             HStack(spacing: 4) {
                                 Image(systemName: "shield.fill")
-                                    .font(.caption)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                                 Text("\(invasionData.defenderCount)")
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelBold)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                             }
                             
@@ -199,9 +209,9 @@ struct NotificationCard: View {
                             
                             HStack(spacing: 4) {
                                 Image(systemName: "clock.fill")
-                                    .font(.caption)
+                                    .font(FontStyles.iconMini)
                                 Text(invasionData.timeRemainingFormatted)
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelBold)
                             }
                             .foregroundColor(KingdomTheme.Colors.gold)
                         }
@@ -210,10 +220,10 @@ struct NotificationCard: View {
                         if invasionData.isAllied == true {
                             HStack(spacing: 4) {
                                 Image(systemName: "handshake.fill")
-                                    .font(.caption)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                                 Text("Allied Empire")
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelSmall)
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                             }
                         }
@@ -221,11 +231,7 @@ struct NotificationCard: View {
                 }
             }
             .padding()
-            .parchmentCard()
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(borderColor, lineWidth: 2)
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)

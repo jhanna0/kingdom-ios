@@ -29,22 +29,25 @@ struct KingdomDetailView: View {
                 // Kingdom header
                 VStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: "crown.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 70, height: 70)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
                     
                     Text(kingdom.name)
-                        .font(KingdomTheme.Typography.largeTitle())
-                        .fontWeight(.bold)
+                        .font(FontStyles.displayMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     if isRuler {
                         Text("Your Kingdom")
-                            .font(KingdomTheme.Typography.subheadline())
-                            .fontWeight(.semibold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
                     } else {
                         Text("Ruled by \(kingdom.rulerName)")
-                            .font(KingdomTheme.Typography.subheadline())
+                            .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
@@ -53,29 +56,28 @@ struct KingdomDetailView: View {
                 // Treasury - Kingdom's money
                 VStack(spacing: 8) {
                     Text("Kingdom Treasury")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     HStack(spacing: 6) {
                         Image(systemName: "building.columns.fill")
-                            .font(.title)
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                            .font(FontStyles.iconLarge)
+                            .foregroundColor(KingdomTheme.Colors.gold)
                         Text("\(kingdom.treasuryGold)")
-                            .font(KingdomTheme.Typography.title())
-                            .fontWeight(.bold)
+                            .font(FontStyles.displaySmall)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         Text("gold")
-                            .font(KingdomTheme.Typography.subheadline())
+                            .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
                     Text("Used for contracts & defenses")
-                        .font(KingdomTheme.Typography.caption2())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
-                .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)
                 
                 // Military strength / intelligence
@@ -104,8 +106,13 @@ struct KingdomDetailView: View {
                 
                 // Buildings section
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 2)
+                        .padding(.horizontal)
+                    
                     Text("Fortifications")
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .padding(.horizontal)
                     
@@ -147,48 +154,53 @@ struct KingdomDetailView: View {
                 
                         // Ruler actions
                         if isRuler {
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(height: 2)
+                                .padding(.horizontal)
+                            
                             VStack(spacing: KingdomTheme.Spacing.medium) {
                                 Text("Kingdom Management")
-                                    .font(KingdomTheme.Typography.headline())
+                                    .font(FontStyles.headingMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 NavigationLink(value: KingdomDetailDestination.build) {
                                     HStack {
                                         Image(systemName: "hammer.fill")
-                                            .font(.title3)
+                                            .font(FontStyles.iconMedium)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("Manage Buildings")
-                                                .font(KingdomTheme.Typography.headline())
+                                                .font(FontStyles.bodyMediumBold)
                                             Text("Upgrade economy & defenses")
-                                                .font(KingdomTheme.Typography.caption())
+                                                .font(FontStyles.labelSmall)
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")
+                                            .font(FontStyles.iconSmall)
                                     }
                                     .foregroundColor(.white)
                                     .padding()
-                                    .background(KingdomTheme.Colors.buttonPrimary)
-                                    .cornerRadius(KingdomTheme.CornerRadius.xLarge)
                                 }
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
                         
                         NavigationLink(value: KingdomDetailDestination.decree) {
                             HStack {
                                 Image(systemName: "scroll.fill")
-                                    .font(.title3)
+                                    .font(FontStyles.iconMedium)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Make Decree")
-                                        .font(KingdomTheme.Typography.headline())
+                                        .font(FontStyles.bodyMediumBold)
                                     Text("Announce to all subjects")
-                                        .font(KingdomTheme.Typography.caption())
+                                        .font(FontStyles.labelSmall)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconSmall)
                             }
                             .foregroundColor(.white)
                             .padding()
-                            .background(KingdomTheme.Colors.buttonSecondary)
-                            .cornerRadius(KingdomTheme.CornerRadius.xLarge)
                         }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSecondary, cornerRadius: 12)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
@@ -198,7 +210,7 @@ struct KingdomDetailView: View {
                 if isRuler {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Benefits of Ruling")
-                            .font(KingdomTheme.Typography.headline())
+                            .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         BenefitRow(icon: "bitcoinsign.circle.fill", text: "Passive income: +10 gold/hour")
@@ -207,11 +219,7 @@ struct KingdomDetailView: View {
                         BenefitRow(icon: "crown.fill", text: "Control territory & make decrees")
                     }
                     .padding()
-                    .parchmentCard(
-                        backgroundColor: KingdomTheme.Colors.parchmentRich,
-                        borderWidth: KingdomTheme.BorderWidth.thin,
-                        hasShadow: false
-                    )
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
                 }

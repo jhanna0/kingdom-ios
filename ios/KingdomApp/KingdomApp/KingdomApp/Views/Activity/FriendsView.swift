@@ -122,11 +122,13 @@ struct FriendsView: View {
             // Header with add button (moved to content for this tab)
             HStack {
                 Image(systemName: "person.2.fill")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 40, height: 40)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
                 Text("Friends")
-                    .font(KingdomTheme.Typography.title2())
+                    .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
@@ -138,7 +140,7 @@ struct FriendsView: View {
                         if !viewModel.pendingReceived.isEmpty {
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                                 Text("Friend Requests")
-                                    .font(KingdomTheme.Typography.headline())
+                                    .font(FontStyles.headingMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                     .padding(.horizontal)
                                 
@@ -158,15 +160,23 @@ struct FriendsView: View {
                         
                         // Friends list
                         if !viewModel.friends.isEmpty {
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(height: 2)
+                                .padding(.horizontal)
+                            
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                                 HStack {
                                     Text("My Friends")
-                                        .font(KingdomTheme.Typography.headline())
+                                        .font(FontStyles.headingMedium)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     
                                     Text("(\(viewModel.friends.count))")
-                                        .font(KingdomTheme.Typography.caption())
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .font(FontStyles.labelSmall)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10, shadowOffset: 1, borderWidth: 1.5)
                                 }
                                 .padding(.horizontal)
                                 
@@ -179,15 +189,17 @@ struct FriendsView: View {
                         } else if !viewModel.isLoading && viewModel.pendingReceived.isEmpty {
                             VStack(spacing: KingdomTheme.Spacing.large) {
                                 Image(systemName: "person.2.slash")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .font(FontStyles.iconExtraLarge)
+                                    .foregroundColor(.white)
+                                    .frame(width: 80, height: 80)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                                 
                                 Text("No Friends Yet")
-                                    .font(KingdomTheme.Typography.title2())
+                                    .font(FontStyles.headingLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 Text("Add friends to see what they're up to!")
-                                    .font(KingdomTheme.Typography.body())
+                                    .font(FontStyles.bodyMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .multilineTextAlignment(.center)
                                 
@@ -204,7 +216,7 @@ struct FriendsView: View {
                         if !viewModel.pendingSent.isEmpty {
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                                 Text("Pending Requests")
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .padding(.horizontal)
                                 
@@ -226,11 +238,13 @@ struct FriendsView: View {
             // Header
             HStack {
                 Image(systemName: "list.bullet.clipboard")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 40, height: 40)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
                 Text("My Activity")
-                    .font(KingdomTheme.Typography.title2())
+                    .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
@@ -240,15 +254,17 @@ struct FriendsView: View {
             if viewModel.myActivities.isEmpty {
                 VStack(spacing: KingdomTheme.Spacing.large) {
                     Image(systemName: "tray")
-                        .font(.system(size: 60))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 80)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                     
                     Text("No Recent Activity")
-                        .font(KingdomTheme.Typography.title2())
+                        .font(FontStyles.headingLarge)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Your actions will appear here")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding(.top, 60)
@@ -268,11 +284,13 @@ struct FriendsView: View {
             // Header
             HStack {
                 Image(systemName: "person.3")
-                    .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 40, height: 40)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
                 Text("Friend Activity")
-                    .font(KingdomTheme.Typography.title2())
+                    .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
@@ -282,15 +300,17 @@ struct FriendsView: View {
             if viewModel.friendActivities.isEmpty {
                 VStack(spacing: KingdomTheme.Spacing.large) {
                     Image(systemName: "person.2.slash")
-                        .font(.system(size: 60))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 80)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                     
                     Text("No Friend Activity")
-                        .font(KingdomTheme.Typography.title2())
+                        .font(FontStyles.headingLarge)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Add friends to see what they're doing!")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding(.top, 60)
@@ -339,26 +359,25 @@ struct ActivityCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                // Icon
+            HStack(spacing: 10) {
+                // Icon with brutalist badge
                 Image(systemName: activity.icon)
-                    .font(.title3)
-                    .foregroundColor(activityColor(activity.color))
-                    .frame(width: 32, height: 32)
-                    .background(activityColor(activity.color).opacity(0.1))
-                    .cornerRadius(8)
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 1.5)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     // User name if showing friend activity
                     if showUser, let displayName = activity.displayName {
                         HStack(spacing: 4) {
                             Text(displayName)
-                                .font(.caption.bold())
+                                .font(FontStyles.labelBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             if let level = activity.userLevel {
                                 Text("Lv\(level)")
-                                    .font(.caption2)
+                                    .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                         }
@@ -366,26 +385,26 @@ struct ActivityCard: View {
                     
                     // Description
                     Text(activity.description)
-                        .font(.subheadline)
+                        .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 8) {
                         // Time
                         Text(activity.timeAgo)
-                            .font(.caption)
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         // Kingdom
                         if let kingdomName = activity.kingdomName {
                             Text("•")
-                                .font(.caption)
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.circle")
-                                    .font(.caption2)
+                                    .font(FontStyles.iconMini)
                                 Text(kingdomName)
-                                    .font(.caption)
+                                    .font(FontStyles.labelSmall)
                             }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
@@ -398,16 +417,16 @@ struct ActivityCard: View {
                 if let amount = activity.amount {
                     VStack(spacing: 2) {
                         Text("\(amount)")
-                            .font(.headline)
+                            .font(FontStyles.headingSmall)
                             .foregroundColor(KingdomTheme.Colors.gold)
                         
                         if activity.actionType == "build" {
                             Text("actions")
-                                .font(.caption2)
+                                .font(FontStyles.labelTiny)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         } else if activity.actionType.contains("property") || activity.actionType == "train" {
                             Image(systemName: "g.circle.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.gold)
                         }
                     }
@@ -415,7 +434,7 @@ struct ActivityCard: View {
             }
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
     
@@ -440,68 +459,66 @@ struct FriendCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                // Avatar with online indicator
+                // Avatar with online indicator and brutalist style
                 ZStack(alignment: .bottomTrailing) {
-                    Circle()
-                        .fill(KingdomTheme.Colors.gold.opacity(0.2))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Text(String(friend.displayName.prefix(1)).uppercased())
-                                .font(.title3.bold())
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                        )
+                    Text(String(friend.displayName.prefix(1)).uppercased())
+                        .font(FontStyles.headingSmall)
+                        .foregroundColor(.white)
+                        .frame(width: 48, height: 48)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
                     
                     // Online indicator
                     if let isOnline = friend.isOnline, isOnline {
                         Circle()
                             .fill(Color.green)
-                            .frame(width: 12, height: 12)
+                            .frame(width: 14, height: 14)
                             .overlay(
                                 Circle()
-                                    .stroke(KingdomTheme.Colors.parchmentLight, lineWidth: 2)
+                                    .stroke(Color.black, lineWidth: 2)
                             )
+                            .offset(x: 2, y: 2)
                     }
                 }
                 
                 // Friend info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(friend.displayName)
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 8) {
                         // Level
                         if let level = friend.level {
                             Text("Lv\(level)")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Text("•")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
                         }
                         
                         // Activity
                         if let activity = friend.activity {
                             HStack(spacing: 4) {
                                 Image(systemName: activity.icon)
-                                    .font(.caption2)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(activityColor(activity.color))
                                 
                                 Text(activity.displayText)
-                                    .font(.caption)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
                             }
                         } else if friend.currentKingdomName != nil {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.circle.fill")
-                                    .font(.caption2)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.gold)
                                 
                                 Text(friend.currentKingdomName!)
-                                    .font(.caption)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
                             }
                         }
@@ -511,11 +528,11 @@ struct FriendCard: View {
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
             }
             .padding()
-            .parchmentCard()
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
@@ -545,22 +562,19 @@ struct FriendRequestCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(KingdomTheme.Colors.gold.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Text(String(friend.displayName.prefix(1)).uppercased())
-                            .font(.headline)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                    )
+                Text(String(friend.displayName.prefix(1)).uppercased())
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(friend.displayName)
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("wants to be friends")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
@@ -576,14 +590,12 @@ struct FriendRequestCard: View {
                     }
                 }) {
                     Text("Accept")
-                        .font(KingdomTheme.Typography.caption())
-                        .fontWeight(.semibold)
+                        .font(FontStyles.labelBold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(KingdomTheme.Colors.buttonSuccess)
-                        .cornerRadius(8)
+                        .padding(.vertical, 10)
                 }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
                 .disabled(isProcessing)
                 
                 Button(action: {
@@ -594,23 +606,17 @@ struct FriendRequestCard: View {
                     }
                 }) {
                     Text("Decline")
-                        .font(KingdomTheme.Typography.caption())
-                        .fontWeight(.semibold)
+                        .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(KingdomTheme.Colors.inkLight.opacity(0.3))
-                        .cornerRadius(8)
+                        .padding(.vertical, 10)
                 }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
                 .disabled(isProcessing)
             }
         }
         .padding()
-        .parchmentCard()
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.gold.opacity(0.5), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
 }
@@ -623,22 +629,19 @@ struct PendingSentCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+            Text(String(friend.displayName.prefix(1)).uppercased())
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
                 .frame(width: 40, height: 40)
-                .overlay(
-                    Text(String(friend.displayName.prefix(1)).uppercased())
-                        .font(.headline)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                )
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(friend.displayName)
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("Request pending")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
@@ -650,12 +653,12 @@ struct PendingSentCard: View {
                 }
             }) {
                 Text("Cancel")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.buttonDanger)
             }
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
 }

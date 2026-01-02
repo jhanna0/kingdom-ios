@@ -21,16 +21,22 @@ struct KingdomInfoSheetView: View {
                     HStack(alignment: .center) {
                         HStack(spacing: 10) {
                             Image(systemName: "building.columns.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(Color(
-                                    red: kingdom.color.strokeRGBA.red,
-                                    green: kingdom.color.strokeRGBA.green,
-                                    blue: kingdom.color.strokeRGBA.blue
-                                ))
+                                .font(FontStyles.iconExtraLarge)
+                                .foregroundColor(.white)
+                                .frame(width: 48, height: 48)
+                                .brutalistBadge(
+                                    backgroundColor: Color(
+                                        red: kingdom.color.strokeRGBA.red,
+                                        green: kingdom.color.strokeRGBA.green,
+                                        blue: kingdom.color.strokeRGBA.blue
+                                    ),
+                                    cornerRadius: 12,
+                                    shadowOffset: 3,
+                                    borderWidth: 2
+                                )
                             
                             Text(kingdom.name)
-                                .font(KingdomTheme.Typography.largeTitle())
-                                .fontWeight(.bold)
+                                .font(FontStyles.displaySmall)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
@@ -38,36 +44,34 @@ struct KingdomInfoSheetView: View {
                         
                         if kingdom.isUnclaimed {
                             Text("Unclaimed")
-                                .font(KingdomTheme.Typography.caption())
-                                .foregroundColor(KingdomTheme.Colors.error)
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(.white)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(KingdomTheme.Colors.parchmentRich)
-                                .cornerRadius(KingdomTheme.CornerRadius.medium)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.error, cornerRadius: 6)
                         }
                     }
                     
                     HStack(alignment: .center, spacing: 6) {
                         if kingdom.isUnclaimed {
                             Image(systemName: "crown")
-                                .font(.subheadline)
+                                .font(FontStyles.iconSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkLight)
                             Text("No ruler")
-                                .font(KingdomTheme.Typography.subheadline())
+                                .font(FontStyles.bodySmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         } else {
                             Image(systemName: "crown.fill")
-                                .font(.subheadline)
+                                .font(FontStyles.iconSmall)
                                 .foregroundColor(kingdom.rulerId == player.playerId ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
                             
                             Text("Ruled by \(kingdom.rulerName)")
-                                .font(KingdomTheme.Typography.subheadline())
+                                .font(FontStyles.bodySmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             if kingdom.rulerId == player.playerId {
                                 Text("(You)")
-                                    .font(KingdomTheme.Typography.subheadline())
-                                    .fontWeight(.semibold)
+                                    .font(FontStyles.bodySmallBold)
                                     .foregroundColor(KingdomTheme.Colors.gold)
                             }
                         }
@@ -76,17 +80,10 @@ struct KingdomInfoSheetView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
                 
-                // Kingdom color divider with medieval style
+                // Kingdom color divider with brutalist style
                 Rectangle()
-                    .fill(
-                        Color(
-                            red: kingdom.color.strokeRGBA.red,
-                            green: kingdom.color.strokeRGBA.green,
-                            blue: kingdom.color.strokeRGBA.blue
-                        )
-                    )
+                    .fill(Color.black)
                     .frame(height: 3)
-                    .cornerRadius(1.5)
                     .padding(.horizontal)
                 
                 // Ruler Actions (moved to top, after header)
@@ -94,35 +91,30 @@ struct KingdomInfoSheetView: View {
                     VStack(spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: "crown.fill")
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(.white)
                             Text("You rule this kingdom")
-                                .font(KingdomTheme.Typography.subheadline())
-                                .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(.white)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(KingdomTheme.Spacing.medium)
-                        .background(KingdomTheme.Colors.parchmentHighlight)
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
-                                .stroke(KingdomTheme.Colors.gold, lineWidth: KingdomTheme.BorderWidth.regular)
-                        )
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                         
                         // Manage Kingdom button
                         Button(action: onViewKingdom) {
                             HStack(spacing: 8) {
                                 Image(systemName: "gearshape.fill")
+                                    .font(FontStyles.iconSmall)
                                     .foregroundColor(.white)
                                 Text("Manage Kingdom")
-                                    .fontWeight(.semibold)
+                                    .font(FontStyles.bodyMediumBold)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(KingdomTheme.Spacing.medium)
-                            .background(KingdomTheme.Colors.buttonPrimary)
                             .foregroundColor(.white)
-                            .cornerRadius(KingdomTheme.CornerRadius.medium)
                         }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
                     }
                     .padding(.horizontal)
                 } else if kingdom.canClaim {
@@ -149,17 +141,17 @@ struct KingdomInfoSheetView: View {
                                     .tint(.white)
                             } else {
                                 Image(systemName: "flag.fill")
+                                    .font(FontStyles.iconSmall)
                                     .foregroundColor(.white)
                             }
                             Text(isClaiming ? "Claiming..." : "Claim This Kingdom")
-                                .fontWeight(.semibold)
+                                .font(FontStyles.bodyMediumBold)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(KingdomTheme.Spacing.medium)
-                        .background(KingdomTheme.Colors.gold)
                         .foregroundColor(.white)
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                     .disabled(isClaiming)
                     .padding(.horizontal)
                     .alert("Claim Failed", isPresented: $showClaimError) {
@@ -171,80 +163,75 @@ struct KingdomInfoSheetView: View {
                     // Already present but someone else rules it
                     HStack(spacing: 6) {
                         Image(systemName: "figure.walk")
-                            .foregroundColor(KingdomTheme.Colors.divider)
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text("You are here")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.divider)
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(8)
-                    .background(KingdomTheme.Colors.parchmentMuted)
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .padding(KingdomTheme.Spacing.small)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
                     .padding(.horizontal)
                 } else {
                     // Not inside this kingdom
                     HStack(spacing: 6) {
                         Image(systemName: "location.circle")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                         Text("You must travel here first")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
-                    .padding(8)
+                    .padding(KingdomTheme.Spacing.small)
                     .padding(.horizontal)
                 }
                 
                 // Population Stats
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                     Text("Population")
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .padding(.horizontal)
                     
                     HStack(spacing: KingdomTheme.Spacing.medium) {
                         VStack(spacing: 8) {
                             Image(systemName: "person.3.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(KingdomTheme.Colors.goldWarm)
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                             
                             Text("\(kingdom.checkedInPlayers)")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("Present Now")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .parchmentCard(
-                            backgroundColor: KingdomTheme.Colors.parchmentLight,
-                            cornerRadius: KingdomTheme.CornerRadius.xLarge,
-                            hasShadow: false
-                        )
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                         
                         VStack(spacing: 8) {
                             Image(systemName: "calendar")
-                                .font(.system(size: 24))
-                                .foregroundColor(KingdomTheme.Colors.goldWarm)
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
                             
                             Text("\(kingdom.weeklyUniqueCheckIns)")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("This Week")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .parchmentCard(
-                            backgroundColor: KingdomTheme.Colors.parchmentLight,
-                            cornerRadius: KingdomTheme.CornerRadius.xLarge,
-                            hasShadow: false
-                        )
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                     }
                     .padding(.horizontal)
                 }
@@ -257,18 +244,19 @@ struct KingdomInfoSheetView: View {
                 VStack(spacing: KingdomTheme.Spacing.small) {
                     HStack(spacing: KingdomTheme.Spacing.medium) {
                         // Treasury
-                        VStack(spacing: 4) {
+                        VStack(spacing: 8) {
                             Image(systemName: "building.columns.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                                .font(FontStyles.iconLarge)
+                                .foregroundColor(.white)
+                                .frame(width: 48, height: 48)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
                             
                             Text("\(kingdom.treasuryGold)g")
-                                .font(KingdomTheme.Typography.title3())
-                                .fontWeight(.bold)
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Text("Treasury")
-                                .font(KingdomTheme.Typography.caption2())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .frame(maxWidth: .infinity)
@@ -279,13 +267,18 @@ struct KingdomInfoSheetView: View {
                     }
                 }
                 .padding(KingdomTheme.Spacing.medium)
-                .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentDark, hasShadow: false)
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)
                 
                 // Buildings & Stats Section
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 2)
+                        .padding(.horizontal)
+                    
                     Text("Fortifications")
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .padding(.horizontal)
                     
@@ -312,7 +305,7 @@ struct KingdomInfoSheetView: View {
                 // Economy Buildings
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                     Text("Economy")
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .padding(.horizontal)
                     
@@ -368,48 +361,46 @@ struct KingdomInfoSheetView: View {
                     VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                         HStack {
                             Image(systemName: "doc.text.fill")
+                                .font(FontStyles.iconSmall)
                                 .foregroundColor(KingdomTheme.Colors.buttonWarning)
                             Text("Active Contract")
-                                .font(KingdomTheme.Typography.subheadline())
-                                .fontWeight(.bold)
+                                .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             Spacer()
                             if contract.isComplete {
                                 Text("Complete")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
-                                    .cornerRadius(KingdomTheme.CornerRadius.small)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                             } else {
                                 Text("In Progress")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                                    .cornerRadius(KingdomTheme.CornerRadius.small)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                             }
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 4) {
                                 Image(systemName: "building.2.fill")
-                                    .font(.caption2)
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 Text("\(contract.buildingType) Level \(contract.buildingLevel)")
-                                    .font(KingdomTheme.Typography.caption())
+                                    .font(FontStyles.labelMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             
                             HStack(spacing: 8) {
                                 Label("\(contract.contributorCount) contributors", systemImage: "person.2.fill")
-                                    .font(KingdomTheme.Typography.caption2())
+                                    .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
                                 
                                 Label("\(contract.rewardPool)g pool", systemImage: "dollarsign.circle")
-                                    .font(KingdomTheme.Typography.caption2())
+                                    .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.gold)
                             }
                             
@@ -418,11 +409,11 @@ struct KingdomInfoSheetView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
                                         Text("Progress")
-                                            .font(KingdomTheme.Typography.caption2())
+                                            .font(FontStyles.labelTiny)
                                             .foregroundColor(KingdomTheme.Colors.inkLight)
                                         Spacer()
                                         Text(String(format: "%.0f%%", contract.progress * 100))
-                                            .font(KingdomTheme.Typography.caption2())
+                                            .font(FontStyles.labelTiny)
                                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     }
                                     
@@ -430,27 +421,31 @@ struct KingdomInfoSheetView: View {
                                         ZStack(alignment: .leading) {
                                             Rectangle()
                                                 .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
-                                                .frame(height: 4)
-                                                .cornerRadius(2)
+                                                .frame(height: 6)
+                                                .overlay(Rectangle().stroke(Color.black, lineWidth: 1))
                                             
                                             Rectangle()
                                                 .fill(KingdomTheme.Colors.buttonWarning)
-                                                .frame(width: geometry.size.width * contract.progress, height: 4)
-                                                .cornerRadius(2)
+                                                .frame(width: geometry.size.width * contract.progress, height: 6)
                                         }
                                     }
-                                    .frame(height: 4)
+                                    .frame(height: 6)
                                 }
                             }
                         }
                     }
                     .padding(KingdomTheme.Spacing.medium)
-                    .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                     .padding(.horizontal)
                 }
                 
                 // Action buttons - Medieval war council style (backend controls visibility)
                 if kingdom.canDeclareWar || kingdom.canFormAlliance {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 2)
+                        .padding(.horizontal)
+                    
                     VStack(spacing: KingdomTheme.Spacing.small) {
                         if kingdom.canDeclareWar {
                             Button(action: {
@@ -459,16 +454,16 @@ struct KingdomInfoSheetView: View {
                             }) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "flame.fill")
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(.white)
                                     Text("Declare War")
-                                        .fontWeight(.semibold)
+                                        .font(FontStyles.bodyMediumBold)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(KingdomTheme.Spacing.medium)
-                                .background(KingdomTheme.Colors.buttonDanger)
                                 .foregroundColor(.white)
-                                .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 10)
                         }
                         
                         if kingdom.canFormAlliance {
@@ -478,16 +473,16 @@ struct KingdomInfoSheetView: View {
                             }) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "hand.raised.fill")
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(.white)
                                     Text("Form Alliance")
-                                        .fontWeight(.semibold)
+                                        .font(FontStyles.bodyMediumBold)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(KingdomTheme.Spacing.medium)
-                                .background(KingdomTheme.Colors.gold)
                                 .foregroundColor(.white)
-                                .cornerRadius(KingdomTheme.CornerRadius.medium)
                             }
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                         }
                         
                         Button(action: {
@@ -496,16 +491,16 @@ struct KingdomInfoSheetView: View {
                         }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "bolt.fill")
+                                    .font(FontStyles.iconSmall)
                                     .foregroundColor(.white)
                                 Text("Stage Coup")
-                                    .fontWeight(.semibold)
+                                    .font(FontStyles.bodyMediumBold)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(KingdomTheme.Spacing.medium)
-                            .background(KingdomTheme.Colors.buttonPrimary)
                             .foregroundColor(.white)
-                            .cornerRadius(KingdomTheme.CornerRadius.medium)
                         }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)

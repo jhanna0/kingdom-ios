@@ -12,18 +12,32 @@ struct MapHUD: View {
     @State private var showMusicSettings = false
     let notificationBadgeCount: Int
     
+    // Get home kingdom name
+    private var homeKingdomName: String? {
+        guard let homeKingdomId = viewModel.player.homeKingdomId else { return nil }
+        return viewModel.kingdoms.first(where: { $0.id == homeKingdomId })?.name
+    }
+    
     var body: some View {
         VStack {
             VStack(spacing: 12) {
                 // Top row - player and location
                 HStack(spacing: 12) {
-                    // Player badge with brutalist style
+                    // Player badge with brutalist style - shows home kingdom
                     HStack(spacing: 8) {
-                        Text(viewModel.player.isRuler ? "👑" : "⚔️")
-                            .font(.system(size: 18))
-                        Text(viewModel.player.name)
-                            .font(.system(size: 15, weight: .bold))
+                        Image(systemName: viewModel.player.isRuler ? "crown.fill" : "shield.fill")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.black)
+                        if let homeKingdom = homeKingdomName {
+                            Text("\(viewModel.player.name) of \(homeKingdom)")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.black)
+                                .lineLimit(1)
+                        } else {
+                            Text(viewModel.player.name)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.black)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -42,39 +56,6 @@ struct MapHUD: View {
                     )
                     
                     Spacer()
-                    
-                    // Location badge with brutalist style
-                    HStack(spacing: 6) {
-                        if let kingdom = viewModel.currentKingdomInside {
-                            Text("📍")
-                                .font(.system(size: 14))
-                            Text(kingdom.name)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.black)
-                                .lineLimit(1)
-                        } else {
-                            Text("🗺️")
-                                .font(.system(size: 14))
-                            Text("Traveling")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.black.opacity(0.6))
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.black)
-                                .offset(x: 2, y: 2)
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(KingdomTheme.Colors.parchmentLight)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                        }
-                    )
                     
                     // Music Control Button - brutalist circle
                     Button {

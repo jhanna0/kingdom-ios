@@ -59,17 +59,21 @@ struct CharacterSheetView: View {
     // MARK: - Combined Combat & Training Card
     
     private var combatAndTrainingCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
+                Image(systemName: "figure.fencing")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
                 Text("Combat & Skills")
-                    .font(.headline)
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
                 HStack(spacing: 4) {
                     Text("\(player.gold)")
-                        .font(.headline.monospacedDigit())
+                        .font(FontStyles.bodyLargeBold)
                         .foregroundColor(KingdomTheme.Colors.gold)
                     
                     Image(systemName: "circle.fill")
@@ -83,27 +87,29 @@ struct CharacterSheetView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: "hourglass")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         
                         Text("Training In Progress: \(activeContract.type.capitalized)")
-                            .font(.subheadline.bold())
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
                     
                     Text("Complete your current training (\(activeContract.actionsCompleted)/\(activeContract.actionsRequired)) before starting a new one")
-                        .font(.caption)
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                .cornerRadius(8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15), cornerRadius: 8)
             }
             
             Text("Tap a skill to view all tiers and purchase training")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            Divider()
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Skills grid - 3 rows for all skills
             VStack(spacing: 10) {
@@ -154,12 +160,7 @@ struct CharacterSheetView: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .task {
             await loadTrainingContracts()
         }
@@ -247,50 +248,45 @@ struct CharacterSheetView: View {
         )) {
             VStack(spacing: 12) {
                 ZStack(alignment: .topTrailing) {
-                    // Icon background
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-                    
+                    // Icon background with brutalist style
                     Image(systemName: iconName)
-                        .font(.title2)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .frame(width: 60, height: 60)
+                        .font(FontStyles.iconLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 52, height: 52)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.gold,
+                            cornerRadius: 12,
+                            shadowOffset: 3,
+                            borderWidth: 2
+                        )
                     
                     // Tier badge
                     Text("\(tier)")
-                        .font(.caption2.bold().monospacedDigit())
+                        .font(FontStyles.labelBadge)
                         .foregroundColor(.white)
-                        .frame(width: 20, height: 20)
-                        .background(KingdomTheme.Colors.buttonPrimary)
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
+                        .frame(width: 22, height: 22)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                            cornerRadius: 11,
+                            shadowOffset: 1,
+                            borderWidth: 1.5
+                        )
+                        .offset(x: 6, y: -6)
                 }
                 
                 VStack(spacing: 2) {
                     Text(displayName)
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Tier \(tier)/5")
-                        .font(.caption2)
+                        .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
         }
         .buttonStyle(.plain)
     }
@@ -334,38 +330,44 @@ struct CharacterSheetView: View {
     // MARK: - Crafting Info Card
     
     private var craftingInfoCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
                 Image(systemName: "hammer.fill")
-                    .font(.title2)
+                    .font(FontStyles.iconMedium)
                     .foregroundColor(KingdomTheme.Colors.gold)
                 
                 Text("Equipment Crafting")
-                    .font(.headline)
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
             }
             
-            // Resources row
-            HStack(spacing: 16) {
+            // Resources row with brutalist badges
+            HStack(spacing: 12) {
                 HStack(spacing: 4) {
                     Image(systemName: "cube.fill")
-                        .font(.caption)
+                        .font(FontStyles.iconMini)
                         .foregroundColor(.gray)
                     Text("\(player.iron)")
-                        .font(.caption.monospacedDigit())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                 
                 HStack(spacing: 4) {
                     Image(systemName: "cube.fill")
-                        .font(.caption)
+                        .font(FontStyles.iconMini)
                         .foregroundColor(.blue)
                     Text("\(player.steel)")
-                        .font(.caption.monospacedDigit())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                 
                 HStack(spacing: 4) {
                     Image(systemName: "circle.fill")
@@ -373,9 +375,12 @@ struct CharacterSheetView: View {
                         .foregroundColor(KingdomTheme.Colors.gold)
                     
                     Text("\(player.gold)")
-                        .font(.caption.monospacedDigit())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.gold)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
             }
             
             // Show active crafting contract if exists
@@ -383,27 +388,29 @@ struct CharacterSheetView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: "hourglass")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         
                         Text("Crafting In Progress: Tier \(activeContract.tier) \(activeContract.equipmentType.capitalized)")
-                            .font(.subheadline.bold())
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     }
                     
                     Text("Complete your current craft (\(activeContract.actionsCompleted)/\(activeContract.actionsRequired)) before starting a new one")
-                        .font(.caption)
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                .cornerRadius(8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15), cornerRadius: 8)
             }
             
             Text("Tap equipment to view all tiers and start crafting")
-                .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            Divider()
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Equipment grid
             HStack(spacing: 10) {
@@ -425,12 +432,7 @@ struct CharacterSheetView: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func craftGridButton(
@@ -451,58 +453,53 @@ struct CharacterSheetView: View {
         )) {
             VStack(spacing: 12) {
                 ZStack(alignment: .topTrailing) {
-                    // Icon background
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-                    
+                    // Icon background with brutalist style
                     Image(systemName: iconName)
-                        .font(.title2)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .frame(width: 60, height: 60)
+                        .font(FontStyles.iconLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 52, height: 52)
+                        .brutalistBadge(
+                            backgroundColor: equipped != nil ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium,
+                            cornerRadius: 12,
+                            shadowOffset: 3,
+                            borderWidth: 2
+                        )
                     
                     // Tier badge
                     if let item = equipped {
                         Text("\(item.tier)")
-                            .font(.caption2.bold().monospacedDigit())
+                            .font(FontStyles.labelBadge)
                             .foregroundColor(.white)
-                            .frame(width: 20, height: 20)
-                            .background(KingdomTheme.Colors.buttonPrimary)
-                            .clipShape(Circle())
-                            .offset(x: 4, y: -4)
+                            .frame(width: 22, height: 22)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                                cornerRadius: 11,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
+                            .offset(x: 6, y: -6)
                     }
                 }
                 
                 VStack(spacing: 2) {
                     Text(displayName)
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     if equipped != nil {
                         Text("+\(bonus)")
-                            .font(.caption.bold())
+                            .font(FontStyles.labelBold)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     } else {
                         Text("Not equipped")
-                            .font(.caption2)
+                            .font(FontStyles.labelTiny)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
         }
         .buttonStyle(.plain)
     }

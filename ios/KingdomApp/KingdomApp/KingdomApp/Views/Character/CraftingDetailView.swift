@@ -26,25 +26,22 @@ struct CraftingDetailView: View {
                 if let equipped = currentEquipment {
                     VStack(spacing: 12) {
                         Image(systemName: equipmentType == "weapon" ? "bolt.fill" : "shield.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .font(FontStyles.iconExtraLarge)
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 16, shadowOffset: 3, borderWidth: 2)
                         
                         Text("Currently Equipped: Tier \(equipped.tier)")
-                            .font(.headline)
+                            .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         Text("+\(equipmentType == "weapon" ? equipped.attackBonus : equipped.defenseBonus) \(equipmentType == "weapon" ? "Attack" : "Defense")")
-                            .font(.subheadline)
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(KingdomTheme.Colors.gold.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(KingdomTheme.Colors.gold, lineWidth: 1)
-                    )
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.gold.opacity(0.1))
                 }
                 
                 // Unified tier selector
@@ -57,7 +54,7 @@ struct CraftingDetailView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             // Tier name
                             Text("Tier \(tier)")
-                                .font(.headline)
+                                .font(FontStyles.headingMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             // Benefits - bullet list like training
@@ -66,18 +63,20 @@ struct CraftingDetailView: View {
                                 
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.subheadline)
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(KingdomTheme.Colors.gold)
                                         .frame(width: 20)
                                     
                                     Text("+\(tierCost.statBonus) \(equipmentType == "weapon" ? "Attack" : "Defense")")
-                                        .font(.subheadline)
+                                        .font(FontStyles.bodySmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                             
-                            Divider()
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(height: 2)
                             
                             // Requirements - ALWAYS SHOW
                             VStack(alignment: .leading, spacing: 12) {
@@ -85,19 +84,22 @@ struct CraftingDetailView: View {
                                 
                                 HStack {
                                     Image(systemName: "figure.walk")
+                                        .font(FontStyles.iconSmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
                                         .frame(width: 20)
                                     Text("\(tierCost.actionsRequired) actions")
-                                        .font(.subheadline)
+                                        .font(FontStyles.bodySmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Spacer()
                                     Text("2 hr cooldown")
-                                        .font(.caption)
+                                        .font(FontStyles.labelSmall)
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
                             }
                             
-                            Divider()
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(height: 2)
                             
                             // Cost - ALWAYS SHOW
                             VStack(alignment: .leading, spacing: 12) {
@@ -150,7 +152,7 @@ struct CraftingDetailView: View {
                         }
                     } else {
                         Text("Loading costs...")
-                            .font(.subheadline)
+                            .font(FontStyles.bodySmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
@@ -170,10 +172,10 @@ struct CraftingDetailView: View {
     private func sectionHeader(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.subheadline)
+                .font(FontStyles.iconSmall)
                 .foregroundColor(KingdomTheme.Colors.gold)
             Text(title)
-                .font(.subheadline.bold())
+                .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }

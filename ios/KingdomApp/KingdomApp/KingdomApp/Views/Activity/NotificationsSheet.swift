@@ -15,11 +15,13 @@ struct NotificationsSheet: View {
                         // Header
                         HStack {
                             Image(systemName: "bell.fill")
-                                .font(.title2)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                             
                             Text("Kingdom Notifications")
-                                .font(KingdomTheme.Typography.title2())
+                                .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Spacer()
@@ -37,15 +39,17 @@ struct NotificationsSheet: View {
                         } else if !viewModel.isLoading {
                             VStack(spacing: KingdomTheme.Spacing.large) {
                                 Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                    .font(FontStyles.iconExtraLarge)
+                                    .foregroundColor(.white)
+                                    .frame(width: 80, height: 80)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 20)
                                 
                                 Text("All Caught Up")
-                                    .font(KingdomTheme.Typography.title2())
+                                    .font(FontStyles.headingLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
                                 Text("No kingdom activity")
-                                    .font(KingdomTheme.Typography.body())
+                                    .font(FontStyles.bodyMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             .padding(.top, 60)

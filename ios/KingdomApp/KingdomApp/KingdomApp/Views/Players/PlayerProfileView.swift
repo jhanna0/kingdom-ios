@@ -21,15 +21,17 @@ struct PlayerProfileView: View {
             } else if let error = errorMessage {
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.circle.badge.xmark")
-                        .font(.system(size: 60))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 80)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                     
                     Text("Failed to load profile")
-                        .font(.headline)
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(error)
-                        .font(.caption)
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .multilineTextAlignment(.center)
                     
@@ -38,7 +40,7 @@ struct PlayerProfileView: View {
                             await loadProfile()
                         }
                     }
-                    .font(KingdomTheme.Typography.body())
+                    .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
                 .padding()
@@ -108,27 +110,29 @@ struct PlayerProfileView: View {
     private func locationAndActivityCard(_ profile: PlayerPublicProfile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Location & Activity")
-                .font(.headline)
+                .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             // Current Kingdom
             HStack(spacing: 12) {
                 Image(systemName: "mappin.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Current Location")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     if let kingdomName = profile.current_kingdom_name {
                         Text(kingdomName)
-                            .font(.subheadline.bold())
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                     } else {
                         Text("Unknown")
-                            .font(.subheadline)
+                            .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
@@ -136,44 +140,39 @@ struct PlayerProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-            .cornerRadius(8)
+            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
             
             // Current Activity
             HStack(spacing: 12) {
                 Image(systemName: profile.activity.icon)
-                    .font(.title3)
-                    .foregroundColor(activityColor(profile.activity.color))
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .brutalistBadge(backgroundColor: activityColor(profile.activity.color), cornerRadius: 8)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Current Activity")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Text(profile.activity.displayText)
-                        .font(.subheadline.bold())
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
                 
                 Spacer()
             }
             .padding()
-            .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-            .cornerRadius(8)
+            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func achievementsCard(_ profile: PlayerPublicProfile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Achievements")
-                .font(.headline)
+                .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             VStack(spacing: 8) {
@@ -209,34 +208,29 @@ struct PlayerProfileView: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func achievementRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(KingdomTheme.Colors.gold)
-                .frame(width: 24)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(.white)
+                .frame(width: 30, height: 30)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
             
             Text(title)
-                .font(.subheadline)
+                .font(FontStyles.bodySmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Spacer()
             
             Text(value)
-                .font(.subheadline.bold().monospacedDigit())
+                .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.gold)
         }
         .padding()
-        .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-        .cornerRadius(8)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
     }
     
     private func activityColor(_ colorName: String) -> Color {

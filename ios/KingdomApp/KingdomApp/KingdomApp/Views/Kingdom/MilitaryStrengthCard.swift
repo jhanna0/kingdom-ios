@@ -13,20 +13,27 @@ struct MilitaryStrengthCard: View {
             // Header
             HStack {
                 Image(systemName: strength?.isOwnKingdom == true ? "shield.fill" : "eye.fill")
-                    .foregroundColor(strength?.isOwnKingdom == true ? KingdomTheme.Colors.goldWarm : KingdomTheme.Colors.buttonWarning)
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .brutalistBadge(
+                        backgroundColor: strength?.isOwnKingdom == true ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonWarning,
+                        cornerRadius: 8,
+                        shadowOffset: 2,
+                        borderWidth: 1.5
+                    )
                 Text(strength?.isOwnKingdom == true ? "Military Strength" : "Intelligence Report")
-                    .font(KingdomTheme.Typography.subheadline())
-                    .fontWeight(.bold)
+                    .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 Spacer()
                 
                 // Intel age indicator
-                if let strength = strength, strength.hasIntel, let days = strength.intelAgeDays {
+                if let strength = strength, strength.hasIntel, let _ = strength.intelAgeDays {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                            .font(KingdomTheme.Typography.caption2())
+                            .font(FontStyles.iconMini)
                         Text(strength.intelAgeText)
-                            .font(KingdomTheme.Typography.caption2())
+                            .font(FontStyles.labelTiny)
                     }
                     .foregroundColor(strength.isIntelExpiring ? KingdomTheme.Colors.buttonWarning : KingdomTheme.Colors.inkLight)
                 }
@@ -49,7 +56,7 @@ struct MilitaryStrengthCard: View {
                 HStack {
                     ProgressView()
                     Text("Loading intelligence...")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -57,7 +64,7 @@ struct MilitaryStrengthCard: View {
             }
         }
         .padding(KingdomTheme.Spacing.medium)
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Own Kingdom View
@@ -104,9 +111,9 @@ struct MilitaryStrengthCard: View {
             if let gatheredBy = strength.gatheredBy {
                 HStack(spacing: 4) {
                     Image(systemName: "person.badge.shield.checkmark")
-                        .font(KingdomTheme.Typography.caption2())
+                        .font(FontStyles.iconMini)
                     Text("Intel by \(gatheredBy)")
-                        .font(KingdomTheme.Typography.caption2())
+                        .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 .padding(.bottom, 4)
@@ -159,9 +166,10 @@ struct MilitaryStrengthCard: View {
                 // Combat assessment
                 HStack(spacing: 4) {
                     Image(systemName: strength.canDefeatInAttack ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(FontStyles.iconMini)
                         .foregroundColor(strength.canDefeatInAttack ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonWarning)
                     Text(strength.canDefeatInAttack ? "We could win an attack!" : "They're too strong to attack")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(strength.canDefeatInAttack ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonWarning)
                 }
                 .padding(.top, 4)
@@ -179,17 +187,19 @@ struct MilitaryStrengthCard: View {
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.clockwise")
+                            .font(FontStyles.iconSmall)
                         Text("Update Intel (500g)")
+                            .font(FontStyles.labelBold)
                     }
-                    .font(KingdomTheme.Typography.caption())
-                    .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
                     .padding(.horizontal, 12)
-                    .background(canGatherIntel ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkLight.opacity(0.3))
                     .foregroundColor(.white)
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
                 }
+                .brutalistBadge(
+                    backgroundColor: canGatherIntel ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkLight.opacity(0.5),
+                    cornerRadius: 8
+                )
                 .disabled(!canGatherIntel)
                 .padding(.top, 8)
             }
@@ -208,48 +218,45 @@ struct MilitaryStrengthCard: View {
             
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.goldWarm)
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.gold)
                     .frame(width: 20)
                 Text("Attack Power")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Spacer()
                 Text("###")
-                    .font(KingdomTheme.Typography.caption())
-                    .fontWeight(.semibold)
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .blur(radius: 3)
             }
             
             HStack(spacing: 8) {
                 Image(systemName: "shield.fill")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.goldWarm)
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.gold)
                     .frame(width: 20)
                 Text("Total Defense")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Spacer()
                 Text("###")
-                    .font(KingdomTheme.Typography.caption())
-                    .fontWeight(.semibold)
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .blur(radius: 3)
             }
             
             HStack(spacing: 8) {
                 Image(systemName: "person.3.fill")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.goldWarm)
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.gold)
                     .frame(width: 20)
                 Text("Active Citizens")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Spacer()
                 Text("##")
-                    .font(KingdomTheme.Typography.caption())
-                    .fontWeight(.semibold)
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .blur(radius: 3)
             }
@@ -261,16 +268,15 @@ struct MilitaryStrengthCard: View {
     private func statRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(KingdomTheme.Typography.caption())
-                .foregroundColor(KingdomTheme.Colors.goldWarm)
+                .font(FontStyles.iconMini)
+                .foregroundColor(KingdomTheme.Colors.gold)
                 .frame(width: 20)
             Text(label)
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             Spacer()
             Text(value)
-                .font(KingdomTheme.Typography.caption())
-                .fontWeight(.semibold)
+                .font(FontStyles.labelBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }
