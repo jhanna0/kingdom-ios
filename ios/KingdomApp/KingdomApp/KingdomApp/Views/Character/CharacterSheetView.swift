@@ -70,27 +70,6 @@ struct CharacterSheetView: View {
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
             
-            // Show active training contract if exists
-            if let activeContract = trainingContracts.first(where: { $0.status != "completed" }) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "hourglass")
-                            .font(FontStyles.iconSmall)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        
-                        Text("Training In Progress: \(activeContract.type.capitalized)")
-                            .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                    }
-                    
-                    Text("Complete your current training (\(activeContract.actionsCompleted)/\(activeContract.actionsRequired)) before starting a new one")
-                        .font(FontStyles.labelMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
-            }
-            
             Text("Tap a skill to view all tiers and purchase training")
                 .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -331,7 +310,7 @@ struct CharacterSheetView: View {
                         .foregroundColor(.white)
                         .frame(width: 22, height: 22)
                         .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                            backgroundColor: .black,
                             cornerRadius: 11,
                             shadowOffset: 1,
                             borderWidth: 1.5
@@ -537,7 +516,7 @@ struct CharacterSheetView: View {
                             .foregroundColor(.white)
                             .frame(width: 22, height: 22)
                             .brutalistBadge(
-                                backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                                backgroundColor: .black,
                                 cornerRadius: 11,
                                 shadowOffset: 1,
                                 borderWidth: 1.5

@@ -71,53 +71,146 @@ struct MyPropertiesView: View {
         }
     }
     
-    // MARK: - Active Contracts Section (simple summary - work done in Actions tab)
+    // MARK: - Active Contracts Section (VISUAL property cards showing construction)
     
     private var contractsSection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
             ForEach(activeContracts, id: \.contract_id) { contract in
-                contractSummaryCard(contract: contract)
+                propertyUnderConstructionCard(contract: contract)
             }
         }
     }
     
-    private func contractSummaryCard(contract: PropertyAPI.PropertyUpgradeContract) -> some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
-            Image(systemName: "hammer.fill")
-                .font(FontStyles.iconMedium)
+    private func propertyUnderConstructionCard(contract: PropertyAPI.PropertyUpgradeContract) -> some View {
+        let targetTier = contract.to_tier
+        let progress = Float(contract.actions_completed) / Float(contract.actions_required)
+        
+        return VStack(spacing: 0) {
+            // Top section - Property visual with construction badge
+            ZStack(alignment: .topTrailing) {
+                // Property icon showcase
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(tierColor(for: targetTier).opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                    
+                    // Show the ACTUAL property icon (square outline for land, etc)
+                    tierIcon(for: targetTier)
+                        .opacity(0.4 + (Double(progress) * 0.6)) // Fade in as construction progresses
+                }
+                .frame(height: 140)
+                
+                // Construction badge overlay
+                HStack(spacing: 4) {
+                    Image(systemName: "hammer.fill")
+                        .font(FontStyles.iconMini)
+                    Text("Building")
+                        .font(FontStyles.labelBold)
+                }
                 .foregroundColor(.white)
-                .frame(width: 44, height: 44)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .brutalistBadge(
                     backgroundColor: KingdomTheme.Colors.buttonWarning,
-                    cornerRadius: 10,
-                    shadowOffset: 2,
+                    cornerRadius: 6,
+                    shadowOffset: 3,
                     borderWidth: 2
                 )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Building \(contract.target_tier_name)")
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("\(contract.actions_completed)/\(contract.actions_required) actions • \(Int((Float(contract.actions_completed) / Float(contract.actions_required)) * 100))%")
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .padding(12)
             }
+            .padding(.horizontal)
+            .padding(.top)
             
-            Spacer()
-            
-            Text("In Progress")
-                .font(FontStyles.labelSmall)
-                .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(KingdomTheme.Colors.buttonWarning, lineWidth: 1)
-                )
+            // Property details
+            VStack(spacing: KingdomTheme.Spacing.medium) {
+                // Title and location
+                VStack(spacing: 6) {
+                    Text(contract.target_tier_name)
+                        .font(FontStyles.displaySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    if let location = contract.location, let kingdomName = contract.kingdom_name {
+                        HStack(spacing: 6) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(FontStyles.iconMini)
+                            Text("\(location.capitalized) Side")
+                                .font(FontStyles.labelMedium)
+                            Text("•")
+                                .font(FontStyles.labelMedium)
+                            Text(kingdomName)
+                                .font(FontStyles.labelMedium)
+                        }
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.black.opacity(0.1))
+                    .frame(height: 1)
+                
+                // Progress section
+                VStack(spacing: 10) {
+                    HStack(alignment: .center) {
+                        Text("Construction Progress")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Spacer()
+                        
+                        Text("\(contract.actions_completed)/\(contract.actions_required)")
+                            .font(FontStyles.headingMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                    
+                    // Animated progress bar with stripes
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(KingdomTheme.Colors.inkDark.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                            
+                            // Progress fill with animated stripes
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(KingdomTheme.Colors.buttonWarning)
+                                
+                                AnimatedStripes()
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(Color.black, lineWidth: 1.5)
+                            }
+                            .frame(width: max(0, geometry.size.width * CGFloat(progress)))
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
+                        }
+                    }
+                    .frame(height: 20)
+                }
+                
+                // Instruction text
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                    
+                    Text("Complete work actions in the Actions tab")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding()
         }
-        .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     

@@ -12,10 +12,10 @@ struct ProfileHeaderCard: View {
             ZStack(alignment: .bottomTrailing) {
                 Text(String(displayName.prefix(1)).uppercased())
                     .font(FontStyles.displaySmall)
-                    .foregroundColor(.white)
+                    .foregroundColor(.black)
                     .frame(width: 64, height: 64)
                     .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.inkMedium,
+                        backgroundColor: .white,
                         cornerRadius: 16,
                         shadowOffset: 3,
                         borderWidth: 2.5
