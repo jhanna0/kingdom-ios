@@ -171,6 +171,7 @@ def get_military_strength(
         total_defense = _calculate_total_defense(db, kingdom_id)
         active_citizens = _count_active_citizens(db, kingdom_id)
         population = _get_population(db, kingdom_id)
+        active_patrols = _count_active_patrols(db, kingdom_id)
         
         return {
             "kingdom_id": kingdom_id,
@@ -181,6 +182,7 @@ def get_military_strength(
             "total_defense_with_walls": total_defense + (kingdom.wall_level * 5),
             "active_citizens": active_citizens,
             "population": population,
+            "patrol_strength": active_patrols,
             "is_own_kingdom": False,  # Not used when viewing as ruler
             "is_ruler": True,
             "has_intel": False,
@@ -218,7 +220,9 @@ def get_military_strength(
             
             # Level 4+: Patrol info
             if intel_level >= 4:
-                response["patrol_strength"] = "Low" if intel.active_citizen_count < 10 else "Medium" if intel.active_citizen_count < 30 else "High"
+                # Get current patrol count
+                active_patrols = _count_active_patrols(db, kingdom_id)
+                response["patrol_strength"] = active_patrols
             
             # Level 5+: Full military stats
             if intel_level >= 5:

@@ -18,7 +18,7 @@ struct MilitaryStrengthResponse: Codable {
     let intelAgeDays: Int?
     let gatheredBy: String?
     let gatheredAt: String?
-    let patrolStrength: String?
+    let patrolStrength: Int?
     let topPlayers: [TopPlayer]?
     let buildingLevels: BuildingLevels?
     
@@ -129,6 +129,7 @@ struct MilitaryStrength: Identifiable {
     let intelAgeDays: Int?
     let gatheredBy: String?
     let gatheredAt: Date?
+    let patrolStrength: Int?
     
     init(from response: MilitaryStrengthResponse) {
         self.kingdomId = response.kingdomId
@@ -145,6 +146,7 @@ struct MilitaryStrength: Identifiable {
         self.intelLevel = response.intelLevel
         self.intelAgeDays = response.intelAgeDays
         self.gatheredBy = response.gatheredBy
+        self.patrolStrength = response.patrolStrength
         
         if let gatheredAtString = response.gatheredAt {
             let formatter = ISO8601DateFormatter()

@@ -97,6 +97,35 @@ class KingdomAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Kingdom Management (Ruler Only)
+    
+    struct SetTaxRateResponse: Codable {
+        let success: Bool
+        let message: String
+        let kingdomId: String
+        let kingdomName: String
+        let taxRate: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case success
+            case message
+            case kingdomId = "kingdom_id"
+            case kingdomName = "kingdom_name"
+            case taxRate = "tax_rate"
+        }
+    }
+    
+    /// Set kingdom tax rate (ruler only)
+    func setTaxRate(kingdomId: String, taxRate: Int) async throws -> SetTaxRateResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let endpoint = "/kingdoms/\(kingdomId)/tax-rate?tax_rate=\(taxRate)"
+        let request = client.request(endpoint: endpoint, method: "PUT")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Leaderboard
     
     struct LeaderboardResponse: Codable {

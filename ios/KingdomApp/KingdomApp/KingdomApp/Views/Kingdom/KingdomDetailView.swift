@@ -3,6 +3,7 @@ import MapKit
 
 enum KingdomDetailDestination: Hashable {
     case build
+    case taxRate
     case decree
 }
 
@@ -104,6 +105,78 @@ struct KingdomDetailView: View {
                     }
                 }
                 
+                // Kingdom Management (Ruler only) - Moved to top
+                if isRuler {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 2)
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: KingdomTheme.Spacing.medium) {
+                        Text("Kingdom Management")
+                            .font(FontStyles.headingMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        NavigationLink(value: KingdomDetailDestination.build) {
+                            HStack {
+                                Image(systemName: "hammer.fill")
+                                    .font(FontStyles.iconMedium)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Manage Buildings")
+                                        .font(FontStyles.bodyMediumBold)
+                                    Text("Upgrade economy & defenses")
+                                        .font(FontStyles.labelSmall)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconSmall)
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                        }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
+                        
+                        NavigationLink(value: KingdomDetailDestination.taxRate) {
+                            HStack {
+                                Image(systemName: "percent")
+                                    .font(FontStyles.iconMedium)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Tax Rate")
+                                        .font(FontStyles.bodyMediumBold)
+                                    Text("Current: \(kingdom.taxRate)%")
+                                        .font(FontStyles.labelSmall)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconSmall)
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                        }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
+                        
+                        NavigationLink(value: KingdomDetailDestination.decree) {
+                            HStack {
+                                Image(systemName: "scroll.fill")
+                                    .font(FontStyles.iconMedium)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Make Decree")
+                                        .font(FontStyles.bodyMediumBold)
+                                    Text("Announce to all subjects")
+                                        .font(FontStyles.labelSmall)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconSmall)
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                        }
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSecondary, cornerRadius: 12)
+                    }
+                    .padding(.horizontal)
+                }
+                
                 // Buildings section
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                     Rectangle()
@@ -135,94 +208,6 @@ struct KingdomDetailView: View {
                     }
                     .padding(.horizontal)
                 }
-                
-                // Player Activity Feed
-                PlayerActivityFeedCard(kingdomId: kingdomId)
-                    .padding(.horizontal)
-                
-                // Tax Rate Management (Ruler only)
-                if isRuler {
-                    TaxRateManagementCard(
-                        kingdom: Binding(
-                            get: { kingdom },
-                            set: { _ in }
-                        ),
-                        viewModel: viewModel
-                    )
-                    .padding(.horizontal)
-                }
-                
-                        // Ruler actions
-                        if isRuler {
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(height: 2)
-                                .padding(.horizontal)
-                            
-                            VStack(spacing: KingdomTheme.Spacing.medium) {
-                                Text("Kingdom Management")
-                                    .font(FontStyles.headingMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                                
-                                NavigationLink(value: KingdomDetailDestination.build) {
-                                    HStack {
-                                        Image(systemName: "hammer.fill")
-                                            .font(FontStyles.iconMedium)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Manage Buildings")
-                                                .font(FontStyles.bodyMediumBold)
-                                            Text("Upgrade economy & defenses")
-                                                .font(FontStyles.labelSmall)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(FontStyles.iconSmall)
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding()
-                                }
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
-                        
-                        NavigationLink(value: KingdomDetailDestination.decree) {
-                            HStack {
-                                Image(systemName: "scroll.fill")
-                                    .font(FontStyles.iconMedium)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Make Decree")
-                                        .font(FontStyles.bodyMediumBold)
-                                    Text("Announce to all subjects")
-                                        .font(FontStyles.labelSmall)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconSmall)
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                        }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSecondary, cornerRadius: 12)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, KingdomTheme.Spacing.xLarge)
-                }
-                
-                // Benefits of ruling
-                if isRuler {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Benefits of Ruling")
-                            .font(FontStyles.headingMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        BenefitRow(icon: "bitcoinsign.circle.fill", text: "Passive income: +10 gold/hour")
-                        BenefitRow(icon: "person.2.fill", text: "Tax subjects & demand tribute")
-                        BenefitRow(icon: "shield.fill", text: "Build defenses against coups")
-                        BenefitRow(icon: "crown.fill", text: "Control territory & make decrees")
-                    }
-                    .padding()
-                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    .padding(.horizontal)
-                    .padding(.bottom, KingdomTheme.Spacing.xLarge)
-                }
             }
             .padding(.top)
         }
@@ -235,6 +220,8 @@ struct KingdomDetailView: View {
             switch destination {
             case .build:
                 BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)
+            case .taxRate:
+                TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)
             case .decree:
                 DecreeInputView(kingdom: kingdom, decreeText: $decreeText)
             }

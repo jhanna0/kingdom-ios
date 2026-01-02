@@ -188,14 +188,17 @@ extension MapViewModel {
             
             await MainActor.run {
                 if let index = kingdoms.firstIndex(where: { $0.id == kingdomId }) {
-                    kingdoms[index].treasuryGold = apiKingdom.treasury_gold
-                    kingdoms[index].wallLevel = apiKingdom.wall_level
-                    kingdoms[index].vaultLevel = apiKingdom.vault_level
-                    kingdoms[index].mineLevel = apiKingdom.mine_level
-                    kingdoms[index].marketLevel = apiKingdom.market_level
-                    kingdoms[index].travelFee = apiKingdom.travel_fee
-                    kingdoms[index].checkedInPlayers = apiKingdom.population
-                    kingdoms[index].activeContract = nil // Clear completed contract
+                kingdoms[index].treasuryGold = apiKingdom.treasury_gold
+                kingdoms[index].wallLevel = apiKingdom.wall_level
+                kingdoms[index].vaultLevel = apiKingdom.vault_level
+                kingdoms[index].mineLevel = apiKingdom.mine_level
+                kingdoms[index].marketLevel = apiKingdom.market_level
+                kingdoms[index].farmLevel = apiKingdom.farm_level
+                kingdoms[index].educationLevel = apiKingdom.education_level
+                kingdoms[index].taxRate = apiKingdom.tax_rate
+                kingdoms[index].travelFee = apiKingdom.travel_fee
+                kingdoms[index].checkedInPlayers = apiKingdom.population
+                kingdoms[index].activeContract = nil // Clear completed contract
                     
                     // Update building upgrade costs
                     kingdoms[index].wallUpgradeCost = apiKingdom.wall_upgrade_cost.map {

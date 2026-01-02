@@ -75,25 +75,29 @@ extension MapViewModel {
     
     /// Set the kingdom tax rate (ruler only)
     func setKingdomTaxRate(_ rate: Int, for kingdomId: String) {
-        guard let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) else {
-            print("❌ Kingdom not found")
-            return
-        }
-        
-        // Check if player is ruler
-        guard kingdoms[kingdomIndex].rulerId == player.playerId else {
-            print("❌ Only ruler can set tax rate")
-            return
-        }
-        
         // Clamp rate to 0-100
         let clampedRate = max(0, min(100, rate))
-        kingdoms[kingdomIndex].taxRate = clampedRate
-        print("✅ Set tax rate to \(clampedRate)%")
         
-        // Update currentKingdomInside if it's the same kingdom
-        if currentKingdomInside?.id == kingdomId {
-            currentKingdomInside = kingdoms[kingdomIndex]
+        Task {
+            do {
+                // Call backend API
+                let response = try await KingdomAPIService.shared.kingdom.setTaxRate(kingdomId: kingdomId, taxRate: clampedRate)
+                
+                await MainActor.run {
+                    // Update local state with response
+                    if let kingdomIndex = kingdoms.firstIndex(where: { $0.id == kingdomId }) {
+                        kingdoms[kingdomIndex].taxRate = response.taxRate
+                        print("✅ Tax rate updated to \(response.taxRate)%")
+                        
+                        // Update currentKingdomInside if it's the same kingdom
+                        if currentKingdomInside?.id == kingdomId {
+                            currentKingdomInside = kingdoms[kingdomIndex]
+                        }
+                    }
+                }
+            } catch {
+                print("❌ Failed to set tax rate: \(error.localizedDescription)")
+            }
         }
     }
 }

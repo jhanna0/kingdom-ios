@@ -136,7 +136,7 @@ struct ActionCard: View {
                         Image(systemName: "dollarsign.circle.fill")
                             .font(FontStyles.iconMini)
                             .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("~\(goldGross)g")
+                        Text("\(goldGross)g")
                             .font(FontStyles.labelBold)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     }

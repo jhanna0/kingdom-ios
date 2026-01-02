@@ -31,7 +31,7 @@ struct MyPropertiesView: View {
                     // ALWAYS show tier benefits - whether user owns property or not
                     propertyBenefitsSection
                 }
-                .padding(.vertical)
+                .padding()
             }
             .parchmentBackground()
             .navigationTitle("My Property")
@@ -74,7 +74,6 @@ struct MyPropertiesView: View {
                 NavigationLink(value: PropertyDestination.detail(property)) {
                     propertyActionButton(property: property)
                 }
-                .padding(.horizontal)
             }
         }
     }
@@ -130,7 +129,6 @@ struct MyPropertiesView: View {
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-        .padding(.horizontal)
     }
     
     private func propertyActionButton(property: Property) -> some View {
@@ -197,7 +195,6 @@ struct MyPropertiesView: View {
             .frame(maxWidth: .infinity)
             .padding()
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            .padding(.horizontal)
             
             // Buy Land Button - prominent
             NavigationLink(value: PropertyDestination.market(currentKingdom)) {
@@ -233,7 +230,6 @@ struct MyPropertiesView: View {
                 .padding()
             }
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            .padding(.horizontal)
         }
     }
     
@@ -241,35 +237,27 @@ struct MyPropertiesView: View {
     
     private var propertyBenefitsSection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            // Section header
-            HStack(spacing: KingdomTheme.Spacing.medium) {
+            // Section header - matching style from PlayerActivityFeedCard
+            HStack {
                 Image(systemName: "star.fill")
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 42, height: 42)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Property Benefits")
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Unlock by upgrading your property")
-                        .font(FontStyles.labelMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
+                Text("Property Benefits")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
             }
-            .padding(.horizontal)
             
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 2)
-                .padding(.horizontal)
             
-            // All tier benefits
-            VStack(spacing: 12) {
+            // All tier benefits - matching PlayerActivityFeedCard spacing
+            VStack(spacing: 10) {
                 tierBenefitRow(
                     tier: 1,
                     icon: "square.dashed",
@@ -310,11 +298,9 @@ struct MyPropertiesView: View {
                     isUnlocked: currentPropertyTier >= 5
                 )
             }
-            .padding(.horizontal)
         }
-        .padding(.vertical)
+        .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-        .padding(.horizontal)
     }
     
     private var currentPropertyTier: Int {
@@ -322,8 +308,8 @@ struct MyPropertiesView: View {
     }
     
     private func tierBenefitRow(tier: Int, icon: String, name: String, benefit: String, isUnlocked: Bool) -> some View {
-        HStack(spacing: 14) {
-            // Tier icon
+        HStack(alignment: .top, spacing: 12) {
+            // Tier icon with badge
             Image(systemName: icon)
                 .font(FontStyles.iconMedium)
                 .foregroundColor(.white)
@@ -331,11 +317,11 @@ struct MyPropertiesView: View {
                 .brutalistBadge(
                     backgroundColor: isUnlocked ? tierColor(for: tier) : KingdomTheme.Colors.inkLight,
                     cornerRadius: 10,
-                    shadowOffset: isUnlocked ? 2 : 0,
+                    shadowOffset: 2,
                     borderWidth: 2
                 )
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text("Tier \(tier)")
                         .font(FontStyles.labelBold)
@@ -350,29 +336,21 @@ struct MyPropertiesView: View {
                 }
                 
                 Text(benefit)
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(isUnlocked ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(isUnlocked ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer()
             
-            if isUnlocked {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.gold)
-            } else {
-                Image(systemName: "lock.fill")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
-            }
+            // Status indicator
+            Image(systemName: isUnlocked ? "checkmark.seal.fill" : "lock.fill")
+                .font(FontStyles.iconSmall)
+                .foregroundColor(isUnlocked ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
         }
-        .padding(12)
-        .background(isUnlocked ? tierColor(for: tier).opacity(0.08) : Color.clear)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isUnlocked ? tierColor(for: tier).opacity(0.3) : KingdomTheme.Colors.inkDark.opacity(0.1), lineWidth: 1.5)
-        )
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
     }
     
     // MARK: - Helper Functions

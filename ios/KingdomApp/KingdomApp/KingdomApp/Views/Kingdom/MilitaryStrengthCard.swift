@@ -100,6 +100,14 @@ struct MilitaryStrengthCard: View {
                     value: "\(citizens)"
                 )
             }
+            
+            if let patrolStrength = strength.patrolStrength {
+                statRow(
+                    icon: "eye.fill",
+                    label: "Currently Patrolling",
+                    value: "\(patrolStrength)"
+                )
+            }
         }
     }
     
@@ -141,6 +149,14 @@ struct MilitaryStrengthCard: View {
                         icon: "person.2.circle.fill",
                         label: "Active Citizens",
                         value: "\(citizens)"
+                    )
+                }
+                
+                if let patrolStrength = strength.patrolStrength {
+                    statRow(
+                        icon: "eye.fill",
+                        label: "Currently Patrolling",
+                        value: "\(patrolStrength)"
                     )
                 }
             }

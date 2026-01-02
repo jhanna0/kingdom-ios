@@ -568,6 +568,52 @@ def get_my_kingdoms(
     return kingdoms
 
 
+# ===== Kingdom Management (Ruler Only) =====
+
+@router.put("/kingdoms/{kingdom_id}/tax-rate")
+def set_kingdom_tax_rate(
+    kingdom_id: str,
+    tax_rate: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set tax rate for a kingdom (ruler only)"""
+    # Validate tax rate
+    if tax_rate < 0 or tax_rate > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tax rate must be between 0 and 100"
+        )
+    
+    # Get kingdom
+    kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+    if not kingdom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kingdom not found"
+        )
+    
+    # Check if user is the ruler
+    if kingdom.ruler_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the ruler can change the tax rate"
+        )
+    
+    # Update tax rate
+    kingdom.tax_rate = tax_rate
+    kingdom.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Tax rate updated to {tax_rate}%",
+        "kingdom_id": kingdom.id,
+        "kingdom_name": kingdom.name,
+        "tax_rate": tax_rate
+    }
+
+
 # ===== Stats & Leaderboard =====
 
 @router.get("/leaderboard")

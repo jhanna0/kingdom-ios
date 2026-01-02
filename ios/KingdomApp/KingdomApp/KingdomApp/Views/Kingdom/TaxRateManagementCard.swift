@@ -76,7 +76,7 @@ struct TaxRateManagementCard: View {
                 
                 infoRow(
                     icon: "hammer.fill",
-                    text: "Citizens pay \(kingdom.taxRate)% tax on contract work"
+                    text: "Citizens pay taxes on any income"
                 )
                 
                 infoRow(
