@@ -35,7 +35,7 @@ struct KingdomAppApp: App {
             }
             .onAppear {
                 // Start background music when app launches
-                musicService.playBackgroundMusic(filename: "ambient_background.wav", volume: 0.25)
+                musicService.playBackgroundMusic(filename: "ambient_background_full.mp3", volume: 0.25)
             }
         }
     }

@@ -161,14 +161,11 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         ("education", kingdom.education_level)
     ]
     
-    # TEMPORARY: Fake 1000 population for testing cost scaling
-    fake_population = 1000
-    
     for building_name, current_level in building_types:
         if current_level < 5:  # Max level is 5
             next_level = current_level + 1
-            actions = calculate_actions_required(building_name.capitalize(), next_level, fake_population)
-            construction_cost = calculate_construction_cost(next_level, fake_population)
+            actions = calculate_actions_required(building_name.capitalize(), next_level, kingdom.population)
+            construction_cost = calculate_construction_cost(next_level, kingdom.population)
             # No more reward pool - rewards given per action now
             kingdom_dict[f"{building_name}_upgrade_cost"] = {
                 "actions_required": actions,
