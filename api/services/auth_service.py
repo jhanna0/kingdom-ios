@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 
 from db import User, UserKingdom, PlayerState
 from models.auth_schemas import AppleSignIn
+from utils.validation import validate_username, sanitize_username
 
 
 # Password hashing
@@ -80,24 +81,35 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
         db.refresh(existing_user)
         return existing_user
     
+    # Sanitize and validate display name
+    display_name = apple_data.display_name or "Player"
+    if display_name != "Player":  # Don't validate default name
+        display_name = sanitize_username(display_name)
+        is_valid, error_msg = validate_username(display_name)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+    
     # Check if display name is taken in this hometown
-    if apple_data.hometown_kingdom_id and apple_data.display_name:
+    if apple_data.hometown_kingdom_id and display_name:
         name_taken = db.query(User).filter(
-            User.display_name == apple_data.display_name,
+            User.display_name == display_name,
             User.hometown_kingdom_id == apple_data.hometown_kingdom_id
         ).first()
         
         if name_taken:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Name '{apple_data.display_name}' is already taken in this city"
+                detail=f"Name '{display_name}' is already taken in this city"
             )
     
     # Create new user - PostgreSQL will auto-generate the ID
     user = User(
         email=apple_data.email,
         apple_user_id=apple_data.apple_user_id,
-        display_name=apple_data.display_name or "Player",
+        display_name=display_name,
         hometown_kingdom_id=apple_data.hometown_kingdom_id,
     )
     
@@ -138,6 +150,32 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+    
+    # Special handling for display_name updates
+    if "display_name" in updates and updates["display_name"] is not None:
+        display_name = sanitize_username(updates["display_name"])
+        is_valid, error_msg = validate_username(display_name)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+        
+        # Check if new name is taken in this hometown
+        if user.hometown_kingdom_id:
+            name_taken = db.query(User).filter(
+                User.display_name == display_name,
+                User.hometown_kingdom_id == user.hometown_kingdom_id,
+                User.id != user_id  # Exclude current user
+            ).first()
+            
+            if name_taken:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Name '{display_name}' is already taken in this city"
+                )
+        
+        updates["display_name"] = display_name
     
     # Update allowed fields
     for key, value in updates.items():

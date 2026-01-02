@@ -1,7 +1,7 @@
 """
 Authentication-related Pydantic schemas
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -14,6 +14,25 @@ class AppleSignIn(BaseModel):
     email: Optional[str] = None
     display_name: Optional[str] = None
     hometown_kingdom_id: Optional[str] = None
+    
+    @field_validator('display_name')
+    @classmethod
+    def validate_display_name(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and sanitize display name"""
+        if v is None:
+            return v
+        
+        from utils.validation import validate_username, sanitize_username
+        
+        # Sanitize first
+        v = sanitize_username(v)
+        
+        # Then validate
+        is_valid, error_msg = validate_username(v)
+        if not is_valid:
+            raise ValueError(error_msg)
+        
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -73,10 +92,29 @@ class UserPrivate(BaseModel):
 
 class UserUpdate(BaseModel):
     """Update user profile"""
-    display_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
     hometown_kingdom_id: Optional[str] = None
+    
+    @field_validator('display_name')
+    @classmethod
+    def validate_display_name(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and sanitize display name"""
+        if v is None:
+            return v
+        
+        from utils.validation import validate_username, sanitize_username
+        
+        # Sanitize first
+        v = sanitize_username(v)
+        
+        # Then validate
+        is_valid, error_msg = validate_username(v)
+        if not is_valid:
+            raise ValueError(error_msg)
+        
+        return v
 
 
 class PasswordChange(BaseModel):

@@ -151,8 +151,15 @@ struct DisplayNameStep: View {
     let selectedCity: String
     let onContinue: () -> Void
     
+    @State private var validationResult: UsernameValidator.ValidationResult = .valid
+    @State private var showValidation = false
+    
+    var validationHints: [ValidationHint] {
+        UsernameValidator.getValidationHints(for: displayName)
+    }
+    
     var isValid: Bool {
-        !displayName.isEmpty && displayName.count >= 2
+        validationResult.isValid && !displayName.isEmpty
     }
     
     var body: some View {
@@ -186,18 +193,56 @@ struct DisplayNameStep: View {
                     .cornerRadius(KingdomTheme.CornerRadius.medium)
                     .overlay(
                         RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
-                            .stroke(KingdomTheme.Colors.border, lineWidth: 1)
+                            .stroke(
+                                showValidation && !validationResult.isValid ? 
+                                    Color.red : KingdomTheme.Colors.border, 
+                                lineWidth: showValidation && !validationResult.isValid ? 2 : 1
+                            )
                     )
+                    .onChange(of: displayName) { oldValue, newValue in
+                        showValidation = !newValue.isEmpty
+                        validationResult = UsernameValidator.validate(newValue)
+                    }
+                
+                // Validation hints
+                if showValidation && !displayName.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(validationHints) { hint in
+                            HStack(spacing: 6) {
+                                Image(systemName: hint.isValid ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(hint.isValid ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight)
+                                
+                                Text(hint.text)
+                                    .font(KingdomTheme.Typography.caption2())
+                                    .foregroundColor(hint.isValid ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                            }
+                        }
+                        
+                        if !validationResult.isValid && !validationResult.errorMessage.isEmpty {
+                            Text(validationResult.errorMessage)
+                                .font(KingdomTheme.Typography.caption2())
+                                .foregroundColor(.red)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
                 
                 Text("Must be unique in \(selectedCity)")
                     .font(KingdomTheme.Typography.caption2())
                     .foregroundColor(KingdomTheme.Colors.inkLight)
+                    .padding(.top, 4)
             }
             .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
             
             Spacer()
             
-            Button(action: onContinue) {
+            Button(action: {
+                // Sanitize before sending
+                displayName = UsernameValidator.sanitize(displayName)
+                onContinue()
+            }) {
                 Text("Establish Your Legacy")
                     .font(KingdomTheme.Typography.headline())
                     .fontWeight(.bold)
