@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Unified action button used across training, crafting, property upgrades, etc.
+/// Uses EXACT MapHUD button style
 struct UnifiedActionButton: View {
     let title: String
     let subtitle: String?
@@ -30,28 +31,51 @@ struct UnifiedActionButton: View {
             Button(action: action) {
                 HStack(spacing: 8) {
                     Image(systemName: icon)
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .bold))
                     Text(title)
-                        .font(.subheadline.bold())
+                        .font(.system(size: 15, weight: .bold))
                 }
-                .foregroundColor(KingdomTheme.Colors.parchmentLight)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(KingdomTheme.Colors.buttonPrimary)
-                .cornerRadius(10)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black)
+                            .offset(x: 3, y: 3)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.buttonPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
             }
+            .buttonStyle(.plain)
         } else if let message = statusMessage {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.subheadline)
+                    .font(.system(size: 14, weight: .bold))
                 Text(message)
-                    .font(.subheadline)
+                    .font(.system(size: 13, weight: .medium))
             }
             .foregroundColor(KingdomTheme.Colors.buttonWarning)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-            .cornerRadius(10)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black)
+                        .offset(x: 2, y: 2)
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                }
+            )
         }
     }
 }
@@ -71,31 +95,30 @@ struct ResourceRow: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .font(.body)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(iconColor)
                 .frame(width: 24)
             
             Text(label)
-                .font(.subheadline)
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Spacer()
             
             HStack(spacing: 4) {
                 Text("\(required)")
-                    .font(.subheadline.bold().monospacedDigit())
+                    .font(.system(size: 14, weight: .bold).monospacedDigit())
                     .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.buttonDanger)
                 
                 Text("/")
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("\(available)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(canAfford ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
             }
         }
         .padding(.vertical, 4)
     }
 }
-

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// View to see all building levels at once
+/// View to see all building levels at once with brutalist styling
 struct BuildingLevelsView: View {
     let buildingName: String
     let icon: String
@@ -14,7 +14,7 @@ struct BuildingLevelsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: KingdomTheme.Spacing.large) {
                 // Level selector with picker
                 TierSelectorCard(
                     currentTier: currentLevel,
@@ -33,31 +33,77 @@ struct BuildingLevelsView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .onAppear {
-            selectedLevel = currentLevel
+            selectedLevel = currentLevel > 0 ? currentLevel : 1
         }
     }
     
     private func levelContent(level: Int) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Level name
-            Text("Level \(level)")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Level header
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: icon)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: levelColor(level),
+                        cornerRadius: 10,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(buildingName) Level \(level)")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text(level <= currentLevel ? "Built" : "Not Built")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                }
+                
+                Spacer()
+                
+                if level <= currentLevel {
+                    Text("Active")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.black)
+                                    .offset(x: 1, y: 1)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(KingdomTheme.Colors.inkMedium)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            }
+                        )
+                }
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Benefits
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                 sectionHeader(icon: "star.fill", title: "Benefits")
                 
                 if let detailedBenefits = detailedBenefits {
                     ForEach(detailedBenefits(level), id: \.self) { benefit in
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
-                                .font(.subheadline)
-                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
                                 .frame(width: 20)
                             
                             Text(benefit)
-                                .font(.subheadline)
+                                .font(FontStyles.bodySmall)
                                 .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -65,75 +111,114 @@ struct BuildingLevelsView: View {
                 } else {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
-                            .font(.subheadline)
-                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
                             .frame(width: 20)
                         
                         Text(benefitForLevel(level))
-                            .font(.subheadline)
+                            .font(FontStyles.bodySmall)
                             .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
             
-            Divider()
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Cost
-            VStack(alignment: .leading, spacing: 12) {
-                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                sectionHeader(icon: "dollarsign.circle.fill", title: "Upgrade Cost")
                 
                 HStack {
-                    Image(systemName: "building.columns.fill")
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Image(systemName: "g.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
                         .frame(width: 20)
+                    
                     Text("\(costForLevel(level)) Gold")
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
                     Spacer()
+                    
                     Text("From Treasury")
-                        .font(.caption)
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
             
-            // Status
+            // Status indicator - MapHUD style
             if level <= currentLevel {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.subheadline)
-                    Text("Unlocked")
-                        .font(.subheadline.bold())
+                        .font(.system(size: 14, weight: .bold))
+                    Text("Built")
+                        .font(.system(size: 15, weight: .bold))
                 }
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(KingdomTheme.Colors.inkMedium.opacity(0.1))
-                .cornerRadius(10)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.inkMedium)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
             } else if level > currentLevel + 1 {
                 HStack(spacing: 8) {
                     Image(systemName: "lock.fill")
-                        .font(.subheadline)
+                        .font(.system(size: 13, weight: .medium))
                     Text("Complete Level \(currentLevel + 1) first")
-                        .font(.subheadline)
+                        .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-                .cornerRadius(10)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
             } else {
                 HStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.subheadline)
-                    Text("Locked")
-                        .font(.subheadline)
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text("Available to Build")
+                        .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-                .cornerRadius(10)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.parchment)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
             }
         }
     }
@@ -141,12 +226,21 @@ struct BuildingLevelsView: View {
     private func sectionHeader(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.subheadline)
+                .font(FontStyles.iconSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             Text(title)
-                .font(.subheadline.bold())
+                .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }
+    
+    private func levelColor(_ level: Int) -> Color {
+        if level <= currentLevel {
+            return KingdomTheme.Colors.inkMedium
+        } else if level == currentLevel + 1 {
+            return KingdomTheme.Colors.buttonPrimary
+        } else {
+            return KingdomTheme.Colors.inkLight
+        }
+    }
 }
-

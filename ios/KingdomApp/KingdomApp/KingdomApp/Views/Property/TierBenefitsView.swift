@@ -1,13 +1,13 @@
 import SwiftUI
 
 /// Full overview of all property tiers and their benefits
-/// Shows users what they're working toward
+/// Shows users what they're working toward with brutalist styling
 struct TierBenefitsView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: KingdomTheme.Spacing.large) {
                 // Header
                 headerCard
                 
@@ -18,137 +18,171 @@ struct TierBenefitsView: View {
             }
             .padding()
         }
-        .parchmentBackground()
+        .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
         .navigationTitle("Property Tiers")
         .navigationBarTitleDisplayMode(.inline)
-        .parchmentNavigationBar()
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
     
     // MARK: - Header
     
     private var headerCard: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
             Image(systemName: "building.2")
-                .font(.system(size: 50))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .font(FontStyles.iconExtraLarge)
+                .foregroundColor(.white)
+                .frame(width: 70, height: 70)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.inkMedium,
+                    cornerRadius: 16,
+                    shadowOffset: 4,
+                    borderWidth: 2.5
+                )
             
             Text("Property Progression")
-                .font(.title2.bold())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text("Upgrade your property to unlock new benefits")
-                .font(.body)
-                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                .font(FontStyles.bodyMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(KingdomTheme.Spacing.large)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
     
     // MARK: - Tier Card
     
     private func tierCard(tier: Int) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Tier header with icon
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [tierColor(for: tier).opacity(0.2), tierColor(for: tier).opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 70, height: 70)
-                    
-                    tierIcon(for: tier)
-                }
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                tierIcon(for: tier)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .brutalistBadge(
+                        backgroundColor: tierColor(for: tier),
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tier \(tier)")
-                        .font(.caption.bold())
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(tierColor(for: tier))
                     
                     Text(tierName(for: tier))
-                        .font(.title3.bold())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(tierDescription(for: tier))
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Spacer()
             }
             
-            Divider()
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
-            // Benefits
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Benefits:")
-                    .font(.subheadline.bold())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            // Benefits section
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                sectionHeader(icon: "star.fill", title: "Benefits")
                 
                 ForEach(tierBenefits(for: tier), id: \.self) { benefit in
-                    HStack(spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(tierColor(for: tier))
-                            .frame(width: 16)
+                            .frame(width: 20)
                         
                         Text(benefit)
-                            .font(.subheadline)
+                            .font(FontStyles.bodySmall)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
             
-            // Cost and requirements
-            Divider()
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
+            // Cost and requirements
             HStack {
                 if tier > 1 {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Upgrade Cost")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                        
-                        Text("\(upgradeCost(from: tier - 1)) gold")
-                            .font(.subheadline.bold())
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                            Text("\(upgradeCost(from: tier - 1))")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                     }
                     
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Work Required")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        Text("\(baseActionsRequired(for: tier - 1)) actions")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        HStack(spacing: 4) {
+                            Image(systemName: "figure.walk")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("\(baseActionsRequired(for: tier - 1)) actions")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Purchase Cost")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                        
-                        Text("500+ gold (varies)")
-                            .font(.subheadline.bold())
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                            Text("500+ (varies by location)")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                     }
                 }
             }
         }
-        .padding()
-        .parchmentCard(
-            backgroundColor: KingdomTheme.Colors.parchmentLight,
-            borderColor: tierColor(for: tier).opacity(0.3)
-        )
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sectionHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            Text(title)
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+        }
     }
     
     // MARK: - Tier Data
@@ -206,8 +240,8 @@ struct TierBenefitsView: View {
         switch tier {
         case 1: return KingdomTheme.Colors.buttonSecondary
         case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.inkMedium
-        case 4: return KingdomTheme.Colors.inkMedium
+        case 3: return Color(red: 0.45, green: 0.35, blue: 0.25)
+        case 4: return Color(red: 0.6, green: 0.4, blue: 0.2)
         case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkDark
         }
@@ -218,36 +252,16 @@ struct TierBenefitsView: View {
         switch tier {
         case 1:
             Image(systemName: "rectangle.dashed")
-                .font(.system(size: 35, weight: .light))
-                .foregroundColor(tierColor(for: tier))
         case 2:
             Image(systemName: "house.fill")
-                .font(.system(size: 35))
-                .foregroundColor(tierColor(for: tier))
         case 3:
             Image(systemName: "hammer.fill")
-                .font(.system(size: 35))
-                .foregroundColor(tierColor(for: tier))
         case 4:
             Image(systemName: "building.columns.fill")
-                .font(.system(size: 35))
-                .foregroundColor(tierColor(for: tier))
         case 5:
-            VStack(spacing: -5) {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Image(systemName: "building.columns.fill")
-                    .font(.system(size: 30))
-                    .foregroundColor(tierColor(for: tier))
-            }
+            Image(systemName: "crown.fill")
         default:
             Image(systemName: "questionmark")
-                .font(.system(size: 35))
-                .foregroundColor(tierColor(for: tier))
         }
     }
 }
-
-
-

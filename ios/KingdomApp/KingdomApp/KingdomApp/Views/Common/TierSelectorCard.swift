@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Reusable component for selecting and viewing tiers with consistent styling
+/// Reusable component for selecting and viewing tiers with brutalist styling
 struct TierSelectorCard<Content: View>: View {
     let currentTier: Int
     let maxTier: Int
@@ -23,43 +23,41 @@ struct TierSelectorCard<Content: View>: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Tier pills - visual tier browser
-            HStack(spacing: 12) {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+            // Tier selector header
+            HStack {
+                Image(systemName: "list.number")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Select Tier")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                if currentTier > 0 {
+                    Text("Current: \(currentTier)")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Tier pills - brutalist style matching MapHUD
+            HStack(spacing: 10) {
                 ForEach(1...maxTier, id: \.self) { tier in
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedTier = tier
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            // Tier indicator
-                            ZStack {
-                                Circle()
-                                    .fill(tierColor(tier))
-                                    .frame(width: 44, height: 44)
-                                
-                                if tier == currentTier && showCurrentBadge {
-                                    Circle()
-                                        .stroke(KingdomTheme.Colors.inkMedium, lineWidth: 3)
-                                        .frame(width: 44, height: 44)
-                                }
-                                
-                                Text("\(tier)")
-                                    .font(.system(.body, design: .rounded).bold())
-                                    .foregroundColor(.white)
-                            }
-                            
-                            // Status text
-                            Text(statusText(tier))
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(statusColor(tier))
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    tierButton(tier: tier)
                 }
             }
             .frame(maxWidth: .infinity)
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Content for selected tier
             content(selectedTier)
@@ -68,13 +66,53 @@ struct TierSelectorCard<Content: View>: View {
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
         }
-        .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
-        )
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    private func tierButton(tier: Int) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedTier = tier
+            }
+        }) {
+            VStack(spacing: 6) {
+                // Tier number badge - EXACT MapHUD style
+                ZStack {
+                    Text("\(tier)")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black)
+                                    .offset(x: 2, y: 2)
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(tierColor(tier))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.black, lineWidth: 2)
+                                    )
+                            }
+                        )
+                    
+                    // Current tier checkmark
+                    if tier == currentTier && showCurrentBadge {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                            .offset(x: 16, y: -16)
+                    }
+                }
+                
+                // Status text
+                Text(statusText(tier))
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(statusColor(tier))
+            }
+        }
+        .buttonStyle(.plain)
     }
     
     private func tierColor(_ tier: Int) -> Color {
@@ -83,13 +121,13 @@ struct TierSelectorCard<Content: View>: View {
         } else if tier == selectedTier {
             return KingdomTheme.Colors.buttonPrimary
         } else {
-            return KingdomTheme.Colors.inkDark.opacity(0.3)
+            return KingdomTheme.Colors.inkLight
         }
     }
     
     private func statusText(_ tier: Int) -> String {
         if tier < currentTier {
-            return "Past"
+            return "Done"
         } else if tier == currentTier {
             return "Current"
         } else if tier == currentTier + 1 {
@@ -105,10 +143,7 @@ struct TierSelectorCard<Content: View>: View {
         } else if tier == selectedTier {
             return KingdomTheme.Colors.buttonPrimary
         } else {
-            return KingdomTheme.Colors.inkDark.opacity(0.5)
+            return KingdomTheme.Colors.inkLight
         }
     }
 }
-
-
-

@@ -83,18 +83,30 @@ struct SkillDetailView: View {
                             )
                         }
                         
-                        // Action button or status - always visible, no collapsing
+                        // Action button or status - EXACT MapHUD style
                         if tier <= currentTier {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(FontStyles.iconSmall)
+                                    .font(.system(size: 14, weight: .bold))
                                 Text("Unlocked")
-                                    .font(FontStyles.bodyMediumBold)
+                                    .font(.system(size: 15, weight: .bold))
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(KingdomTheme.Colors.inkMedium)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
                         } else if tier == currentTier + 1 && currentTier < 5 {
                             UnifiedActionButton(
                                 title: "Start Training",
@@ -110,25 +122,49 @@ struct SkillDetailView: View {
                         } else if tier > currentTier + 1 {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
-                                    .font(FontStyles.iconSmall)
+                                    .font(.system(size: 13, weight: .medium))
                                 Text("Complete Tier \(currentTier + 1) first")
-                                    .font(FontStyles.bodySmall)
+                                    .font(.system(size: 13, weight: .medium))
                             }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(KingdomTheme.Colors.parchmentLight)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
                         } else if currentTier >= 5 {
                             HStack(spacing: 8) {
                                 Image(systemName: "crown.fill")
-                                    .font(FontStyles.iconSmall)
+                                    .font(.system(size: 14, weight: .bold))
                                 Text("Maximum Tier Reached!")
-                                    .font(FontStyles.bodyMediumBold)
+                                    .font(.system(size: 15, weight: .bold))
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(KingdomTheme.Colors.inkMedium)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
                         }
                     }
                 }

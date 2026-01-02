@@ -59,53 +59,101 @@ struct BuildingDetailView: View {
                             )
                         }
                         
-                        // Status indicator
+                        // Status indicator - MapHUD style
                         if tier <= currentLevel {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(FontStyles.iconSmall)
+                                    .font(.system(size: 14, weight: .bold))
                                 Text("Built")
-                                    .font(FontStyles.bodyMediumBold)
+                                    .font(.system(size: 15, weight: .bold))
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(KingdomTheme.Colors.inkMedium)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
                         } else if tier == currentLevel + 1 {
                             if kingdom.rulerId == player.playerId {
                                 HStack(spacing: 8) {
                                     Image(systemName: "crown.fill")
-                                        .font(FontStyles.iconSmall)
+                                        .font(.system(size: 13, weight: .medium))
                                     Text("Available to upgrade")
-                                        .font(FontStyles.bodySmall)
+                                        .font(.system(size: 13, weight: .medium))
                                 }
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+                                .background(
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(Color.black)
+                                            .offset(x: 2, y: 2)
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(KingdomTheme.Colors.parchmentLight)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(Color.black, lineWidth: 2)
+                                            )
+                                    }
+                                )
                             } else {
                                 HStack(spacing: 8) {
                                     Image(systemName: "lock.fill")
-                                        .font(FontStyles.iconSmall)
+                                        .font(.system(size: 13, weight: .medium))
                                     Text("Only the ruler can upgrade")
-                                        .font(FontStyles.bodySmall)
+                                        .font(.system(size: 13, weight: .medium))
                                 }
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+                                .background(
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(Color.black)
+                                            .offset(x: 2, y: 2)
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(KingdomTheme.Colors.parchmentLight)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(Color.black, lineWidth: 2)
+                                            )
+                                    }
+                                )
                             }
                         } else {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
-                                    .font(FontStyles.iconSmall)
+                                    .font(.system(size: 13, weight: .medium))
                                 Text("Build Level \(currentLevel + 1) first")
-                                    .font(FontStyles.bodySmall)
+                                    .font(.system(size: 13, weight: .medium))
                             }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(KingdomTheme.Colors.parchmentLight)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
                         }
                     }
                 }
@@ -247,4 +295,3 @@ struct BuildingDetailView: View {
         return benefits
     }
 }
-
