@@ -43,6 +43,10 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var canDeclareWar: Bool  // Backend determines if current user can declare war
     var canFormAlliance: Bool  // Backend determines if current user can form alliance
     
+    // Relationship to player (from backend)
+    var isAllied: Bool  // True if allied with any of player's kingdoms
+    var isEnemy: Bool  // True if at war with any of player's kingdoms
+    
     // Loading state
     var isCurrentCity: Bool  // True if user is currently inside this city (from API)
     var hasBoundaryCached: Bool  // True if full boundary polygon is loaded
@@ -95,7 +99,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -110,6 +114,8 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.canClaim = canClaim
         self.canDeclareWar = canDeclareWar
         self.canFormAlliance = canFormAlliance
+        self.isAllied = isAllied
+        self.isEnemy = isEnemy
         self.isCurrentCity = false  // Set by CityAPI after fetch
         self.hasBoundaryCached = true  // Assume true, CityAPI sets false if needed
         

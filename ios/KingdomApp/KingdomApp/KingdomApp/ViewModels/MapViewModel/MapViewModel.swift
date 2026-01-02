@@ -31,7 +31,7 @@ class MapViewModel: ObservableObject {
     let contractAPI = ContractAPI()
     
     // MARK: - Configuration
-    var loadRadiusMiles: Double = 10  // How many miles around user to load cities
+    var loadRadiusMiles: Double = 8  // How many miles around user to load cities (focused on local area)
     
     // MARK: - Private State
     var hasInitializedLocation = false

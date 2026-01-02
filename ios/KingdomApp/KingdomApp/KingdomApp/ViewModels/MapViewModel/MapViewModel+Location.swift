@@ -17,11 +17,11 @@ extension MapViewModel {
             hasInitializedLocation = true
             print("🎯 First location received - loading REAL town data")
             
-            // Center map on user's location with appropriate zoom for town view
+            // Center map on user's location with focused zoom for local area
             cameraPosition = .region(
                 MKCoordinateRegion(
                     center: location,
-                    span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3)
+                    span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
                 )
             )
             

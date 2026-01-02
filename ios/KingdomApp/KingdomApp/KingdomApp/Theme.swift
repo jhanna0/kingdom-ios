@@ -120,6 +120,21 @@ struct KingdomTheme {
         static let cardStrong = (color: Color.black.opacity(0.4), radius: 8.0, x: 2.0, y: 4.0)
         static let button = (color: Color.black.opacity(0.3), radius: 3.0, x: 1.0, y: 2.0)
         static let overlay = (color: Color.black.opacity(0.4), radius: 10.0, x: 0.0, y: 0.0)
+        
+        // Neo-brutalist offset shadow (solid black offset + soft shadow)
+        static let brutalistOffset: CGFloat = 4.0
+        static let brutalistSoft = (color: Color.black.opacity(0.15), radius: 12.0, x: 6.0, y: 8.0)
+    }
+    
+    // MARK: - Brutalist Style Constants
+    /// Neo-brutalist style inspired by modern bold UI
+    struct Brutalist {
+        static let borderWidth: CGFloat = 3
+        static let borderColor = Color.black
+        static let cornerRadiusLarge: CGFloat = 24
+        static let cornerRadiusMedium: CGFloat = 16
+        static let cornerRadiusSmall: CGFloat = 12
+        static let offsetShadow: CGFloat = 4
     }
     
     // MARK: - Spacing
@@ -172,6 +187,74 @@ struct ParchmentCardStyle: ViewModifier {
                 x: hasShadow ? KingdomTheme.Shadows.card.x : 0,
                 y: hasShadow ? KingdomTheme.Shadows.card.y : 0
             )
+    }
+}
+
+/// Neo-brutalist card style with thick border and offset shadow
+struct BrutalistCardStyle: ViewModifier {
+    var backgroundColor: Color = KingdomTheme.Colors.parchment
+    var borderColor: Color = KingdomTheme.Brutalist.borderColor
+    var cornerRadius: CGFloat = KingdomTheme.Brutalist.cornerRadiusMedium
+    
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    // Offset solid shadow (the distinctive "3D" effect)
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(borderColor)
+                        .offset(x: KingdomTheme.Brutalist.offsetShadow, y: KingdomTheme.Brutalist.offsetShadow)
+                    
+                    // Main card background
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(backgroundColor)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(borderColor, lineWidth: KingdomTheme.Brutalist.borderWidth)
+                        )
+                }
+            )
+            // Soft shadow for depth
+            .shadow(
+                color: KingdomTheme.Shadows.brutalistSoft.color,
+                radius: KingdomTheme.Shadows.brutalistSoft.radius,
+                x: KingdomTheme.Shadows.brutalistSoft.x,
+                y: KingdomTheme.Shadows.brutalistSoft.y
+            )
+    }
+}
+
+/// Brutalist button style - bold with offset shadow
+struct BrutalistButtonStyle: ButtonStyle {
+    var backgroundColor: Color = KingdomTheme.Colors.buttonPrimary
+    var foregroundColor: Color = .white
+    var fullWidth: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(foregroundColor)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                ZStack {
+                    // Offset shadow
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                        .fill(Color.black)
+                        .offset(x: 3, y: 3)
+                    
+                    // Button background
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                        .fill(configuration.isPressed ? backgroundColor.opacity(0.8) : backgroundColor)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                }
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .offset(x: configuration.isPressed ? 1 : 0, y: configuration.isPressed ? 1 : 0)
     }
 }
 
@@ -259,6 +342,19 @@ extension View {
         ))
     }
     
+    /// Apply neo-brutalist card styling with thick border and offset shadow
+    func brutalistCard(
+        backgroundColor: Color = KingdomTheme.Colors.parchment,
+        borderColor: Color = KingdomTheme.Brutalist.borderColor,
+        cornerRadius: CGFloat = KingdomTheme.Brutalist.cornerRadiusMedium
+    ) -> some View {
+        modifier(BrutalistCardStyle(
+            backgroundColor: backgroundColor,
+            borderColor: borderColor,
+            cornerRadius: cornerRadius
+        ))
+    }
+    
     /// Apply parchment background for full screens
     func parchmentBackground() -> some View {
         self.background(KingdomTheme.Colors.parchment.ignoresSafeArea())
@@ -298,6 +394,15 @@ extension ButtonStyle where Self == ToolbarButtonStyle {
     
     static func toolbar(color: Color) -> ToolbarButtonStyle {
         ToolbarButtonStyle(color: color)
+    }
+}
+
+extension ButtonStyle where Self == BrutalistButtonStyle {
+    static var brutalist: BrutalistButtonStyle { BrutalistButtonStyle() }
+    static var brutalistFullWidth: BrutalistButtonStyle { BrutalistButtonStyle(fullWidth: true) }
+    
+    static func brutalist(backgroundColor: Color, foregroundColor: Color = .white, fullWidth: Bool = false) -> BrutalistButtonStyle {
+        BrutalistButtonStyle(backgroundColor: backgroundColor, foregroundColor: foregroundColor, fullWidth: fullWidth)
     }
 }
 

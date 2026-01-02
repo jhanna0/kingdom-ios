@@ -11,7 +11,7 @@ struct MapView: View {
     @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
-    @State private var mapOpacity: Double = 0.0
+    @State private var mapOpacity: Double = 1.0
     @State private var showAPIDebug = false
     @State private var showActivity = false
     @State private var showNotifications = false
@@ -22,77 +22,40 @@ struct MapView: View {
     
     var body: some View {
         ZStack {
-            Map(position: $viewModel.cameraPosition) {
-                // Add territory overlays
-                ForEach(viewModel.kingdoms) { kingdom in
-                    // Only draw polygon if boundary is cached (not empty)
-                    // Neighbors without boundaries just show markers
-                    if kingdom.hasBoundaryCached {
-                        // Territory polygon - hand-drawn medieval style
-                        MapPolygon(coordinates: kingdom.territory.boundary)
-                            .foregroundStyle(
-                                Color(
-                                    red: kingdom.color.rgba.red,
-                                    green: kingdom.color.rgba.green,
-                                    blue: kingdom.color.rgba.blue,
-                                    opacity: kingdom.color.rgba.alpha * mapOpacity
-                                )
-                            )
-                            .stroke(
-                                Color(
-                                    red: kingdom.color.strokeRGBA.red,
-                                    green: kingdom.color.strokeRGBA.green,
-                                    blue: kingdom.color.strokeRGBA.blue,
-                                    opacity: kingdom.color.strokeRGBA.alpha * mapOpacity
-                                ),
-                                style: StrokeStyle(
-                                    lineWidth: 2,
-                                    lineCap: .round,
-                                    lineJoin: .round,
-                                    dash: [8, 3]  // Dashed style for hand-drawn feel
-                                )
-                            )
-                    }
-                    
-                    // Kingdom marker (castle icon) - always shown
-                    Annotation(kingdom.name, coordinate: kingdom.territory.center) {
-                        KingdomMarker(kingdom: kingdom)
-                            .opacity(mapOpacity)
-                            .onTapGesture {
-                                kingdomForInfoSheet = kingdom
-                                // Lazy-load boundary if not cached
-                                if !kingdom.hasBoundaryCached {
-                                    Task {
-                                        await viewModel.loadKingdomBoundary(kingdomId: kingdom.id)
-                                    }
-                                }
-                            }
-                    }
-                }
-                
-                // User location
-                UserAnnotation()
-            }
-            .mapStyle(.imagery(elevation: .flat))
-            .mapControls {
-                MapCompass()
-                MapScaleView()
-            }
+            // Simple map view (not used - DrawnMapView is used instead)
+            mapContent
+            overlayContent
             
-            // Error overlay - Medieval style
+            // Error overlay - Brutalist style
             if let error = viewModel.errorMessage {
                 VStack(spacing: KingdomTheme.Spacing.large) {
-                    Image(systemName: "exclamationmark.shield.fill")
-                        .font(.largeTitle)
-                        .foregroundColor(KingdomTheme.Colors.error)
+                    // Error icon with brutalist badge
+                    ZStack {
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 64, height: 64)
+                            .offset(x: 3, y: 3)
+                        
+                        Circle()
+                            .fill(KingdomTheme.Colors.buttonDanger)
+                            .frame(width: 64, height: 64)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
+                        
+                        Image(systemName: "exclamationmark")
+                            .font(.system(size: 28, weight: .black))
+                            .foregroundColor(.white)
+                    }
                     
                     Text("Map Scroll Damaged")
-                        .font(KingdomTheme.Typography.headline())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.black)
                     
                     Text(error)
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.black.opacity(0.6))
                         .multilineTextAlignment(.center)
                     
                     Button(action: {
@@ -100,29 +63,39 @@ struct MapView: View {
                     }) {
                         Label("Repair Map", systemImage: "arrow.triangle.2.circlepath")
                     }
-                    .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary))
+                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
                 }
                 .padding(KingdomTheme.Spacing.xxLarge)
-                .parchmentCard(cornerRadius: KingdomTheme.CornerRadius.xxLarge)
-                .shadow(color: KingdomTheme.Shadows.overlay.color, radius: KingdomTheme.Shadows.overlay.radius)
+                .brutalistCard(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
             }
             
-            // Travel fee toast notification (at the very top, above sheets)
+            // Travel fee toast notification (at the very top, above sheets) - brutalist style
             if showTravelFeeToast {
                 VStack {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         Image(systemName: travelFeeIcon)
-                            .foregroundColor(.white)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
                         Text(travelFeeMessage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.black)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 18)
                     .padding(.vertical, 12)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black.opacity(0.85))
-                            .shadow(color: .black.opacity(0.3), radius: 8)
+                        ZStack {
+                            // Brutalist offset shadow
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                .fill(Color.black)
+                                .offset(x: 3, y: 3)
+                            
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                .fill(KingdomTheme.Colors.parchment)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                        }
                     )
                     .padding(.top, 70)
                     
@@ -210,12 +183,7 @@ struct MapView: View {
             }
         }
         .onChange(of: viewModel.isLoading) { oldValue, newValue in
-            // When loading completes, fade in the map smoothly
-            if !newValue && oldValue && viewModel.kingdoms.count > 0 {
-                withAnimation(.easeInOut(duration: 0.6)) {
-                    mapOpacity = 1.0
-                }
-            }
+            // Map is always visible
         }
         .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
             // Automatically show kingdom info sheet on initial map load if player is inside a kingdom
@@ -300,6 +268,47 @@ struct MapView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             Task {
                 await loadNotificationBadge()
+            }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var mapContent: some View {
+        Map(position: $viewModel.cameraPosition) {
+            ForEach(viewModel.kingdoms) { kingdom in
+                if kingdom.hasBoundaryCached {
+                    MapPolygon(coordinates: kingdom.territory.boundary)
+                        .stroke(Color.black, lineWidth: 5)
+                        .foregroundStyle(
+                            Color(
+                                red: kingdom.color.rgba.red,
+                                green: kingdom.color.rgba.green,
+                                blue: kingdom.color.rgba.blue,
+                                opacity: 0.3
+                            )
+                        )
+                }
+                
+                Annotation(kingdom.name, coordinate: kingdom.territory.center) {
+                    KingdomMarker(kingdom: kingdom)
+                        .onTapGesture {
+                            kingdomForInfoSheet = kingdom
+                        }
+                }
+            }
+            
+            UserAnnotation()
+        }
+        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
+    }
+    
+    private var overlayContent: some View {
+        VStack {
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .padding()
             }
         }
     }

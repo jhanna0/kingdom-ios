@@ -14,54 +14,107 @@ struct MapHUD: View {
     
     var body: some View {
         VStack {
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 // Top row - player and location
-                HStack(spacing: 10) {
-                    // Player badge
-                    HStack(spacing: 6) {
+                HStack(spacing: 12) {
+                    // Player badge with brutalist style
+                    HStack(spacing: 8) {
                         Text(viewModel.player.isRuler ? "👑" : "⚔️")
-                            .font(.system(size: 16))
+                            .font(.system(size: 18))
                         Text(viewModel.player.name)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.black)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.black)
+                                .offset(x: 2, y: 2)
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                        }
+                    )
                     
                     Spacer()
                     
-                    // Location badge
-                    HStack(spacing: 4) {
+                    // Location badge with brutalist style
+                    HStack(spacing: 6) {
                         if let kingdom = viewModel.currentKingdomInside {
                             Text("📍")
-                                .font(.system(size: 12))
+                                .font(.system(size: 14))
                             Text(kingdom.name)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.black)
                                 .lineLimit(1)
                         } else {
                             Text("🗺️")
-                                .font(.system(size: 12))
+                                .font(.system(size: 14))
                             Text("Traveling")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.black.opacity(0.6))
                         }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.black)
+                                .offset(x: 2, y: 2)
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                        }
+                    )
                     
-                    // Music Control Button
+                    // Music Control Button - brutalist circle
                     Button {
                         showMusicSettings = true
                     } label: {
-                        Image(systemName: musicService.isMusicEnabled ? "music.note" : "music.note.slash")
-                            .font(.system(size: 14))
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        ZStack {
+                            Circle()
+                                .fill(Color.black)
+                                .frame(width: 32, height: 32)
+                                .offset(x: 2, y: 2)
+                            Circle()
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                            Image(systemName: musicService.isMusicEnabled ? "music.note" : "music.note.slash")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.black)
+                        }
                     }
                     
-                    // API Status Indicator
+                    // API Status Indicator - brutalist style
                     Button {
                         showAPIDebug = true
                     } label: {
-                        Circle()
-                            .fill(viewModel.apiService.isConnected ? Color.green : Color.gray.opacity(0.4))
-                            .frame(width: 8, height: 8)
+                        ZStack {
+                            Circle()
+                                .fill(Color.black)
+                                .frame(width: 16, height: 16)
+                                .offset(x: 1, y: 1)
+                            Circle()
+                                .fill(viewModel.apiService.isConnected ? Color.green : Color.gray)
+                                .frame(width: 16, height: 16)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                        }
                     }
                 }
                 .sheet(isPresented: $showMusicSettings) {
@@ -69,100 +122,159 @@ struct MapHUD: View {
                         .environmentObject(musicService)
                 }
                 
-                // Divider
+                // Divider - thick black line
                 Rectangle()
-                    .fill(KingdomTheme.Colors.inkLight.opacity(0.2))
-                    .frame(height: 1)
+                    .fill(Color.black)
+                    .frame(height: 2)
                 
-                // Bottom row - actions
-                HStack(spacing: 8) {
-                    // Character button (shows level + gold)
+                // Bottom row - action buttons
+                HStack(spacing: 10) {
+                    // Character button (shows level + gold) - brutalist style
                     Button(action: {
                         showCharacterSheet = true
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 6) {
                             // Level badge
                             ZStack {
                                 Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 26, height: 26)
+                                    .offset(x: 1, y: 1)
+                                Circle()
                                     .fill(KingdomTheme.Colors.gold)
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 26, height: 26)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black, lineWidth: 2)
+                                    )
                                 Text("\(viewModel.player.level)")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 11, weight: .black))
                                     .foregroundColor(.white)
                             }
                             
                             // Gold
-                            Text("\(viewModel.player.gold)")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                            Text("\(viewModel.player.gold)g")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.black)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black)
+                                    .offset(x: 2, y: 2)
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(KingdomTheme.Colors.parchmentLight)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.black, lineWidth: 2)
+                                    )
+                            }
+                        )
                     }
                     
                     Spacer()
                     
                     // My Kingdoms (icon only, show if player is a ruler)
                     if viewModel.player.isRuler {
-                        Button(action: {
+                        BrutalistIconButton(
+                            icon: "crown.fill",
+                            backgroundColor: KingdomTheme.Colors.buttonPrimary
+                        ) {
                             showMyKingdoms = true
-                        }) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white)
-                                .frame(width: 32, height: 32)
-                                .background(KingdomTheme.Colors.buttonPrimary)
-                                .cornerRadius(6)
                         }
                     }
                     
                     // Actions (icon only)
-                    Button(action: {
+                    BrutalistIconButton(
+                        icon: "hammer.fill",
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess
+                    ) {
                         showActions = true
-                    }) {
-                        Image(systemName: "hammer.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(KingdomTheme.Colors.buttonSuccess)
-                            .cornerRadius(6)
                     }
                     
                     // Properties (icon only)
-                    Button(action: {
+                    BrutalistIconButton(
+                        icon: "house.fill",
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess
+                    ) {
                         showProperties = true
-                    }) {
-                        Image(systemName: "house.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(KingdomTheme.Colors.buttonSuccess)
-                            .cornerRadius(6)
                     }
                     
                     // Friends (icon only)
-                    Button(action: {
+                    BrutalistIconButton(
+                        icon: "person.2.fill",
+                        backgroundColor: KingdomTheme.Colors.gold
+                    ) {
                         showActivity = true
-                    }) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(KingdomTheme.Colors.gold)
-                            .cornerRadius(6)
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KingdomTheme.Colors.parchment)
-                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 2)
+                ZStack {
+                    // Offset shadow
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(Color.black)
+                        .offset(x: KingdomTheme.Brutalist.offsetShadow, y: KingdomTheme.Brutalist.offsetShadow)
+                    
+                    // Main card
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .stroke(Color.black, lineWidth: KingdomTheme.Brutalist.borderWidth)
+                        )
+                }
+            )
+            // Soft shadow for extra depth
+            .shadow(
+                color: KingdomTheme.Shadows.brutalistSoft.color,
+                radius: KingdomTheme.Shadows.brutalistSoft.radius,
+                x: KingdomTheme.Shadows.brutalistSoft.x,
+                y: KingdomTheme.Shadows.brutalistSoft.y
             )
             .padding(.horizontal, 12)
             
             Spacer()
         }
-        .padding(.top, 60)
+        .padding(.top, 8)
+    }
+}
+
+// MARK: - Brutalist Icon Button Component
+struct BrutalistIconButton: View {
+    let icon: String
+    var backgroundColor: Color = KingdomTheme.Colors.buttonPrimary
+    var size: CGFloat = 36
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                // Offset shadow
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .frame(width: size, height: size)
+                    .offset(x: 2, y: 2)
+                
+                // Button
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(backgroundColor)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

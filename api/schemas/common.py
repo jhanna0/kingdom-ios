@@ -43,6 +43,8 @@ class KingdomData(BaseModel):
     can_claim: bool = False  # Backend determines if current user can claim this kingdom
     can_declare_war: bool = False  # Backend determines if current user can declare war on this kingdom
     can_form_alliance: bool = False  # Backend determines if current user can form alliance with this kingdom
+    is_allied: bool = False  # True if this kingdom is allied with any of user's kingdoms
+    is_enemy: bool = False  # True if this kingdom is at war with any of user's kingdoms
 
 
 class CityBoundaryResponse(BaseModel):

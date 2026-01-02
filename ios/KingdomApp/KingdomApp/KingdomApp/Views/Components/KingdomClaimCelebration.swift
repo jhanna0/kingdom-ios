@@ -19,62 +19,101 @@ struct KingdomClaimCelebration: View {
                 }
             
             VStack(spacing: 24) {
-                // Animated crown icon
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(KingdomTheme.Colors.gold)
-                    .rotationEffect(.degrees(crownRotation))
-                    .shadow(color: KingdomTheme.Colors.gold.opacity(0.5), radius: 20)
+                // Animated crown icon with brutalist badge
+                ZStack {
+                    // Crown background badge
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 110, height: 110)
+                        .offset(x: 4, y: 4)
+                    
+                    Circle()
+                        .fill(KingdomTheme.Colors.gold)
+                        .frame(width: 110, height: 110)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 3)
+                        )
+                    
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 50, weight: .bold))
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(crownRotation))
+                }
                 
                 // Main message
                 VStack(spacing: 8) {
-                    Text("Hail!")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                    Text("HAIL!")
+                        .font(.system(size: 36, weight: .black))
+                        .foregroundColor(.black)
+                        .tracking(2)
                     
                     Text("Ruler of")
-                        .font(KingdomTheme.Typography.body())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.black.opacity(0.6))
                     
                     Text(kingdomName)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .font(.system(size: 28, weight: .black))
+                        .foregroundColor(.black)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
                 
-                // Decorative divider
-                Divider()
-                    .background(KingdomTheme.Colors.divider)
+                // Decorative divider - thick black
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 3)
                     .padding(.horizontal, 40)
                 
                 // Flavor text
                 Text("Your reign begins")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.black.opacity(0.5))
                     .italic()
                 
-                // Dismiss button
+                // Dismiss button - brutalist style
                 Button(action: {
                     dismissWithAnimation()
                 }) {
-                    Text("Long Live the Ruler!")
-                        .font(KingdomTheme.Typography.body())
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(KingdomTheme.Colors.buttonPrimary)
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    ZStack {
+                        // Button shadow
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                            .fill(Color.black)
+                            .offset(x: 4, y: 4)
+                        
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                            .fill(KingdomTheme.Colors.buttonPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
+                        
+                        Text("Long Live the Ruler!")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.vertical, 14)
+                    }
+                    .frame(height: 52)
                 }
-                .padding(.horizontal, 32)
+                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, 24)
                 .padding(.top, 8)
             }
             .padding(32)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(KingdomTheme.Colors.parchment)
-                    .shadow(color: .black.opacity(0.3), radius: 20)
+                ZStack {
+                    // Brutalist offset shadow
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusLarge)
+                        .fill(Color.black)
+                        .offset(x: 6, y: 6)
+                    
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusLarge)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusLarge)
+                                .stroke(Color.black, lineWidth: 4)
+                        )
+                }
             )
             .frame(maxWidth: 400)
             .padding(.horizontal, 24)

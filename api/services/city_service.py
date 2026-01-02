@@ -67,20 +67,16 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     
     # Get user's current location (which kingdom they're in)
     user_current_kingdom_id = None
-    user_can_claim = False
-    user_is_ruler = False
     if current_user:
-        # Check if user currently rules any kingdoms
-        ruling_count = db.query(Kingdom).filter(
-            Kingdom.ruler_id == current_user.id
-        ).count()
-        user_can_claim = (ruling_count == 0)
-        user_is_ruler = (ruling_count > 0)
-        
-        # Get user's current kingdom location
         player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
         if player_state:
             user_current_kingdom_id = player_state.current_kingdom_id
+    
+    # Get user's kingdoms for relationship checking
+    user_kingdom_ids = set()
+    if current_user:
+        user_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
+        user_kingdom_ids = {k.id for k in user_kingdoms}
     
     # Batch fetch ruler names
     ruler_ids = [k.ruler_id for k in kingdoms if k.ruler_id]
@@ -96,7 +92,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         # Can claim ONLY if: kingdom is unclaimed, user doesn't rule any kingdoms, AND user is INSIDE this kingdom
         can_claim = (
             kingdom.ruler_id is None and 
-            user_can_claim and 
+            len(user_kingdom_ids) == 0 and 
             user_current_kingdom_id == kingdom.id
         )
         
@@ -106,11 +102,23 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         # - This kingdom has a ruler
         # - This kingdom's ruler is not the current user
         can_interact = (
-            user_is_ruler and
+            len(user_kingdom_ids) > 0 and
             user_current_kingdom_id == kingdom.id and
             kingdom.ruler_id is not None and
             kingdom.ruler_id != current_user.id if current_user else False
         )
+        
+        # Determine relationship to player
+        is_allied = False
+        is_enemy = False
+        
+        if user_kingdom_ids:
+            # Check if this kingdom is allied or at war with any of player's kingdoms
+            kingdom_allies = set(kingdom.allies) if kingdom.allies else set()
+            kingdom_enemies = set(kingdom.enemies) if kingdom.enemies else set()
+            
+            is_allied = bool(user_kingdom_ids & kingdom_allies)
+            is_enemy = bool(user_kingdom_ids & kingdom_enemies)
         
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
@@ -128,7 +136,9 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             travel_fee=kingdom.travel_fee,
             can_claim=can_claim,
             can_declare_war=can_interact,
-            can_form_alliance=can_interact
+            can_form_alliance=can_interact,
+            is_allied=is_allied,
+            is_enemy=is_enemy
         )
     
     return result

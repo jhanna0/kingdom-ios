@@ -15,46 +15,57 @@ struct FloatingNotificationsButton: View {
                     showNotifications = true
                 }) {
                     ZStack(alignment: .topTrailing) {
+                        // Brutalist offset shadow
                         Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        KingdomTheme.Colors.gold,
-                                        KingdomTheme.Colors.gold.opacity(0.8)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(Color.black)
                             .frame(width: 60, height: 60)
-                            .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                            .offset(x: 4, y: 4)
+                        
+                        // Main button
+                        Circle()
+                            .fill(KingdomTheme.Colors.gold)
+                            .frame(width: 60, height: 60)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
                         
                         Image(systemName: "bell.fill")
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 60, height: 60)
                         
-                        // Badge
+                        // Badge with brutalist style
                         if badgeCount > 0 {
                             ZStack {
+                                // Badge shadow
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 26, height: 26)
+                                    .offset(x: 2, y: 2)
+                                
                                 Circle()
                                     .fill(KingdomTheme.Colors.buttonDanger)
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: 26, height: 26)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black, lineWidth: 2)
+                                    )
                                 
                                 Text("\(min(badgeCount, 99))")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 12, weight: .black))
                                     .foregroundColor(.white)
                             }
-                            .offset(x: 4, y: -4)
+                            .offset(x: 6, y: -6)
                         }
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.trailing, 20)
-                .padding(.bottom, 20) // Position at bottom right with safe area
+                .padding(.bottom, 20)
             }
         }
-        .ignoresSafeArea(edges: []) // Respect safe area
+        .ignoresSafeArea(edges: [])
     }
 }
 

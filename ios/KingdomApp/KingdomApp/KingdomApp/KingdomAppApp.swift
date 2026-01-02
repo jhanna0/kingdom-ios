@@ -44,18 +44,24 @@ struct KingdomAppApp: App {
 struct AuthenticatedView: View {
     @EnvironmentObject var appInit: AppInitService
     @StateObject private var viewModel = MapViewModel()
+    @StateObject private var locationManager = LocationManager()
     @State private var hasLoadedInitially = false
+    @State private var kingdomForInfoSheet: Kingdom?
+    @State private var showMyKingdoms = false
+    @State private var showActions = false
+    @State private var showCharacterSheet = false
+    @State private var showProperties = false
+    @State private var kingdomToShow: Kingdom?
+    @State private var showAPIDebug = false
+    @State private var showActivity = false
+    @State private var showNotifications = false
+    @State private var notificationBadgeCount = 0
     
     var body: some View {
         ZStack {
-            MapView(viewModel: viewModel)
+            DrawnMapView(viewModel: viewModel, kingdomForInfoSheet: $kingdomForInfoSheet)
                 .ignoresSafeArea()
                 .opacity(hasLoadedInitially ? 1 : 0)
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                    Task {
-                        await appInit.refresh()
-                    }
-                }
             
             // Show loading screen until initial load completes
             if !hasLoadedInitially {
@@ -64,9 +70,103 @@ struct AuthenticatedView: View {
                     MedievalLoadingView(status: "Loading your kingdom...")
                 }
             }
+            
+            // HUD and UI overlays
+            if hasLoadedInitially {
+                MapHUD(
+                    viewModel: viewModel,
+                    showCharacterSheet: $showCharacterSheet,
+                    showMyKingdoms: $showMyKingdoms,
+                    showActions: $showActions,
+                    showProperties: $showProperties,
+                    showActivity: $showActivity,
+                    showAPIDebug: $showAPIDebug,
+                    notificationBadgeCount: notificationBadgeCount
+                )
+                
+                FloatingNotificationsButton(
+                    showNotifications: $showNotifications,
+                    badgeCount: notificationBadgeCount
+                )
+            }
+        }
+        .onReceive(locationManager.$currentLocation) { location in
+            if let location = location {
+                viewModel.updateUserLocation(location)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            Task {
+                await appInit.refresh()
+                await loadNotificationBadge()
+            }
+        }
+        .sheet(isPresented: $showMyKingdoms) {
+            MyKingdomsSheet(
+                player: viewModel.player,
+                viewModel: viewModel,
+                onDismiss: { showMyKingdoms = false }
+            )
+        }
+        .sheet(isPresented: $showActions) {
+            NavigationStack {
+                ActionsView(viewModel: viewModel)
+            }
+        }
+        .sheet(isPresented: $showProperties) {
+            MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
+        }
+        .sheet(isPresented: $showCharacterSheet) {
+            NavigationStack {
+                CharacterSheetView(player: viewModel.player)
+            }
+        }
+        .sheet(item: $kingdomForInfoSheet) { kingdom in
+            KingdomInfoSheetView(
+                kingdom: kingdom,
+                player: viewModel.player,
+                viewModel: viewModel,
+                isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
+                onViewKingdom: {
+                    kingdomForInfoSheet = nil
+                    kingdomToShow = kingdom
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $kingdomToShow) { kingdom in
+            NavigationStack {
+                KingdomDetailView(
+                    kingdomId: kingdom.id,
+                    player: viewModel.player,
+                    viewModel: viewModel
+                )
+                .navigationTitle(kingdom.name)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            kingdomToShow = nil
+                        }
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.semibold)
+                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showAPIDebug) {
+            APIDebugView()
+        }
+        .sheet(isPresented: $showActivity) {
+            FriendsView()
+        }
+        .sheet(isPresented: $showNotifications) {
+            NotificationsSheet()
         }
         .task {
             await appInit.initialize()
+            await loadNotificationBadge()
         }
         .onChange(of: viewModel.isLoading) { _, isLoading in
             if !isLoading {
@@ -74,6 +174,17 @@ struct AuthenticatedView: View {
                     hasLoadedInitially = true
                 }
             }
+        }
+    }
+    
+    private func loadNotificationBadge() async {
+        do {
+            let summary = try await viewModel.apiService.notifications.getSummary()
+            await MainActor.run {
+                notificationBadgeCount = summary.unreadNotifications
+            }
+        } catch {
+            print("❌ Failed to load notification badge: \(error)")
         }
     }
 }

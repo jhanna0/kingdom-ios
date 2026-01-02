@@ -74,6 +74,8 @@ struct CityKingdomData: Codable {
     let can_claim: Bool  // Backend determines if current user can claim
     let can_declare_war: Bool  // Backend determines if current user can declare war
     let can_form_alliance: Bool  // Backend determines if current user can form alliance
+    let is_allied: Bool  // True if allied with any of player's kingdoms
+    let is_enemy: Bool  // True if at war with any of player's kingdoms
 }
 
 struct CityBoundaryResponse: Codable {

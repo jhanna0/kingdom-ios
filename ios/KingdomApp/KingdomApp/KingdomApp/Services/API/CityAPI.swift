@@ -116,6 +116,8 @@ class CityAPI {
             kingdom.educationLevel = kingdomData.education_level
             kingdom.travelFee = kingdomData.travel_fee
             kingdom.checkedInPlayers = kingdomData.population
+            kingdom.isAllied = kingdomData.is_allied
+            kingdom.isEnemy = kingdomData.is_enemy
         }
         
         return kingdom
