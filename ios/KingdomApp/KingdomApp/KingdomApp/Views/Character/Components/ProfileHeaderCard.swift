@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Reusable profile header showing name, level, and XP progress
+/// Reusable profile header showing name, level, and XP progress - brutalist style
 struct ProfileHeaderCard: View {
     let displayName: String
     let level: Int
@@ -28,62 +28,89 @@ struct ProfileHeaderCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            // Avatar with level badge
+            ZStack(alignment: .bottomTrailing) {
+                Text(String(displayName.prefix(1)).uppercased())
+                    .font(FontStyles.displaySmall)
+                    .foregroundColor(.white)
+                    .frame(width: 64, height: 64)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.gold,
+                        cornerRadius: 16,
+                        shadowOffset: 3,
+                        borderWidth: 2.5
+                    )
+                
+                // Level badge
+                Text("\(level)")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(.white)
+                    .frame(width: 26, height: 26)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                        cornerRadius: 13,
+                        shadowOffset: 2,
+                        borderWidth: 2
+                    )
+                    .offset(x: 6, y: 6)
+            }
+            
+            VStack(alignment: .leading, spacing: 6) {
                 Text(displayName)
-                    .font(.title2.bold())
+                    .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Level \(level)")
-                        .font(.headline)
+                HStack(spacing: 6) {
+                    Image(systemName: "star.fill")
+                        .font(FontStyles.iconMini)
                         .foregroundColor(KingdomTheme.Colors.gold)
+                    Text("Level \(level)")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+                
+                // XP Progress Bar (only show if enabled)
+                if showsXPBar {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("\(experience) / \(maxExperience) XP")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            Spacer()
+                            
+                            Text("\(Int(xpProgress * 100))%")
+                                .font(FontStyles.labelBold)
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                        
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                // Background
+                                Rectangle()
+                                    .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
+                                    .frame(height: 10)
+                                    .overlay(
+                                        Rectangle()
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                                
+                                // Progress
+                                Rectangle()
+                                    .fill(KingdomTheme.Colors.gold)
+                                    .frame(width: geometry.size.width * xpProgress, height: 10)
+                            }
+                        }
+                        .frame(height: 10)
+                    }
                 }
             }
             
-            // XP Progress Bar (only show if enabled)
-            if showsXPBar {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Experience")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                        
-                        Spacer()
-                        
-                        Text("\(experience) / \(maxExperience) XP")
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
-                    }
-                    
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background
-                            Rectangle()
-                                .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
-                                .frame(height: 8)
-                                .cornerRadius(4)
-                            
-                            // Progress
-                            Rectangle()
-                                .fill(KingdomTheme.Colors.gold)
-                                .frame(width: geometry.size.width * xpProgress, height: 8)
-                                .cornerRadius(4)
-                        }
-                    }
-                    .frame(height: 8)
-                }
-            }
+            Spacer()
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 }
 
@@ -110,6 +137,3 @@ struct ProfileHeaderCard: View {
     .padding()
     .background(KingdomTheme.Colors.parchment)
 }
-
-
-

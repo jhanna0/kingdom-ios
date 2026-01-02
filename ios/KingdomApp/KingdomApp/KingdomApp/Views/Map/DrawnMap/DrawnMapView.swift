@@ -6,7 +6,12 @@ struct DrawnMapView: View {
     @ObservedObject var viewModel: MapViewModel
     @Binding var kingdomForInfoSheet: Kingdom?
     
-    @State private var transform = MapTransformState()
+    @State private var transform: MapTransformState = {
+        var state = MapTransformState()
+        state.scale = 0.3  // Start zoomed out for better overview
+        state.lastScale = 0.3
+        return state
+    }()
     
     /// Pixels per degree of lat/lon for coordinate conversion
     private let baseScale: CGFloat = 6000.0

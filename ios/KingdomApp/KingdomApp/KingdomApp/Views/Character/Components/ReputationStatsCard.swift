@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Reusable reputation display card
+/// Reusable reputation display card - brutalist style
 struct ReputationStatsCard: View {
     let reputation: Int
     let honor: Int?  // Optional - not all contexts have honor
@@ -17,167 +17,142 @@ struct ReputationStatsCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Reputation")
-                .font(.headline)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            HStack {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Header with icon and title
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                // Tier icon with brutalist badge
+                Image(systemName: reputationTier.icon)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 52, height: 52)
+                    .brutalistBadge(
+                        backgroundColor: reputationTier.color,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
                 VStack(alignment: .leading, spacing: 4) {
                     Text(reputationTier.displayName)
-                        .font(.title3.bold())
-                        .foregroundColor(reputationTier.color)
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 8) {
                         Text("\(reputation) reputation")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         if let honor = honor {
                             Text("•")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+                                .font(FontStyles.labelMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Text("\(honor) honor")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                .font(FontStyles.labelMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                     }
                 }
                 
                 Spacer()
-                
-                Image(systemName: reputationTier.icon)
-                    .font(.system(size: 40))
-                    .foregroundColor(reputationTier.color)
             }
             
             if showAbilities {
-                Divider()
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
                 
                 // Abilities unlocked
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Abilities:")
-                        .font(.caption.bold())
-                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Abilities Unlocked")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    abilityRow(
-                        icon: "checkmark.circle.fill",
-                        text: "Accept contracts",
-                        unlocked: true
-                    )
-                    
-                    abilityRow(
-                        icon: "house.fill",
-                        text: "Buy property",
-                        unlocked: reputation >= 50
-                    )
-                    
-                    abilityRow(
-                        icon: "hand.raised.fill",
-                        text: "Vote on coups",
-                        unlocked: reputation >= 150
-                    )
-                    
-                    abilityRow(
-                        icon: "flag.fill",
-                        text: "Propose coups",
-                        unlocked: reputation >= 300
-                    )
-                    
-                    abilityRow(
-                        icon: "star.fill",
-                        text: "Vote counts 2x",
-                        unlocked: reputation >= 500
-                    )
-                    
-                    abilityRow(
-                        icon: "crown.fill",
-                        text: "Vote counts 3x",
-                        unlocked: reputation >= 1000
-                    )
+                    // Single column for better readability
+                    VStack(spacing: 8) {
+                        abilityRow(
+                            icon: "checkmark.circle.fill",
+                            text: "Accept contracts",
+                            unlocked: true
+                        )
+                        
+                        abilityRow(
+                            icon: "house.fill",
+                            text: "Buy property",
+                            unlocked: reputation >= 50,
+                            requirement: 50
+                        )
+                        
+                        abilityRow(
+                            icon: "hand.raised.fill",
+                            text: "Vote on coups",
+                            unlocked: reputation >= 150,
+                            requirement: 150
+                        )
+                        
+                        abilityRow(
+                            icon: "flag.fill",
+                            text: "Propose coups",
+                            unlocked: reputation >= 300,
+                            requirement: 300
+                        )
+                        
+                        abilityRow(
+                            icon: "star.fill",
+                            text: "Vote counts 2x",
+                            unlocked: reputation >= 500,
+                            requirement: 500
+                        )
+                        
+                        abilityRow(
+                            icon: "crown.fill",
+                            text: "Vote counts 3x",
+                            unlocked: reputation >= 1000,
+                            requirement: 1000
+                        )
+                    }
                 }
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.3), lineWidth: 2)
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func abilityRow(icon: String, text: String, unlocked: Bool) -> some View {
+    private func abilityRow(icon: String, text: String, unlocked: Bool, requirement: Int? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(unlocked ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
-                .frame(width: 16)
+                .font(FontStyles.iconMini)
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .brutalistBadge(
+                    backgroundColor: unlocked ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight,
+                    cornerRadius: 6,
+                    shadowOffset: 1,
+                    borderWidth: 1.5
+                )
             
-            Text(text)
-                .font(.caption)
-                .foregroundColor(unlocked ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkDark.opacity(0.5))
-            
-            if !unlocked {
-                Image(systemName: "lock.fill")
-                    .font(.caption2)
-                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.3))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(text)
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                if !unlocked, let req = requirement {
+                    Text("\(req) rep")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
             }
+            
+            Spacer()
         }
-    }
-}
-
-// MARK: - Reputation Tier Helper
-
-enum ReputationTier {
-    case stranger
-    case resident
-    case citizen
-    case notable
-    case champion
-    case legendary
-    
-    var displayName: String {
-        switch self {
-        case .stranger: return "Stranger"
-        case .resident: return "Resident"
-        case .citizen: return "Citizen"
-        case .notable: return "Notable"
-        case .champion: return "Champion"
-        case .legendary: return "Legendary"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .stranger: return "person.fill"
-        case .resident: return "house.fill"
-        case .citizen: return "person.2.fill"
-        case .notable: return "star.fill"
-        case .champion: return "crown.fill"
-        case .legendary: return "sparkles"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .stranger: return .gray
-        case .resident: return KingdomTheme.Colors.inkDark.opacity(0.7)
-        case .citizen: return .blue
-        case .notable: return .purple
-        case .champion: return KingdomTheme.Colors.gold
-        case .legendary: return .orange
-        }
-    }
-    
-    static func from(reputation: Int) -> ReputationTier {
-        if reputation >= 1000 { return .legendary }
-        if reputation >= 500 { return .champion }
-        if reputation >= 300 { return .notable }
-        if reputation >= 150 { return .citizen }
-        if reputation >= 50 { return .resident }
-        return .stranger
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(unlocked ? KingdomTheme.Colors.gold.opacity(0.1) : KingdomTheme.Colors.inkDark.opacity(0.03))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(unlocked ? KingdomTheme.Colors.gold.opacity(0.3) : Color.clear, lineWidth: 1)
+        )
     }
 }
 
@@ -191,6 +166,3 @@ enum ReputationTier {
     .padding()
     .background(KingdomTheme.Colors.parchment)
 }
-
-
-

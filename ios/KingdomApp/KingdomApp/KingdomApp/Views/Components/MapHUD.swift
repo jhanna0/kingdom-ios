@@ -27,7 +27,7 @@ struct MapHUD: View {
                     HStack(spacing: 8) {
                         Image(systemName: viewModel.player.isRuler ? "crown.fill" : "shield.fill")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.black)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                         if let homeKingdom = homeKingdomName {
                             Text("\(viewModel.player.name) of \(homeKingdom)")
                                 .font(.system(size: 15, weight: .bold))

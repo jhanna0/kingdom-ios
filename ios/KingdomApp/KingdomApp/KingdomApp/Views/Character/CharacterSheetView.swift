@@ -24,12 +24,6 @@ struct CharacterSheetView: View {
                     showsXPBar: true
                 )
                 
-                // Reputation section
-                ReputationStatsCard(
-                    reputation: player.reputation,
-                    showAbilities: true
-                )
-                
                 // Combined combat stats and training
                 combatAndTrainingCard
                 
@@ -111,7 +105,7 @@ struct CharacterSheetView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Skills grid - 3 rows for all skills
+            // Skills grid - 3 rows for all skills + reputation
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     skillGridButton(
@@ -153,9 +147,8 @@ struct CharacterSheetView: View {
                         skillType: "intelligence"
                     )
                     
-                    // Empty space for symmetry
-                    Color.clear
-                        .frame(maxWidth: .infinity)
+                    // Reputation button
+                    reputationGridButton
                 }
             }
         }
@@ -188,6 +181,42 @@ struct CharacterSheetView: View {
     }
     
     // MARK: - Helper Views
+    
+    private var reputationGridButton: some View {
+        let reputationTier = ReputationTier.from(reputation: player.reputation)
+        
+        return NavigationLink(destination: ReputationDetailView(player: player)) {
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    // Icon background with brutalist style
+                    Image(systemName: reputationTier.icon)
+                        .font(FontStyles.iconLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 52, height: 52)
+                        .brutalistBadge(
+                            backgroundColor: reputationTier.color,
+                            cornerRadius: 12,
+                            shadowOffset: 3,
+                            borderWidth: 2
+                        )
+                }
+                
+                VStack(spacing: 2) {
+                    Text("Reputation")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("\(player.reputation) rep")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+        }
+        .buttonStyle(.plain)
+    }
     
     private func getSkillDescription(type: String, tier: Int) -> String {
         switch type {

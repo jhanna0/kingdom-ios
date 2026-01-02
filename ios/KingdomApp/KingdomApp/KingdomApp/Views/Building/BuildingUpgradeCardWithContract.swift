@@ -29,205 +29,241 @@ struct BuildingUpgradeCardWithContract: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // View all levels button
-            NavigationLink(destination: BuildingLevelsView(
-                buildingName: name,
-                icon: icon,
-                currentLevel: currentLevel,
-                maxLevel: maxLevel,
-                benefitForLevel: { level in benefit },
-                costForLevel: { level in constructionCost },
-                detailedBenefits: getDetailedBenefitsForBuilding(name: name)
-            )) {
-                HStack {
-                    Image(systemName: "list.number")
-                        .font(.caption)
-                    Text("View All Levels")
-                        .font(.caption.bold())
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                }
-                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(KingdomTheme.Colors.buttonPrimary.opacity(0.1))
-                .cornerRadius(6)
-            }
-            
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Header with icon, name, and level
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [KingdomTheme.Colors.gold.opacity(0.3), KingdomTheme.Colors.gold.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 50, height: 50)
-                    
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
+            HStack(spacing: 14) {
+                // Building icon with brutalist badge
+                Image(systemName: icon)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 52, height: 52)
+                    .brutalistBadge(
+                        backgroundColor: isMaxLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonPrimary,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(name)
-                        .font(.headline)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    HStack(spacing: 8) {
-                        // Level indicator
-                        HStack(spacing: 4) {
-                            ForEach(1...maxLevel, id: \.self) { level in
-                                Circle()
-                                    .fill(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.2))
-                                    .frame(width: 6, height: 6)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(name)
+                            .font(FontStyles.headingMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        // View all levels link
+                        NavigationLink(destination: BuildingLevelsView(
+                            buildingName: name,
+                            icon: icon,
+                            currentLevel: currentLevel,
+                            maxLevel: maxLevel,
+                            benefitForLevel: { level in benefit },
+                            costForLevel: { level in constructionCost },
+                            detailedBenefits: getDetailedBenefitsForBuilding(name: name)
+                        )) {
+                            HStack(spacing: 4) {
+                                Text("All Levels")
+                                    .font(FontStyles.labelSmall)
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconMini)
                             }
+                            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        }
+                    }
+                    
+                    // Level indicator dots
+                    HStack(spacing: 6) {
+                        ForEach(1...maxLevel, id: \.self) { level in
+                            Circle()
+                                .fill(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.15))
+                                .frame(width: 10, height: 10)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: level <= currentLevel ? 1.5 : 0.5)
+                                )
                         }
                         
                         Text("Level \(currentLevel)/\(maxLevel)")
-                            .font(.caption2)
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .padding(.leading, 4)
                     }
                 }
-                
-                Spacer()
             }
             
             if !isMaxLevel {
-                Divider()
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
                 
-                // Benefit
-                HStack(spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.gold.opacity(0.7))
-                    Text(benefit)
-                        .font(.subheadline)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                // Next level benefit
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Level \(currentLevel + 1) Benefit")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                        Text(benefit)
+                            .font(FontStyles.bodySmallBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
                 }
                 
                 if hasActiveContract {
                     // Active contract indicator
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         Image(systemName: "hourglass")
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        Text("Contract in progress")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .font(FontStyles.iconMedium)
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 8)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Contract in Progress")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            Text("Citizens are working on this upgrade")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-                    .cornerRadius(8)
+                    .padding()
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.12), cornerRadius: 10)
                 } else if hasAnyActiveContract {
                     // Blocked by another contract
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
                         Text("Complete current contract first")
-                            .font(.caption)
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
+                    .padding()
                     .background(KingdomTheme.Colors.inkDark.opacity(0.05))
-                    .cornerRadius(8)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                    )
                 } else {
                     // Cost and action button
-                    VStack(spacing: 10) {
-                        HStack(spacing: 16) {
+                    VStack(spacing: 12) {
+                        // Stats row
+                        HStack(spacing: 0) {
                             // Cost
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("COST")
-                                    .font(.caption2.bold())
-                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                                
+                            VStack(spacing: 4) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "building.columns.fill")
-                                        .font(.caption)
+                                        .font(FontStyles.iconMini)
                                         .foregroundColor(KingdomTheme.Colors.gold)
                                     Text("\(constructionCost)g")
-                                        .font(.subheadline.bold().monospacedDigit())
-                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : .red)
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.buttonDanger)
                                 }
+                                Text("COST")
+                                    .font(FontStyles.labelTiny)
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
+                            
+                            Spacer().frame(width: 10)
                             
                             // Actions
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("ACTIONS")
-                                    .font(.caption2.bold())
-                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                                
+                            VStack(spacing: 4) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "figure.walk")
-                                        .font(.caption)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                        .font(FontStyles.iconMini)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     Text("\(actionsRequired)")
-                                        .font(.subheadline.bold().monospacedDigit())
+                                        .font(FontStyles.bodyLargeBold)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                 }
+                                Text("ACTIONS")
+                                    .font(FontStyles.labelTiny)
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
                             
-                            Spacer()
+                            Spacer().frame(width: 10)
                             
                             // Treasury balance
-                            VStack(alignment: .trailing, spacing: 3) {
-                                Text("TREASURY")
-                                    .font(.caption2.bold())
-                                    .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.6))
-                                
+                            VStack(spacing: 4) {
                                 Text("\(kingdom.treasuryGold)g")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                                    .font(FontStyles.bodyLargeBold)
+                                    .foregroundColor(canAfford ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
+                                Text("TREASURY")
+                                    .font(FontStyles.labelTiny)
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
                         }
                         
                         // Post Contract button
                         Button(action: onCreateContract) {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.badge.plus")
+                                    .font(FontStyles.iconSmall)
                                 Text("Post Contract")
-                                    .font(.subheadline.bold())
+                                    .font(FontStyles.bodyMediumBold)
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(canAfford ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled)
-                            .cornerRadius(10)
+                            .padding(.vertical, 14)
                         }
+                        .brutalistBadge(
+                            backgroundColor: canAfford ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled,
+                            cornerRadius: 12,
+                            shadowOffset: canAfford ? 3 : 0,
+                            borderWidth: 2
+                        )
                         .disabled(!canAfford)
                     }
                 }
             } else {
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
+                
                 // Max level reached
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "crown.fill")
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                    Text("Maximum Level Reached")
-                        .font(.subheadline.bold())
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Maximum Level Reached")
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Text("This building is fully upgraded")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(KingdomTheme.Colors.gold.opacity(0.1))
-                .cornerRadius(8)
+                .padding()
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold.opacity(0.12), cornerRadius: 10)
             }
         }
-        .padding(16)
-        .background(KingdomTheme.Colors.parchmentLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KingdomTheme.Colors.inkDark.opacity(0.2), lineWidth: 1)
-        )
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func getDetailedBenefitsForBuilding(name: String) -> ((Int) -> [String])? {
@@ -304,5 +340,3 @@ struct BuildingUpgradeCardWithContract: View {
         }
     }
 }
-
-

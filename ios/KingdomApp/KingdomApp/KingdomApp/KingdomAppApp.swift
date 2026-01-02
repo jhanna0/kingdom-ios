@@ -81,6 +81,7 @@ struct AuthenticatedView: View {
     @State private var showActivity = false
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
+    @State private var hasShownInitialKingdom = false
     
     var body: some View {
         ZStack {
@@ -197,6 +198,26 @@ struct AuthenticatedView: View {
             if !isLoading {
                 withAnimation(.easeIn(duration: 0.3)) {
                     hasLoadedInitially = true
+                }
+                
+                // When loading completes, show kingdom sheet if player is inside one
+                if !hasShownInitialKingdom, let kingdom = viewModel.currentKingdomInside {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        kingdomForInfoSheet = kingdom
+                        hasShownInitialKingdom = true
+                    }
+                }
+            }
+        }
+        .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
+            // Automatically show kingdom info sheet on initial map load if player is inside a kingdom
+            if !hasShownInitialKingdom && !viewModel.isLoading && newValue != nil {
+                // Delay slightly to ensure map has fully loaded and animated in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    if let kingdom = viewModel.currentKingdomInside {
+                        kingdomForInfoSheet = kingdom
+                        hasShownInitialKingdom = true
+                    }
                 }
             }
         }
