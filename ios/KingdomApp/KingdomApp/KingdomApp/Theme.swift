@@ -165,6 +165,42 @@ struct KingdomTheme {
 
 // MARK: - View Modifiers
 
+/// Brutalist badge/pill style with offset shadow
+struct BrutalistBadgeStyle: ViewModifier {
+    var backgroundColor: Color
+    var cornerRadius: CGFloat = 8
+    var shadowOffset: CGFloat = 2
+    var borderWidth: CGFloat = 2
+    
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(Color.black)
+                        .offset(x: shadowOffset, y: shadowOffset)
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(backgroundColor)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(Color.black, lineWidth: borderWidth)
+                        )
+                }
+            )
+    }
+}
+
+/// Brutalist progress bar style with black border
+struct BrutalistProgressBarStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                Rectangle()
+                    .stroke(Color.black, lineWidth: 2)
+            )
+    }
+}
+
 /// Parchment card style with border and shadow
 struct ParchmentCardStyle: ViewModifier {
     var backgroundColor: Color = KingdomTheme.Colors.parchment
@@ -353,6 +389,26 @@ extension View {
             borderColor: borderColor,
             cornerRadius: cornerRadius
         ))
+    }
+    
+    /// Apply brutalist badge/pill styling with offset shadow
+    func brutalistBadge(
+        backgroundColor: Color,
+        cornerRadius: CGFloat = 8,
+        shadowOffset: CGFloat = 2,
+        borderWidth: CGFloat = 2
+    ) -> some View {
+        modifier(BrutalistBadgeStyle(
+            backgroundColor: backgroundColor,
+            cornerRadius: cornerRadius,
+            shadowOffset: shadowOffset,
+            borderWidth: borderWidth
+        ))
+    }
+    
+    /// Apply brutalist progress bar styling
+    func brutalistProgressBar() -> some View {
+        modifier(BrutalistProgressBarStyle())
     }
     
     /// Apply parchment background for full screens

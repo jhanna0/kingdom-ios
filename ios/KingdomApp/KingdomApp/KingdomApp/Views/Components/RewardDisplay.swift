@@ -37,24 +37,25 @@ struct RewardDisplayView: View {
             
             // Main reward card
             VStack(spacing: 20) {
-                // Success icon with theme colors
+                // Success icon with brutalist style
                 ZStack {
+                    // Offset shadow
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    KingdomTheme.Colors.goldWarm.opacity(0.3),
-                                    KingdomTheme.Colors.gold.opacity(0.2)
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Color.black)
                         .frame(width: 70, height: 70)
+                        .offset(x: 3, y: 3)
+                    
+                    Circle()
+                        .fill(KingdomTheme.Colors.gold)
+                        .frame(width: 70, height: 70)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 3)
+                        )
                     
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(.white)
                         .symbolEffect(.bounce, options: .speed(0.5))
                 }
                 .padding(.top, 8)
@@ -105,33 +106,41 @@ struct RewardDisplayView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 
-                // Close button with theme color
+                // Close button with brutalist style
                 Button(action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         isShowing = false
                     }
                 }) {
                     Text("Continue")
-                        .font(KingdomTheme.Typography.body())
-                        .fontWeight(.bold)
-                        .foregroundColor(KingdomTheme.Colors.parchment)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(KingdomTheme.Colors.buttonPrimary)
-                        .cornerRadius(KingdomTheme.CornerRadius.large)
                 }
+                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             }
             .padding(.vertical, 28)
             .background(
-                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.xLarge)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .shadow(color: Color.black.opacity(0.4), radius: 25, x: 0, y: 10)
+                ZStack {
+                    // Offset shadow for brutalist effect
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(Color.black)
+                        .offset(x: KingdomTheme.Brutalist.offsetShadow, y: KingdomTheme.Brutalist.offsetShadow)
+                    
+                    // Main card
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(KingdomTheme.Colors.parchmentLight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .stroke(Color.black, lineWidth: KingdomTheme.Brutalist.borderWidth)
+                        )
+                }
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.xLarge)
-                    .stroke(KingdomTheme.Colors.borderDark, lineWidth: KingdomTheme.BorderWidth.regular)
+            // Soft shadow for extra depth
+            .shadow(
+                color: KingdomTheme.Shadows.brutalistSoft.color,
+                radius: KingdomTheme.Shadows.brutalistSoft.radius,
+                x: KingdomTheme.Shadows.brutalistSoft.x,
+                y: KingdomTheme.Shadows.brutalistSoft.y
             )
             .padding(.horizontal, 32)
             .scaleEffect(scale)
@@ -265,14 +274,7 @@ struct AnimatedRewardCounter: View {
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                .fill(color.opacity(0.12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                        .stroke(color.opacity(0.25), lineWidth: KingdomTheme.BorderWidth.thin)
-                )
-        )
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .onAppear {
             withAnimation {
                 showAddition = true

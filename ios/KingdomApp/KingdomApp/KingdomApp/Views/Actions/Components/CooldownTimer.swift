@@ -35,41 +35,40 @@ struct CooldownTimer: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "clock.fill")
+                    .font(FontStyles.iconSmall)
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
                 
                 Text("In Progress")
-                    .font(KingdomTheme.Typography.body())
+                    .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .fontWeight(.semibold)
                 
                 Spacer()
                 
                 Text(formattedTime)
-                    .font(KingdomTheme.Typography.body())
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .fontWeight(.medium)
             }
             
-            // Progress bar
+            // Progress bar - brutalist style
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
                         .fill(KingdomTheme.Colors.parchmentDark)
-                        .frame(height: 8)
+                        .frame(height: 12)
+                        .brutalistProgressBar()
                     
                     Rectangle()
                         .fill(KingdomTheme.Colors.buttonWarning)
-                        .frame(width: geometry.size.width * progress, height: 8)
+                        .frame(width: max(0, geometry.size.width * progress - 4), height: 8)
+                        .offset(x: 2)
                         .animation(.linear(duration: 0.5), value: progress)
                 }
-                .cornerRadius(4)
             }
-            .frame(height: 8)
+            .frame(height: 12)
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(KingdomTheme.Colors.parchmentDark)
-        .cornerRadius(KingdomTheme.CornerRadius.medium)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 }
 

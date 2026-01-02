@@ -106,15 +106,15 @@ struct ActionsView: View {
     // MARK: - Header Section
     
     private var headerSection: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
+        VStack(spacing: KingdomTheme.Spacing.large) {
             // Title
             HStack {
                 Image(systemName: "figure.walk")
-                    .font(.title2)
+                    .font(FontStyles.iconExtraLarge)
                     .foregroundColor(KingdomTheme.Colors.gold)
                 
                 Text("Available Actions")
-                    .font(KingdomTheme.Typography.title2())
+                    .font(FontStyles.displayMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
@@ -124,51 +124,57 @@ struct ActionsView: View {
             kingdomContextCard
         }
         .padding(.horizontal)
-        .padding(.top, KingdomTheme.Spacing.small)
+        .padding(.top, KingdomTheme.Spacing.medium)
     }
     
     @ViewBuilder
     private var kingdomContextCard: some View {
         if let kingdom = currentKingdom {
             HStack(spacing: KingdomTheme.Spacing.medium) {
+                // Icon with brutalist badge
                 Image(systemName: isInHomeKingdom ? "crown.fill" : "shield.fill")
                     .font(.title3)
-                    .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
-                    .frame(width: 40, height: 40)
-                    .background(isInHomeKingdom ? KingdomTheme.Colors.gold.opacity(0.1) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .foregroundColor(.white)
+                    .frame(width: 42, height: 42)
+                    .brutalistBadge(
+                        backgroundColor: isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger,
+                        cornerRadius: 8
+                    )
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(kingdom.name)
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(isInHomeKingdom ? "Your Kingdom" : "Enemy Territory")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelLarge)
                         .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
                 }
                 
                 Spacer()
             }
             .padding(KingdomTheme.Spacing.medium)
-            .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         } else {
             HStack(spacing: KingdomTheme.Spacing.medium) {
+                // Icon with brutalist badge
                 Image(systemName: "map")
                     .font(.title3)
-                    .foregroundColor(KingdomTheme.Colors.textMuted)
-                    .frame(width: 40, height: 40)
-                    .background(KingdomTheme.Colors.disabled.opacity(0.1))
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .foregroundColor(.white)
+                    .frame(width: 42, height: 42)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.disabled,
+                        cornerRadius: 8
+                    )
                 
                 Text("Enter a kingdom to perform actions")
-                    .font(KingdomTheme.Typography.body())
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Spacer()
             }
             .padding(KingdomTheme.Spacing.medium)
-            .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight, hasShadow: false)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         }
     }
     
@@ -222,37 +228,39 @@ struct ActionsView: View {
         let seconds = remaining % 60
         
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Action in Progress")
-                .font(KingdomTheme.Typography.headline())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+            HStack(spacing: 8) {
+                Image(systemName: "hourglass")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                
+                Text("Action in Progress")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
             
             Text("You are already \(blockingActionDisplay). Only ONE action at a time!")
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.bodySmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             HStack {
                 if hours > 0 {
                     Text("Available in \(hours)h \(minutes)m \(seconds)s")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyLargeBold)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        .fontWeight(.semibold)
                 } else if minutes > 0 {
                     Text("Available in \(minutes)m \(seconds)s")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyLargeBold)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        .fontWeight(.semibold)
                 } else {
                     Text("Available in \(seconds)s")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyLargeBold)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        .fontWeight(.semibold)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(KingdomTheme.Colors.buttonWarning.opacity(0.15))
-        .cornerRadius(KingdomTheme.CornerRadius.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15))
         .padding(.horizontal)
     }
     
@@ -260,17 +268,20 @@ struct ActionsView: View {
     
     private func trainingSection(status: AllActionStatus) -> some View {
         Group {
-            Divider().padding(.horizontal)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
             
             Text("Character Training")
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
                 .padding(.top, KingdomTheme.Spacing.medium)
             
             Text("Train your skills - complete actions to level up (2 hour cooldown)")
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -295,17 +306,20 @@ struct ActionsView: View {
     
     private func propertyUpgradeSection(contracts: [PropertyUpgradeContract], status: AllActionStatus) -> some View {
         Group {
-            Divider().padding(.horizontal)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
             
             Text("Property Upgrades")
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
                 .padding(.top, KingdomTheme.Spacing.medium)
             
             Text("Build and upgrade your properties - complete work actions to finish")
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -328,10 +342,13 @@ struct ActionsView: View {
     
     private func beneficialActionsSection(status: AllActionStatus) -> some View {
         Group {
-            Divider().padding(.horizontal)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
             
             Text("Beneficial Actions")
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -357,7 +374,7 @@ struct ActionsView: View {
             if !availableContractsInKingdom.isEmpty {
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                     Text("Work on Contracts")
-                        .font(KingdomTheme.Typography.subheadline())
+                        .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .padding(.horizontal)
                         .padding(.top, KingdomTheme.Spacing.small)
@@ -405,10 +422,13 @@ struct ActionsView: View {
     
     private func hostileActionsSection(status: AllActionStatus) -> some View {
         Group {
-            Divider().padding(.horizontal)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
             
             Text("Hostile Actions")
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)

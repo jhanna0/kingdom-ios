@@ -12,16 +12,16 @@ struct InfoCard: View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(FontStyles.iconLarge)
                     .foregroundColor(color)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(description)
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
@@ -29,7 +29,7 @@ struct InfoCard: View {
             }
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard()
         .padding(.horizontal)
     }
 }

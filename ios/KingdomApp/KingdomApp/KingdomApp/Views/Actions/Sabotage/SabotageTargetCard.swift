@@ -22,11 +22,16 @@ struct SabotageTargetCard: View {
                         
                         Text("Level \(target.buildingLevel)")
                             .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .foregroundColor(.white)
+                            .fontWeight(.bold)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(KingdomTheme.Colors.parchmentDark)
-                            .cornerRadius(4)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.buttonDanger,
+                                cornerRadius: 4,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
                     }
                     
                     HStack(spacing: 4) {
@@ -60,8 +65,12 @@ struct SabotageTargetCard: View {
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
-            .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-            .cornerRadius(KingdomTheme.CornerRadius.small)
+            .brutalistBadge(
+                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                cornerRadius: 6,
+                shadowOffset: 1,
+                borderWidth: 1.5
+            )
             
             // Action Button
             Button(action: onSelect) {
@@ -70,14 +79,14 @@ struct SabotageTargetCard: View {
                     Text("Sabotage This Contract")
                 }
             }
-            .buttonStyle(.medieval(
-                color: canSabotage ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.disabled,
+            .buttonStyle(.brutalist(
+                backgroundColor: canSabotage ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.disabled,
                 fullWidth: true
             ))
             .disabled(!canSabotage)
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard()
         .padding(.horizontal)
     }
     

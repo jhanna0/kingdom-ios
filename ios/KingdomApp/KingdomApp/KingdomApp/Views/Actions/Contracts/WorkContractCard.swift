@@ -25,34 +25,33 @@ struct WorkContractCard: View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
                 Image(systemName: "hammer.fill")
-                    .font(.title2)
+                    .font(FontStyles.iconLarge)
                     .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(contract.buildingType)
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 4) {
                         Text("\(contract.actionsCompleted)/\(contract.totalActionsRequired) actions")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("•")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("\(Int(contract.progress * 100))%")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelBold)
                             .foregroundColor(KingdomTheme.Colors.gold)
-                            .fontWeight(.semibold)
                         
                         Text("•")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("\(contract.rewardPool)g pool")
-                            .font(KingdomTheme.Typography.caption())
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
@@ -60,40 +59,42 @@ struct WorkContractCard: View {
                 Spacer()
             }
             
-            // Progress bar
+            // Progress bar - brutalist style
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
                         .fill(KingdomTheme.Colors.parchmentDark)
-                        .frame(height: 8)
+                        .frame(height: 12)
+                        .brutalistProgressBar()
                     
                     ZStack {
                         Rectangle()
                             .fill(KingdomTheme.Colors.gold)
-                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                            .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
+                            .offset(x: 2)
                         
                         // Animated diagonal stripes
                         AnimatedStripes()
-                            .frame(width: geometry.size.width * contract.progress, height: 8)
+                            .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
+                            .offset(x: 2)
                             .mask(
                                 Rectangle()
-                                    .frame(width: geometry.size.width * contract.progress, height: 8)
+                                    .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             )
                     }
                 }
-                .cornerRadius(4)
             }
-            .frame(height: 8)
+            .frame(height: 12)
             
             if globalCooldownActive {
                 let blockingActionDisplay = actionNameToDisplayName(blockingAction)
                 Text("You are already \(blockingActionDisplay)")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(KingdomTheme.Colors.parchmentDark)
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if isReady {
                 Button(action: onAction) {
                     HStack {
@@ -101,7 +102,7 @@ struct WorkContractCard: View {
                         Text("Work on This")
                     }
                 }
-                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
             } else {
                 CooldownTimer(
                     secondsRemaining: calculatedSecondsRemaining,
@@ -110,7 +111,7 @@ struct WorkContractCard: View {
             }
         }
         .padding()
-        .parchmentCard()
+        .brutalistCard()
         .padding(.horizontal)
     }
 }

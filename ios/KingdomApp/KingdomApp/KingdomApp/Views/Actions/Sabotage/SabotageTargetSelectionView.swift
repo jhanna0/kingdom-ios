@@ -129,8 +129,9 @@ struct SabotageTargetSelectionView: View {
                     }
                 }
                 
-                Divider()
-                    .frame(height: 30)
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 2, height: 30)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your Gold")
@@ -147,10 +148,7 @@ struct SabotageTargetSelectionView: View {
             }
         }
         .padding()
-        .parchmentCard(
-            backgroundColor: KingdomTheme.Colors.parchmentLight,
-            hasShadow: false
-        )
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
@@ -172,8 +170,7 @@ struct SabotageTargetSelectionView: View {
             }
         }
         .padding()
-        .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
-        .cornerRadius(KingdomTheme.CornerRadius.medium)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
