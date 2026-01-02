@@ -518,6 +518,7 @@ extension ActionsView {
                 await loadActionStatus()
                 await viewModel.loadContracts()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -558,6 +559,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -598,6 +600,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -647,6 +650,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -703,6 +707,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     currentReward = Reward(
@@ -739,6 +744,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -775,6 +781,7 @@ extension ActionsView {
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
                 
                 await MainActor.run {
                     currentReward = Reward(

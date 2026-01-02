@@ -36,9 +36,10 @@ struct KingdomMarker: View {
                             .stroke(Color.black, lineWidth: 3)
                     )
                 
-                // Castle icon
-                Text("🏰")
-                    .font(.system(size: 30))
+                // Kingdom icon - monumental building
+                Image(systemName: "building.columns.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(isUnclaimed ? KingdomTheme.Colors.inkLight : kingdomColor)
                 
                 // Level badge - brutalist style
                 ZStack {

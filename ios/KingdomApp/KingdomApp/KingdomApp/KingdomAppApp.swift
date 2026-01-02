@@ -193,6 +193,7 @@ struct AuthenticatedView: View {
         .task {
             await appInit.initialize()
             await loadNotificationBadge()
+            viewModel.loadInitialCooldown()
         }
         .onChange(of: viewModel.isLoading) { _, isLoading in
             if !isLoading {

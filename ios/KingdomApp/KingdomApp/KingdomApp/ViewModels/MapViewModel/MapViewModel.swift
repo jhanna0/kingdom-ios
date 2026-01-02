@@ -26,9 +26,14 @@ class MapViewModel: ObservableObject {
     // Contracts
     @Published var availableContracts: [Contract] = []
     
+    // Action Cooldown
+    @Published var globalCooldown: GlobalCooldown?
+    @Published var cooldownFetchedAt: Date?
+    
     // MARK: - Services
     var apiService = KingdomAPIService.shared
     let contractAPI = ContractAPI()
+    let actionsAPI = ActionsAPI()
     
     // MARK: - Configuration
     var loadRadiusMiles: Double = 8  // How many miles around user to load cities (focused on local area)

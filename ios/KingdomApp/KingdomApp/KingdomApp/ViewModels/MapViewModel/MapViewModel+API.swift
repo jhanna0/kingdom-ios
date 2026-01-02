@@ -39,6 +39,35 @@ extension MapViewModel {
             }
         }
     }
+    
+    /// Fetch global action cooldown status
+    func fetchGlobalCooldown() async {
+        guard apiService.isAuthenticated else { return }
+        
+        do {
+            let status = try await actionsAPI.getActionStatus()
+            await MainActor.run {
+                self.globalCooldown = status.globalCooldown
+                self.cooldownFetchedAt = Date()
+            }
+        } catch {
+            print("⚠️ Failed to fetch global cooldown: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Refresh cooldown immediately (call after performing actions)
+    func refreshCooldown() {
+        Task {
+            await fetchGlobalCooldown()
+        }
+    }
+    
+    /// Fetch cooldown once on app load
+    func loadInitialCooldown() {
+        Task {
+            await fetchGlobalCooldown()
+        }
+    }
 }
 
 

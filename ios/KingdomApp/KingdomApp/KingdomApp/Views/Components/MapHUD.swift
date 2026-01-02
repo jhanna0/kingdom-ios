@@ -10,6 +10,8 @@ struct MapHUD: View {
     @Binding var showAPIDebug: Bool
     @EnvironmentObject var musicService: MusicService
     @State private var showMusicSettings = false
+    @State private var currentTime = Date()
+    @State private var updateTimer: Timer?
     let notificationBadgeCount: Int
     
     // Get home kingdom name
@@ -56,6 +58,11 @@ struct MapHUD: View {
                     )
                     
                     Spacer()
+                    
+                    // Action Status Indicator - inline
+                    if let cooldown = viewModel.globalCooldown {
+                        actionStatusBadge(cooldown: cooldown)
+                    }
                     
                     // Music Control Button - brutalist circle
                     Button {
@@ -222,6 +229,77 @@ struct MapHUD: View {
             Spacer()
         }
         .padding(.top, 8)
+        .onAppear {
+            startUIUpdateTimer()
+        }
+        .onDisappear {
+            stopUIUpdateTimer()
+        }
+    }
+    
+    // MARK: - Timer
+    
+    private func startUIUpdateTimer() {
+        updateTimer?.invalidate()
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+    
+    private func stopUIUpdateTimer() {
+        updateTimer?.invalidate()
+        updateTimer = nil
+    }
+    
+    // MARK: - Action Status Badge (Compact)
+    
+    @ViewBuilder
+    private func actionStatusBadge(cooldown: GlobalCooldown) -> some View {
+        let elapsed = viewModel.cooldownFetchedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let calculatedRemaining = max(0, Double(cooldown.secondsRemaining) - elapsed)
+        let isIdle = cooldown.ready || calculatedRemaining <= 0
+        
+        HStack(spacing: 4) {
+            if isIdle {
+                Text("💤")
+                    .font(.system(size: 12))
+            } else if let action = cooldown.blockingAction {
+                Image(systemName: actionIcon(for: action))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.black)
+                let minutes = Int(calculatedRemaining) / 60
+                Text("\(minutes)m")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.black.opacity(0.7))
+            }
+        }
+        .frame(height: 32)
+        .padding(.horizontal, 8)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
+    private func actionIcon(for action: String) -> String {
+        switch action.lowercased() {
+        case "farm": return "leaf.fill"
+        case "work": return "hammer.fill"
+        case "patrol": return "eye.fill"
+        case "scout": return "magnifyingglass"
+        case "sabotage": return "flame.fill"
+        case "training": return "figure.walk"
+        default: return "hourglass"
+        }
     }
 }
 
