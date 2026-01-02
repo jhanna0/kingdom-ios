@@ -121,7 +121,7 @@ class APIClient: ObservableObject {
                     print("Unknown decoding error")
                 }
             }
-            throw error
+            throw APIError.decodingError(error)
         }
     }
     
@@ -204,6 +204,7 @@ enum APIError: LocalizedError {
     case notFound(String)
     case unauthorized
     case networkError(Error)
+    case decodingError(Error)
     
     var errorDescription: String? {
         switch self {
@@ -217,6 +218,8 @@ enum APIError: LocalizedError {
             return "Not authenticated"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .decodingError(let error):
+            return "Decoding error: \(error.localizedDescription)"
         }
     }
 }

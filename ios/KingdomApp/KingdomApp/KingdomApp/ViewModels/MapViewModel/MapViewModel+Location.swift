@@ -54,7 +54,7 @@ extension MapViewModel {
                     await MainActor.run {
                         // Update player from backend response (includes check-in rewards and ALL player data)
                         player.updateFromAPIState(updatedState)
-                        player.currentKingdom = current.name
+                        // DO NOT overwrite currentKingdom - backend sets it correctly as ID
                         // Backend is source of truth - no local caching
                         
                         // Store travel event from backend
