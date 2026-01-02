@@ -17,64 +17,49 @@ struct KingdomInfoSheetView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
                 // Header with medieval styling
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                    HStack(alignment: .center) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "building.columns.fill")
-                                .font(FontStyles.iconExtraLarge)
-                                .foregroundColor(.white)
-                                .frame(width: 48, height: 48)
-                                .brutalistBadge(
-                                    backgroundColor: Color(
-                                        red: kingdom.color.strokeRGBA.red,
-                                        green: kingdom.color.strokeRGBA.green,
-                                        blue: kingdom.color.strokeRGBA.blue
-                                    ),
-                                    cornerRadius: 12,
-                                    shadowOffset: 3,
-                                    borderWidth: 2
-                                )
-                            
-                            Text(kingdom.name)
-                                .font(FontStyles.displaySmall)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                        }
-                        
-                        Spacer()
-                        
-                        if kingdom.isUnclaimed {
-                            Text("Unclaimed")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.error, cornerRadius: 6)
-                        }
-                    }
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "building.columns.fill")
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 48, height: 48)
+                        .brutalistBadge(
+                            backgroundColor: Color(
+                                red: kingdom.color.strokeRGBA.red,
+                                green: kingdom.color.strokeRGBA.green,
+                                blue: kingdom.color.strokeRGBA.blue
+                            ),
+                            cornerRadius: 12,
+                            shadowOffset: 3,
+                            borderWidth: 2
+                        )
                     
-                    HStack(alignment: .center, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(kingdom.name)
+                            .font(FontStyles.displaySmall)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
                         if kingdom.isUnclaimed {
-                            Image(systemName: "crown")
-                                .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
                             Text("No ruler")
                                 .font(FontStyles.bodySmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         } else {
-                            Image(systemName: "crown.fill")
-                                .font(FontStyles.iconSmall)
-                                .foregroundColor(kingdom.rulerId == player.playerId ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
-                            
-                            Text("Ruled by \(kingdom.rulerName)")
-                                .font(FontStyles.bodySmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            if kingdom.rulerId == player.playerId {
-                                Text("(You)")
-                                    .font(FontStyles.bodySmallBold)
-                                    .foregroundColor(KingdomTheme.Colors.gold)
+                            HStack(spacing: 4) {
+                                Text("Ruled by \(kingdom.rulerName)")
+                                    .font(FontStyles.bodySmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                         }
+                    }
+                    
+                    Spacer()
+                    
+                    if kingdom.isUnclaimed {
+                        Text("Unclaimed")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.error, cornerRadius: 6)
                     }
                 }
                 .padding(.horizontal)
@@ -88,34 +73,32 @@ struct KingdomInfoSheetView: View {
                 
                 // Ruler Actions (moved to top, after header)
                 if isPlayerInside && kingdom.rulerId == player.playerId {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
+                    Button(action: onViewKingdom) {
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
                             Image(systemName: "crown.fill")
-                                .font(FontStyles.iconSmall)
+                                .font(.title2)
                                 .foregroundColor(.white)
-                            Text("You rule this kingdom")
-                                .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(.white)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(KingdomTheme.Spacing.medium)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
-                        
-                        // Manage Kingdom button
-                        Button(action: onViewKingdom) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "gearshape.fill")
-                                    .font(FontStyles.iconSmall)
-                                    .foregroundColor(.white)
-                                Text("Manage Kingdom")
-                                    .font(FontStyles.bodyMediumBold)
+                                .frame(width: 54, height: 54)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 14, shadowOffset: 3, borderWidth: 2.5)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Manage Your Kingdom")
+                                    .font(FontStyles.bodyLargeBold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                Text("Buildings, taxes & decrees")
+                                    .font(FontStyles.labelMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(KingdomTheme.Spacing.medium)
-                            .foregroundColor(.white)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                        .padding(KingdomTheme.Spacing.medium)
                     }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                     .padding(.horizontal)
                 } else if kingdom.canClaim {
                     // Backend says we can claim!

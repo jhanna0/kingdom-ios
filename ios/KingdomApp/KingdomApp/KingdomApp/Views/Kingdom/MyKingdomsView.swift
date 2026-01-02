@@ -16,7 +16,7 @@ struct MyKingdomsView: View {
         NavigationView {
             ZStack {
                 // Parchment background
-                Color(red: 0.95, green: 0.87, blue: 0.70)
+                KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
                 if ruledKingdoms.isEmpty {
@@ -186,8 +186,9 @@ struct KingdomCard: View {
                 }
             }
             
-            Divider()
-                .background(Color(red: 0.4, green: 0.3, blue: 0.2))
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Kingdom stats
             HStack(spacing: 20) {
@@ -196,36 +197,25 @@ struct KingdomCard: View {
                 KingdomStatItem(icon: "lock.shield.fill", label: "Vault", value: "Lvl \(kingdom.vaultLevel)")
             }
             
-            // Quick actions
-            HStack(spacing: 12) {
-                Button(action: {
-                    // Build action
-                }) {
-                    Label("Build", systemImage: "hammer.fill")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(red: 0.5, green: 0.3, blue: 0.1))
-                        .cornerRadius(6)
-                }
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Tap to open kingdom details
+            HStack(spacing: 10) {
+                Image(systemName: "gearshape.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 
-                Button(action: {
-                    // Decree action
-                }) {
-                    Label("Decree", systemImage: "scroll.fill")
-                        .font(.system(.caption, design: .serif))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(red: 0.4, green: 0.25, blue: 0.15))
-                        .cornerRadius(6)
-                }
+                Text("Tap to manage kingdom")
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.1))
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
         .padding()

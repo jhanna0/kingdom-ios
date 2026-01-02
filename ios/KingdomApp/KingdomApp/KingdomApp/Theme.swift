@@ -54,6 +54,18 @@ struct KingdomTheme {
         /// Special purple - coup, special actions
         static let buttonSpecial = Color(red: 0.3, green: 0.15, blue: 0.4)
         
+        // MARK: Royal Kingdom Management Colors
+        /// ROYAL PURPLE - Building & construction management
+        static let royalPurple = Color(red: 0.45, green: 0.2, blue: 0.7)
+        /// IMPERIAL GOLD - Tax and treasury management
+        static let imperialGold = Color(red: 0.8, green: 0.6, blue: 0.1)
+        /// CRIMSON RED - Decrees and proclamations
+        static let royalCrimson = Color(red: 0.75, green: 0.1, blue: 0.2)
+        /// DEEP BLUE - Royal governance
+        static let royalBlue = Color(red: 0.15, green: 0.3, blue: 0.65)
+        /// EMERALD GREEN - Prosperity and economy
+        static let royalEmerald = Color(red: 0.1, green: 0.6, blue: 0.4)
+        
         // MARK: Border Colors
         /// Standard card/element border
         static let border = Color(red: 0.4, green: 0.3, blue: 0.2)

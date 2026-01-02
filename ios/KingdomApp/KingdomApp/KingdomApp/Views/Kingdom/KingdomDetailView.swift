@@ -118,61 +118,85 @@ struct KingdomDetailView: View {
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         NavigationLink(value: KingdomDetailDestination.build) {
-                            HStack {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "hammer.fill")
-                                    .font(FontStyles.iconMedium)
-                                VStack(alignment: .leading, spacing: 2) {
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalPurple, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text("Manage Buildings")
-                                        .font(FontStyles.bodyMediumBold)
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Text("Upgrade economy & defenses")
-                                        .font(FontStyles.labelSmall)
+                                        .font(FontStyles.labelMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
+                                
                                 Spacer()
+                                
                                 Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconSmall)
+                                    .font(FontStyles.iconMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
-                            .foregroundColor(.white)
-                            .padding()
+                            .padding(KingdomTheme.Spacing.medium)
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                         
                         NavigationLink(value: KingdomDetailDestination.taxRate) {
-                            HStack {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "percent")
-                                    .font(FontStyles.iconMedium)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Tax Rate")
-                                        .font(FontStyles.bodyMediumBold)
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Set Tax Rate")
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Text("Current: \(kingdom.taxRate)%")
-                                        .font(FontStyles.labelSmall)
+                                        .font(FontStyles.labelMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
+                                
                                 Spacer()
+                                
                                 Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconSmall)
+                                    .font(FontStyles.iconMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
-                            .foregroundColor(.white)
-                            .padding()
+                            .padding(KingdomTheme.Spacing.medium)
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                         
                         NavigationLink(value: KingdomDetailDestination.decree) {
-                            HStack {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "scroll.fill")
-                                    .font(FontStyles.iconMedium)
-                                VStack(alignment: .leading, spacing: 2) {
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text("Make Decree")
-                                        .font(FontStyles.bodyMediumBold)
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Text("Announce to all subjects")
-                                        .font(FontStyles.labelSmall)
+                                        .font(FontStyles.labelMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
+                                
                                 Spacer()
+                                
                                 Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconSmall)
+                                    .font(FontStyles.iconMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
-                            .foregroundColor(.white)
-                            .padding()
+                            .padding(KingdomTheme.Spacing.medium)
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSecondary, cornerRadius: 12)
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                     }
                     .padding(.horizontal)
                 }
