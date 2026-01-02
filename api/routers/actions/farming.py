@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown, log_activity
 from .constants import WORK_BASE_COOLDOWN, FARM_COOLDOWN, FARM_GOLD_REWARD
 from .tax_utils import apply_kingdom_tax_with_bonus
 
@@ -71,6 +71,24 @@ def perform_farming(
     
     # Update last farm action
     state.last_farm_action = datetime.utcnow()
+    
+    # Log activity
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="farm",
+        action_category="economy",
+        description="Farmed for gold",
+        kingdom_id=state.current_kingdom_id,
+        amount=net_income,
+        details={
+            "gold_earned": net_income,
+            "gold_before_tax": gross_income,
+            "tax_amount": tax_amount,
+            "tax_rate": tax_rate,
+            "building_skill_bonus": bonus_multiplier - 1.0
+        }
+    )
     
     db.commit()
     

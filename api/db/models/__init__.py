@@ -14,6 +14,7 @@ from .invasion import InvasionEvent
 from .kingdom_history import KingdomHistory
 from .alliance import Alliance
 from .friend import Friend
+from .activity_log import PlayerActivityLog
 
 __all__ = [
     "User",
@@ -30,5 +31,6 @@ __all__ = [
     "KingdomHistory",
     "Alliance",
     "Friend",
+    "PlayerActivityLog",
 ]
 

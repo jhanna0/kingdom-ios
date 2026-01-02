@@ -15,6 +15,7 @@ from .models import (
     InvasionEvent,
     KingdomHistory,
     Alliance,
+    PlayerActivityLog,
 )
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "InvasionEvent",
     "KingdomHistory",
     "Alliance",
+    "PlayerActivityLog",
 ]
 

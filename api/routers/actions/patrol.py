@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown, log_activity
 from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD
 
 
@@ -64,6 +64,21 @@ def start_patrol(
     
     # Award reputation for patrol (civic duty)
     state.reputation += PATROL_REPUTATION_REWARD
+    
+    # Log activity
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="patrol",
+        action_category="kingdom",
+        description="Patrolled for reputation",
+        kingdom_id=state.current_kingdom_id,
+        amount=PATROL_REPUTATION_REWARD,
+        details={
+            "reputation_earned": PATROL_REPUTATION_REWARD,
+            "duration_minutes": PATROL_DURATION_MINUTES
+        }
+    )
     
     db.commit()
     

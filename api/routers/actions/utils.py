@@ -2,7 +2,8 @@
 Utility functions for actions system
 """
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
+from sqlalchemy.orm import Session
 import math
 from .constants import (
     PATROL_COOLDOWN,
@@ -11,6 +12,8 @@ from .constants import (
     SCOUT_COOLDOWN,
     TRAINING_COOLDOWN
 )
+from db.models.activity_log import PlayerActivityLog
+from db import Kingdom
 
 
 def format_datetime_iso(dt: datetime) -> str:
@@ -96,4 +99,53 @@ def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: f
         }
     
     return {"ready": True, "seconds_remaining": 0, "blocking_action": None}
+
+
+def log_activity(
+    db: Session,
+    user_id: int,
+    action_type: str,
+    action_category: str,
+    description: str,
+    kingdom_id: Optional[str] = None,
+    amount: Optional[int] = None,
+    details: Optional[dict] = None,
+    visibility: str = "friends"
+) -> PlayerActivityLog:
+    """
+    Log an action to the activity feed
+    
+    Args:
+        db: Database session
+        user_id: User ID performing the action
+        action_type: Type of action (farm, patrol, scout, etc.)
+        action_category: Category (economy, kingdom, combat, social)
+        description: Human-readable description
+        kingdom_id: Optional kingdom ID where action occurred
+        amount: Optional quantitative value (gold earned, rep gained, etc.)
+        details: Optional dict with additional context
+        visibility: Who can see this activity (friends, public, private)
+    
+    Returns:
+        The created PlayerActivityLog entry
+    """
+    # Get kingdom name if kingdom_id provided
+    kingdom_name = None
+    if kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else kingdom_id
+    
+    activity = PlayerActivityLog(
+        user_id=user_id,
+        action_type=action_type,
+        action_category=action_category,
+        description=description,
+        kingdom_id=kingdom_id,
+        kingdom_name=kingdom_name,
+        amount=amount,
+        details=details or {},
+        visibility=visibility
+    )
+    db.add(activity)
+    return activity
 

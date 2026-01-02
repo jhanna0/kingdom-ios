@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from db.base import get_db
 from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, CheckInHistory
+from db.models.activity_log import PlayerActivityLog
 from routers.auth import get_current_user
 from schemas.activity import ActivityLogEntry, PlayerActivityResponse
 
@@ -273,6 +274,41 @@ def _get_checkin_activities(db: Session, user_id: int, limit: int = 50) -> List[
     return activities
 
 
+def _get_action_log_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get logged activities from PlayerActivityLog (farm, patrol, scout, etc.)"""
+    activities = []
+    
+    logs = db.query(PlayerActivityLog).filter(
+        PlayerActivityLog.user_id == user_id
+    ).order_by(desc(PlayerActivityLog.created_at)).limit(limit).all()
+    
+    for log in logs:
+        # Format description with amount if present
+        description = log.description
+        if log.amount:
+            if log.action_type == "farm":
+                description = f"{description} (+{log.amount}g)"
+            elif log.action_type == "patrol":
+                description = f"{description} (+{log.amount} rep)"
+            elif log.action_type == "scout":
+                description = f"{description} (+{log.amount}g)"
+        
+        activities.append(ActivityLogEntry(
+            id=log.id,
+            user_id=user_id,
+            action_type=log.action_type,
+            action_category=log.action_category,
+            description=description,
+            kingdom_id=log.kingdom_id,
+            kingdom_name=log.kingdom_name,
+            amount=log.amount,
+            details=log.details or {},
+            created_at=log.created_at
+        ))
+    
+    return activities
+
+
 @router.get("/my-activities", response_model=PlayerActivityResponse)
 def get_my_activities(
     limit: int = 50,
@@ -290,6 +326,7 @@ def get_my_activities(
     - Property purchases/upgrades
     - Training sessions
     - Check-ins
+    - Income actions (farming, patrol, scouting)
     
     Parameters:
     - limit: Max activities to return (default 50)
@@ -311,6 +348,7 @@ def get_my_activities(
     all_activities.extend(_get_property_activities(db, user_id, limit))
     all_activities.extend(_get_training_activities(db, user_id, state, limit))
     all_activities.extend(_get_checkin_activities(db, user_id, limit))
+    all_activities.extend(_get_action_log_activities(db, user_id, limit))
     
     # Filter by date if specified
     if days and days > 0:
@@ -393,6 +431,7 @@ def get_friend_activities(
         friend_activities.extend(_get_property_activities(db, friend_id, 20))
         friend_activities.extend(_get_training_activities(db, friend_id, friend_state, 10))
         friend_activities.extend(_get_checkin_activities(db, friend_id, 20))
+        friend_activities.extend(_get_action_log_activities(db, friend_id, 20))
         
         # Add user info to activities
         for activity in friend_activities:

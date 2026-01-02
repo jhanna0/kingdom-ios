@@ -22,23 +22,11 @@ struct ActionsView: View {
     
     var currentKingdom: Kingdom? {
         guard let currentKingdomId = viewModel.player.currentKingdom else {
-            print("❌ ActionsView: player.currentKingdom is nil")
             return nil
         }
-        
-        print("🔍 ActionsView currentKingdom computed:")
-        print("   - Looking for ID: '\(currentKingdomId)'")
-        print("   - viewModel.kingdoms.count: \(viewModel.kingdoms.count)")
-        print("   - Kingdom IDs in viewModel: \(viewModel.kingdoms.map { $0.id }.joined(separator: ", "))")
         
         // Search by ID (which is what player.currentKingdom should always be)
-        if let kingdom = viewModel.kingdoms.first(where: { $0.id == currentKingdomId }) {
-            print("✅ ActionsView: Found kingdom: \(kingdom.name) (ID: \(kingdom.id))")
-            return kingdom
-        } else {
-            print("❌ ActionsView: NO KINGDOM FOUND for ID '\(currentKingdomId)'")
-            return nil
-        }
+        return viewModel.kingdoms.first(where: { $0.id == currentKingdomId })
     }
     
     var availableContractsInKingdom: [Contract] {
@@ -260,7 +248,7 @@ struct ActionsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15))
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
@@ -475,10 +463,7 @@ extension ActionsView {
     private func loadActionStatus() async {
         isLoading = true
         do {
-            print("📊 Loading action status...")
             let status = try await KingdomAPIService.shared.actions.getActionStatus()
-            print("📊 Action status loaded successfully")
-            print("📊 Farm status: ready=\(status.farm.ready), secondsRemaining=\(status.farm.secondsRemaining)")
             actionStatus = status
             statusFetchedAt = Date()
             
@@ -504,10 +489,9 @@ extension ActionsView {
                         status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
                     )
                 }
-                print("📊 Loaded \(viewModel.availableContracts.count) contracts")
             }
         } catch let error as APIError {
-            print("❌ loadActionStatus APIError: \(error)")
+            print("❌ loadActionStatus error: \(error)")
             await MainActor.run {
                 errorMessage = "Status Error: \(error.localizedDescription)"
                 showError = true
@@ -606,24 +590,16 @@ extension ActionsView {
     private func performFarming() {
         Task {
             do {
-                print("🌾 Starting farm action...")
                 let previousGold = viewModel.player.gold
                 let previousReputation = viewModel.player.reputation
                 let previousExperience = viewModel.player.experience
                 
-                print("🌾 Calling API performFarming...")
                 let response = try await KingdomAPIService.shared.actions.performFarming()
-                print("🌾 Farm response received: \(response.message)")
-                print("🌾 Farm rewards: \(String(describing: response.rewards))")
                 
-                print("🌾 Loading action status...")
                 await loadActionStatus()
-                
-                print("🌾 Refreshing player from backend...")
                 await viewModel.refreshPlayerFromBackend()
                 
                 await MainActor.run {
-                    print("🌾 Displaying reward UI...")
                     if let rewards = response.rewards {
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
@@ -640,34 +616,16 @@ extension ActionsView {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
-                        print("🌾 Farm action complete!")
-                    } else {
-                        print("⚠️ No rewards in farm response")
                     }
                 }
             } catch let error as APIError {
-                print("❌ Farm action APIError: \(error)")
-                switch error {
-                case .serverError(let message):
-                    print("❌ Server error: \(message)")
-                case .decodingError(let decodingError):
-                    print("❌ Decoding error: \(decodingError)")
-                case .networkError(let networkError):
-                    print("❌ Network error: \(networkError)")
-                case .unauthorized:
-                    print("❌ Unauthorized")
-                case .notFound(let message):
-                    print("❌ Not found: \(message)")
-                case .invalidURL:
-                    print("❌ Invalid URL")
-                }
+                print("❌ Farm action error: \(error)")
                 await MainActor.run {
                     errorMessage = "Farm Error: \(error.localizedDescription)"
                     showError = true
                 }
             } catch {
-                print("❌ Farm action unknown error: \(error)")
-                print("❌ Error type: \(type(of: error))")
+                print("❌ Farm action error: \(error)")
                 await MainActor.run {
                     errorMessage = "Farm Error: \(error.localizedDescription)"
                     showError = true

@@ -36,7 +36,10 @@ def get_db():
 def init_db():
     """Initialize database tables"""
     # Import all models to register them with Base
-    from .models import User, PlayerState, Kingdom, UserKingdom, Contract, Property, CityBoundary, CheckInHistory
+    from .models import (
+        User, PlayerState, Kingdom, UserKingdom, Contract, Property, 
+        CityBoundary, CheckInHistory, PlayerActivityLog
+    )
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created")
 
