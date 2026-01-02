@@ -42,6 +42,19 @@ class UpgradePropertyRequest(BaseModel):
     property_id: str
 
 
+class PurchaseConstructionResponse(BaseModel):
+    """Response when starting property construction (similar to PropertyUpgradeResponse)"""
+    success: bool
+    message: str
+    contract_id: str
+    property_id: str
+    kingdom_id: str
+    kingdom_name: str
+    location: str
+    actions_required: int
+    cost_paid: int
+
+
 # ===== Helper Functions =====
 
 def get_tier_name(tier: int) -> str:
@@ -138,11 +151,16 @@ def get_property_status(
             detail="Player state not found"
         )
     
+    import json
+    
     # Get player's properties
     properties = db.query(Property).filter(
         Property.owner_id == current_user.id
     ).all()
     properties_list = [property_to_response(p) for p in properties]
+    
+    # Load property upgrade/construction contracts
+    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
     
     # Get current kingdom info (if checked in)
     current_kingdom = None
@@ -161,10 +179,19 @@ def get_property_status(
             # Calculate land price for current kingdom
             land_price = calculate_land_price(kingdom.population)
             
-            # Check if player already owns property in THIS kingdom
+            # Check if player already owns property in THIS kingdom (including pending construction)
             already_owns_property_in_current_kingdom = any(
                 p.kingdom_id == kingdom.id for p in properties
             )
+            
+            # Also check for pending construction contracts in this kingdom
+            if not already_owns_property_in_current_kingdom:
+                for contract in property_contracts:
+                    if (contract.get("status") == "in_progress" and 
+                        contract.get("from_tier") == 0 and
+                        contract.get("kingdom_id") == kingdom.id):
+                        already_owns_property_in_current_kingdom = True
+                        break
     
     # Purchase validation flags
     meets_reputation_requirement = state.reputation >= 50
@@ -176,9 +203,7 @@ def get_property_status(
         and can_afford
     )
     
-    # Load property upgrade contracts
-    import json
-    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    # Add computed fields to contracts
     for contract in property_contracts:
         # Compute target_tier_name from to_tier (not stored in DB)
         contract["target_tier_name"] = get_tier_name(contract["to_tier"])
@@ -229,19 +254,25 @@ def get_property_status(
     }
 
 
-@router.post("/purchase", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/purchase", response_model=PurchaseConstructionResponse)
 def purchase_land(
     request: PurchaseLandRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Purchase land (T1) in a kingdom
+    Purchase land and start construction contract (like training system)
     
     Requirements:
     - 50+ reputation
     - Enough gold (price scales with kingdom population)
     - Cannot own property in this kingdom already (ONE per kingdom)
+    
+    Works like training:
+    1. Pay gold upfront
+    2. Get a construction contract requiring actions
+    3. Complete actions to build the property
+    4. Property is created when contract finishes
     """
     state = current_user.player_state
     if not state:
@@ -257,7 +288,7 @@ def purchase_land(
             detail=f"Need 50+ reputation. Current: {state.reputation}"
         )
     
-    # Check if player already owns property in this kingdom
+    # Check if player already owns property in this kingdom (including pending construction)
     existing_property = db.query(Property).filter(
         Property.owner_id == current_user.id,
         Property.kingdom_id == request.kingdom_id
@@ -268,6 +299,26 @@ def purchase_land(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"You already own property in {request.kingdom_name} (Tier {existing_property.tier})"
         )
+    
+    # Check if player has pending construction contract in this kingdom
+    import json
+    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    for contract in property_contracts:
+        if (contract.get("status") == "in_progress" and 
+            contract.get("from_tier") == 0 and
+            contract.get("kingdom_id") == request.kingdom_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"You already have a construction in progress in {request.kingdom_name}"
+            )
+    
+    # Check if ANY property upgrade/construction is in progress (only one at a time)
+    for contract in property_contracts:
+        if contract.get("status") == "in_progress":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You already have a property upgrade/construction in progress. Complete it before starting a new one."
+            )
     
     # Get kingdom to calculate price
     kingdom = db.query(Kingdom).filter(Kingdom.id == request.kingdom_id).first()
@@ -295,27 +346,47 @@ def purchase_land(
             detail=f"Invalid location. Choose: north, south, east, or west"
         )
     
-    # Deduct gold
-    state.gold -= land_price
+    # Calculate actions required for construction (tier 0->1)
+    actions_required = calculate_upgrade_actions_required(0, state.building_skill)
     
-    # Create property at T1
-    new_property = Property(
-        id=str(uuid.uuid4()),
+    # Generate property ID (will be used when construction completes)
+    property_id = str(uuid.uuid4())
+    contract_id = str(uuid.uuid4())
+    
+    # Create construction contract (from_tier=0 indicates new construction)
+    new_contract = {
+        "contract_id": contract_id,
+        "property_id": property_id,
+        "kingdom_id": request.kingdom_id,
+        "kingdom_name": request.kingdom_name,
+        "location": request.location.lower(),
+        "from_tier": 0,  # 0 = new construction
+        "to_tier": 1,
+        "actions_required": actions_required,
+        "actions_completed": 0,
+        "cost": land_price,
+        "status": "in_progress",
+        "started_at": datetime.utcnow().isoformat()
+    }
+    
+    # Deduct gold and add construction contract
+    state.gold -= land_price
+    property_contracts.append(new_contract)
+    state.property_upgrade_contracts = json.dumps(property_contracts)
+    
+    db.commit()
+    
+    return PurchaseConstructionResponse(
+        success=True,
+        message=f"Started construction in {request.kingdom_name}! Complete {actions_required} actions to build your property.",
+        contract_id=contract_id,
+        property_id=property_id,
         kingdom_id=request.kingdom_id,
         kingdom_name=request.kingdom_name,
-        owner_id=current_user.id,
-        owner_name=current_user.display_name,
-        tier=1,
         location=request.location.lower(),
-        purchased_at=datetime.utcnow(),
-        last_upgraded=None
+        actions_required=actions_required,
+        cost_paid=land_price
     )
-    
-    db.add(new_property)
-    db.commit()
-    db.refresh(new_property)
-    
-    return property_to_response(new_property)
 
 
 @router.post("/{property_id}/upgrade/purchase")

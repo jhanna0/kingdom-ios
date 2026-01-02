@@ -435,13 +435,13 @@ struct PropertyMarketView: View {
         }
         
         do {
-            let property = try await propertyAPI.purchaseLand(
+            let response = try await propertyAPI.purchaseLand(
                 kingdomId: kingdomInfo.id,
                 kingdomName: kingdomInfo.name,
                 location: selectedLocation
             )
             
-            print("✅ Successfully purchased property: \(property.tierName) in \(kingdomInfo.name)")
+            print("✅ Started property construction in \(kingdomInfo.name): \(response.actionsRequired) actions required")
             
             await MainActor.run {
                 Task {
@@ -461,7 +461,7 @@ struct PropertyMarketView: View {
                 isPurchasing = false
                 purchaseError = error.localizedDescription
             }
-            print("❌ Failed to purchase property: \(error)")
+            print("❌ Failed to start property construction: \(error)")
         }
     }
 }

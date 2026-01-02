@@ -61,6 +61,28 @@ class PropertyAPI {
         }
     }
     
+    struct PurchaseConstructionResponse: Codable {
+        let success: Bool
+        let message: String
+        let contractId: String
+        let propertyId: String
+        let kingdomId: String
+        let kingdomName: String
+        let location: String
+        let actionsRequired: Int
+        let costPaid: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case success, message, location
+            case contractId = "contract_id"
+            case propertyId = "property_id"
+            case kingdomId = "kingdom_id"
+            case kingdomName = "kingdom_name"
+            case actionsRequired = "actions_required"
+            case costPaid = "cost_paid"
+        }
+    }
+    
     // MARK: - Get Property Status (ALL data in one call)
     
     struct PropertyStatus: Codable {
@@ -92,6 +114,9 @@ class PropertyAPI {
     struct PropertyUpgradeContract: Codable {
         let contract_id: String
         let property_id: String
+        let kingdom_id: String?  // Only for construction (from_tier=0)
+        let kingdom_name: String?  // Only for construction (from_tier=0)
+        let location: String?  // Only for construction (from_tier=0)
         let from_tier: Int
         let to_tier: Int
         let target_tier_name: String
@@ -114,13 +139,13 @@ class PropertyAPI {
         return response
     }
     
-    // MARK: - Purchase Land
+    // MARK: - Purchase Land (starts construction contract)
     
-    func purchaseLand(kingdomId: String, kingdomName: String, location: String) async throws -> Property {
+    func purchaseLand(kingdomId: String, kingdomName: String, location: String) async throws -> PurchaseConstructionResponse {
         let body = PurchaseLandRequest(kingdom_id: kingdomId, kingdom_name: kingdomName, location: location)
         let request = try client.request(endpoint: "/properties/purchase", method: "POST", body: body)
-        let response: PropertyResponse = try await client.execute(request)
-        return response.toProperty()
+        let response: PurchaseConstructionResponse = try await client.execute(request)
+        return response
     }
     
     // MARK: - Upgrade Property (Purchase Contract)
@@ -156,6 +181,9 @@ class PropertyAPI {
     struct ActiveUpgradeContract: Codable {
         let contract_id: String
         let property_id: String
+        let kingdom_id: String?  // Only for construction (from_tier=0)
+        let kingdom_name: String?  // Only for construction (from_tier=0)
+        let location: String?  // Only for construction (from_tier=0)
         let from_tier: Int
         let to_tier: Int
         let actions_required: Int

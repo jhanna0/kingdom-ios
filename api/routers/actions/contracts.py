@@ -157,7 +157,12 @@ def work_on_property_upgrade(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Contribute one action to a property upgrade contract (same cooldown as building contracts)"""
+    """Contribute one action to a property upgrade/construction contract (same cooldown as building contracts)
+    
+    Handles both:
+    - New construction (from_tier=0): Creates property when complete
+    - Upgrades (from_tier>0): Upgrades existing property tier
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -220,14 +225,31 @@ def work_on_property_upgrade(
         contract_data["status"] = "completed"
         contract_data["completed_at"] = datetime.utcnow().isoformat()
         
-        # Upgrade the property tier
-        property = db.query(Property).filter(
-            Property.id == contract_data["property_id"]
-        ).first()
-        
-        if property:
-            property.tier = contract_data["to_tier"]
-            property.last_upgraded = datetime.utcnow()
+        # Check if this is a new construction (from_tier=0) or an upgrade
+        if contract_data.get("from_tier") == 0:
+            # NEW CONSTRUCTION: Create the property
+            from db.models import Property
+            new_property = Property(
+                id=contract_data["property_id"],
+                kingdom_id=contract_data["kingdom_id"],
+                kingdom_name=contract_data["kingdom_name"],
+                owner_id=current_user.id,
+                owner_name=current_user.display_name,
+                tier=1,
+                location=contract_data["location"],
+                purchased_at=datetime.utcnow(),
+                last_upgraded=None
+            )
+            db.add(new_property)
+        else:
+            # UPGRADE: Update existing property tier
+            property = db.query(Property).filter(
+                Property.id == contract_data["property_id"]
+            ).first()
+            
+            if property:
+                property.tier = contract_data["to_tier"]
+                property.last_upgraded = datetime.utcnow()
         
         # Mark contract as completed
         state.contracts_completed += 1
@@ -240,9 +262,18 @@ def work_on_property_upgrade(
     
     progress_percent = int((contract_data["actions_completed"] / contract_data["actions_required"]) * 100)
     
+    # Determine message based on contract type
+    if is_complete:
+        if contract_data.get("from_tier") == 0:
+            completion_msg = " - Property construction complete!"
+        else:
+            completion_msg = " - Property upgrade complete!"
+    else:
+        completion_msg = ""
+    
     return {
         "success": True,
-        "message": "Work action completed! +1 action" + (" - Property upgrade complete!" if is_complete else ""),
+        "message": "Work action completed! +1 action" + completion_msg,
         "contract_id": contract_id,
         "property_id": contract_data["property_id"],
         "actions_completed": contract_data["actions_completed"],

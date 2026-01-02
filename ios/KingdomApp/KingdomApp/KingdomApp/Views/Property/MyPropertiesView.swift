@@ -10,6 +10,7 @@ struct MyPropertiesView: View {
     @ObservedObject var player: Player
     var currentKingdom: Kingdom?
     @State private var properties: [Property] = []
+    @State private var activeContracts: [PropertyAPI.PropertyUpgradeContract] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
@@ -21,12 +22,23 @@ struct MyPropertiesView: View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                    // Properties list or empty state
-                    if properties.isEmpty {
-                        emptyStateView
-                    } else {
+                    // Active contracts (construction OR upgrade)
+                    if !activeContracts.isEmpty {
+                        contractsSection
+                    }
+                    
+                    // Properties list
+                    if !properties.isEmpty {
                         propertySection
                     }
+                    
+                    // Empty state (only if no properties AND no contracts)
+                    if properties.isEmpty && activeContracts.isEmpty {
+                        emptyStateView
+                    }
+                    
+                    // Always show View All Tiers button
+                    viewAllTiersButton
                 }
                 .padding()
             }
@@ -57,6 +69,56 @@ struct MyPropertiesView: View {
                 loadProperties()
             }
         }
+    }
+    
+    // MARK: - Active Contracts Section (simple summary - work done in Actions tab)
+    
+    private var contractsSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            ForEach(activeContracts, id: \.contract_id) { contract in
+                contractSummaryCard(contract: contract)
+            }
+        }
+    }
+    
+    private func contractSummaryCard(contract: PropertyAPI.PropertyUpgradeContract) -> some View {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            Image(systemName: "hammer.fill")
+                .font(FontStyles.iconMedium)
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonWarning,
+                    cornerRadius: 10,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Building \(contract.target_tier_name)")
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("\(contract.actions_completed)/\(contract.actions_required) actions • \(Int((Float(contract.actions_completed) / Float(contract.actions_required)) * 100))%")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            Spacer()
+            
+            Text("In Progress")
+                .font(FontStyles.labelSmall)
+                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(KingdomTheme.Colors.buttonWarning, lineWidth: 1)
+                )
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Property Section (when user owns property)
@@ -168,6 +230,38 @@ struct MyPropertiesView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment)
     }
     
+    // MARK: - View All Tiers Button
+    
+    private var viewAllTiersButton: some View {
+        NavigationLink(destination: PropertyTiersView(player: player, property: properties.first)) {
+            HStack(spacing: 12) {
+                Image(systemName: "list.number")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("View All Tiers")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("See upgrade path & benefits")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .padding()
+        }
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
     // MARK: - Empty State
     
     private var emptyStateView: some View {
@@ -216,35 +310,6 @@ struct MyPropertiesView: View {
                                 .font(FontStyles.labelMedium)
                                 .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         }
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(FontStyles.iconSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                .padding()
-            }
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            
-            // View All Tiers button
-            NavigationLink(destination: PropertyTiersView(player: player, property: nil)) {
-                HStack(spacing: 12) {
-                    Image(systemName: "list.number")
-                        .font(FontStyles.iconMedium)
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("View All Tiers")
-                            .font(FontStyles.headingMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Text("See upgrade path & benefits")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
                     Spacer()
@@ -344,6 +409,10 @@ struct MyPropertiesView: View {
                 let status = try await propertyAPI.getPropertyStatus()
                 await MainActor.run {
                     properties = status.properties.map { $0.toProperty() }
+                    
+                    // Get all in-progress contracts (construction OR upgrades)
+                    activeContracts = status.property_upgrade_contracts?.filter { $0.status == "in_progress" } ?? []
+                    
                     isLoading = false
                 }
             } catch {
@@ -351,9 +420,11 @@ struct MyPropertiesView: View {
                     errorMessage = error.localizedDescription
                     isLoading = false
                     properties = []
+                    activeContracts = []
                 }
                 print("❌ Failed to load property status: \(error)")
             }
         }
     }
 }
+
