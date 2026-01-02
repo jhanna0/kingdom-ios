@@ -77,7 +77,6 @@ struct AuthenticatedView: View {
     @State private var showCharacterSheet = false
     @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
-    @State private var showAPIDebug = false
     @State private var showActivity = false
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
@@ -106,7 +105,6 @@ struct AuthenticatedView: View {
                     showActions: $showActions,
                     showProperties: $showProperties,
                     showActivity: $showActivity,
-                    showAPIDebug: $showAPIDebug,
                     notificationBadgeCount: notificationBadgeCount
                 )
                 
@@ -180,9 +178,6 @@ struct AuthenticatedView: View {
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showAPIDebug) {
-            APIDebugView()
         }
         .sheet(isPresented: $showActivity) {
             FriendsView()

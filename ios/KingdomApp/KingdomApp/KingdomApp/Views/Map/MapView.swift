@@ -18,7 +18,6 @@ struct MapView: View {
     @State private var kingdomToShow: Kingdom?
     @State private var hasShownInitialKingdom = false
     @State private var mapOpacity: Double = 1.0
-    @State private var showAPIDebug = false
     @State private var showActivity = false
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
@@ -133,7 +132,6 @@ struct MapView: View {
                 showActions: $showActions,
                 showProperties: $showProperties,
                 showActivity: $showActivity,
-                showAPIDebug: $showAPIDebug,
                 notificationBadgeCount: notificationBadgeCount
             )
             
@@ -259,9 +257,6 @@ struct MapView: View {
                 }
             }
         }
-        .sheet(isPresented: $showAPIDebug) {
-            APIDebugView()
-        }
         .sheet(isPresented: $showActivity) {
             FriendsView()
         }
@@ -297,7 +292,7 @@ struct MapView: View {
                 }
                 
                 Annotation(kingdom.name, coordinate: kingdom.territory.center) {
-                    KingdomMarker(kingdom: kingdom)
+                    KingdomMarker(kingdom: kingdom, homeKingdomId: viewModel.player.homeKingdomId, playerId: viewModel.player.playerId)
                         .onTapGesture {
                             kingdomForInfoSheet = kingdom
                         }

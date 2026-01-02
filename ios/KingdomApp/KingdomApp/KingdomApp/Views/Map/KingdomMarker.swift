@@ -3,17 +3,23 @@ import SwiftUI
 // Kingdom marker on map - Bold brutalist style with visual indicators
 struct KingdomMarker: View {
     let kingdom: Kingdom
+    let homeKingdomId: String?
+    let playerId: Int
     
     // Animation state
     @State private var isPressed = false
     
     // Visual state
     private var isUnclaimed: Bool { kingdom.isUnclaimed }
-    private var kingdomColor: Color {
-        Color(
-            red: kingdom.color.rgba.red,
-            green: kingdom.color.rgba.green,
-            blue: kingdom.color.rgba.blue
+    private var isHomeKingdom: Bool { kingdom.id == homeKingdomId }
+    
+    // Match EXACTLY what DrawnMapView uses for polygon colors
+    private var markerBackgroundColor: Color {
+        return KingdomTheme.Colors.territoryColor(
+            kingdomId: kingdom.id,
+            isPlayer: isHomeKingdom,
+            isEnemy: kingdom.isEnemy,
+            isAllied: kingdom.isAllied
         )
     }
     
@@ -27,19 +33,19 @@ struct KingdomMarker: View {
                     .frame(width: 56, height: 56)
                     .offset(x: 3, y: 3)
                 
-                // Main marker - single clean background
+                // Main marker - colored background like a game piece
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(KingdomTheme.Colors.parchment)
+                    .fill(markerBackgroundColor)
                     .frame(width: 56, height: 56)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(Color.black, lineWidth: 3)
                     )
                 
-                // Kingdom icon - monumental building
+                // Kingdom icon - white on colored background (game piece style)
                 Image(systemName: "building.columns.fill")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(isUnclaimed ? KingdomTheme.Colors.inkLight : kingdomColor)
+                    .foregroundColor(.white)
                 
                 // Level badge - brutalist style
                 ZStack {
@@ -50,7 +56,7 @@ struct KingdomMarker: View {
                         .offset(x: 2, y: 2)
                     
                     Circle()
-                        .fill(isUnclaimed ? KingdomTheme.Colors.parchmentDark : kingdomColor)
+                        .fill(markerBackgroundColor)
                         .frame(width: 24, height: 24)
                         .overlay(
                             Circle()
@@ -59,7 +65,7 @@ struct KingdomMarker: View {
                     
                     Text("\(kingdom.wallLevel)")
                         .font(.system(size: 11, weight: .black))
-                        .foregroundColor(isUnclaimed ? .black : .white)
+                        .foregroundColor(.white)
                 }
                 .offset(x: 22, y: 22)
                 

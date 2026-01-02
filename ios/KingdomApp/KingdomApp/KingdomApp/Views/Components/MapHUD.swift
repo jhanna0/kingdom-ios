@@ -7,9 +7,6 @@ struct MapHUD: View {
     @Binding var showActions: Bool
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
-    @Binding var showAPIDebug: Bool
-    @EnvironmentObject var musicService: MusicService
-    @State private var showMusicSettings = false
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     let notificationBadgeCount: Int
@@ -30,16 +27,19 @@ struct MapHUD: View {
                         Image(systemName: viewModel.player.isRuler ? "crown.fill" : "shield.fill")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(KingdomTheme.Colors.goldLight)
-                        if let homeKingdom = homeKingdomName {
-                            Text("\(viewModel.player.name) of \(homeKingdom)")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.black)
-                                .lineLimit(1)
-                        } else {
-                            Text(viewModel.player.name)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.black)
-                        }
+                    if let homeKingdom = homeKingdomName {
+                        Text("\(viewModel.player.name) of \(homeKingdom)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.black)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    } else {
+                        Text(viewModel.player.name)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.black)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -63,51 +63,6 @@ struct MapHUD: View {
                     if let cooldown = viewModel.globalCooldown {
                         actionStatusBadge(cooldown: cooldown)
                     }
-                    
-                    // Music Control Button - brutalist circle
-                    Button {
-                        showMusicSettings = true
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 32, height: 32)
-                                .offset(x: 2, y: 2)
-                            Circle()
-                                .fill(KingdomTheme.Colors.parchmentLight)
-                                .frame(width: 32, height: 32)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                            Image(systemName: musicService.isMusicEnabled ? "music.note" : "music.note.slash")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.black)
-                        }
-                    }
-                    
-                    // API Status Indicator - brutalist style
-                    Button {
-                        showAPIDebug = true
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 16, height: 16)
-                                .offset(x: 1, y: 1)
-                            Circle()
-                                .fill(viewModel.apiService.isConnected ? Color.green : Color.gray)
-                                .frame(width: 16, height: 16)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                        }
-                    }
-                }
-                .sheet(isPresented: $showMusicSettings) {
-                    MusicSettingsView()
-                        .environmentObject(musicService)
                 }
                 
                 // Divider - thick black line

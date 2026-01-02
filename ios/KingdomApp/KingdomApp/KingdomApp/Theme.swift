@@ -71,6 +71,59 @@ struct KingdomTheme {
         static let disabled = Color(red: 0.5, green: 0.4, blue: 0.3)
         /// Muted text for de-emphasized content
         static let textMuted = Color(red: 0.45, green: 0.35, blue: 0.25)
+        
+        // MARK: Kingdom Territory Colors (Map Polygons & Markers)
+        /// Player's kingdom - ROYAL BLUE (darker)
+        static let territoryPlayer = Color(red: 0.15, green: 0.25, blue: 0.65)
+        /// Enemy kingdom - deep muted red (medieval vermillion)
+        static let territoryEnemy = Color(red: 0.75, green: 0.30, blue: 0.25)
+        /// Allied kingdom - map blue-green (like cartographer's seas)
+        static let territoryAllied = Color(red: 0.35, green: 0.60, blue: 0.65)
+        
+        // Neutral kingdom colors (hash-based assignment)
+        static let territoryNeutral0 = Color(red: 0.40, green: 0.55, blue: 0.75)  // Ocean blue
+        static let territoryNeutral1 = Color(red: 0.45, green: 0.68, blue: 0.50)  // Forest green
+        static let territoryNeutral2 = Color(red: 0.70, green: 0.52, blue: 0.42)  // Terracotta
+        static let territoryNeutral3 = Color(red: 0.38, green: 0.65, blue: 0.70)  // Teal
+        static let territoryNeutral4 = Color(red: 0.55, green: 0.60, blue: 0.45)  // Sage green
+        static let territoryNeutral5 = Color(red: 0.50, green: 0.45, blue: 0.65)  // Dusty purple
+        static let territoryNeutral6 = Color(red: 0.65, green: 0.58, blue: 0.45)  // Sandy brown
+        static let territoryNeutral7 = Color(red: 0.42, green: 0.58, blue: 0.60)  // Steel blue
+        static let territoryNeutral8 = Color(red: 0.58, green: 0.65, blue: 0.42)  // Olive green
+        static let territoryNeutral9 = Color(red: 0.68, green: 0.50, blue: 0.52)  // Dusty rose
+        static let territoryNeutral10 = Color(red: 0.45, green: 0.52, blue: 0.58) // Slate blue
+        static let territoryNeutral11 = Color(red: 0.62, green: 0.55, blue: 0.48) // Warm gray
+        
+        /// Get territory color for a kingdom based on relationship and hash
+        static func territoryColor(kingdomId: String, isPlayer: Bool, isEnemy: Bool, isAllied: Bool) -> Color {
+            if isPlayer {
+                return territoryPlayer
+            } else if isEnemy {
+                return territoryEnemy
+            } else if isAllied {
+                return territoryAllied
+            } else {
+                // Neutral - hash-based color assignment
+                let hash = abs(kingdomId.hashValue)
+                let colorIndex = hash % 12
+                
+                switch colorIndex {
+                case 0: return territoryNeutral0
+                case 1: return territoryNeutral1
+                case 2: return territoryNeutral2
+                case 3: return territoryNeutral3
+                case 4: return territoryNeutral4
+                case 5: return territoryNeutral5
+                case 6: return territoryNeutral6
+                case 7: return territoryNeutral7
+                case 8: return territoryNeutral8
+                case 9: return territoryNeutral9
+                case 10: return territoryNeutral10
+                case 11: return territoryNeutral11
+                default: return Color(red: 0.50, green: 0.50, blue: 0.50) // Fallback gray
+                }
+            }
+        }
     }
     
     // MARK: - Typography

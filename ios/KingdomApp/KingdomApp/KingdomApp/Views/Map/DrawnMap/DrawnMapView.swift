@@ -71,7 +71,7 @@ struct DrawnMapView: View {
     private func kingdomMarkers(in geometry: GeometryProxy) -> some View {
         ForEach(viewModel.kingdoms) { kingdom in
             if let position = coordinateToPoint(kingdom.territory.center) {
-                KingdomMarker(kingdom: kingdom)
+                KingdomMarker(kingdom: kingdom, homeKingdomId: viewModel.player.homeKingdomId, playerId: viewModel.player.playerId)
                     .position(
                         x: geometry.size.width / 2 + position.x * transform.scale + transform.offset.width,
                         y: geometry.size.height / 2 + position.y * transform.scale + transform.offset.height
@@ -118,51 +118,12 @@ struct DrawnMapView: View {
     }
     
     private func kingdomFillColor(for kingdom: Kingdom) -> Color {
-        if kingdom.rulerId == viewModel.player.playerId {
-            // YOUR KINGDOM - warm amber/bronze (like illuminated manuscripts)
-            return Color(red: 0.85, green: 0.65, blue: 0.30)
-        } else if kingdom.isEnemy {
-            // AT WAR - deep muted red (medieval vermillion)
-            return Color(red: 0.75, green: 0.30, blue: 0.25)
-        } else if kingdom.isAllied {
-            // ALLIED - map blue-green (like cartographer's seas)
-            return Color(red: 0.35, green: 0.60, blue: 0.65)
-        } else {
-            // NEUTRAL - Nice varied map colors based on kingdom ID
-            // Use hash of kingdom ID to get consistent but varied colors
-            let hash = abs(kingdom.id.hashValue)
-            let colorIndex = hash % 12
-            
-            // Array of beautiful map colors - blues, greens, earth tones
-            switch colorIndex {
-            case 0:
-                return Color(red: 0.40, green: 0.55, blue: 0.75) // Ocean blue
-            case 1:
-                return Color(red: 0.45, green: 0.68, blue: 0.50) // Forest green
-            case 2:
-                return Color(red: 0.70, green: 0.52, blue: 0.42) // Terracotta
-            case 3:
-                return Color(red: 0.38, green: 0.65, blue: 0.70) // Teal
-            case 4:
-                return Color(red: 0.55, green: 0.60, blue: 0.45) // Sage green
-            case 5:
-                return Color(red: 0.50, green: 0.45, blue: 0.65) // Dusty purple
-            case 6:
-                return Color(red: 0.65, green: 0.58, blue: 0.45) // Sandy brown
-            case 7:
-                return Color(red: 0.42, green: 0.58, blue: 0.60) // Steel blue
-            case 8:
-                return Color(red: 0.58, green: 0.65, blue: 0.42) // Olive green
-            case 9:
-                return Color(red: 0.68, green: 0.50, blue: 0.52) // Dusty rose
-            case 10:
-                return Color(red: 0.45, green: 0.52, blue: 0.58) // Slate blue
-            case 11:
-                return Color(red: 0.60, green: 0.55, blue: 0.48) // Warm taupe
-            default:
-                return Color(red: 0.50, green: 0.55, blue: 0.60) // Default grey-blue
-            }
-        }
+        return KingdomTheme.Colors.territoryColor(
+            kingdomId: kingdom.id,
+            isPlayer: kingdom.id == viewModel.player.homeKingdomId,
+            isEnemy: kingdom.isEnemy,
+            isAllied: kingdom.isAllied
+        )
     }
     
     private func drawUserLocation(context: GraphicsContext) {
