@@ -21,6 +21,56 @@ struct DrawnMapView: View {
                     kingdomMarkers(in: geometry)
                 }
                 .panZoomable(transform: $transform)
+                
+                // Error overlay - Brutalist style (same as MapView.swift)
+                if let error = viewModel.errorMessage {
+                    VStack {
+                        Spacer()
+                        
+                        VStack(spacing: KingdomTheme.Spacing.large) {
+                            // Error icon with brutalist badge
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 64, height: 64)
+                                    .offset(x: 3, y: 3)
+                                
+                                Circle()
+                                    .fill(KingdomTheme.Colors.buttonDanger)
+                                    .frame(width: 64, height: 64)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                                
+                                Image(systemName: "exclamationmark")
+                                    .font(.system(size: 28, weight: .black))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            Text("Map Scroll Damaged")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.black)
+                            
+                            Text(error)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.black.opacity(0.6))
+                                .multilineTextAlignment(.center)
+                            
+                            Button(action: {
+                                viewModel.refreshKingdoms()
+                            }) {
+                                Label("Repair Map", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
+                        }
+                        .padding(KingdomTheme.Spacing.xxLarge)
+                        .brutalistCard(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .padding(.horizontal, 40)
+                        
+                        Spacer()
+                    }
+                }
             }
         }
     }
@@ -86,8 +136,8 @@ struct DrawnMapView: View {
         
         let fillColor = kingdomFillColor(for: kingdom)
         
-        // Fill territory (semi-transparent so texture shows through)
-        context.fill(path, with: .color(fillColor.opacity(0.3)))
+        // Fill territory (higher opacity for better visibility)
+        context.fill(path, with: .color(fillColor.opacity(0.55)))
         
         // Brutalist style: thick solid black border
         context.stroke(
@@ -99,21 +149,49 @@ struct DrawnMapView: View {
     
     private func kingdomFillColor(for kingdom: Kingdom) -> Color {
         if kingdom.rulerId == viewModel.player.playerId {
-            // YOUR KINGDOM - bright gold
-            return Color(red: 1.0, green: 0.85, blue: 0.0)
+            // YOUR KINGDOM - warm amber/bronze (like illuminated manuscripts)
+            return Color(red: 0.85, green: 0.65, blue: 0.30)
         } else if kingdom.isEnemy {
-            // AT WAR - dangerous red
-            return Color(red: 0.90, green: 0.25, blue: 0.20)
+            // AT WAR - deep muted red (medieval vermillion)
+            return Color(red: 0.75, green: 0.30, blue: 0.25)
         } else if kingdom.isAllied {
-            // ALLIED - friendly green
-            return Color(red: 0.30, green: 0.75, blue: 0.40)
+            // ALLIED - map blue-green (like cartographer's seas)
+            return Color(red: 0.35, green: 0.60, blue: 0.65)
         } else {
-            // NEUTRAL - use default kingdom color
-            return Color(
-                red: kingdom.color.rgba.red,
-                green: kingdom.color.rgba.green,
-                blue: kingdom.color.rgba.blue
-            )
+            // NEUTRAL - Nice varied map colors based on kingdom ID
+            // Use hash of kingdom ID to get consistent but varied colors
+            let hash = abs(kingdom.id.hashValue)
+            let colorIndex = hash % 12
+            
+            // Array of beautiful map colors - blues, greens, earth tones
+            switch colorIndex {
+            case 0:
+                return Color(red: 0.40, green: 0.55, blue: 0.75) // Ocean blue
+            case 1:
+                return Color(red: 0.45, green: 0.68, blue: 0.50) // Forest green
+            case 2:
+                return Color(red: 0.70, green: 0.52, blue: 0.42) // Terracotta
+            case 3:
+                return Color(red: 0.38, green: 0.65, blue: 0.70) // Teal
+            case 4:
+                return Color(red: 0.55, green: 0.60, blue: 0.45) // Sage green
+            case 5:
+                return Color(red: 0.50, green: 0.45, blue: 0.65) // Dusty purple
+            case 6:
+                return Color(red: 0.65, green: 0.58, blue: 0.45) // Sandy brown
+            case 7:
+                return Color(red: 0.42, green: 0.58, blue: 0.60) // Steel blue
+            case 8:
+                return Color(red: 0.58, green: 0.65, blue: 0.42) // Olive green
+            case 9:
+                return Color(red: 0.68, green: 0.50, blue: 0.52) // Dusty rose
+            case 10:
+                return Color(red: 0.45, green: 0.52, blue: 0.58) // Slate blue
+            case 11:
+                return Color(red: 0.60, green: 0.55, blue: 0.48) // Warm taupe
+            default:
+                return Color(red: 0.50, green: 0.55, blue: 0.60) // Default grey-blue
+            }
         }
     }
     

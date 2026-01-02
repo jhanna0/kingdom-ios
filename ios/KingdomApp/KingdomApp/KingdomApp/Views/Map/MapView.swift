@@ -1,6 +1,12 @@
 import SwiftUI
 import MapKit
 
+// MARK: - DEPRECATED
+// This file is deprecated and no longer used in the app.
+// The app now uses DrawnMapView.swift which provides a custom hand-drawn
+// parchment-style map instead of Apple Maps.
+// See: Views/Map/DrawnMap/DrawnMapView.swift
+
 struct MapView: View {
     @ObservedObject var viewModel: MapViewModel
     @StateObject private var locationManager = LocationManager()

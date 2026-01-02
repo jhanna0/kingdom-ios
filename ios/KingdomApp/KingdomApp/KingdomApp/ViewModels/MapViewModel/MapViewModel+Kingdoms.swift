@@ -71,9 +71,23 @@ extension MapViewModel {
                 
             } catch {
                 await MainActor.run {
-                    loadingStatus = "The royal cartographers have failed..."
-                    errorMessage = "API Error: \(error.localizedDescription)"
-                    print("❌ Failed to load cities: \(error.localizedDescription)")
+                    // Provide specific error messages based on the error type
+                    let errorDescription = error.localizedDescription
+                    
+                    if errorDescription.contains("No city found") {
+                        loadingStatus = ""
+                        errorMessage = "No kingdoms discovered at this location. The royal cartographers have not yet mapped this region. Try a major city or move to a different area."
+                        print("❌ Failed to load cities: \(errorDescription)")
+                    } else if errorDescription.contains("network") || errorDescription.contains("internet") {
+                        loadingStatus = "Connection to royal archives lost..."
+                        errorMessage = "Cannot reach the kingdom servers. Check your internet connection and try again."
+                        print("❌ Network error loading cities: \(errorDescription)")
+                    } else {
+                        loadingStatus = "The royal cartographers have failed..."
+                        errorMessage = "Error loading kingdoms: \(errorDescription)"
+                        print("❌ Failed to load cities: \(errorDescription)")
+                    }
+                    
                     isLoading = false
                 }
             }

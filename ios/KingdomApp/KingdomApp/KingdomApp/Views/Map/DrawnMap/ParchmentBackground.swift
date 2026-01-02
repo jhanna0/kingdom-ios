@@ -2,27 +2,27 @@ import SwiftUI
 
 /// Beautiful aged parchment background with visible texture
 struct ParchmentBackground: View {
-    // Texture configuration
+    // Texture configuration - Subtle texture
     private enum Texture {
-        static let horizontalLineSpacing: CGFloat = 4
-        static let horizontalLineWidth: CGFloat = 1.2
-        static let horizontalLineOpacity: Double = 0.35
+        static let horizontalLineSpacing: CGFloat = 8
+        static let horizontalLineWidth: CGFloat = 1.0
+        static let horizontalLineOpacity: Double = 0.15
         
-        static let verticalLineSpacing: CGFloat = 6
-        static let verticalLineWidth: CGFloat = 1.0
-        static let verticalLineOpacity: Double = 0.25
+        static let verticalLineSpacing: CGFloat = 12
+        static let verticalLineWidth: CGFloat = 0.8
+        static let verticalLineOpacity: Double = 0.12
         
-        static let speckleSpacing: Int = 10
-        static let speckleSize: CGFloat = 2.5
-        static let speckleOpacity: Double = 0.4
+        static let speckleSpacing: Int = 20
+        static let speckleSize: CGFloat = 2.0
+        static let speckleOpacity: Double = 0.2
     }
     
-    // Color configuration
+    // Color configuration - Muted blue-grey parchment (blend of ocean and tan)
     private enum Colors {
-        static let base = Color(red: 0.85, green: 0.77, blue: 0.63)
-        static let gradientLight = Color(red: 0.88, green: 0.80, blue: 0.66)
-        static let gradientDark = Color(red: 0.80, green: 0.72, blue: 0.58)
-        static let textureColor = Color.brown
+        static let base = Color(red: 0.68, green: 0.69, blue: 0.66)
+        static let gradientLight = Color(red: 0.72, green: 0.73, blue: 0.70)
+        static let gradientDark = Color(red: 0.62, green: 0.63, blue: 0.59)
+        static let textureColor = Color(red: 0.45, green: 0.48, blue: 0.50)
     }
     
     var body: some View {
@@ -102,8 +102,8 @@ struct ParchmentBackground: View {
     private var colorGradient: some View {
         LinearGradient(
             colors: [
-                Colors.gradientLight.opacity(0.3),
-                Colors.gradientDark.opacity(0.3)
+                Colors.gradientLight.opacity(0.2),
+                Colors.gradientDark.opacity(0.2)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

@@ -12,11 +12,25 @@ class LocationManager: NSObject, ObservableObject {
     /// Set to true to use fake location instead of real GPS
     static var useFakeLocation = false
     
-    /// Fake location for testing (Apple Park, Cupertino, CA)
-    static var fakeLocation = CLLocationCoordinate2D(
-        latitude: 37.3349,  // Apple Park
-        longitude: -122.0090
-    )
+    /// Test city locations for development
+    /// NOTE: Not all locations may have kingdom data in the database yet.
+    /// If you get "No city found" errors, try a different city or use a location
+    /// where you've previously played the game.
+    static let testCities = [
+        "nyc": CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060),        // New York City
+        "sf": CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),       // San Francisco
+        "la": CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437),       // Los Angeles
+        "boston": CLLocationCoordinate2D(latitude: 42.3601, longitude: -71.0589),    // Boston
+        "chicago": CLLocationCoordinate2D(latitude: 41.8781, longitude: -87.6298),   // Chicago
+        "miami": CLLocationCoordinate2D(latitude: 25.7617, longitude: -80.1918),     // Miami
+        "seattle": CLLocationCoordinate2D(latitude: 47.6062, longitude: -122.3321),  // Seattle
+        "austin": CLLocationCoordinate2D(latitude: 30.2672, longitude: -97.7431),    // Austin
+        "denver": CLLocationCoordinate2D(latitude: 39.7392, longitude: -104.9903),   // Denver
+        "portland": CLLocationCoordinate2D(latitude: 45.5152, longitude: -122.6784)  // Portland
+    ]
+    
+    /// Fake location for testing (defaults to NYC)
+    static var fakeLocation = testCities["denver"]!
     
     override init() {
         super.init()
@@ -28,7 +42,10 @@ class LocationManager: NSObject, ObservableObject {
         
         // If using fake location, set it immediately
         if Self.useFakeLocation {
-            print("🧪 Using FAKE location: Apple Park, Cupertino, CA (\(Self.fakeLocation.latitude), \(Self.fakeLocation.longitude))")
+            // Find which city this is for better logging
+            let cityName = Self.testCities.first(where: { $0.value.latitude == Self.fakeLocation.latitude && $0.value.longitude == Self.fakeLocation.longitude })?.key ?? "custom"
+            print("🧪 Using FAKE location: \(cityName.uppercased()) (\(Self.fakeLocation.latitude), \(Self.fakeLocation.longitude))")
+            print("ℹ️  If you get 'No city found' errors, try a different test city from LocationManager.testCities")
             currentLocation = Self.fakeLocation
             authorizationStatus = .authorizedWhenInUse
         } else {
