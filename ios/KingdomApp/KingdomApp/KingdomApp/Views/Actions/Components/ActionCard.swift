@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Action Type
 
 enum ActionType {
-    case work, patrol, scout, sabotage
+    case work, patrol, farm, scout, sabotage
 }
 
 // MARK: - Action Card
@@ -65,6 +65,11 @@ struct ActionCard: View {
                     Text(description)
                         .font(KingdomTheme.Typography.caption())
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    // Show expected rewards
+                    if let reward = status.expectedReward {
+                        expectedRewardView(reward: reward)
+                    }
                 }
                 
                 Spacer()
@@ -114,5 +119,58 @@ struct ActionCard: View {
             return KingdomTheme.Colors.disabled
         }
     }
+    
+    @ViewBuilder
+    private func expectedRewardView(reward: ExpectedReward) -> some View {
+        HStack(spacing: 8) {
+            if let gold = reward.gold {
+                HStack(spacing: 4) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    Text("\(gold)g")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .fontWeight(.semibold)
+                }
+            } else if let goldGross = reward.goldGross {
+                HStack(spacing: 4) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    Text("~\(goldGross)g")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .fontWeight(.semibold)
+                }
+            }
+            
+            if let reputation = reward.reputation {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                    Text("\(reputation) rep")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        .fontWeight(.semibold)
+                }
+            }
+            
+            if let experience = reward.experience {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.caption2)
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                    Text("\(experience) xp")
+                        .font(KingdomTheme.Typography.caption())
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
 }
+
 

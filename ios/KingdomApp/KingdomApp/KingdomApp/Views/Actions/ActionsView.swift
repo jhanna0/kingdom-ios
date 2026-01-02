@@ -321,6 +321,22 @@ struct ActionsView: View {
                 .padding(.horizontal)
                 .padding(.top, KingdomTheme.Spacing.medium)
             
+            // Farm (Always available)
+            ActionCard(
+                title: "Farm",
+                icon: "leaf.fill",
+                description: "Work the fields to earn gold",
+                status: status.farm,
+                fetchedAt: statusFetchedAt ?? Date(),
+                currentTime: currentTime,
+                actionType: .farm,
+                isEnabled: true,
+                activeCount: nil,
+                globalCooldownActive: !status.globalCooldown.ready,
+                blockingAction: status.globalCooldown.blockingAction,
+                onAction: { performFarming() }
+            )
+            
             // Work on Contracts
             if !availableContractsInKingdom.isEmpty {
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
@@ -506,6 +522,46 @@ extension ActionsView {
                 let previousExperience = viewModel.player.experience
                 
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performFarming() {
+        Task {
+            do {
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.performFarming()
                 
                 await loadActionStatus()
                 await viewModel.refreshPlayerFromBackend()

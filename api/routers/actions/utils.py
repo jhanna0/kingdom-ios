@@ -6,6 +6,7 @@ from typing import Dict
 import math
 from .constants import (
     PATROL_COOLDOWN,
+    FARM_COOLDOWN,
     SABOTAGE_COOLDOWN,
     SCOUT_COOLDOWN,
     TRAINING_COOLDOWN
@@ -55,7 +56,8 @@ def check_cooldown(last_action: datetime, cooldown_minutes: float) -> Dict:
     return {"ready": False, "seconds_remaining": remaining}
 
 
-def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN, 
+def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN,
+                                  farm_cooldown: float = FARM_COOLDOWN,
                                   sabotage_cooldown: float = SABOTAGE_COOLDOWN,
                                   scout_cooldown: float = SCOUT_COOLDOWN, training_cooldown: float = TRAINING_COOLDOWN) -> Dict:
     """Check if ANY action is on cooldown (global action lock)
@@ -67,6 +69,7 @@ def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: f
     actions = [
         ("work", state.last_work_action, work_cooldown),
         ("patrol", state.last_patrol_action, patrol_cooldown),
+        ("farm", state.last_farm_action, farm_cooldown),
         ("sabotage", state.last_sabotage_action, sabotage_cooldown),
         ("scout", state.last_scout_action, scout_cooldown),
         ("training", state.last_training_action, training_cooldown),

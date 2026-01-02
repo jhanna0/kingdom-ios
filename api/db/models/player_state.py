@@ -83,6 +83,7 @@ class PlayerState(Base):
     # Action System (cooldown-based)
     last_work_action = Column(DateTime, nullable=True)
     last_patrol_action = Column(DateTime, nullable=True)
+    last_farm_action = Column(DateTime, nullable=True)  # Always available farming action
     last_sabotage_action = Column(DateTime, nullable=True)
     last_scout_action = Column(DateTime, nullable=True)
     last_intelligence_action = Column(DateTime, nullable=True)

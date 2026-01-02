@@ -5,6 +5,7 @@ Central configuration for action cooldowns and constants
 # Action cooldowns (in minutes)
 WORK_BASE_COOLDOWN = 120  # 2 hours
 PATROL_COOLDOWN = 10  # 10 minutes
+FARM_COOLDOWN = 10  # 10 minutes (same as patrol - always available)
 SABOTAGE_COOLDOWN = 120  # 2 hours
 SCOUT_COOLDOWN = 120  # 2 hours
 TRAINING_COOLDOWN = 120  # 2 hours
@@ -25,6 +26,7 @@ HEIST_REP_LOSS = 500  # Reputation lost in target kingdom when caught
 HEIST_BAN = True  # Whether to ban from kingdom when caught
 
 # Action rewards
+FARM_GOLD_REWARD = 25  # Base farming reward
 SCOUT_GOLD_REWARD = 10
 PATROL_GOLD_REWARD = 5
 PATROL_REPUTATION_REWARD = 10

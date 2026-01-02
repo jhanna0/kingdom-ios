@@ -14,6 +14,26 @@ struct GlobalCooldown: Codable {
     }
 }
 
+// MARK: - Expected Reward
+
+struct ExpectedReward: Codable {
+    let gold: Int?
+    let goldGross: Int?
+    let goldBonusMultiplier: Double?
+    let buildingSkill: Int?
+    let reputation: Int?
+    let experience: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case gold
+        case goldGross = "gold_gross"
+        case goldBonusMultiplier = "gold_bonus_multiplier"
+        case buildingSkill = "building_skill"
+        case reputation
+        case experience
+    }
+}
+
 // MARK: - Action Status
 
 struct ActionStatus: Codable {
@@ -25,6 +45,7 @@ struct ActionStatus: Codable {
     let currentStat: Int?
     let sessionsAvailable: Int?
     let purchaseCost: Int?
+    let expectedReward: ExpectedReward?
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -35,6 +56,7 @@ struct ActionStatus: Codable {
         case currentStat = "current_stat"
         case sessionsAvailable = "sessions_available"
         case purchaseCost = "purchase_cost"
+        case expectedReward = "expected_reward"
     }
 }
 
@@ -44,6 +66,7 @@ struct AllActionStatus: Codable {
     let globalCooldown: GlobalCooldown
     let work: ActionStatus
     let patrol: ActionStatus
+    let farm: ActionStatus
     let sabotage: ActionStatus
     let scout: ActionStatus
     let training: ActionStatus
@@ -56,7 +79,7 @@ struct AllActionStatus: Codable {
     let contracts: [APIContract]
     
     enum CodingKeys: String, CodingKey {
-        case work, patrol, sabotage, scout, training, crafting, contracts
+        case work, patrol, farm, sabotage, scout, training, crafting, contracts
         case globalCooldown = "global_cooldown"
         case trainingContracts = "training_contracts"
         case trainingCosts = "training_costs"

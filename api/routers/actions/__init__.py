@@ -5,6 +5,7 @@ This module organizes action endpoints into logical groupings:
 - status: Get cooldown status for all actions
 - contracts: Work on building contracts
 - patrol: Start patrols to guard kingdoms
+- farming: Farm to generate gold (always available)
 - scouting: Scout enemy kingdoms for intelligence
 - training: Purchase and complete stat training
 - crafting: Purchase and craft weapons/armor
@@ -13,7 +14,7 @@ This module organizes action endpoints into logical groupings:
 """
 from fastapi import APIRouter
 
-from . import status, contracts, patrol, scouting, training, crafting, sabotage, vault_heist
+from . import status, contracts, patrol, farming, scouting, training, crafting, sabotage, vault_heist
 
 # Main actions router
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/actions", tags=["actions"])
 router.include_router(status.router)
 router.include_router(contracts.router)
 router.include_router(patrol.router)
+router.include_router(farming.router)
 router.include_router(scouting.router)
 router.include_router(training.router)
 router.include_router(crafting.router)

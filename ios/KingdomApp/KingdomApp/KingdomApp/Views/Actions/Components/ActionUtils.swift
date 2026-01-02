@@ -5,6 +5,7 @@ func actionNameToDisplayName(_ actionName: String?) -> String {
     guard let name = actionName?.lowercased() else { return "another action" }
     switch name {
     case "patrol": return "Patrolling"
+    case "farm": return "Farming"
     case "work": return "Working"
     case "scout": return "Scouting"
     case "sabotage": return "Sabotaging"

@@ -15,9 +15,13 @@ from .crafting import get_craft_cost, get_iron_required, get_steel_required, get
 from .constants import (
     WORK_BASE_COOLDOWN,
     PATROL_COOLDOWN,
+    FARM_COOLDOWN,
+    FARM_GOLD_REWARD,
     SABOTAGE_COOLDOWN,
     SCOUT_COOLDOWN,
-    TRAINING_COOLDOWN
+    SCOUT_GOLD_REWARD,
+    TRAINING_COOLDOWN,
+    PATROL_REPUTATION_REWARD
 )
 
 
@@ -40,6 +44,7 @@ def get_action_status(
     # Calculate cooldowns based on skills
     work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     patrol_cooldown = PATROL_COOLDOWN
+    farm_cooldown = FARM_COOLDOWN
     sabotage_cooldown = SABOTAGE_COOLDOWN
     scout_cooldown = SCOUT_COOLDOWN
     training_cooldown = TRAINING_COOLDOWN
@@ -66,7 +71,8 @@ def get_action_status(
     global_cooldown = check_global_action_cooldown(
         state, 
         work_cooldown, 
-        patrol_cooldown, 
+        patrol_cooldown,
+        farm_cooldown,
         sabotage_cooldown, 
         scout_cooldown, 
         training_cooldown
@@ -89,6 +95,20 @@ def get_action_status(
         # Compute target_tier_name from to_tier (not stored in DB!)
         contract["target_tier_name"] = get_tier_name(contract["to_tier"])
     
+    # Calculate expected rewards (accounting for bonuses and taxes)
+    # Farm reward
+    farm_base = FARM_GOLD_REWARD
+    farm_bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
+    farm_gross = int(farm_base * farm_bonus_multiplier)
+    
+    # Scout reward (no tax or bonus for scouts in enemy territory)
+    scout_reward = SCOUT_GOLD_REWARD
+    
+    # Patrol reward (reputation only)
+    patrol_rep_reward = PATROL_REPUTATION_REWARD
+    
+    # Work reward (need to calculate per contract, so we'll add it to each contract object)
+    
     return {
         "global_cooldown": global_cooldown,  # NEW: Global action lock
         "work": {
@@ -99,7 +119,19 @@ def get_action_status(
             **check_cooldown(state.last_patrol_action, patrol_cooldown),
             "cooldown_minutes": patrol_cooldown,
             "is_patrolling": state.patrol_expires_at and state.patrol_expires_at > datetime.utcnow(),
-            "active_patrollers": active_patrollers
+            "active_patrollers": active_patrollers,
+            "expected_reward": {
+                "reputation": patrol_rep_reward
+            }
+        },
+        "farm": {
+            **check_cooldown(state.last_farm_action, farm_cooldown),
+            "cooldown_minutes": farm_cooldown,
+            "expected_reward": {
+                "gold_gross": farm_gross,
+                "gold_bonus_multiplier": farm_bonus_multiplier,
+                "building_skill": state.building_skill
+            }
         },
         "sabotage": {
             **check_cooldown(state.last_sabotage_action, sabotage_cooldown),
@@ -107,7 +139,10 @@ def get_action_status(
         },
         "scout": {
             **check_cooldown(state.last_scout_action, scout_cooldown),
-            "cooldown_minutes": scout_cooldown
+            "cooldown_minutes": scout_cooldown,
+            "expected_reward": {
+                "gold": scout_reward
+            }
         },
         "training": {
             **check_cooldown(state.last_training_action, training_cooldown),
