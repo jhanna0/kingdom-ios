@@ -11,6 +11,15 @@ struct DrawnMapView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var zoomAnchor: CGPoint = .zero
     
+    // Gesture state - captures baseline when transitioning to zoom
+    @State private var isZooming: Bool = false
+    @State private var magnificationBaseline: CGFloat = 1.0
+    @State private var scaleWhenZoomStarted: CGFloat = 1.0
+    @State private var offsetWhenZoomStarted: CGSize = .zero
+    
+    // Threshold: magnification change required before committing to zoom
+    private let zoomThreshold: CGFloat = 0.06
+    
     // Scale for coordinate conversion (pixels per degree of lat/lon)
     private let baseScale: CGFloat = 6000.0
     
@@ -60,36 +69,68 @@ struct DrawnMapView: View {
                 .simultaneousGesture(
                     DragGesture()
                         .onChanged { value in
-                            offset = CGSize(
-                                width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height
-                            )
+                            // Always allow panning - don't block based on zoom state
+                            // When zooming, the offset is managed by magnification gesture
+                            if !isZooming {
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
                         }
                         .onEnded { _ in
                             lastOffset = offset
+                            lastScale = scale
+                            // Reset zoom state
+                            isZooming = false
+                            magnificationBaseline = 1.0
                         }
                 )
                 .simultaneousGesture(
                     MagnificationGesture()
                         .onChanged { value in
-                            // Calculate new scale
-                            let newScale = lastScale * value
-                            let clampedScale = min(max(newScale, 0.2), 5.0)
+                            // First event of this gesture - store initial magnification
+                            if magnificationBaseline == 1.0 {
+                                magnificationBaseline = value
+                            }
                             
-                            // Calculate how much the scale changed from the start of the gesture
-                            let scaleRatio = clampedScale / lastScale
+                            // Calculate change from the baseline
+                            let magnificationDelta = abs(value - magnificationBaseline)
                             
-                            // Adjust offset proportionally to keep user centered
-                            offset = CGSize(
-                                width: lastOffset.width * scaleRatio,
-                                height: lastOffset.height * scaleRatio
-                            )
+                            // Commit to zoom mode once threshold is exceeded
+                            if !isZooming && magnificationDelta > zoomThreshold {
+                                isZooming = true
+                                // Capture current state as the zoom baseline - this prevents jumps
+                                scaleWhenZoomStarted = scale
+                                offsetWhenZoomStarted = offset
+                                // Reset baseline to current value so zoom starts from 1.0
+                                magnificationBaseline = value
+                            }
                             
-                            scale = clampedScale
+                            // Apply zoom only after committed
+                            if isZooming {
+                                // Calculate scale change from when zoom started
+                                let zoomFactor = value / magnificationBaseline
+                                let newScale = scaleWhenZoomStarted * zoomFactor
+                                let clampedScale = min(max(newScale, 0.2), 5.0)
+                                
+                                // Calculate how offset should change to keep content centered
+                                let scaleRatio = clampedScale / scaleWhenZoomStarted
+                                
+                                scale = clampedScale
+                                offset = CGSize(
+                                    width: offsetWhenZoomStarted.width * scaleRatio,
+                                    height: offsetWhenZoomStarted.height * scaleRatio
+                                )
+                            }
                         }
                         .onEnded { _ in
+                            // Persist current values
                             lastScale = scale
                             lastOffset = offset
+                            // Reset gesture state
+                            isZooming = false
+                            magnificationBaseline = 1.0
                         }
                 )
             }
