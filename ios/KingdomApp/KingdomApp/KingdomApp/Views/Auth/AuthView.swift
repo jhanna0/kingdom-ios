@@ -3,6 +3,7 @@ import AuthenticationServices
 
 struct AuthView: View {
     @EnvironmentObject var authManager: AuthManager
+    @State private var appleSignInCoordinator: AppleSignInCoordinator?
     
     var body: some View {
         ZStack {
@@ -43,21 +44,34 @@ struct AuthView: View {
                     Text("Begin Your Journey")
                         .font(FontStyles.headingLarge)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // Apple Sign In
-                    SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName, .email]
-                    } onCompletion: { result in
-                        handleAppleSignIn(result)
+                    Button(action: {
+                        performAppleSignIn()
+                    }) {
+                        HStack {
+                            Image(systemName: "applelogo")
+                                .font(FontStyles.iconSmall)
+                            Text("Sign in with Apple")
+                                .font(FontStyles.bodyMediumBold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.black)
+                                    .offset(x: 3, y: 3)
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.black)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                            }
+                        )
                     }
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 56)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.black, lineWidth: 3)
-                    )
                     
                     // Developer Sign In
                     Button(action: {
@@ -105,27 +119,47 @@ struct AuthView: View {
         }
     }
     
-    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let auth):
-            if let credential = auth.credential as? ASAuthorizationAppleIDCredential {
-                let userID = credential.user
-                let email = credential.email
-                let name = [credential.fullName?.givenName, credential.fullName?.familyName]
-                    .compactMap { $0 }
-                    .joined(separator: " ")
-                
-                Task {
-                    await authManager.signInWithApple(
-                        userID: userID,
-                        email: email,
-                        name: name.isEmpty ? nil : name
-                    )
-                }
+    private func performAppleSignIn() {
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        
+        let coordinator = AppleSignInCoordinator(authManager: authManager)
+        self.appleSignInCoordinator = coordinator
+        
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = coordinator
+        controller.performRequests()
+    }
+}
+
+// Coordinator to handle Apple Sign In
+class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate {
+    let authManager: AuthManager
+    
+    init(authManager: AuthManager) {
+        self.authManager = authManager
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            let userID = credential.user
+            let email = credential.email
+            let name = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            
+            Task {
+                await authManager.signInWithApple(
+                    userID: userID,
+                    email: email,
+                    name: name.isEmpty ? nil : name
+                )
             }
-        case .failure(let error):
-            print("❌ Apple Sign In failed: \(error.localizedDescription)")
         }
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        print("❌ Apple Sign In failed: \(error.localizedDescription)")
     }
 }
 

@@ -79,7 +79,7 @@ struct KingdomMarker: View {
                             .offset(x: 1, y: 1)
                         
                         Circle()
-                            .fill(KingdomTheme.Colors.inkMedium)
+                            .fill(KingdomTheme.Colors.imperialGold)
                             .frame(width: 20, height: 20)
                             .overlay(
                                 Circle()

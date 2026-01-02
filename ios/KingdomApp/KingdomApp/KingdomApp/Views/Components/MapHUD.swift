@@ -3,7 +3,6 @@ import SwiftUI
 struct MapHUD: View {
     @ObservedObject var viewModel: MapViewModel
     @Binding var showCharacterSheet: Bool
-    @Binding var showMyKingdoms: Bool
     @Binding var showActions: Bool
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
@@ -84,7 +83,7 @@ struct MapHUD: View {
                                     .frame(width: 26, height: 26)
                                     .offset(x: 1, y: 1)
                                 Circle()
-                                    .fill(KingdomTheme.Colors.inkMedium)
+                                    .fill(KingdomTheme.Colors.buttonPrimary)
                                     .frame(width: 26, height: 26)
                                     .overlay(
                                         Circle()
@@ -125,20 +124,10 @@ struct MapHUD: View {
                     
                     Spacer()
                     
-                    // My Kingdoms (icon only, show if player is a ruler)
-                    if viewModel.player.isRuler {
-                        BrutalistIconButton(
-                            icon: "crown.fill",
-                            backgroundColor: KingdomTheme.Colors.buttonPrimary
-                        ) {
-                            showMyKingdoms = true
-                        }
-                    }
-                    
                     // Actions (icon only)
                     BrutalistIconButton(
                         icon: "hammer.fill",
-                        backgroundColor: KingdomTheme.Colors.buttonSuccess
+                        backgroundColor: KingdomTheme.Colors.royalBlue
                     ) {
                         showActions = true
                     }
@@ -154,7 +143,7 @@ struct MapHUD: View {
                     // Friends (icon only)
                     BrutalistIconButton(
                         icon: "person.2.fill",
-                        backgroundColor: KingdomTheme.Colors.inkMedium
+                        backgroundColor: KingdomTheme.Colors.buttonDanger
                     ) {
                         showActivity = true
                     }
@@ -227,11 +216,11 @@ struct MapHUD: View {
             } else if let action = cooldown.blockingAction {
                 Image(systemName: actionIcon(for: action))
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(actionBackgroundColor(for: action))
                 let minutes = Int(calculatedRemaining) / 60
                 Text("\(minutes)m")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
             }
         }
         .frame(height: 32)
@@ -242,7 +231,7 @@ struct MapHUD: View {
                     .fill(Color.black)
                     .offset(x: 2, y: 2)
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isIdle ? KingdomTheme.Colors.parchmentLight : actionBackgroundColor(for: cooldown.blockingAction))
+                    .fill(KingdomTheme.Colors.parchmentLight)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.black, lineWidth: 2)

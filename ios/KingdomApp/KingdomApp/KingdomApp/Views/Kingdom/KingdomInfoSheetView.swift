@@ -7,6 +7,7 @@ struct KingdomInfoSheetView: View {
     @ObservedObject var viewModel: MapViewModel
     let isPlayerInside: Bool
     let onViewKingdom: () -> Void
+    let onViewAllKingdoms: () -> Void
     
     @Environment(\.dismiss) var dismiss
     @State private var showClaimError = false
@@ -73,32 +74,61 @@ struct KingdomInfoSheetView: View {
                 
                 // Ruler Actions (moved to top, after header)
                 if isPlayerInside && kingdom.rulerId == player.playerId {
-                    Button(action: onViewKingdom) {
-                        HStack(spacing: KingdomTheme.Spacing.medium) {
-                            Image(systemName: "crown.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 54, height: 54)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 14, shadowOffset: 3, borderWidth: 2.5)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Manage Your Kingdom")
-                                    .font(FontStyles.bodyLargeBold)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                                Text("Buildings, taxes & decrees")
-                                    .font(FontStyles.labelMedium)
+                    VStack(spacing: KingdomTheme.Spacing.small) {
+                        Button(action: onViewKingdom) {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
+                                Image(systemName: "crown.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: 54, height: 54)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 14, shadowOffset: 3, borderWidth: 2.5)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Manage Your Kingdom")
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    Text("Buildings, taxes & decrees")
+                                        .font(FontStyles.labelMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(FontStyles.iconMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .padding(KingdomTheme.Spacing.medium)
                         }
-                        .padding(KingdomTheme.Spacing.medium)
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                        
+                        Button(action: onViewAllKingdoms) {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
+                                Image(systemName: "map.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: 54, height: 54)
+                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 14, shadowOffset: 3, borderWidth: 2.5)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("View All Kingdoms")
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    Text("Explore your realm")
+                                        .font(FontStyles.labelMedium)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.iconMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
+                            .padding(KingdomTheme.Spacing.medium)
+                        }
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                     }
-                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                     .padding(.horizontal)
                 } else if kingdom.canClaim {
                     // Backend says we can claim!

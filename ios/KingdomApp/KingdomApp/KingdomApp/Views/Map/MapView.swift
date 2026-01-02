@@ -128,7 +128,6 @@ struct MapView: View {
             MapHUD(
                 viewModel: viewModel,
                 showCharacterSheet: $showCharacterSheet,
-                showMyKingdoms: $showMyKingdoms,
                 showActions: $showActions,
                 showProperties: $showProperties,
                 showActivity: $showActivity,
@@ -232,6 +231,10 @@ struct MapView: View {
                 onViewKingdom: {
                     kingdomForInfoSheet = nil
                     kingdomToShow = kingdom
+                },
+                onViewAllKingdoms: {
+                    kingdomForInfoSheet = nil
+                    showMyKingdoms = true
                 }
             )
             .presentationDetents([.medium, .large])
