@@ -30,7 +30,7 @@ struct FloatingNotificationsButton: View {
                                     .stroke(Color.black, lineWidth: 3)
                             )
                         
-                        Image(systemName: "bell.fill")
+                        Image(systemName: "scroll.fill")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 60, height: 60)

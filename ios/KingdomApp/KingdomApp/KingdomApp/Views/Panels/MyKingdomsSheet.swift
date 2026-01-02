@@ -100,42 +100,51 @@ struct MyKingdomCardFromBackend: View {
     
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
-            // Castle icon with color
-            ZStack {
-                Circle()
-                    .fill(KingdomTheme.Colors.buttonPrimary.opacity(0.2))
-                    .frame(width: 50, height: 50)
-                    .overlay(
-                        Circle()
-                            .stroke(KingdomTheme.Colors.buttonPrimary, lineWidth: KingdomTheme.BorderWidth.regular)
-                    )
-                
-                Text("🏰")
-                    .font(.title2)
-            }
+            // Castle icon with brutalist badge
+            Image(systemName: "crown.fill")
+                .font(FontStyles.iconLarge)
+                .foregroundColor(.white)
+                .frame(width: 50, height: 50)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                    cornerRadius: 12,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(response.name)
-                    .font(KingdomTheme.Typography.headline())
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack(spacing: KingdomTheme.Spacing.medium) {
-                    Label("\(response.treasury_gold)g", systemImage: "dollarsign.circle.fill")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                    HStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle.fill")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Text("\(response.treasury_gold)g")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                    }
                     
-                    Label("\(response.checked_in_players)", systemImage: "person.2.fill")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                        Text("\(response.checked_in_players)")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
+                .font(FontStyles.iconMedium)
                 .foregroundColor(KingdomTheme.Colors.inkLight)
         }
         .padding()
-        .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 }

@@ -161,7 +161,7 @@ struct PlayerActivityFeedCard: View {
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Failed to load players"
+                errorMessage = "Scout to reveal kingdom activity"
                 isLoading = false
             }
         }

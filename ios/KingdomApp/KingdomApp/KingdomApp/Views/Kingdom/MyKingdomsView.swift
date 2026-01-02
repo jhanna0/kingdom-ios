@@ -229,11 +229,9 @@ struct KingdomCard: View {
             }
         }
         .padding()
-        .background(Color(red: 0.98, green: 0.92, blue: 0.80))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: 2)
+        .brutalistCard(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium
         )
     }
 }

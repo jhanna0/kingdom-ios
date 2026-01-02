@@ -10,27 +10,28 @@ struct TaxRateManagementCard: View {
             // Header
             HStack {
                 Image(systemName: "dollarsign.circle.fill")
+                    .font(FontStyles.iconLarge)
                     .foregroundColor(KingdomTheme.Colors.gold)
                 Text("Tax Rate")
-                    .font(KingdomTheme.Typography.title3())
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
             
             Text("Set the percentage of citizen income that goes to the kingdom treasury.")
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             // Tax Rate Slider
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Tax Rate:")
-                        .font(KingdomTheme.Typography.body())
+                        .font(FontStyles.bodyMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Spacer()
                     
                     Text("\(kingdom.taxRate)%")
-                        .font(KingdomTheme.Typography.headline())
+                        .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.gold)
                 }
                 
@@ -52,25 +53,25 @@ struct TaxRateManagementCard: View {
                 
                 HStack {
                     Text("Low (0%)")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Spacer()
                     
                     Text("High (100%)")
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
             
-            Divider()
-                .background(KingdomTheme.Colors.inkLight)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Tax Impact Information
             VStack(alignment: .leading, spacing: 8) {
                 Text("How it works:")
-                    .font(KingdomTheme.Typography.body())
-                    .fontWeight(.semibold)
+                    .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 infoRow(
@@ -94,42 +95,41 @@ struct TaxRateManagementCard: View {
                 )
             }
             
-            Divider()
-                .background(KingdomTheme.Colors.inkLight)
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Strategy tips
             VStack(alignment: .leading, spacing: 4) {
                 Text("Strategy:")
-                    .font(KingdomTheme.Typography.caption())
-                    .fontWeight(.semibold)
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("• Low tax = Happy citizens, slower treasury growth")
-                    .font(KingdomTheme.Typography.caption2())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("• High tax = More treasury income, unhappy citizens")
-                    .font(KingdomTheme.Typography.caption2())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(KingdomTheme.Colors.parchmentLight)
-                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .brutalistCard(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium
         )
     }
     
     private func infoRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
-                .font(.caption)
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.gold)
                 .frame(width: 16)
             
             Text(text)
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
     }

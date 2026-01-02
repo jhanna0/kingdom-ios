@@ -335,6 +335,42 @@ struct ActionsView: View {
                 .frame(height: 2)
                 .padding(.horizontal)
             
+            Text("Kingdom Project")
+                .font(FontStyles.headingLarge)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.top, KingdomTheme.Spacing.medium)
+            
+            // Work on Contracts
+            if !availableContractsInKingdom.isEmpty {
+                ForEach(availableContractsInKingdom) { contract in
+                    WorkContractCard(
+                        contract: contract,
+                        status: status.work,
+                        fetchedAt: statusFetchedAt ?? Date(),
+                        currentTime: currentTime,
+                        globalCooldownActive: !status.globalCooldown.ready,
+                        blockingAction: status.globalCooldown.blockingAction,
+                        onAction: { performWork(contractId: contract.id) }
+                    )
+                }
+            } else {
+                InfoCard(
+                    title: "No Active Contracts",
+                    icon: "hammer.fill",
+                    description: "Ruler can create contracts for building upgrades",
+                    color: .gray
+                )
+            }
+            
+            // Divider
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+                .padding(.top, KingdomTheme.Spacing.medium)
+            
             Text("Beneficial Actions")
                 .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -357,36 +393,6 @@ struct ActionsView: View {
                 blockingAction: status.globalCooldown.blockingAction,
                 onAction: { performFarming() }
             )
-            
-            // Work on Contracts
-            if !availableContractsInKingdom.isEmpty {
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                    Text("Work on Contracts")
-                        .font(FontStyles.headingSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .padding(.horizontal)
-                        .padding(.top, KingdomTheme.Spacing.small)
-                    
-                    ForEach(availableContractsInKingdom) { contract in
-                        WorkContractCard(
-                            contract: contract,
-                            status: status.work,
-                            fetchedAt: statusFetchedAt ?? Date(),
-                            currentTime: currentTime,
-                            globalCooldownActive: !status.globalCooldown.ready,
-                            blockingAction: status.globalCooldown.blockingAction,
-                            onAction: { performWork(contractId: contract.id) }
-                        )
-                    }
-                }
-            } else {
-                InfoCard(
-                    title: "No Active Contracts",
-                    icon: "hammer.fill",
-                    description: "Ruler can create contracts for building upgrades",
-                    color: .gray
-                )
-            }
             
             // Patrol
             ActionCard(
