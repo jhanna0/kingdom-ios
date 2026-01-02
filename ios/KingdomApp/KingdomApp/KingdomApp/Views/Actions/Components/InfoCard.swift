@@ -10,10 +10,18 @@ struct InfoCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                // Icon in brutalist badge
                 Image(systemName: icon)
                     .font(FontStyles.iconLarge)
-                    .foregroundColor(color)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: color,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -28,8 +36,8 @@ struct InfoCard: View {
                 Spacer()
             }
         }
-        .padding()
-        .brutalistCard()
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
 }

@@ -10,6 +10,7 @@ struct TrainingContractCard: View {
     let isEnabled: Bool
     let globalCooldownActive: Bool
     let blockingAction: String?
+    let globalCooldownSecondsRemaining: Int
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -42,12 +43,31 @@ struct TrainingContractCard: View {
         }
     }
     
+    var iconColor: Color {
+        // Keep specific colors for training types (not in ActionIconHelper)
+        switch contract.type {
+        case "attack": return KingdomTheme.Colors.buttonDanger
+        case "defense": return KingdomTheme.Colors.buttonPrimary
+        case "leadership": return KingdomTheme.Colors.gold
+        case "building": return KingdomTheme.Colors.buttonWarning
+        default: return ActionIconHelper.actionColor(for: "training")
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                // Icon in brutalist badge
                 Image(systemName: iconName)
                     .font(FontStyles.iconLarge)
-                    .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: isReady ? iconColor : KingdomTheme.Colors.disabled,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -101,7 +121,13 @@ struct TrainingContractCard: View {
             
             if globalCooldownActive {
                 let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-                Text("You are already \(blockingActionDisplay)")
+                let elapsed = currentTime.timeIntervalSince(fetchedAt)
+                let calculatedRemaining = max(0, Double(globalCooldownSecondsRemaining) - elapsed)
+                let remaining = Int(calculatedRemaining)
+                let minutes = remaining / 60
+                let seconds = remaining % 60
+                
+                Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)
@@ -112,7 +138,7 @@ struct TrainingContractCard: View {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Train Now")
+                        Text("Start")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
@@ -131,8 +157,8 @@ struct TrainingContractCard: View {
                 )
             }
         }
-        .padding()
-        .brutalistCard()
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
 }

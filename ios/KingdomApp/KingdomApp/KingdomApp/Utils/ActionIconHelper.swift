@@ -120,5 +120,27 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.inkMedium
         }
     }
+    
+    /// Get color for specific action type
+    static func actionColor(for actionType: String) -> Color {
+        switch actionType.lowercased() {
+        case "farm", "farming":
+            return KingdomTheme.Colors.buttonSuccess // Green
+        case "work", "build":
+            return KingdomTheme.Colors.gold // Gold
+        case "patrol":
+            return KingdomTheme.Colors.buttonPrimary // Blue
+        case "scout", "scouting":
+            return KingdomTheme.Colors.buttonWarning // Orange
+        case "sabotage":
+            return KingdomTheme.Colors.buttonDanger // Red
+        case "training", "train":
+            return KingdomTheme.Colors.buttonPrimary // Blue
+        case "property_upgrade":
+            return KingdomTheme.Colors.buttonWarning // Orange
+        default:
+            return KingdomTheme.Colors.gold
+        }
+    }
 }
 

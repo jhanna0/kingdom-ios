@@ -271,7 +271,10 @@ struct KingdomInfoSheetView: View {
                             name: "Walls",
                             level: kingdom.wallLevel,
                             maxLevel: 5,
-                            benefit: "+\(kingdom.wallLevel * 2) defenders"
+                            benefit: "+\(kingdom.wallLevel * 2) defenders",
+                            buildingType: "wall",
+                            kingdom: kingdom,
+                            player: player
                         )
                         
                         BuildingStatCard(
@@ -279,7 +282,10 @@ struct KingdomInfoSheetView: View {
                             name: "Vault",
                             level: kingdom.vaultLevel,
                             maxLevel: 5,
-                            benefit: "\(kingdom.vaultLevel * 20)% protected"
+                            benefit: "\(kingdom.vaultLevel * 20)% protected",
+                            buildingType: "vault",
+                            kingdom: kingdom,
+                            player: player
                         )
                     }
                     .padding(.horizontal)
@@ -298,7 +304,10 @@ struct KingdomInfoSheetView: View {
                             name: "Mine",
                             level: kingdom.mineLevel,
                             maxLevel: 5,
-                            benefit: "+\(kingdom.mineLevel * 5)g/hr"
+                            benefit: "+\(kingdom.mineLevel * 5)g/hr",
+                            buildingType: "mine",
+                            kingdom: kingdom,
+                            player: player
                         )
                         
                         BuildingStatCard(
@@ -306,7 +315,10 @@ struct KingdomInfoSheetView: View {
                             name: "Market",
                             level: kingdom.marketLevel,
                             maxLevel: 5,
-                            benefit: "+\(kingdom.marketLevel * 3)g/hr"
+                            benefit: "+\(kingdom.marketLevel * 3)g/hr",
+                            buildingType: "market",
+                            kingdom: kingdom,
+                            player: player
                         )
                     }
                     .padding(.horizontal)

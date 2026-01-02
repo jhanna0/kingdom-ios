@@ -20,6 +20,7 @@ struct ActionCard: View {
     let activeCount: Int?
     let globalCooldownActive: Bool
     let blockingAction: String?
+    let globalCooldownSecondsRemaining: Int
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -34,10 +35,18 @@ struct ActionCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                // Icon in brutalist badge
                 Image(systemName: icon)
                     .font(FontStyles.iconLarge)
-                    .foregroundColor(iconColor)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: iconColor,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
@@ -53,11 +62,15 @@ struct ActionCard: View {
                                 Text("\(count)")
                                     .font(FontStyles.labelTiny)
                             }
-                            .foregroundColor(count > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.textMuted)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background((count > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled).opacity(0.1))
-                            .cornerRadius(8)
+                            .brutalistBadge(
+                                backgroundColor: count > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                                cornerRadius: 6,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
                         }
                     }
                     
@@ -76,7 +89,13 @@ struct ActionCard: View {
             
             if globalCooldownActive {
                 let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-                Text("You are already \(blockingActionDisplay)")
+                let elapsed = currentTime.timeIntervalSince(fetchedAt)
+                let calculatedRemaining = max(0, Double(globalCooldownSecondsRemaining) - elapsed)
+                let remaining = Int(calculatedRemaining)
+                let minutes = remaining / 60
+                let seconds = remaining % 60
+                
+                Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)
@@ -87,7 +106,7 @@ struct ActionCard: View {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Perform Action")
+                        Text("Start")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
@@ -106,16 +125,28 @@ struct ActionCard: View {
                 )
             }
         }
-        .padding()
-        .brutalistCard()
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
     
     private var iconColor: Color {
-        if isReady && isEnabled {
-            return KingdomTheme.Colors.gold
-        } else {
+        if !isReady || !isEnabled {
             return KingdomTheme.Colors.disabled
+        }
+        
+        // Use ActionIconHelper for consistent colors
+        switch actionType {
+        case .farm:
+            return ActionIconHelper.actionColor(for: "farm")
+        case .patrol:
+            return ActionIconHelper.actionColor(for: "patrol")
+        case .scout:
+            return ActionIconHelper.actionColor(for: "scout")
+        case .sabotage:
+            return ActionIconHelper.actionColor(for: "sabotage")
+        case .work:
+            return ActionIconHelper.actionColor(for: "work")
         }
     }
     

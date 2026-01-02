@@ -94,25 +94,10 @@ struct ActionsView: View {
     // MARK: - Header Section
     
     private var headerSection: some View {
-        VStack(spacing: KingdomTheme.Spacing.large) {
-            // Title
-            HStack {
-                Image(systemName: "figure.walk")
-                    .font(FontStyles.iconExtraLarge)
-                    .foregroundColor(KingdomTheme.Colors.gold)
-                
-                Text("Available Actions")
-                    .font(FontStyles.displayMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-            }
-            
-            // Kingdom Context Card
-            kingdomContextCard
-        }
-        .padding(.horizontal)
-        .padding(.top, KingdomTheme.Spacing.medium)
+        // Just the Kingdom Context Card - sleek!
+        kingdomContextCard
+            .padding(.horizontal)
+            .padding(.top, KingdomTheme.Spacing.small)
     }
     
     @ViewBuilder
@@ -121,12 +106,14 @@ struct ActionsView: View {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 // Icon with brutalist badge
                 Image(systemName: isInHomeKingdom ? "crown.fill" : "shield.fill")
-                    .font(.title3)
+                    .font(.title2)
                     .foregroundColor(.white)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 48, height: 48)
                     .brutalistBadge(
                         backgroundColor: isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger,
-                        cornerRadius: 8
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -135,34 +122,42 @@ struct ActionsView: View {
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(isInHomeKingdom ? "Your Kingdom" : "Enemy Territory")
-                        .font(FontStyles.labelLarge)
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
                 }
                 
                 Spacer()
             }
             .padding(KingdomTheme.Spacing.medium)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         } else {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 // Icon with brutalist badge
                 Image(systemName: "map")
-                    .font(.title3)
+                    .font(.title2)
                     .foregroundColor(.white)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 48, height: 48)
                     .brutalistBadge(
                         backgroundColor: KingdomTheme.Colors.disabled,
-                        cornerRadius: 8
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
                     )
                 
-                Text("Enter a kingdom to perform actions")
-                    .font(FontStyles.bodyMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("No Kingdom")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Enter a kingdom to perform actions")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
                 
                 Spacer()
             }
             .padding(KingdomTheme.Spacing.medium)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         }
     }
     
@@ -170,11 +165,6 @@ struct ActionsView: View {
     
     @ViewBuilder
     private func actionStatusContent(status: AllActionStatus) -> some View {
-        // Global Cooldown Warning
-        if !status.globalCooldown.ready {
-            globalCooldownWarning(status: status)
-        }
-        
         // Training Contracts
         if !status.trainingContracts.isEmpty {
             trainingSection(status: status)
@@ -198,58 +188,6 @@ struct ActionsView: View {
                 color: .orange
             )
         }
-    }
-    
-    // MARK: - Global Cooldown Warning
-    
-    private func globalCooldownWarning(status: AllActionStatus) -> some View {
-        let blockingAction = status.globalCooldown.blockingAction
-        let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-        
-        // Calculate remaining time accounting for elapsed time since fetch
-        let elapsed = currentTime.timeIntervalSince(statusFetchedAt ?? Date())
-        let calculatedRemaining = max(0, Double(status.globalCooldown.secondsRemaining) - elapsed)
-        let remaining = Int(calculatedRemaining)
-        
-        let hours = remaining / 3600
-        let minutes = (remaining % 3600) / 60
-        let seconds = remaining % 60
-        
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "hourglass")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                
-                Text("Action in Progress")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
-            
-            Text("You are already \(blockingActionDisplay). Only ONE action at a time!")
-                .font(FontStyles.bodySmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            HStack {
-                if hours > 0 {
-                    Text("Available in \(hours)h \(minutes)m \(seconds)s")
-                        .font(FontStyles.bodyLargeBold)
-                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                } else if minutes > 0 {
-                    Text("Available in \(minutes)m \(seconds)s")
-                        .font(FontStyles.bodyLargeBold)
-                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                } else {
-                    Text("Available in \(seconds)s")
-                        .font(FontStyles.bodyLargeBold)
-                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
-        .padding(.horizontal)
     }
     
     // MARK: - Training Section
@@ -284,6 +222,7 @@ struct ActionsView: View {
                     isEnabled: currentKingdom != nil,
                     globalCooldownActive: !status.globalCooldown.ready,
                     blockingAction: status.globalCooldown.blockingAction,
+                    globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                     onAction: { performTraining(contractId: contract.id) }
                 )
             }
@@ -320,6 +259,7 @@ struct ActionsView: View {
                     currentTime: currentTime,
                     globalCooldownActive: !status.globalCooldown.ready,
                     blockingAction: status.globalCooldown.blockingAction,
+                    globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                     onAction: { performPropertyUpgrade(contractId: contract.id) }
                 )
             }
@@ -352,6 +292,7 @@ struct ActionsView: View {
                         currentTime: currentTime,
                         globalCooldownActive: !status.globalCooldown.ready,
                         blockingAction: status.globalCooldown.blockingAction,
+                        globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                         onAction: { performWork(contractId: contract.id) }
                     )
                 }
@@ -391,6 +332,7 @@ struct ActionsView: View {
                 activeCount: nil,
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
+                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                 onAction: { performFarming() }
             )
             
@@ -407,6 +349,7 @@ struct ActionsView: View {
                 activeCount: status.patrol.activePatrollers,
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
+                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                 onAction: { performPatrol() }
             )
         }
@@ -441,6 +384,7 @@ struct ActionsView: View {
                 activeCount: nil,
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
+                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                 onAction: { performScout() }
             )
             
@@ -457,6 +401,7 @@ struct ActionsView: View {
                 activeCount: nil,
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
+                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
                 onAction: { showSabotageTargetSelection() }
             )
         }

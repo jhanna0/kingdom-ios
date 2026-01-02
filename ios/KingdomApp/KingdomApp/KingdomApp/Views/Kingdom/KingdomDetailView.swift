@@ -219,7 +219,10 @@ struct KingdomDetailView: View {
                             name: "Walls",
                             level: kingdom.wallLevel,
                             maxLevel: 5,
-                            benefit: "+\(kingdom.wallLevel * 2) defenders"
+                            benefit: "+\(kingdom.wallLevel * 2) defenders",
+                            buildingType: "wall",
+                            kingdom: kingdom,
+                            player: player
                         )
                         
                         BuildingStatCard(
@@ -227,7 +230,10 @@ struct KingdomDetailView: View {
                             name: "Vault",
                             level: kingdom.vaultLevel,
                             maxLevel: 5,
-                            benefit: "\(kingdom.vaultLevel * 20)% protected"
+                            benefit: "\(kingdom.vaultLevel * 20)% protected",
+                            buildingType: "vault",
+                            kingdom: kingdom,
+                            player: player
                         )
                     }
                     .padding(.horizontal)

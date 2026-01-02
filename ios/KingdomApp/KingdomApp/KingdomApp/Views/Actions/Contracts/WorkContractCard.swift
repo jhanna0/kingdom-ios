@@ -9,6 +9,7 @@ struct WorkContractCard: View {
     let currentTime: Date
     let globalCooldownActive: Bool
     let blockingAction: String?
+    let globalCooldownSecondsRemaining: Int
     let onAction: () -> Void
     
     var calculatedSecondsRemaining: Int {
@@ -23,10 +24,18 @@ struct WorkContractCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                // Icon in brutalist badge
                 Image(systemName: "hammer.fill")
                     .font(FontStyles.iconLarge)
-                    .foregroundColor(isReady ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: isReady ? ActionIconHelper.actionColor(for: "work") : KingdomTheme.Colors.disabled,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(contract.buildingType)
@@ -88,7 +97,13 @@ struct WorkContractCard: View {
             
             if globalCooldownActive {
                 let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-                Text("You are already \(blockingActionDisplay)")
+                let elapsed = currentTime.timeIntervalSince(fetchedAt)
+                let calculatedRemaining = max(0, Double(globalCooldownSecondsRemaining) - elapsed)
+                let remaining = Int(calculatedRemaining)
+                let minutes = remaining / 60
+                let seconds = remaining % 60
+                
+                Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)
@@ -99,7 +114,7 @@ struct WorkContractCard: View {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Work on This")
+                        Text("Start")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
@@ -110,8 +125,8 @@ struct WorkContractCard: View {
                 )
             }
         }
-        .padding()
-        .brutalistCard()
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
 }
