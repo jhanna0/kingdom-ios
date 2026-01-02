@@ -64,22 +64,31 @@ struct WelcomeStep: View {
         VStack(spacing: KingdomTheme.Spacing.xxLarge) {
             Spacer()
             
+            // Logo with brutalist badge
             VStack(spacing: KingdomTheme.Spacing.large) {
                 Image(systemName: "crown.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(.system(size: 64))
+                    .foregroundColor(.white)
+                    .frame(width: 120, height: 120)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.gold,
+                        cornerRadius: 24,
+                        shadowOffset: 6,
+                        borderWidth: 4
+                    )
                 
                 Text("KINGDOM")
-                    .font(.system(size: 48, weight: .bold, design: .serif))
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(FontStyles.displayLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("Build Your Empire")
-                    .font(KingdomTheme.Typography.title3())
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
             Spacer()
             
+            // Features Card
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.large) {
                 FeatureRow(
                     icon: "map.fill",
@@ -99,21 +108,41 @@ struct WelcomeStep: View {
                     description: "Conquer kingdoms and manage your empire"
                 )
             }
-            .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+            .padding(KingdomTheme.Spacing.large)
+            .brutalistCard(
+                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                cornerRadius: 20
+            )
+            .padding(.horizontal, KingdomTheme.Spacing.large)
             
             Spacer()
             
+            // Continue Button
             Button(action: onContinue) {
-                Text("Begin Your Journey")
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.parchment)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(KingdomTheme.Colors.gold)
-                    .cornerRadius(KingdomTheme.CornerRadius.large)
+                HStack {
+                    Text("Begin Your Journey")
+                        .font(FontStyles.bodyLargeBold)
+                    Image(systemName: "arrow.right")
+                        .font(FontStyles.iconSmall)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KingdomTheme.Spacing.large)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(Color.black)
+                            .offset(x: 4, y: 4)
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(KingdomTheme.Colors.gold)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
+                    }
+                )
             }
-            .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
             .padding(.bottom, KingdomTheme.Spacing.xxLarge)
         }
     }
@@ -126,18 +155,23 @@ struct FeatureRow: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+            // Icon with brutalist badge
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(KingdomTheme.Colors.gold)
-                .frame(width: 40)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(.white)
+                .frame(width: 42, height: 42)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.gold,
+                    cornerRadius: 8
+                )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(KingdomTheme.Typography.headline())
+                    .font(FontStyles.headingSmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text(description)
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
@@ -164,39 +198,49 @@ struct DisplayNameStep: View {
     
     var body: some View {
         VStack(spacing: KingdomTheme.Spacing.xxLarge) {
-            VStack(spacing: KingdomTheme.Spacing.medium) {
+            // Header with brutalist icon
+            VStack(spacing: KingdomTheme.Spacing.large) {
                 Image(systemName: "person.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .font(.system(size: 48))
+                    .foregroundColor(.white)
+                    .frame(width: 100, height: 100)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.gold,
+                        cornerRadius: 20,
+                        shadowOffset: 4,
+                        borderWidth: 3
+                    )
                 
                 Text("Choose Your Name")
-                    .font(KingdomTheme.Typography.title())
+                    .font(FontStyles.displayMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("What should citizens of \(selectedCity) call you?")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .multilineTextAlignment(.center)
             }
             .padding(.top, 60)
-            .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
             
-            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            // Input Card
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                 Text("Display Name")
-                    .font(KingdomTheme.Typography.headline())
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 TextField("Enter your name", text: $displayName)
+                    .font(FontStyles.bodyLarge)
                     .textFieldStyle(.plain)
-                    .padding()
-                    .background(KingdomTheme.Colors.parchmentLight)
-                    .cornerRadius(KingdomTheme.CornerRadius.medium)
+                    .padding(KingdomTheme.Spacing.medium)
+                    .background(KingdomTheme.Colors.parchment)
+                    .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
                     .overlay(
-                        RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.medium)
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
                             .stroke(
                                 showValidation && !validationResult.isValid ? 
-                                    Color.red : KingdomTheme.Colors.border, 
-                                lineWidth: showValidation && !validationResult.isValid ? 2 : 1
+                                    Color.red : Color.black, 
+                                lineWidth: showValidation && !validationResult.isValid ? 3 : 2
                             )
                     )
                     .onChange(of: displayName) { oldValue, newValue in
@@ -208,20 +252,20 @@ struct DisplayNameStep: View {
                 if showValidation && !displayName.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(validationHints) { hint in
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(systemName: hint.isValid ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 12))
+                                    .font(FontStyles.iconMini)
                                     .foregroundColor(hint.isValid ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight)
                                 
                                 Text(hint.text)
-                                    .font(KingdomTheme.Typography.caption2())
+                                    .font(FontStyles.labelSmall)
                                     .foregroundColor(hint.isValid ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
                             }
                         }
                         
                         if !validationResult.isValid && !validationResult.errorMessage.isEmpty {
                             Text(validationResult.errorMessage)
-                                .font(KingdomTheme.Typography.caption2())
+                                .font(FontStyles.labelSmall)
                                 .foregroundColor(.red)
                                 .padding(.top, 2)
                         }
@@ -230,30 +274,50 @@ struct DisplayNameStep: View {
                 }
                 
                 Text("Must be unique in \(selectedCity)")
-                    .font(KingdomTheme.Typography.caption2())
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                     .padding(.top, 4)
             }
-            .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+            .padding(KingdomTheme.Spacing.large)
+            .brutalistCard(
+                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                cornerRadius: 20
+            )
+            .padding(.horizontal, KingdomTheme.Spacing.large)
             
             Spacer()
             
+            // Continue Button
             Button(action: {
                 // Sanitize before sending
                 displayName = UsernameValidator.sanitize(displayName)
                 onContinue()
             }) {
-                Text("Establish Your Legacy")
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.parchment)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(isValid ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
-                    .cornerRadius(KingdomTheme.CornerRadius.large)
+                HStack {
+                    Text("Establish Your Legacy")
+                        .font(FontStyles.bodyLargeBold)
+                    Image(systemName: "arrow.right")
+                        .font(FontStyles.iconSmall)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KingdomTheme.Spacing.large)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(Color.black)
+                            .offset(x: 4, y: 4)
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(isValid ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
+                    }
+                )
             }
             .disabled(!isValid)
-            .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
             .padding(.bottom, KingdomTheme.Spacing.xxLarge)
         }
     }
@@ -343,83 +407,123 @@ struct HometownStep: View {
                 }
             } else {
                 // No location permission - show prompt
-                VStack(spacing: KingdomTheme.Spacing.large) {
+                VStack(spacing: KingdomTheme.Spacing.xxLarge) {
                     Image(systemName: "location.slash.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                        .font(.system(size: 48))
+                        .foregroundColor(.white)
+                        .frame(width: 100, height: 100)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonWarning,
+                            cornerRadius: 20,
+                            shadowOffset: 4,
+                            borderWidth: 3
+                        )
                     
-                    Text("Location Access Required")
-                        .font(KingdomTheme.Typography.title())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("We need your location to find nearby cities and kingdoms")
-                        .font(KingdomTheme.Typography.body())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    VStack(spacing: KingdomTheme.Spacing.medium) {
+                        Text("Location Access Required")
+                            .font(FontStyles.displayMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text("We need your location to find nearby cities and kingdoms")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
                     
                     Button(action: {
                         locationManager.requestPermissions()
                     }) {
-                        Text("Enable Location")
-                            .font(KingdomTheme.Typography.headline())
-                            .fontWeight(.bold)
-                            .foregroundColor(KingdomTheme.Colors.parchment)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(KingdomTheme.Colors.gold)
-                            .cornerRadius(KingdomTheme.CornerRadius.large)
+                        HStack {
+                            Text("Enable Location")
+                                .font(FontStyles.bodyLargeBold)
+                            Image(systemName: "location.fill")
+                                .font(FontStyles.iconSmall)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, KingdomTheme.Spacing.large)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .fill(Color.black)
+                                    .offset(x: 4, y: 4)
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .fill(KingdomTheme.Colors.gold)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                            }
+                        )
                     }
-                    .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
                 }
             }
             
             // Top Header
             VStack {
-                VStack(spacing: KingdomTheme.Spacing.medium) {
-                    Text("Choose Your Homeland")
-                        .font(KingdomTheme.Typography.title())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                HStack(spacing: KingdomTheme.Spacing.medium) {
+                    Image(systemName: "map.fill")
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.gold,
+                            cornerRadius: 10
+                        )
                     
-                    Text("Where will you build your reputation?")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Choose Your Homeland")
+                            .font(FontStyles.headingLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text("Where will you build your reputation?")
+                            .font(FontStyles.bodySmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    
+                    Spacer()
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(KingdomTheme.Colors.parchment)
-                        .shadow(radius: 8)
+                .padding(KingdomTheme.Spacing.large)
+                .brutalistCard(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 16
                 )
-                .padding(.horizontal)
+                .padding(.horizontal, KingdomTheme.Spacing.medium)
                 
                 Spacer()
                 
                 // Bottom Card with city selection
                 VStack(spacing: KingdomTheme.Spacing.large) {
                     if isLoadingCity {
-                        HStack {
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.gold))
                             Text("Finding nearby cities...")
-                                .font(KingdomTheme.Typography.caption())
+                                .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
-                        .padding()
+                        .padding(KingdomTheme.Spacing.large)
                     } else if let city = nearbyCity {
                         VStack(spacing: KingdomTheme.Spacing.medium) {
-                            HStack {
+                            HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "mappin.circle.fill")
-                                    .foregroundColor(KingdomTheme.Colors.gold)
-                                    .font(.title2)
+                                    .font(FontStyles.iconMedium)
+                                    .foregroundColor(.white)
+                                    .frame(width: 44, height: 44)
+                                    .brutalistBadge(
+                                        backgroundColor: KingdomTheme.Colors.gold,
+                                        cornerRadius: 10
+                                    )
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(city)
-                                        .font(KingdomTheme.Typography.headline())
+                                        .font(FontStyles.headingMedium)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     
                                     Text("Your current location")
-                                        .font(KingdomTheme.Typography.caption())
+                                        .font(FontStyles.labelMedium)
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
                                 
@@ -427,8 +531,12 @@ struct HometownStep: View {
                                 
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                                    .font(.title2)
+                                    .font(FontStyles.iconMedium)
                             }
+                            
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(height: 2)
                             
                             // Info bullets
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
@@ -437,29 +545,43 @@ struct HometownStep: View {
                                 InfoBullet(text: "Choose where you'll be most often")
                             }
                         }
-                        .padding()
+                        .padding(KingdomTheme.Spacing.large)
                     }
                     
                     // Continue Button
                     Button(action: onContinue) {
-                        Text("Continue")
-                            .font(KingdomTheme.Typography.headline())
-                            .fontWeight(.bold)
-                            .foregroundColor(KingdomTheme.Colors.parchment)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(selectedCity != nil ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight)
-                            .cornerRadius(KingdomTheme.CornerRadius.large)
+                        HStack {
+                            Text("Continue")
+                                .font(FontStyles.bodyLargeBold)
+                            Image(systemName: "arrow.right")
+                                .font(FontStyles.iconSmall)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, KingdomTheme.Spacing.large)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .fill(Color.black)
+                                    .offset(x: 4, y: 4)
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .fill(selectedCity != nil ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                            }
+                        )
                     }
                     .disabled(selectedCity == nil)
+                    .padding(.horizontal, KingdomTheme.Spacing.medium)
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(KingdomTheme.Colors.parchment)
-                        .shadow(radius: 12)
+                .padding(KingdomTheme.Spacing.large)
+                .brutalistCard(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 20
                 )
-                .padding(.horizontal)
+                .padding(.horizontal, KingdomTheme.Spacing.medium)
             }
             .padding(.top, 60)
             .padding(.bottom, 20)
@@ -511,11 +633,11 @@ struct InfoBullet: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: KingdomTheme.Spacing.small) {
-            Text("•")
-                .font(KingdomTheme.Typography.body())
-                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+            Image(systemName: "checkmark.circle.fill")
+                .font(FontStyles.iconMini)
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
             Text(text)
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
     }

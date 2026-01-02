@@ -6,60 +6,99 @@ struct AuthView: View {
     
     var body: some View {
         ZStack {
-            // Medieval background
-            LinearGradient(colors: [.brown.opacity(0.3), .black], startPoint: .top, endPoint: .bottom)
+            // Parchment background
+            KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
-            VStack(spacing: 32) {
+            VStack(spacing: KingdomTheme.Spacing.xxLarge) {
                 Spacer()
                 
-                // Logo
-                VStack(spacing: 16) {
+                // Logo Section
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    // Crown with brutalist badge
                     Image(systemName: "crown.fill")
-                        .font(.system(size: 80))
-                        .foregroundStyle(.yellow)
+                        .font(.system(size: 64))
+                        .foregroundColor(.white)
+                        .frame(width: 120, height: 120)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.gold,
+                            cornerRadius: 24,
+                            shadowOffset: 6,
+                            borderWidth: 4
+                        )
                     
                     Text("KINGDOM")
-                        .font(.system(size: 48, weight: .bold, design: .serif))
-                        .foregroundStyle(.yellow)
+                        .font(FontStyles.displayLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("Build Your Empire")
-                        .font(.system(size: 18, weight: .medium, design: .serif))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Spacer()
                 
-                // Apple Sign In
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName, .email]
-                } onCompletion: { result in
-                    handleAppleSignIn(result)
-                }
-                .signInWithAppleButtonStyle(.white)
-                .frame(height: 50)
-                .cornerRadius(10)
-                .padding(.horizontal, 40)
-                
-                // Developer Sign In
-                Button(action: {
-                    Task {
-                        await authManager.signInWithApple(
-                            userID: "appletest",
-                            email: "appletest@example.com",
-                            name: "Apple Reviewer"
-                        )
+                // Sign In Card
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    Text("Begin Your Journey")
+                        .font(FontStyles.headingLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Apple Sign In
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        handleAppleSignIn(result)
                     }
-                }) {
-                    Text("Developer Sign In")
-                        .font(.system(size: 16, weight: .semibold))
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 56)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black, lineWidth: 3)
+                    )
+                    
+                    // Developer Sign In
+                    Button(action: {
+                        Task {
+                            await authManager.signInWithApple(
+                                userID: "appletest",
+                                email: "appletest@example.com",
+                                name: "Apple Reviewer"
+                            )
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "person.badge.key.fill")
+                                .font(FontStyles.iconSmall)
+                            Text("Developer Sign In")
+                                .font(FontStyles.bodyMediumBold)
+                        }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color.blue.opacity(0.8))
-                        .cornerRadius(10)
+                        .frame(height: 56)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.black)
+                                    .offset(x: 3, y: 3)
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.blue)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                            }
+                        )
+                    }
                 }
-                .padding(.horizontal, 40)
+                .padding(KingdomTheme.Spacing.xxLarge)
+                .brutalistCard(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 20
+                )
+                .padding(.horizontal, KingdomTheme.Spacing.large)
                 
                 Spacer()
             }

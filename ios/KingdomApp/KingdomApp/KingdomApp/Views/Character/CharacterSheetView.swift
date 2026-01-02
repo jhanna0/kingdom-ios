@@ -94,7 +94,7 @@ struct CharacterSheetView: View {
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15), cornerRadius: 8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
             }
             
             Text("Tap a skill to view all tiers and purchase training")
