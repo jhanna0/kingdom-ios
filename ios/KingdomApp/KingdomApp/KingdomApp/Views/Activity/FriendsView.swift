@@ -5,13 +5,7 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @State private var showAddFriend = false
     @State private var selectedFriend: Friend?
-    @State private var selectedTab: Tab = .friends
-    
-    enum Tab {
-        case friends
-        case myActivity
-        case friendActivity
-    }
+    @State private var showFriendActivity = false
     
     var body: some View {
         NavigationStack {
@@ -19,38 +13,30 @@ struct FriendsView: View {
                 KingdomTheme.Colors.parchment
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Tab selector
-                    HStack(spacing: 0) {
-                        TabButton(title: "Friends", icon: "person.2.fill", isSelected: selectedTab == .friends) {
-                            selectedTab = .friends
+                ScrollView {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
+                        // Header
+                        headerSection
+                        
+                        // Friend Requests
+                        if !viewModel.pendingReceived.isEmpty {
+                            friendRequestsSection
                         }
                         
-                        TabButton(title: "My Activity", icon: "list.bullet.clipboard", isSelected: selectedTab == .myActivity) {
-                            selectedTab = .myActivity
+                        // Friends List
+                        friendsListSection
+                        
+                        // Pending Sent
+                        if !viewModel.pendingSent.isEmpty {
+                            pendingSentSection
                         }
                         
-                        TabButton(title: "Friend Activity", icon: "person.3", isSelected: selectedTab == .friendActivity) {
-                            selectedTab = .friendActivity
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, KingdomTheme.Spacing.small)
-                    
-                    // Content
-                    ScrollView {
-                        VStack(spacing: KingdomTheme.Spacing.large) {
-                            switch selectedTab {
-                            case .friends:
-                                friendsContent
-                            case .myActivity:
-                                myActivityContent
-                            case .friendActivity:
-                                friendActivityContent
+                        // Friend Activity Section
+                        if !viewModel.friendActivities.isEmpty {
+                            friendActivitySection
                             }
                         }
                         .padding(.vertical)
-                    }
                 }
                 
                 if viewModel.isLoading {
@@ -59,22 +45,12 @@ struct FriendsView: View {
                     MedievalLoadingView(status: "Loading...")
                 }
             }
-            .navigationTitle("Social")
+            .navigationTitle("Friends")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if selectedTab == .friends {
-                        Button(action: { showAddFriend = true }) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.title3)
-                                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                        }
-                    }
-                }
-                
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -86,7 +62,6 @@ struct FriendsView: View {
             }
             .task {
                 await viewModel.loadFriends()
-                await viewModel.loadMyActivity()
                 await viewModel.loadFriendActivity()
             }
             .sheet(isPresented: $showAddFriend) {
@@ -114,34 +89,76 @@ struct FriendsView: View {
         }
     }
     
-    // MARK: - Friends Content
+    // MARK: - Header Section
     
-    @ViewBuilder
-    private var friendsContent: some View {
-        VStack(spacing: KingdomTheme.Spacing.large) {
-            // Header with add button (moved to content for this tab)
-            HStack {
-                Image(systemName: "person.2.fill")
-                    .font(FontStyles.iconMedium)
+    private var headerSection: some View {
+        VStack(spacing: KingdomTheme.Spacing.medium) {
+                HStack {
+                    Image(systemName: "person.2.fill")
+                    .font(FontStyles.iconExtraLarge)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                    
+                    Text("Friends")
+                        .font(FontStyles.displayMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Spacer()
+                
+                // Friend count badge
+                if !viewModel.friends.isEmpty {
+                    Text("\(viewModel.friends.count)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
+                }
+            }
+            
+            // Add Friend Button
+                Button(action: { showAddFriend = true }) {
+                HStack(spacing: 8) {
+                        Image(systemName: "person.badge.plus")
+                            .font(FontStyles.iconSmall)
+                        Text("Add Friend")
+                            .font(FontStyles.bodyMediumBold)
+                    }
                     .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
-                
-                Text("Friends")
-                    .font(FontStyles.headingLarge)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                }
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                    cornerRadius: 10,
+                    shadowOffset: 3,
+                    borderWidth: 2
+                )
             }
             .padding(.horizontal)
-            .padding(.top, KingdomTheme.Spacing.small)
+        .padding(.top, KingdomTheme.Spacing.medium)
+    }
+    
+    // MARK: - Friend Requests Section
                         
-                        // Friend requests received
-                        if !viewModel.pendingReceived.isEmpty {
+    private var friendRequestsSection: some View {
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+            
+            HStack {
                                 Text("Friend Requests")
-                                    .font(FontStyles.headingMedium)
+                    .font(FontStyles.headingLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("\(viewModel.pendingReceived.count)")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 10, shadowOffset: 1, borderWidth: 1.5)
+            }
                                     .padding(.horizontal)
                                 
                                 ForEach(viewModel.pendingReceived) { friend in
@@ -158,65 +175,67 @@ struct FriendsView: View {
                             }
                         }
                         
-                        // Friends list
-                        if !viewModel.friends.isEmpty {
+    // MARK: - Friends List Section
+    
+    private var friendsListSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            if !viewModel.pendingReceived.isEmpty || !viewModel.friends.isEmpty {
                             Rectangle()
                                 .fill(Color.black)
                                 .frame(height: 2)
                                 .padding(.horizontal)
+            }
                             
-                            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                                HStack {
+            if !viewModel.friends.isEmpty {
                                     Text("My Friends")
-                                        .font(FontStyles.headingMedium)
+                    .font(FontStyles.headingLarge)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    
-                                    Text("(\(viewModel.friends.count))")
-                                        .font(FontStyles.labelSmall)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 2)
-                                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10, shadowOffset: 1, borderWidth: 1.5)
-                                }
                                 .padding(.horizontal)
                                 
                                 ForEach(viewModel.friends) { friend in
                                     FriendCard(friend: friend, onTap: {
                                         selectedFriend = friend
                                     })
+                }
+            } else if !viewModel.isLoading && viewModel.pendingReceived.isEmpty {
+                emptyFriendsState
+            }
                                 }
                             }
-                        } else if !viewModel.isLoading && viewModel.pendingReceived.isEmpty {
+    
+    // MARK: - Empty State
+    
+    private var emptyFriendsState: some View {
                             VStack(spacing: KingdomTheme.Spacing.large) {
                                 Image(systemName: "person.2.slash")
-                                    .font(FontStyles.iconExtraLarge)
-                                    .foregroundColor(.white)
-                                    .frame(width: 80, height: 80)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
+                .font(.system(size: 48))
+                .foregroundColor(KingdomTheme.Colors.inkLight)
                                 
                                 Text("No Friends Yet")
                                     .font(FontStyles.headingLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                                 
-                                Text("Add friends to see what they're up to!")
+            Text("Add friends to see what they're up to and compete together!")
                                     .font(FontStyles.bodyMedium)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .multilineTextAlignment(.center)
-                                
-                                Button(action: { showAddFriend = true }) {
-                                    Label("Add Friends", systemImage: "person.badge.plus")
-                                }
-                                .buttonStyle(.medieval(color: KingdomTheme.Colors.buttonPrimary))
+                .padding(.horizontal, 40)
                             }
-                            .padding(.top, 60)
-                            .padding(.horizontal)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
                         }
                         
-                        // Pending sent requests
-                        if !viewModel.pendingSent.isEmpty {
+    // MARK: - Pending Sent Section
+    
+    private var pendingSentSection: some View {
                             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+            
                                 Text("Pending Requests")
-                                    .font(FontStyles.labelMedium)
+                .font(FontStyles.labelLarge)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .padding(.horizontal)
                                 
@@ -224,129 +243,43 @@ struct FriendsView: View {
                                     PendingSentCard(friend: friend, onCancel: {
                                         await viewModel.removeFriend(friend.id)
                                     })
-                                }
-                            }
-                        }
+            }
         }
     }
     
-    // MARK: - My Activity Content
+    // MARK: - Friend Activity Section
     
-    @ViewBuilder
-    private var myActivityContent: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Header
-            HStack {
-                Image(systemName: "list.bullet.clipboard")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
-                
-                Text("My Activity")
-                    .font(FontStyles.headingLarge)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-            }
+    private var friendActivitySection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             .padding(.horizontal)
             
-            if viewModel.myActivities.isEmpty {
-                VStack(spacing: KingdomTheme.Spacing.large) {
-                    Image(systemName: "tray")
-                        .font(FontStyles.iconExtraLarge)
-                        .foregroundColor(.white)
-                        .frame(width: 80, height: 80)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
-                    
-                    Text("No Recent Activity")
-                        .font(FontStyles.headingLarge)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Your actions will appear here")
-                        .font(FontStyles.bodyMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                .padding(.top, 60)
-            } else {
-                ForEach(viewModel.myActivities) { activity in
-                    ActivityCard(activity: activity, showUser: false)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Friend Activity Content
-    
-    @ViewBuilder
-    private var friendActivityContent: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Header
             HStack {
-                Image(systemName: "person.3")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
-                
                 Text("Friend Activity")
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
+                
+                Text("Last 7 days")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             .padding(.horizontal)
             
-            if viewModel.friendActivities.isEmpty {
-                VStack(spacing: KingdomTheme.Spacing.large) {
-                    Image(systemName: "person.2.slash")
-                        .font(FontStyles.iconExtraLarge)
-                        .foregroundColor(.white)
-                        .frame(width: 80, height: 80)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
-                    
-                    Text("No Friend Activity")
-                        .font(FontStyles.headingLarge)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Add friends to see what they're doing!")
-                        .font(FontStyles.bodyMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                .padding(.top, 60)
-            } else {
-                ForEach(viewModel.friendActivities) { activity in
+            ForEach(viewModel.friendActivities.prefix(5)) { activity in
                     ActivityCard(activity: activity, showUser: true)
                 }
+            
+            if viewModel.friendActivities.count > 5 {
+                Text("+ \(viewModel.friendActivities.count - 5) more activities")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
             }
-        }
-    }
-}
-
-// MARK: - Tab Button
-
-struct TabButton: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                
-                Text(title)
-                    .font(.caption2)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .foregroundColor(isSelected ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkMedium)
-            .background(
-                isSelected ? KingdomTheme.Colors.buttonPrimary.opacity(0.1) : Color.clear
-            )
-            .cornerRadius(8)
         }
     }
 }
@@ -358,83 +291,67 @@ struct ActivityCard: View {
     let showUser: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                // Icon with brutalist badge
-                Image(systemName: activity.icon)
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 1.5)
+        HStack(spacing: 10) {
+            // Icon with brutalist badge
+            Image(systemName: activity.icon)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(.white)
+                .frame(width: 36, height: 36)
+                .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
                 
-                VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                     // User name if showing friend activity
                     if showUser, let displayName = activity.displayName {
                         HStack(spacing: 4) {
                             Text(displayName)
-                                .font(FontStyles.labelBold)
+                            .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             if let level = activity.userLevel {
                                 Text("Lv\(level)")
-                                    .font(FontStyles.labelTiny)
+                                .font(FontStyles.labelSmall)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
+                        }
                         }
                     }
                     
-                    // Description
-                    Text(activity.description)
+                // Simple action label
+                Text(ActionIconHelper.activityDescription(for: activity.actionType))
                         .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    HStack(spacing: 8) {
-                        // Time
+                // Time and location
+                HStack(spacing: 6) {
                         Text(activity.timeAgo)
                             .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        // Kingdom
                         if let kingdomName = activity.kingdomName {
                             Text("•")
-                                .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle")
-                                    .font(FontStyles.iconMini)
                                 Text(kingdomName)
                                     .font(FontStyles.labelSmall)
-                            }
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
+                    }
                     }
                 }
                 
                 Spacer()
                 
-                // Amount if present
+            // Amount
                 if let amount = activity.amount {
-                    VStack(spacing: 2) {
-                        Text("\(amount)")
+                HStack(spacing: 4) {
+                    Text("+\(amount)")
                             .font(FontStyles.headingSmall)
                             .foregroundColor(KingdomTheme.Colors.gold)
-                        
-                        if activity.actionType == "build" {
-                            Text("actions")
-                                .font(FontStyles.labelTiny)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        } else if activity.actionType.contains("property") || activity.actionType == "train" {
                             Image(systemName: "g.circle.fill")
                                 .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.gold)
-                        }
-                    }
                 }
             }
         }
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
         .padding(.horizontal)
     }
     
@@ -459,7 +376,7 @@ struct FriendCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                // Avatar with online indicator and brutalist style
+                // Avatar with online indicator
                 ZStack(alignment: .bottomTrailing) {
                     Text(String(friend.displayName.prefix(1)).uppercased())
                         .font(FontStyles.headingSmall)
@@ -472,11 +389,8 @@ struct FriendCard: View {
                         Circle()
                             .fill(Color.green)
                             .frame(width: 14, height: 14)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black, lineWidth: 2)
-                            )
-                            .offset(x: 2, y: 2)
+                            .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                            .offset(x: 4, y: 4)
                     }
                 }
                 
@@ -487,18 +401,12 @@ struct FriendCard: View {
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 8) {
-                        // Level
                         if let level = friend.level {
                             Text("Lv\(level)")
                                 .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            Text("•")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
                         }
                         
-                        // Activity
                         if let activity = friend.activity {
                             HStack(spacing: 4) {
                                 Image(systemName: activity.icon)
@@ -510,13 +418,13 @@ struct FriendCard: View {
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
                             }
-                        } else if friend.currentKingdomName != nil {
+                        } else if let kingdomName = friend.currentKingdomName {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.circle.fill")
                                     .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.gold)
                                 
-                                Text(friend.currentKingdomName!)
+                                Text(kingdomName)
                                     .font(FontStyles.labelSmall)
                                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
@@ -534,7 +442,7 @@ struct FriendCard: View {
             .padding()
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
         .padding(.horizontal)
     }
     
@@ -611,7 +519,7 @@ struct FriendRequestCard: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                 }
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
                 .disabled(isProcessing)
             }
         }
@@ -668,4 +576,3 @@ struct PendingSentCard: View {
 #Preview {
     FriendsView()
 }
-

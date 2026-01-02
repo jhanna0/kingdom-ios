@@ -11,6 +11,8 @@ struct CharacterSheetView: View {
     @State private var craftingQueue: [CraftingContract] = []
     @State private var craftingCosts: CraftingCosts?
     @State private var isLoadingContracts = true
+    @State private var myActivities: [ActivityLogEntry] = []
+    @State private var isLoadingActivities = true
     
     var body: some View {
         ScrollView {
@@ -29,8 +31,14 @@ struct CharacterSheetView: View {
                 
                 // Crafting section
                 craftingInfoCard
+                
+                // My Activity section
+                myActivitySection
             }
             .padding()
+        }
+        .task {
+            await loadMyActivities()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
         .navigationTitle("Character Sheet")
@@ -176,6 +184,20 @@ struct CharacterSheetView: View {
         } catch {
             await MainActor.run {
                 isLoadingContracts = false
+            }
+        }
+    }
+    
+    private func loadMyActivities() async {
+        do {
+            let response = try await KingdomAPIService.shared.friends.getMyActivities(limit: 20, days: 7)
+            await MainActor.run {
+                myActivities = response.activities
+                isLoadingActivities = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingActivities = false
             }
         }
     }
@@ -533,6 +555,73 @@ struct CharacterSheetView: View {
         .buttonStyle(.plain)
     }
     
+    // MARK: - My Activity Section
+    
+    private var myActivitySection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: "list.bullet.clipboard")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("My Activity")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                Text("Last 7 days")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            if isLoadingActivities {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(KingdomTheme.Colors.inkMedium)
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            } else if myActivities.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 32))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    
+                    Text("No Recent Activity")
+                        .font(FontStyles.bodyMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    Text("Your actions will appear here")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(myActivities.prefix(5)) { activity in
+                        MyActivityRow(activity: activity)
+                    }
+                    
+                    if myActivities.count > 5 {
+                        Text("+ \(myActivities.count - 5) more activities")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 4)
+                    }
+                }
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
     
     private func purchaseCraft(equipmentType: String, tier: Int) {
         Task {
@@ -570,6 +659,70 @@ struct CharacterSheetView: View {
         }
     }
     
+}
+
+// MARK: - My Activity Row
+
+struct MyActivityRow: View {
+    let activity: ActivityLogEntry
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon
+            Image(systemName: activity.icon)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(.white)
+                .frame(width: 34, height: 34)
+                .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+            
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ActionIconHelper.activityDescription(for: activity.actionType))
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                HStack(spacing: 6) {
+                    Text(activity.timeAgo)
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    if let kingdomName = activity.kingdomName {
+                        Text("•")
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Text(kingdomName)
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Amount if present
+            if let amount = activity.amount {
+                HStack(spacing: 3) {
+                    Text("+\(amount)")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                    Image(systemName: "g.circle.fill")
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+            }
+        }
+        .padding(12)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+    }
+    
+    private func activityColor(_ colorName: String) -> Color {
+        switch colorName {
+        case "green": return KingdomTheme.Colors.buttonSuccess
+        case "blue": return KingdomTheme.Colors.buttonPrimary
+        case "orange": return KingdomTheme.Colors.buttonWarning
+        case "red": return KingdomTheme.Colors.buttonDanger
+        case "yellow": return KingdomTheme.Colors.gold
+        default: return KingdomTheme.Colors.inkMedium
+        }
+    }
 }
 
 // MARK: - Preview

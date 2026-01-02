@@ -246,15 +246,7 @@ struct MapHUD: View {
     }
     
     private func actionIcon(for action: String) -> String {
-        switch action.lowercased() {
-        case "farm": return "leaf.fill"
-        case "work": return "hammer.fill"
-        case "patrol": return "eye.fill"
-        case "scout": return "magnifyingglass"
-        case "sabotage": return "flame.fill"
-        case "training": return "figure.walk"
-        default: return "hourglass"
-        }
+        return ActionIconHelper.icon(for: action)
     }
 }
 

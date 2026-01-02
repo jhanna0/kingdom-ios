@@ -44,17 +44,7 @@ struct PlayerActivityResponse: Codable {
 
 extension ActivityLogEntry {
     var icon: String {
-        switch actionType {
-        case "build": return "hammer.fill"
-        case "vote": return "checkmark.seal.fill"
-        case "invasion": return "shield.lefthalf.filled"
-        case "property_purchase": return "house.fill"
-        case "property_upgrade": return "arrow.up.forward.app.fill"
-        case "train": return "figure.strengthtraining.traditional"
-        case "travel": return "figure.walk"
-        case "checkin": return "location.circle.fill"
-        default: return "circle.fill"
-        }
+        return ActionIconHelper.icon(for: actionType)
     }
     
     var color: String {
