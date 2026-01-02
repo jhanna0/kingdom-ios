@@ -11,7 +11,7 @@ struct TaxRateManagementCard: View {
             HStack {
                 Image(systemName: "dollarsign.circle.fill")
                     .font(FontStyles.iconLarge)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Text("Tax Rate")
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -32,7 +32,7 @@ struct TaxRateManagementCard: View {
                     
                     Text("\(kingdom.taxRate)%")
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Slider(
@@ -49,7 +49,7 @@ struct TaxRateManagementCard: View {
                     in: 0...100,
                     step: 5
                 )
-                .accentColor(KingdomTheme.Colors.gold)
+                .accentColor(KingdomTheme.Colors.inkMedium)
                 
                 HStack {
                     Text("Low (0%)")
@@ -125,7 +125,7 @@ struct TaxRateManagementCard: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(width: 16)
             
             Text(text)

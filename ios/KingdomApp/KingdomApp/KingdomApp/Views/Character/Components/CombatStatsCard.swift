@@ -123,7 +123,7 @@ struct CombatStatsCard: View {
             HStack(spacing: 12) {
                 Image(systemName: iconName)
                     .font(.title3)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -144,11 +144,11 @@ struct CombatStatsCard: View {
                     if let bonus = bonus, bonus > 0 {
                         Text("\(baseStat + bonus)")
                             .font(.title3.bold().monospacedDigit())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     } else {
                         Text("T\(baseStat)")
                             .font(.title3.bold().monospacedDigit())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
                     if isInteractive {

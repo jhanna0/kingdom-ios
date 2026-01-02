@@ -96,7 +96,7 @@ struct FriendsView: View {
                 HStack {
                     Image(systemName: "person.2.fill")
                     .font(FontStyles.iconExtraLarge)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Text("Friends")
                         .font(FontStyles.displayMedium)
@@ -297,7 +297,7 @@ struct ActivityCard: View {
                 .font(FontStyles.iconSmall)
                 .foregroundColor(.white)
                 .frame(width: 36, height: 36)
-                .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                .brutalistBadge(backgroundColor: activity.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
                 
             VStack(alignment: .leading, spacing: 4) {
                     // User name if showing friend activity
@@ -343,27 +343,16 @@ struct ActivityCard: View {
                 HStack(spacing: 4) {
                     Text("+\(amount)")
                             .font(FontStyles.headingSmall)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                             Image(systemName: "g.circle.fill")
                                 .font(FontStyles.iconMini)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
                 }
             }
         }
         .padding()
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
         .padding(.horizontal)
-    }
-    
-    private func activityColor(_ colorName: String) -> Color {
-        switch colorName {
-        case "green": return KingdomTheme.Colors.buttonSuccess
-        case "blue": return KingdomTheme.Colors.buttonPrimary
-        case "orange": return KingdomTheme.Colors.buttonWarning
-        case "red": return KingdomTheme.Colors.buttonDanger
-        case "yellow": return KingdomTheme.Colors.gold
-        default: return KingdomTheme.Colors.inkMedium
-        }
     }
 }
 
@@ -382,7 +371,7 @@ struct FriendCard: View {
                         .font(FontStyles.headingSmall)
                         .foregroundColor(.white)
                         .frame(width: 48, height: 48)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
                     
                     // Online indicator
                     if let isOnline = friend.isOnline, isOnline {
@@ -422,7 +411,7 @@ struct FriendCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.circle.fill")
                                     .font(FontStyles.iconMini)
-                                    .foregroundColor(KingdomTheme.Colors.gold)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 
                                 Text(kingdomName)
                                     .font(FontStyles.labelSmall)
@@ -452,7 +441,7 @@ struct FriendCard: View {
         case "blue": return KingdomTheme.Colors.buttonPrimary
         case "orange": return KingdomTheme.Colors.buttonWarning
         case "red": return KingdomTheme.Colors.buttonDanger
-        case "yellow": return KingdomTheme.Colors.gold
+        case "yellow": return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkMedium
         }
     }
@@ -474,7 +463,7 @@ struct FriendRequestCard: View {
                     .font(FontStyles.headingSmall)
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(friend.displayName)

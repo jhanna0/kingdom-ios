@@ -45,7 +45,7 @@ struct SabotageTargetCard: View {
                         
                         Text("\(target.progressPercent)% complete")
                             .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .fontWeight(.semibold)
                     }
                 }

@@ -1,31 +1,10 @@
 import SwiftUI
 
-/// Reusable profile header showing name, level, and XP progress - brutalist style
+/// Reusable profile header showing name, level, and optionally gold - brutalist style
 struct ProfileHeaderCard: View {
     let displayName: String
     let level: Int
-    let experience: Int
-    let maxExperience: Int
-    let showsXPBar: Bool
-    
-    init(
-        displayName: String,
-        level: Int,
-        experience: Int = 0,
-        maxExperience: Int = 100,
-        showsXPBar: Bool = true
-    ) {
-        self.displayName = displayName
-        self.level = level
-        self.experience = experience
-        self.maxExperience = maxExperience
-        self.showsXPBar = showsXPBar
-    }
-    
-    private var xpProgress: Double {
-        guard maxExperience > 0 else { return 0 }
-        return Double(experience) / Double(maxExperience)
-    }
+    let gold: Int?  // Optional - only shown for own profile
     
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -36,7 +15,7 @@ struct ProfileHeaderCard: View {
                     .foregroundColor(.white)
                     .frame(width: 64, height: 64)
                     .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.gold,
+                        backgroundColor: KingdomTheme.Colors.inkMedium,
                         cornerRadius: 16,
                         shadowOffset: 3,
                         borderWidth: 2.5
@@ -60,49 +39,18 @@ struct ProfileHeaderCard: View {
                 Text(displayName)
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .lineLimit(2)
                 
-                HStack(spacing: 6) {
-                    Image(systemName: "star.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                    Text("Level \(level)")
-                        .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
-                
-                // XP Progress Bar (only show if enabled)
-                if showsXPBar {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("\(experience) / \(maxExperience) XP")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(xpProgress * 100))%")
-                                .font(FontStyles.labelBold)
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                        }
+                // Gold display (only if provided)
+                if let gold = gold {
+                    HStack(spacing: 4) {
+                        Text("\(gold)")
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background
-                                Rectangle()
-                                    .fill(KingdomTheme.Colors.inkDark.opacity(0.1))
-                                    .frame(height: 10)
-                                    .overlay(
-                                        Rectangle()
-                                            .stroke(Color.black, lineWidth: 1.5)
-                                    )
-                                
-                                // Progress
-                                Rectangle()
-                                    .fill(KingdomTheme.Colors.gold)
-                                    .frame(width: geometry.size.width * xpProgress, height: 10)
-                            }
-                        }
-                        .frame(height: 10)
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                     }
                 }
             }
@@ -118,20 +66,16 @@ struct ProfileHeaderCard: View {
 
 #Preview {
     VStack(spacing: 20) {
-        // With XP bar
         ProfileHeaderCard(
             displayName: "Alice",
             level: 5,
-            experience: 150,
-            maxExperience: 300,
-            showsXPBar: true
+            gold: 1250
         )
         
-        // Without XP bar (for viewing other players)
         ProfileHeaderCard(
             displayName: "Bob",
             level: 12,
-            showsXPBar: false
+            gold: 5780
         )
     }
     .padding()

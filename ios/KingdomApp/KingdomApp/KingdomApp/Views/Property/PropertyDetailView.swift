@@ -194,7 +194,7 @@ struct PropertyDetailView: View {
                 VStack(spacing: -8) {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 32))
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Image(systemName: "building.columns.fill")
                         .font(.system(size: 55))
                         .foregroundColor(tierColor)
@@ -212,9 +212,9 @@ struct PropertyDetailView: View {
         switch property.tier {
         case 1: return KingdomTheme.Colors.buttonSecondary
         case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.goldWarm
-        case 4: return KingdomTheme.Colors.gold
-        case 5: return KingdomTheme.Colors.gold
+        case 3: return KingdomTheme.Colors.inkMedium
+        case 4: return KingdomTheme.Colors.inkMedium
+        case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkDark
         }
     }
@@ -228,7 +228,7 @@ struct PropertyDetailView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 40, height: 40)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(property.kingdomName)
@@ -268,7 +268,7 @@ struct PropertyDetailView: View {
                 if let status = upgradeStatus {
                     Text("\(status.upgrade_cost) gold")
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(status.player_gold >= status.upgrade_cost ? KingdomTheme.Colors.gold : .red)
+                        .foregroundColor(status.player_gold >= status.upgrade_cost ? KingdomTheme.Colors.inkMedium : .red)
                 }
             }
             
@@ -426,7 +426,7 @@ struct PropertyDetailView: View {
                 .font(FontStyles.iconExtraLarge)
                 .foregroundColor(.white)
                 .frame(width: 60, height: 60)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 16)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 16)
             
             Text("Maximum Level")
                 .font(FontStyles.headingMedium)
@@ -439,7 +439,7 @@ struct PropertyDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.gold.opacity(0.1))
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.inkMedium.opacity(0.1))
     }
     
     

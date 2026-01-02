@@ -84,7 +84,7 @@ struct ContractCreationView: View {
                         HStack {
                             Text("\(buildingName) → Level \(nextLevel)")
                                 .font(KingdomTheme.Typography.title3())
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Spacer()
                         }
@@ -120,11 +120,11 @@ struct ContractCreationView: View {
                                 
                                 HStack(spacing: 6) {
                                     Image(systemName: "hammer.fill")
-                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     Text("\(constructionCost)g")
                                         .font(KingdomTheme.Typography.title2())
                                         .fontWeight(.bold)
-                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
                             }
                             
@@ -137,7 +137,7 @@ struct ContractCreationView: View {
                                 
                                 HStack(spacing: 4) {
                                     Image(systemName: "building.columns.fill")
-                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.gold : .red)
+                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkMedium : .red)
                                     Text("\(kingdom.treasuryGold)g")
                                         .font(KingdomTheme.Typography.title3())
                                         .fontWeight(.semibold)

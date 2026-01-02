@@ -40,9 +40,9 @@ struct MyKingdomCard: View {
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack(spacing: KingdomTheme.Spacing.medium) {
-                    Label("\(kingdom.treasuryGold)g", systemImage: "dollarsign.circle.fill")
+                    Label("\(kingdom.treasuryGold)", systemImage: "g.circle.fill")
                         .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
                     
                     Label("\(kingdom.checkedInPlayers)", systemImage: "person.2.fill")
                         .font(KingdomTheme.Typography.caption())

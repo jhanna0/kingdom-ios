@@ -18,7 +18,7 @@ struct CoupVotingSheet: View {
                         VStack(spacing: 8) {
                             Image(systemName: "crown.fill")
                                 .font(.system(size: 60))
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Text("Coup in \(coupData.kingdomName)")
                                 .font(.title)
@@ -42,7 +42,7 @@ struct CoupVotingSheet: View {
                             Text(coupData.timeRemainingFormatted)
                                 .font(.title2)
                                 .fontWeight(.bold)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         .padding()
                         .background(Color.white.opacity(0.1))
@@ -53,7 +53,7 @@ struct CoupVotingSheet: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Image(systemName: "person.fill")
-                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     Text("Meet Your New Ruler")
                                         .font(.headline)
                                         .foregroundColor(.white)
@@ -68,7 +68,7 @@ struct CoupVotingSheet: View {
                                     
                                     StatRow(label: "Attack", value: "\(stats.attackPower)", icon: "sword.fill", color: .red)
                                     StatRow(label: "Defense", value: "\(stats.defensePower)", icon: "shield.fill", color: .blue)
-                                    StatRow(label: "Leadership", value: "\(stats.leadership)", icon: "crown.fill", color: KingdomTheme.Colors.gold)
+                                    StatRow(label: "Leadership", value: "\(stats.leadership)", icon: "crown.fill", color: KingdomTheme.Colors.inkMedium)
                                     StatRow(label: "Building", value: "\(stats.buildingSkill)", icon: "hammer.fill", color: .orange)
                                     StatRow(label: "Intelligence", value: "\(stats.intelligence)", icon: "brain.head.profile", color: .green)
                                     
@@ -191,7 +191,7 @@ struct CoupVotingSheet: View {
                                 dismiss()
                             }
                         }
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .fontWeight(.bold)
                     }
                 }

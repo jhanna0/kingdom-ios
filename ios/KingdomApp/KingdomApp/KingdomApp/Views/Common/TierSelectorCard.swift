@@ -41,7 +41,7 @@ struct TierSelectorCard<Content: View>: View {
                                 
                                 if tier == currentTier && showCurrentBadge {
                                     Circle()
-                                        .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
+                                        .stroke(KingdomTheme.Colors.inkMedium, lineWidth: 3)
                                         .frame(width: 44, height: 44)
                                 }
                                 
@@ -79,7 +79,7 @@ struct TierSelectorCard<Content: View>: View {
     
     private func tierColor(_ tier: Int) -> Color {
         if tier <= currentTier {
-            return KingdomTheme.Colors.gold
+            return KingdomTheme.Colors.inkMedium
         } else if tier == selectedTier {
             return KingdomTheme.Colors.buttonPrimary
         } else {
@@ -101,7 +101,7 @@ struct TierSelectorCard<Content: View>: View {
     
     private func statusColor(_ tier: Int) -> Color {
         if tier <= currentTier {
-            return KingdomTheme.Colors.gold
+            return KingdomTheme.Colors.inkMedium
         } else if tier == selectedTier {
             return KingdomTheme.Colors.buttonPrimary
         } else {

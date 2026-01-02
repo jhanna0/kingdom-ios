@@ -41,7 +41,7 @@ struct ReputationDetailView: View {
                     
                     Text("\(player.reputation) Reputation")
                         .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -53,7 +53,7 @@ struct ReputationDetailView: View {
                     HStack {
                         Image(systemName: "star.fill")
                             .font(FontStyles.iconMedium)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("Reputation Tiers")
                             .font(FontStyles.headingMedium)
@@ -90,7 +90,7 @@ struct ReputationDetailView: View {
                             if selectedTier <= currentTierIndex {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.gold)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                         }
                         
@@ -123,7 +123,7 @@ struct ReputationDetailView: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: selectedTier <= currentTierIndex ? "checkmark.circle.fill" : "lock.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(selectedTier <= currentTierIndex ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .foregroundColor(selectedTier <= currentTierIndex ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(ability)
@@ -145,7 +145,7 @@ struct ReputationDetailView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                         } else {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
@@ -250,15 +250,15 @@ struct ReputationDetailView: View {
                 if isUnlocked {
                     Image(systemName: "checkmark.circle.fill")
                         .font(FontStyles.iconSmall)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
             .padding(12)
-            .background(isSelected ? KingdomTheme.Colors.gold.opacity(0.1) : KingdomTheme.Colors.parchment)
+            .background(isSelected ? KingdomTheme.Colors.inkMedium.opacity(0.1) : KingdomTheme.Colors.parchment)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? KingdomTheme.Colors.gold : Color.black, lineWidth: isSelected ? 2 : 1.5)
+                    .stroke(isSelected ? KingdomTheme.Colors.inkMedium : Color.black, lineWidth: isSelected ? 2 : 1.5)
             )
         }
         .buttonStyle(.plain)
@@ -268,7 +268,7 @@ struct ReputationDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -279,7 +279,7 @@ struct ReputationDetailView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(width: 20)
             
             Text(text)
@@ -331,7 +331,7 @@ struct ReputationDetailView: View {
                 name: "Champion",
                 requirement: 500,
                 icon: "crown.fill",
-                color: KingdomTheme.Colors.gold,
+                color: KingdomTheme.Colors.inkMedium,
                 abilities: ["Vote weight counts 2x", "Significantly increased influence", "Respected leader status"]
             )
         case 6:

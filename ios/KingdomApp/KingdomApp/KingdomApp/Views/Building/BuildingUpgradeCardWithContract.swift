@@ -38,7 +38,7 @@ struct BuildingUpgradeCardWithContract: View {
                     .foregroundColor(.white)
                     .frame(width: 52, height: 52)
                     .brutalistBadge(
-                        backgroundColor: isMaxLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonPrimary,
+                        backgroundColor: isMaxLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonPrimary,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -76,7 +76,7 @@ struct BuildingUpgradeCardWithContract: View {
                     HStack(spacing: 6) {
                         ForEach(1...maxLevel, id: \.self) { level in
                             Circle()
-                                .fill(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.15))
+                                .fill(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.15))
                                 .frame(width: 10, height: 10)
                                 .overlay(
                                     Circle()
@@ -103,7 +103,7 @@ struct BuildingUpgradeCardWithContract: View {
                         .font(FontStyles.iconSmall)
                         .foregroundColor(.white)
                         .frame(width: 28, height: 28)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Level \(currentLevel + 1) Benefit")
@@ -165,7 +165,7 @@ struct BuildingUpgradeCardWithContract: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "building.columns.fill")
                                         .font(FontStyles.iconMini)
-                                        .foregroundColor(KingdomTheme.Colors.gold)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                                     Text("\(constructionCost)g")
                                         .font(FontStyles.bodyLargeBold)
                                         .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.buttonDanger)
@@ -204,7 +204,7 @@ struct BuildingUpgradeCardWithContract: View {
                             VStack(spacing: 4) {
                                 Text("\(kingdom.treasuryGold)g")
                                     .font(FontStyles.bodyLargeBold)
-                                    .foregroundColor(canAfford ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
+                                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
                                 Text("TREASURY")
                                     .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
@@ -246,12 +246,12 @@ struct BuildingUpgradeCardWithContract: View {
                         .font(FontStyles.iconMedium)
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Maximum Level Reached")
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text("This building is fully upgraded")
                             .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -259,7 +259,7 @@ struct BuildingUpgradeCardWithContract: View {
                     Spacer()
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold.opacity(0.12), cornerRadius: 10)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium.opacity(0.12), cornerRadius: 10)
             }
         }
         .padding()

@@ -21,7 +21,7 @@ struct AuthView: View {
                         .foregroundColor(.white)
                         .frame(width: 120, height: 120)
                         .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.gold,
+                            backgroundColor: KingdomTheme.Colors.inkMedium,
                             cornerRadius: 24,
                             shadowOffset: 6,
                             borderWidth: 4

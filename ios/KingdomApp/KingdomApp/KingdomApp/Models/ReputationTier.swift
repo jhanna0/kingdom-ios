@@ -37,7 +37,7 @@ enum ReputationTier {
         case .resident: return KingdomTheme.Colors.buttonPrimary
         case .citizen: return .blue
         case .notable: return .purple
-        case .champion: return KingdomTheme.Colors.gold
+        case .champion: return KingdomTheme.Colors.inkMedium
         case .legendary: return .orange
         }
     }

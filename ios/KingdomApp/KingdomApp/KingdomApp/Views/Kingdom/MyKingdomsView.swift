@@ -75,12 +75,12 @@ struct MyKingdomsView: View {
                                     
                                     // Personal gold
                                     HStack(spacing: 4) {
-                                        Image(systemName: "bitcoinsign.circle.fill")
-                                            .foregroundColor(Color(red: 0.8, green: 0.6, blue: 0.2))
                                         Text("\(player.gold)")
                                             .font(.system(.title3, design: .serif))
                                             .fontWeight(.bold)
                                             .foregroundColor(Color(red: 0.2, green: 0.1, blue: 0.05))
+                                        Image(systemName: "g.circle.fill")
+                                            .foregroundColor(KingdomTheme.Colors.goldLight)
                                     }
                                 }
                                 

@@ -109,7 +109,7 @@ struct AddFriendView: View {
                                 .font(FontStyles.iconExtraLarge)
                                 .foregroundColor(.white)
                                 .frame(width: 80, height: 80)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 20)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20)
                             
                             Text("Add Friends")
                                 .font(FontStyles.headingLarge)
@@ -214,7 +214,7 @@ struct UserSearchResultCard: View {
                 .font(FontStyles.headingSmall)
                 .foregroundColor(.white)
                 .frame(width: 48, height: 48)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.displayName)

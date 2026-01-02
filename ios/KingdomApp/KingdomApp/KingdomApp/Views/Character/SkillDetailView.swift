@@ -32,7 +32,7 @@ struct SkillDetailView: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(benefit)
@@ -75,8 +75,8 @@ struct SkillDetailView: View {
                             sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
                             
                             ResourceRow(
-                                icon: "circle.fill",
-                                iconColor: KingdomTheme.Colors.gold,
+                                icon: "g.circle.fill",
+                                iconColor: KingdomTheme.Colors.goldLight,
                                 label: "Gold",
                                 required: getCost(tier: tier),
                                 available: player.gold
@@ -94,7 +94,7 @@ struct SkillDetailView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                         } else if tier == currentTier + 1 && currentTier < 5 {
                             UnifiedActionButton(
                                 title: "Start Training",
@@ -128,7 +128,7 @@ struct SkillDetailView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                         }
                     }
                 }
@@ -152,7 +152,7 @@ struct SkillDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)

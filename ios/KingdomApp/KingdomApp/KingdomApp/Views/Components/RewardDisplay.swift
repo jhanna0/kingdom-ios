@@ -46,7 +46,7 @@ struct RewardDisplayView: View {
                         .offset(x: 3, y: 3)
                     
                     Circle()
-                        .fill(KingdomTheme.Colors.gold)
+                        .fill(KingdomTheme.Colors.inkMedium)
                         .frame(width: 70, height: 70)
                         .overlay(
                             Circle()
@@ -73,11 +73,11 @@ struct RewardDisplayView: View {
                     // Gold counter (if earned)
                     if reward.goldReward > 0 {
                         AnimatedRewardCounter(
-                            icon: "sparkles",
+                            icon: "g.circle.fill",
                             label: "Gold",
                             currentValue: goldCounter,
                             addedValue: reward.goldReward,
-                            color: KingdomTheme.Colors.gold
+                            color: KingdomTheme.Colors.inkMedium
                         )
                     }
                     

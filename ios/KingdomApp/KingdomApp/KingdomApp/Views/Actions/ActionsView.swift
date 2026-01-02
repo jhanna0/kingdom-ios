@@ -110,7 +110,7 @@ struct ActionsView: View {
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger,
+                        backgroundColor: isInHomeKingdom ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -123,7 +123,7 @@ struct ActionsView: View {
                     
                     Text(isInHomeKingdom ? "Your Kingdom" : "Enemy Territory")
                         .font(FontStyles.labelMedium)
-                        .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonDanger)
+                        .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
                 }
                 
                 Spacer()

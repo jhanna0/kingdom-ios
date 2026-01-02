@@ -31,7 +31,7 @@ struct EquipmentStatsCard: View {
             HStack {
                 Image(systemName: "hammer.fill")
                     .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("Equipment")
                     .font(.headline)
@@ -84,7 +84,7 @@ struct EquipmentStatsCard: View {
             HStack(spacing: 12) {
                 Image(systemName: iconName)
                     .font(.title3)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -95,7 +95,7 @@ struct EquipmentStatsCard: View {
                     if let tier = tier, let bonus = bonus {
                         Text("Tier \(tier) (+\(bonus))")
                             .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     } else {
                         Text("No \(displayName.lowercased()) equipped")
                             .font(.caption)

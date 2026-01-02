@@ -18,7 +18,7 @@ struct NotificationsSheet: View {
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 40, height: 40)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                             
                             Text("Kingdom Notifications")
                                 .font(FontStyles.headingLarge)

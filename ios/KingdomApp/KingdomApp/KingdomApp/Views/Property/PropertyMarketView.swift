@@ -110,10 +110,10 @@ struct PropertyMarketView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 8))
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Text("\(propertyStatus?.player_gold ?? 0)")
                         .font(FontStyles.headingLarge)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 Text("GOLD")
                     .font(FontStyles.labelTiny)
@@ -269,10 +269,10 @@ struct PropertyMarketView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "circle.fill")
                                 .font(.system(size: 8))
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             Text("\(price)g")
                                 .font(FontStyles.headingMedium)
-                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                     } else {
                         Text("Check in first")

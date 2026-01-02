@@ -125,7 +125,7 @@ struct ReputationStatsCard: View {
                 .foregroundColor(.white)
                 .frame(width: 24, height: 24)
                 .brutalistBadge(
-                    backgroundColor: unlocked ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkLight,
+                    backgroundColor: unlocked ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight,
                     cornerRadius: 6,
                     shadowOffset: 1,
                     borderWidth: 1.5
@@ -147,11 +147,11 @@ struct ReputationStatsCard: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(unlocked ? KingdomTheme.Colors.gold.opacity(0.1) : KingdomTheme.Colors.inkDark.opacity(0.03))
+        .background(unlocked ? KingdomTheme.Colors.inkMedium.opacity(0.1) : KingdomTheme.Colors.inkDark.opacity(0.03))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(unlocked ? KingdomTheme.Colors.gold.opacity(0.3) : Color.clear, lineWidth: 1)
+                .stroke(unlocked ? KingdomTheme.Colors.inkMedium.opacity(0.3) : Color.clear, lineWidth: 1)
         )
     }
 }

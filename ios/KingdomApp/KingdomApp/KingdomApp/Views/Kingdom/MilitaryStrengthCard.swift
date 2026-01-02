@@ -17,7 +17,7 @@ struct MilitaryStrengthCard: View {
                     .foregroundColor(.white)
                     .frame(width: 32, height: 32)
                     .brutalistBadge(
-                        backgroundColor: strength?.isRuler == true ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonWarning,
+                        backgroundColor: strength?.isRuler == true ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonWarning,
                         cornerRadius: 8,
                         shadowOffset: 2,
                         borderWidth: 1.5
@@ -235,7 +235,7 @@ struct MilitaryStrengthCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill")
                     .font(FontStyles.iconMini)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(width: 20)
                 Text("Attack Power")
                     .font(FontStyles.labelSmall)
@@ -250,7 +250,7 @@ struct MilitaryStrengthCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "shield.fill")
                     .font(FontStyles.iconMini)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(width: 20)
                 Text("Total Defense")
                     .font(FontStyles.labelSmall)
@@ -265,7 +265,7 @@ struct MilitaryStrengthCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "person.3.fill")
                     .font(FontStyles.iconMini)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(width: 20)
                 Text("Active Citizens")
                     .font(FontStyles.labelSmall)
@@ -285,7 +285,7 @@ struct MilitaryStrengthCard: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconMini)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(width: 20)
             Text(label)
                 .font(FontStyles.labelSmall)

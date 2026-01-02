@@ -23,7 +23,7 @@ struct BuildMenuView: View {
                         icon: "dollarsign.circle.fill",
                         title: "Economic Buildings",
                         subtitle: "Generate passive income for the city treasury",
-                        iconColor: KingdomTheme.Colors.gold
+                        iconColor: KingdomTheme.Colors.inkMedium
                     )
                     
                     // Mine upgrade
@@ -172,7 +172,7 @@ struct BuildMenuView: View {
                 .font(FontStyles.iconLarge)
                 .foregroundColor(.white)
                 .frame(width: 52, height: 52)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Kingdom Treasury")
@@ -181,7 +181,7 @@ struct BuildMenuView: View {
                 
                 Text("\(kingdom.treasuryGold) gold")
                     .font(FontStyles.headingLarge)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
             Spacer()

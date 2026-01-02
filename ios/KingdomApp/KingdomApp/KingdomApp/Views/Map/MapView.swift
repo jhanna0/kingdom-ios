@@ -169,8 +169,8 @@ struct MapView: View {
                     showTravelFeeToast = true
                 } else if event.travel_fee_paid > 0 {
                     // Paid travel fee
-                    travelFeeMessage = "Paid \(event.travel_fee_paid)g to enter \(event.kingdom_name)"
-                    travelFeeIcon = "dollarsign.circle.fill"
+                    travelFeeMessage = "Paid \(event.travel_fee_paid) to enter \(event.kingdom_name)"
+                    travelFeeIcon = "g.circle.fill"
                     showTravelFeeToast = true
                 }
                 

@@ -21,7 +21,7 @@ struct MusicSettingsView: View {
                     HStack {
                         Image(systemName: musicService.isMusicEnabled ? "music.note" : "music.note.slash")
                             .font(.title2)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("Background Music")
                             .font(.headline)
@@ -31,7 +31,7 @@ struct MusicSettingsView: View {
                         
                         Toggle("", isOn: $musicService.isMusicEnabled)
                             .labelsHidden()
-                            .tint(KingdomTheme.Colors.gold)
+                            .tint(KingdomTheme.Colors.inkMedium)
                     }
                     .padding()
                     .background(
@@ -43,7 +43,7 @@ struct MusicSettingsView: View {
                     HStack {
                         Image(systemName: musicService.isSoundEffectsEnabled ? "speaker.wave.3" : "speaker.slash")
                             .font(.title2)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("Sound Effects")
                             .font(.headline)
@@ -53,7 +53,7 @@ struct MusicSettingsView: View {
                         
                         Toggle("", isOn: $musicService.isSoundEffectsEnabled)
                             .labelsHidden()
-                            .tint(KingdomTheme.Colors.gold)
+                            .tint(KingdomTheme.Colors.inkMedium)
                     }
                     .padding()
                     .background(
@@ -79,7 +79,7 @@ struct MusicSettingsView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
         }

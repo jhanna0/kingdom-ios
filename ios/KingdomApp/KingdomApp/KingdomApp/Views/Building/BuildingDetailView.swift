@@ -31,7 +31,7 @@ struct BuildingDetailView: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: tier <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(tier <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .foregroundColor(tier <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(benefit)
@@ -51,8 +51,8 @@ struct BuildingDetailView: View {
                             sectionHeader(icon: "dollarsign.circle.fill", title: "Upgrade Cost")
                             
                             ResourceRow(
-                                icon: "circle.fill",
-                                iconColor: KingdomTheme.Colors.gold,
+                                icon: "g.circle.fill",
+                                iconColor: KingdomTheme.Colors.goldLight,
                                 label: "Gold",
                                 required: getUpgradeCost(tier: tier),
                                 available: kingdom.treasuryGold
@@ -70,7 +70,7 @@ struct BuildingDetailView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                         } else if tier == currentLevel + 1 {
                             if kingdom.rulerId == player.playerId {
                                 HStack(spacing: 8) {
@@ -129,7 +129,7 @@ struct BuildingDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)

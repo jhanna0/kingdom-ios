@@ -53,7 +53,7 @@ struct BuildingLevelsView: View {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                                 .font(.subheadline)
-                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
                                 .frame(width: 20)
                             
                             Text(benefit)
@@ -66,7 +66,7 @@ struct BuildingLevelsView: View {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                             .font(.subheadline)
-                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.3))
+                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
                             .frame(width: 20)
                         
                         Text(benefitForLevel(level))
@@ -85,7 +85,7 @@ struct BuildingLevelsView: View {
                 
                 HStack {
                     Image(systemName: "building.columns.fill")
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .frame(width: 20)
                     Text("\(costForLevel(level)) Gold")
                         .font(.subheadline)
@@ -105,10 +105,10 @@ struct BuildingLevelsView: View {
                     Text("Unlocked")
                         .font(.subheadline.bold())
                 }
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(KingdomTheme.Colors.gold.opacity(0.1))
+                .background(KingdomTheme.Colors.inkMedium.opacity(0.1))
                 .cornerRadius(10)
             } else if level > currentLevel + 1 {
                 HStack(spacing: 8) {
@@ -142,7 +142,7 @@ struct BuildingLevelsView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.subheadline)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             Text(title)
                 .font(.subheadline.bold())
                 .foregroundColor(KingdomTheme.Colors.inkDark)

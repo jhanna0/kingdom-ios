@@ -23,7 +23,7 @@ struct FloatingNotificationsButton: View {
                         
                         // Main button
                         Circle()
-                            .fill(KingdomTheme.Colors.gold)
+                            .fill(KingdomTheme.Colors.inkMedium)
                             .frame(width: 60, height: 60)
                             .overlay(
                                 Circle()

@@ -18,7 +18,7 @@ struct ActivityView: View {
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 40, height: 40)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                             
                             Text("Activity Feed")
                                 .font(FontStyles.headingLarge)
@@ -160,7 +160,7 @@ struct NotificationCard: View {
                             Text(coupData.timeRemainingFormatted)
                                 .font(FontStyles.labelBold)
                         }
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -213,7 +213,7 @@ struct NotificationCard: View {
                                 Text(invasionData.timeRemainingFormatted)
                                     .font(FontStyles.labelBold)
                             }
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         
                         // Show alliance badge if applicable
@@ -268,7 +268,7 @@ struct NotificationCard: View {
         switch notification.priority {
         case .critical: return KingdomTheme.Colors.buttonDanger
         case .high: return KingdomTheme.Colors.buttonWarning
-        case .medium: return KingdomTheme.Colors.gold
+        case .medium: return KingdomTheme.Colors.inkMedium
         case .low: return KingdomTheme.Colors.inkMedium
         }
     }
@@ -277,7 +277,7 @@ struct NotificationCard: View {
         switch notification.priority {
         case .critical: return KingdomTheme.Colors.buttonDanger.opacity(0.5)
         case .high: return KingdomTheme.Colors.buttonWarning.opacity(0.5)
-        case .medium: return KingdomTheme.Colors.gold.opacity(0.3)
+        case .medium: return KingdomTheme.Colors.inkMedium.opacity(0.3)
         case .low: return KingdomTheme.Colors.inkLight.opacity(0.3)
         }
     }

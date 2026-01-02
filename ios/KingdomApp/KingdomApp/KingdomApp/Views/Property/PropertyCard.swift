@@ -129,7 +129,7 @@ struct PropertyCard: View {
                     VStack(spacing: -5) {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 25))
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Image(systemName: "building.columns.fill")
                             .font(.system(size: 45))
                             .foregroundColor(tierColor)
@@ -150,9 +150,9 @@ struct PropertyCard: View {
         switch property.tier {
         case 1: return KingdomTheme.Colors.buttonSecondary
         case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.goldWarm
-        case 4: return KingdomTheme.Colors.gold
-        case 5: return KingdomTheme.Colors.gold
+        case 3: return KingdomTheme.Colors.inkMedium
+        case 4: return KingdomTheme.Colors.inkMedium
+        case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkDark
         }
     }
@@ -187,7 +187,7 @@ struct PropertyCard: View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(width: 14)
             
             Text(text)

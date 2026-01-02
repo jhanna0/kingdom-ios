@@ -23,7 +23,7 @@ struct BuildingUpgradeCard: View {
             HStack {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.goldWarm)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)

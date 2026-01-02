@@ -20,7 +20,7 @@ struct MyKingdomsSheet: View {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         Image(systemName: "crown")
                             .font(.system(size: 60))
-                            .foregroundColor(KingdomTheme.Colors.goldWarm)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .opacity(0.5)
                         
                         Text("No Kingdoms Yet")
@@ -119,12 +119,12 @@ struct MyKingdomCardFromBackend: View {
                 
                 HStack(spacing: KingdomTheme.Spacing.medium) {
                     HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("\(response.treasury_gold)g")
+                        Text("\(response.treasury_gold)")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                     }
                     
                     HStack(spacing: 4) {

@@ -28,7 +28,7 @@ struct KingdomClaimCelebration: View {
                         .offset(x: 4, y: 4)
                     
                     Circle()
-                        .fill(KingdomTheme.Colors.gold)
+                        .fill(KingdomTheme.Colors.inkMedium)
                         .frame(width: 110, height: 110)
                         .overlay(
                             Circle()

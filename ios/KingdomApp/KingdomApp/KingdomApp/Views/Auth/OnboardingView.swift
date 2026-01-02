@@ -71,7 +71,7 @@ struct WelcomeStep: View {
                     .foregroundColor(.white)
                     .frame(width: 120, height: 120)
                     .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.gold,
+                        backgroundColor: KingdomTheme.Colors.inkMedium,
                         cornerRadius: 24,
                         shadowOffset: 6,
                         borderWidth: 4
@@ -134,7 +134,7 @@ struct WelcomeStep: View {
                             .fill(Color.black)
                             .offset(x: 4, y: 4)
                         RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                            .fill(KingdomTheme.Colors.gold)
+                            .fill(KingdomTheme.Colors.inkMedium)
                             .overlay(
                                 RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                                     .stroke(Color.black, lineWidth: 3)
@@ -161,7 +161,7 @@ struct FeatureRow: View {
                 .foregroundColor(.white)
                 .frame(width: 42, height: 42)
                 .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.gold,
+                    backgroundColor: KingdomTheme.Colors.inkMedium,
                     cornerRadius: 8
                 )
             
@@ -205,7 +205,7 @@ struct DisplayNameStep: View {
                     .foregroundColor(.white)
                     .frame(width: 100, height: 100)
                     .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.gold,
+                        backgroundColor: KingdomTheme.Colors.inkMedium,
                         cornerRadius: 20,
                         shadowOffset: 4,
                         borderWidth: 3
@@ -308,7 +308,7 @@ struct DisplayNameStep: View {
                             .fill(Color.black)
                             .offset(x: 4, y: 4)
                         RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                            .fill(isValid ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                            .fill(isValid ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.disabled)
                             .overlay(
                                 RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                                     .stroke(Color.black, lineWidth: 3)
@@ -368,7 +368,7 @@ struct HometownStep: View {
                                         .frame(width: 44, height: 44)
                                         .overlay(
                                             Circle()
-                                                .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
+                                                .stroke(KingdomTheme.Colors.inkMedium, lineWidth: 3)
                                         )
                                         .shadow(radius: 4)
                                     
@@ -449,7 +449,7 @@ struct HometownStep: View {
                                     .fill(Color.black)
                                     .offset(x: 4, y: 4)
                                 RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                                    .fill(KingdomTheme.Colors.gold)
+                                    .fill(KingdomTheme.Colors.inkMedium)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                                             .stroke(Color.black, lineWidth: 3)
@@ -469,7 +469,7 @@ struct HometownStep: View {
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
                         .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.gold,
+                            backgroundColor: KingdomTheme.Colors.inkMedium,
                             cornerRadius: 10
                         )
                     
@@ -499,7 +499,7 @@ struct HometownStep: View {
                     if isLoadingCity {
                         HStack(spacing: KingdomTheme.Spacing.medium) {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.gold))
+                                .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.inkMedium))
                             Text("Finding nearby cities...")
                                 .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -513,7 +513,7 @@ struct HometownStep: View {
                                     .foregroundColor(.white)
                                     .frame(width: 44, height: 44)
                                     .brutalistBadge(
-                                        backgroundColor: KingdomTheme.Colors.gold,
+                                        backgroundColor: KingdomTheme.Colors.inkMedium,
                                         cornerRadius: 10
                                     )
                                 
@@ -565,7 +565,7 @@ struct HometownStep: View {
                                     .fill(Color.black)
                                     .offset(x: 4, y: 4)
                                 RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                                    .fill(selectedCity != nil ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled)
+                                    .fill(selectedCity != nil ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.disabled)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                                             .stroke(Color.black, lineWidth: 3)
@@ -655,7 +655,7 @@ struct LocationOptionCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Image(systemName: "mappin.circle.fill")
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text(cityName)
                             .font(KingdomTheme.Typography.headline())
                             .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -680,7 +680,7 @@ struct LocationOptionCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
                     .stroke(
-                        isSelected ? KingdomTheme.Colors.gold : KingdomTheme.Colors.border,
+                        isSelected ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.border,
                         lineWidth: isSelected ? 2 : 1
                     )
             )

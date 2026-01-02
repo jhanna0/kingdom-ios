@@ -200,7 +200,7 @@ struct MyPropertiesView: View {
                         .font(FontStyles.iconMedium)
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Buy Land")
@@ -287,9 +287,9 @@ struct MyPropertiesView: View {
         switch tier {
         case 1: return KingdomTheme.Colors.buttonSecondary
         case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.goldWarm
-        case 4: return KingdomTheme.Colors.gold
-        case 5: return KingdomTheme.Colors.gold
+        case 3: return KingdomTheme.Colors.inkMedium
+        case 4: return KingdomTheme.Colors.inkMedium
+        case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkDark
         }
     }
@@ -323,7 +323,7 @@ struct MyPropertiesView: View {
             VStack(spacing: -5) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 25))
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Image(systemName: "building.columns.fill")
                     .font(.system(size: 45))
                     .foregroundColor(tierColor(for: tier))

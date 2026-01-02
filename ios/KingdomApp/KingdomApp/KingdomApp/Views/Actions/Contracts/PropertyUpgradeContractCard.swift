@@ -31,7 +31,7 @@ struct PropertyUpgradeContractCard: View {
         case 2: return KingdomTheme.Colors.buttonSuccess
         case 3: return ActionIconHelper.actionColor(for: "property_upgrade")
         case 4: return KingdomTheme.Colors.buttonPrimary
-        case 5: return KingdomTheme.Colors.gold
+        case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.buttonSuccess
         }
     }
@@ -45,7 +45,7 @@ struct PropertyUpgradeContractCard: View {
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isReady ? iconColor : KingdomTheme.Colors.disabled,
+                        backgroundColor: iconColor,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -67,7 +67,7 @@ struct PropertyUpgradeContractCard: View {
                         
                         Text("\(Int(contract.progress * 100))%")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -84,7 +84,7 @@ struct PropertyUpgradeContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.gold)
+                            .fill(KingdomTheme.Colors.inkMedium)
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

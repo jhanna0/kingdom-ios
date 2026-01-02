@@ -31,7 +31,7 @@ struct WorkContractCard: View {
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isReady ? ActionIconHelper.actionColor(for: "work") : KingdomTheme.Colors.disabled,
+                        backgroundColor: ActionIconHelper.actionColor(for: "work"),
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -53,7 +53,7 @@ struct WorkContractCard: View {
                         
                         Text("\(Int(contract.progress * 100))%")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         Text("•")
                             .font(FontStyles.labelMedium)
@@ -78,7 +78,7 @@ struct WorkContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.gold)
+                            .fill(KingdomTheme.Colors.inkMedium)
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

@@ -134,7 +134,7 @@ struct KingdomInfoSheetView: View {
                         .padding(KingdomTheme.Spacing.medium)
                         .foregroundColor(.white)
                     }
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                     .disabled(isClaiming)
                     .padding(.horizontal)
                     .alert("Claim Failed", isPresented: $showClaimError) {
@@ -183,7 +183,7 @@ struct KingdomInfoSheetView: View {
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                             
                             Text("\(kingdom.checkedInPlayers)")
                                 .font(FontStyles.headingLarge)
@@ -232,7 +232,7 @@ struct KingdomInfoSheetView: View {
                                 .font(FontStyles.iconLarge)
                                 .foregroundColor(.white)
                                 .frame(width: 48, height: 48)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 12)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
                             
                             Text("\(kingdom.treasuryGold)g")
                                 .font(FontStyles.headingLarge)
@@ -394,9 +394,9 @@ struct KingdomInfoSheetView: View {
                                     .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
                                 
-                                Label("\(contract.rewardPool)g pool", systemImage: "dollarsign.circle")
+                                Label("\(contract.rewardPool) pool", systemImage: "g.circle.fill")
                                     .font(FontStyles.labelTiny)
-                                    .foregroundColor(KingdomTheme.Colors.gold)
+                                    .foregroundColor(KingdomTheme.Colors.goldLight)
                             }
                             
                             // Progress bar
@@ -477,7 +477,7 @@ struct KingdomInfoSheetView: View {
                                 .padding(KingdomTheme.Spacing.medium)
                                 .foregroundColor(.white)
                             }
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                         }
                         
                         Button(action: {

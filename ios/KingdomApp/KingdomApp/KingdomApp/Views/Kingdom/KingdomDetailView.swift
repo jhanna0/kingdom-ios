@@ -33,7 +33,7 @@ struct KingdomDetailView: View {
                         .font(FontStyles.iconExtraLarge)
                         .foregroundColor(.white)
                         .frame(width: 70, height: 70)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
                     
                     Text(kingdom.name)
                         .font(FontStyles.displayMedium)
@@ -45,7 +45,7 @@ struct KingdomDetailView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8)
                     } else {
                         Text("Ruled by \(kingdom.rulerName)")
                             .font(FontStyles.bodyMedium)
@@ -63,7 +63,7 @@ struct KingdomDetailView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "building.columns.fill")
                             .font(FontStyles.iconLarge)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text("\(kingdom.treasuryGold)")
                             .font(FontStyles.displaySmall)
                             .foregroundColor(KingdomTheme.Colors.inkDark)

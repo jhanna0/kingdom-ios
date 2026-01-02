@@ -48,7 +48,7 @@ struct TrainingContractCard: View {
         switch contract.type {
         case "attack": return KingdomTheme.Colors.buttonDanger
         case "defense": return KingdomTheme.Colors.buttonPrimary
-        case "leadership": return KingdomTheme.Colors.gold
+        case "leadership": return KingdomTheme.Colors.inkMedium
         case "building": return KingdomTheme.Colors.buttonWarning
         default: return ActionIconHelper.actionColor(for: "training")
         }
@@ -63,7 +63,7 @@ struct TrainingContractCard: View {
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isReady ? iconColor : KingdomTheme.Colors.disabled,
+                        backgroundColor: iconColor,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -85,7 +85,7 @@ struct TrainingContractCard: View {
                         
                         Text("\(Int(contract.progress * 100))%")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -102,7 +102,7 @@ struct TrainingContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.gold)
+                            .fill(KingdomTheme.Colors.inkMedium)
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

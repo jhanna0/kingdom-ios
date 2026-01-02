@@ -17,13 +17,11 @@ struct CharacterSheetView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with level and XP
+                // Header with level and gold
                 ProfileHeaderCard(
                     displayName: player.name,
                     level: player.level,
-                    experience: player.experience,
-                    maxExperience: player.getXPForNextLevel(),
-                    showsXPBar: true
+                    gold: player.gold
                 )
                 
                 // Combined combat stats and training
@@ -65,23 +63,11 @@ struct CharacterSheetView: View {
             HStack {
                 Image(systemName: "figure.fencing")
                     .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("Combat & Skills")
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Text("\(player.gold)")
-                        .font(FontStyles.bodyLargeBold)
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                    
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 6))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
             }
             
             // Show active training contract if exists
@@ -240,6 +226,34 @@ struct CharacterSheetView: View {
         .buttonStyle(.plain)
     }
     
+    private func getSkillColor(skillType: String) -> Color {
+        switch skillType {
+        case "attack":
+            return KingdomTheme.Colors.buttonDanger // Red for attack
+        case "defense":
+            return KingdomTheme.Colors.royalBlue // Royal blue for defense
+        case "leadership":
+            return KingdomTheme.Colors.royalPurple // Royal purple for leadership/authority
+        case "building":
+            return KingdomTheme.Colors.imperialGold // Imperial gold for building
+        case "intelligence":
+            return KingdomTheme.Colors.royalEmerald // Royal emerald for intelligence
+        default:
+            return KingdomTheme.Colors.inkMedium
+        }
+    }
+    
+    private func getEquipmentColor(equipmentType: String, equipped: Bool) -> Color {
+        switch equipmentType {
+        case "weapon":
+            return KingdomTheme.Colors.buttonDanger // Always red
+        case "armor":
+            return KingdomTheme.Colors.royalBlue // Always royal blue
+        default:
+            return KingdomTheme.Colors.inkMedium
+        }
+    }
+    
     private func getSkillDescription(type: String, tier: Int) -> String {
         switch type {
         case "attack":
@@ -305,7 +319,7 @@ struct CharacterSheetView: View {
                         .foregroundColor(.white)
                         .frame(width: 52, height: 52)
                         .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.gold,
+                            backgroundColor: getSkillColor(skillType: skillType),
                             cornerRadius: 12,
                             shadowOffset: 3,
                             borderWidth: 2
@@ -385,7 +399,7 @@ struct CharacterSheetView: View {
             HStack {
                 Image(systemName: "hammer.fill")
                     .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("Equipment Crafting")
                     .font(FontStyles.headingMedium)
@@ -421,13 +435,13 @@ struct CharacterSheetView: View {
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                 
                 HStack(spacing: 4) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 6))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                    
                     Text("\(player.gold)")
                         .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    Image(systemName: "g.circle.fill")
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -510,7 +524,7 @@ struct CharacterSheetView: View {
                         .foregroundColor(.white)
                         .frame(width: 52, height: 52)
                         .brutalistBadge(
-                            backgroundColor: equipped != nil ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium,
+                            backgroundColor: getEquipmentColor(equipmentType: equipmentType, equipped: equipped != nil),
                             cornerRadius: 12,
                             shadowOffset: 3,
                             borderWidth: 2
@@ -540,7 +554,7 @@ struct CharacterSheetView: View {
                     if equipped != nil {
                         Text("+\(bonus)")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     } else {
                         Text("Not equipped")
                             .font(FontStyles.labelTiny)
@@ -562,7 +576,7 @@ struct CharacterSheetView: View {
             HStack {
                 Image(systemName: "list.bullet.clipboard")
                     .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text("My Activity")
                     .font(FontStyles.headingMedium)
@@ -673,7 +687,7 @@ struct MyActivityRow: View {
                 .font(FontStyles.iconSmall)
                 .foregroundColor(.white)
                 .frame(width: 34, height: 34)
-                .brutalistBadge(backgroundColor: activityColor(activity.color), cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                .brutalistBadge(backgroundColor: activity.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
             
             VStack(alignment: .leading, spacing: 3) {
                 Text(ActionIconHelper.activityDescription(for: activity.actionType))
@@ -702,26 +716,15 @@ struct MyActivityRow: View {
                 HStack(spacing: 3) {
                     Text("+\(amount)")
                         .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Image(systemName: "g.circle.fill")
                         .font(FontStyles.iconMini)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
                 }
             }
         }
         .padding(12)
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
-    }
-    
-    private func activityColor(_ colorName: String) -> Color {
-        switch colorName {
-        case "green": return KingdomTheme.Colors.buttonSuccess
-        case "blue": return KingdomTheme.Colors.buttonPrimary
-        case "orange": return KingdomTheme.Colors.buttonWarning
-        case "red": return KingdomTheme.Colors.buttonDanger
-        case "yellow": return KingdomTheme.Colors.gold
-        default: return KingdomTheme.Colors.inkMedium
-        }
     }
 }
 

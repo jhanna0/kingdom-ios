@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Activity Log Entry
 
@@ -47,14 +48,8 @@ extension ActivityLogEntry {
         return ActionIconHelper.icon(for: actionType)
     }
     
-    var color: String {
-        switch actionCategory {
-        case "kingdom": return "blue"
-        case "combat": return "red"
-        case "economy": return "yellow"
-        case "social": return "green"
-        default: return "gray"
-        }
+    var color: Color {
+        return ActionIconHelper.actionColor(for: actionType)
     }
     
     var timeAgo: String {

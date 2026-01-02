@@ -79,7 +79,7 @@ struct PlayersListView: View {
             HStack {
                 Image(systemName: "flag.fill")
                     .font(.title2)
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 Text(data.kingdom_name)
                     .font(.title2.bold())
@@ -193,12 +193,12 @@ struct PlayerRowCard: View {
             // Avatar or icon
             ZStack(alignment: .bottomTrailing) {
                 Circle()
-                    .fill(KingdomTheme.Colors.gold.opacity(0.2))
+                    .fill(KingdomTheme.Colors.inkMedium.opacity(0.2))
                     .frame(width: 50, height: 50)
                     .overlay(
                         Text(String(playerData.display_name.prefix(1)).uppercased())
                             .font(.title3.bold())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     )
                 
                 // Online indicator
@@ -221,7 +221,7 @@ struct PlayerRowCard: View {
                     if playerData.is_ruler {
                         Image(systemName: "crown.fill")
                             .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -256,7 +256,7 @@ struct PlayerRowCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bolt.fill")
                         .font(.caption2)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Text("\(playerData.attack_power)")
                         .font(.caption.monospacedDigit())
                         .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -265,7 +265,7 @@ struct PlayerRowCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "shield.fill")
                         .font(.caption2)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Text("\(playerData.defense_power)")
                         .font(.caption.monospacedDigit())
                         .foregroundColor(KingdomTheme.Colors.inkDark)

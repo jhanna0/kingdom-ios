@@ -19,7 +19,7 @@ struct TaxRateManagementView: View {
                         .font(FontStyles.iconExtraLarge)
                         .foregroundColor(.white)
                         .frame(width: 70, height: 70)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
                     
                     Text("Tax Rate")
                         .font(FontStyles.displayMedium)
@@ -41,7 +41,7 @@ struct TaxRateManagementView: View {
                     
                     Text("\(currentTaxRate)%")
                         .font(FontStyles.displaySmall)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -64,7 +64,7 @@ struct TaxRateManagementView: View {
                         in: 0...100,
                         step: 5
                     )
-                    .accentColor(KingdomTheme.Colors.gold)
+                    .accentColor(KingdomTheme.Colors.inkMedium)
                     
                     HStack {
                         Text("Low (0%)")
@@ -191,7 +191,7 @@ struct TaxRateManagementView: View {
                 .font(FontStyles.iconMedium)
                 .foregroundColor(.white)
                 .frame(width: 32, height: 32)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8)
             
             Text(text)
                 .font(FontStyles.bodyMedium)

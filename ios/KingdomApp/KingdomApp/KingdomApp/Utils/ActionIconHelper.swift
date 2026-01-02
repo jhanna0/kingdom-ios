@@ -113,7 +113,7 @@ struct ActionIconHelper {
         case "combat":
             return KingdomTheme.Colors.buttonDanger
         case "economy":
-            return KingdomTheme.Colors.gold
+            return KingdomTheme.Colors.inkMedium
         case "social":
             return KingdomTheme.Colors.buttonSuccess
         default:
@@ -127,7 +127,7 @@ struct ActionIconHelper {
         case "farm", "farming":
             return KingdomTheme.Colors.buttonSuccess // Green
         case "work", "build":
-            return KingdomTheme.Colors.gold // Gold
+            return KingdomTheme.Colors.inkMedium // Gold
         case "patrol":
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "scout", "scouting":
@@ -136,10 +136,22 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.buttonDanger // Red
         case "training", "train":
             return KingdomTheme.Colors.buttonPrimary // Blue
+        case "craft", "crafting":
+            return KingdomTheme.Colors.buttonWarning // Orange
+        case "vote":
+            return KingdomTheme.Colors.buttonPrimary // Blue
+        case "invasion":
+            return KingdomTheme.Colors.buttonDanger // Red
+        case "property_purchase":
+            return KingdomTheme.Colors.buttonSuccess // Green
         case "property_upgrade":
             return KingdomTheme.Colors.buttonWarning // Orange
+        case "travel":
+            return KingdomTheme.Colors.buttonPrimary // Blue
+        case "checkin":
+            return KingdomTheme.Colors.buttonSuccess // Green
         default:
-            return KingdomTheme.Colors.gold
+            return KingdomTheme.Colors.inkMedium
         }
     }
 }

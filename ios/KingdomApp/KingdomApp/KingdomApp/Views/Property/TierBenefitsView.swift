@@ -30,7 +30,7 @@ struct TierBenefitsView: View {
         VStack(spacing: 12) {
             Image(systemName: "building.2")
                 .font(.system(size: 50))
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             Text("Property Progression")
                 .font(.title2.bold())
@@ -117,7 +117,7 @@ struct TierBenefitsView: View {
                         
                         Text("\(upgradeCost(from: tier - 1)) gold")
                             .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
                     Spacer()
@@ -139,7 +139,7 @@ struct TierBenefitsView: View {
                         
                         Text("500+ gold (varies)")
                             .font(.subheadline.bold())
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
             }
@@ -206,9 +206,9 @@ struct TierBenefitsView: View {
         switch tier {
         case 1: return KingdomTheme.Colors.buttonSecondary
         case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.goldWarm
-        case 4: return KingdomTheme.Colors.gold
-        case 5: return KingdomTheme.Colors.gold
+        case 3: return KingdomTheme.Colors.inkMedium
+        case 4: return KingdomTheme.Colors.inkMedium
+        case 5: return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkDark
         }
     }
@@ -236,7 +236,7 @@ struct TierBenefitsView: View {
             VStack(spacing: -5) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                 Image(systemName: "building.columns.fill")
                     .font(.system(size: 30))
                     .foregroundColor(tierColor(for: tier))

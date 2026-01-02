@@ -84,7 +84,7 @@ struct MapHUD: View {
                                     .frame(width: 26, height: 26)
                                     .offset(x: 1, y: 1)
                                 Circle()
-                                    .fill(KingdomTheme.Colors.gold)
+                                    .fill(KingdomTheme.Colors.inkMedium)
                                     .frame(width: 26, height: 26)
                                     .overlay(
                                         Circle()
@@ -96,9 +96,15 @@ struct MapHUD: View {
                             }
                             
                             // Gold
-                            Text("\(viewModel.player.gold)g")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.black)
+                            HStack(spacing: 3) {
+                                Text("\(viewModel.player.gold)")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.black)
+                                
+                                Image(systemName: "g.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(KingdomTheme.Colors.goldLight)
+                            }
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -148,7 +154,7 @@ struct MapHUD: View {
                     // Friends (icon only)
                     BrutalistIconButton(
                         icon: "person.2.fill",
-                        backgroundColor: KingdomTheme.Colors.gold
+                        backgroundColor: KingdomTheme.Colors.inkMedium
                     ) {
                         showActivity = true
                     }
@@ -221,11 +227,11 @@ struct MapHUD: View {
             } else if let action = cooldown.blockingAction {
                 Image(systemName: actionIcon(for: action))
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.black)
+                    .foregroundColor(.white)
                 let minutes = Int(calculatedRemaining) / 60
                 Text("\(minutes)m")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.black.opacity(0.7))
+                    .foregroundColor(.white)
             }
         }
         .frame(height: 32)
@@ -236,7 +242,7 @@ struct MapHUD: View {
                     .fill(Color.black)
                     .offset(x: 2, y: 2)
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .fill(isIdle ? KingdomTheme.Colors.parchmentLight : actionBackgroundColor(for: cooldown.blockingAction))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.black, lineWidth: 2)
@@ -247,6 +253,13 @@ struct MapHUD: View {
     
     private func actionIcon(for action: String) -> String {
         return ActionIconHelper.icon(for: action)
+    }
+    
+    private func actionBackgroundColor(for action: String?) -> Color {
+        guard let action = action else {
+            return KingdomTheme.Colors.parchmentLight
+        }
+        return ActionIconHelper.actionColor(for: action)
     }
 }
 

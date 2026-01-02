@@ -8,7 +8,7 @@ struct BenefitRow: View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(KingdomTheme.Colors.goldWarm)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(width: 20)
             
             Text(text)

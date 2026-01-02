@@ -27,7 +27,7 @@ struct PlayerActivityFeedCard: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 42, height: 42)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
                 
                 Text("Player Activity")
                     .font(FontStyles.headingMedium)
@@ -305,7 +305,7 @@ struct PlayerActivityRow: View {
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
                     .brutalistBadge(
-                        backgroundColor: playerData.is_ruler ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonPrimary,
+                        backgroundColor: playerData.is_ruler ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonPrimary,
                         cornerRadius: 10,
                         shadowOffset: 2,
                         borderWidth: 2
@@ -335,7 +335,7 @@ struct PlayerActivityRow: View {
                     if playerData.is_ruler {
                         Image(systemName: "crown.fill")
                             .font(FontStyles.iconSmall)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -385,7 +385,7 @@ struct PlayerActivityRow: View {
         case "green": return KingdomTheme.Colors.buttonSuccess
         case "purple": return KingdomTheme.Colors.buttonSpecial
         case "orange": return .orange
-        case "yellow": return KingdomTheme.Colors.gold
+        case "yellow": return KingdomTheme.Colors.inkMedium
         case "red": return KingdomTheme.Colors.buttonDanger
         default: return KingdomTheme.Colors.inkMedium
         }

@@ -131,11 +131,7 @@ struct ActionCard: View {
     }
     
     private var iconColor: Color {
-        if !isReady || !isEnabled {
-            return KingdomTheme.Colors.disabled
-        }
-        
-        // Use ActionIconHelper for consistent colors
+        // Always show the vibrant color - don't gray out!
         switch actionType {
         case .farm:
             return ActionIconHelper.actionColor(for: "farm")
@@ -155,21 +151,21 @@ struct ActionCard: View {
         HStack(spacing: 8) {
             if let gold = reward.gold {
                     HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("\(gold)g")
+                        Text("\(gold)")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                     }
             } else if let goldGross = reward.goldGross {
                     HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("\(goldGross)g")
+                        Text("\(goldGross)")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                     }
             }
             

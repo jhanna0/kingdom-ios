@@ -118,14 +118,14 @@ struct SabotageTargetSelectionView: View {
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        
-                        Text("\(targets.sabotageCost)g")
+                        Text("\(targets.sabotageCost)")
                             .font(KingdomTheme.Typography.body())
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                             .fontWeight(.semibold)
+                        
+                        Image(systemName: "g.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
                     }
                 }
                 

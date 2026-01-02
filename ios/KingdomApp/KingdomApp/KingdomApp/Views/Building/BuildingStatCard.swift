@@ -24,7 +24,7 @@ struct BuildingStatCard: View {
                     .foregroundColor(.white)
                     .frame(width: 50, height: 50)
                     .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.gold,
+                        backgroundColor: KingdomTheme.Colors.inkMedium,
                         cornerRadius: 12,
                         shadowOffset: 2,
                         borderWidth: 2
@@ -39,7 +39,7 @@ struct BuildingStatCard: View {
                     HStack(spacing: 4) {
                         ForEach(1...maxLevel, id: \.self) { lvl in
                             Circle()
-                                .fill(lvl <= level ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark.opacity(0.2))
+                                .fill(lvl <= level ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.2))
                                 .frame(width: 7, height: 7)
                                 .overlay(
                                     Circle()
@@ -50,7 +50,7 @@ struct BuildingStatCard: View {
                     
                     Text("Lv \(level)")
                         .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
                 Text(benefit)

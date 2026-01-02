@@ -62,11 +62,11 @@ struct PlayerProfileView: View {
     private func profileContent(_ profile: PlayerPublicProfile) -> some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with name and level
+                // Header with name and level (no gold shown for other players)
                 ProfileHeaderCard(
                     displayName: profile.display_name,
                     level: profile.level,
-                    showsXPBar: false  // Don't show XP for other players
+                    gold: nil  // Don't show other players' gold
                 )
                 
                 // Location & Activity
@@ -119,7 +119,7 @@ struct PlayerProfileView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 36, height: 36)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 8)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Current Location")
@@ -217,7 +217,7 @@ struct PlayerProfileView: View {
                 .font(FontStyles.iconSmall)
                 .foregroundColor(.white)
                 .frame(width: 30, height: 30)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.gold, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
             
             Text(title)
                 .font(FontStyles.bodySmall)
@@ -227,7 +227,7 @@ struct PlayerProfileView: View {
             
             Text(value)
                 .font(FontStyles.bodyMediumBold)
-                .foregroundColor(KingdomTheme.Colors.gold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
         .padding()
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
