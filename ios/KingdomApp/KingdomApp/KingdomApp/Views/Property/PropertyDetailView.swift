@@ -268,7 +268,7 @@ struct PropertyDetailView: View {
                 if let status = upgradeStatus {
                     Text("\(status.upgrade_cost) gold")
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(player.gold >= status.upgrade_cost ? KingdomTheme.Colors.gold : .red)
+                        .foregroundColor(status.player_gold >= status.upgrade_cost ? KingdomTheme.Colors.gold : .red)
                 }
             }
             
@@ -364,21 +364,21 @@ struct PropertyDetailView: View {
                         }
                     }
                     .buttonStyle(.medieval(
-                        color: (player.gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
+                        color: (status.player_gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
                         fullWidth: true
                     ))
-                    .disabled(player.gold < status.upgrade_cost || hasAnyPropertyUpgradeInProgress)
+                    .disabled(status.player_gold < status.upgrade_cost || hasAnyPropertyUpgradeInProgress)
                     .transition(.opacity)
                     
                     Text("Like training, upgrades require work actions to complete")
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
-                    if player.gold < status.upgrade_cost {
+                    if status.player_gold < status.upgrade_cost {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .font(FontStyles.iconMini)
-                            Text("Need \(status.upgrade_cost - player.gold) more gold")
+                            Text("Need \(status.upgrade_cost - status.player_gold) more gold")
                                 .font(FontStyles.labelSmall)
                         }
                         .foregroundColor(.red)

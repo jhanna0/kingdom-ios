@@ -9,23 +9,37 @@ struct PropertyMarketView: View {
     @State private var showingPurchaseConfirmation = false
     @State private var isPurchasing = false
     @State private var purchaseError: String?
+    @State private var propertyStatus: PropertyAPI.PropertyStatus?
+    @State private var isLoadingInfo = true
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
     
     var body: some View {
         ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                // Player resources
-                resourcesCard
-                
-                // Location selection
-                locationSelectionCard
-                
-                // Purchase card
-                purchaseCard
+            if isLoadingInfo {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading market info...")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 100)
+            } else {
+                VStack(spacing: KingdomTheme.Spacing.xLarge) {
+                    // Player resources
+                    resourcesCard
+                    
+                    // Location selection
+                    locationSelectionCard
+                    
+                    // Purchase card
+                    purchaseCard
+                }
+                .padding(.vertical)
             }
-            .padding(.vertical)
         }
         .parchmentBackground()
         .navigationTitle("Buy Land")
@@ -39,6 +53,9 @@ struct PropertyMarketView: View {
                 .buttonStyle(.toolbar)
             }
         }
+        .task {
+            await loadPurchaseInfo()
+        }
         .alert("Purchase Land", isPresented: $showingPurchaseConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Purchase") {
@@ -47,7 +64,11 @@ struct PropertyMarketView: View {
                 }
             }
         } message: {
-            Text("Clear the forest on the \(selectedLocation) side and claim this land? (Price determined by kingdom population)")
+            if let price = propertyStatus?.land_price, let kingdom = propertyStatus?.current_kingdom {
+                Text("Clear the forest on the \(selectedLocation) side and claim this land in \(kingdom.name) for \(price)g?")
+            } else {
+                Text("Clear the forest on the \(selectedLocation) side and claim this land?")
+            }
         }
         .alert("Error", isPresented: .constant(purchaseError != nil)) {
             Button("OK") {
@@ -90,7 +111,7 @@ struct PropertyMarketView: View {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 8))
                         .foregroundColor(KingdomTheme.Colors.gold)
-                    Text("\(player.gold)")
+                    Text("\(propertyStatus?.player_gold ?? 0)")
                         .font(FontStyles.headingLarge)
                         .foregroundColor(KingdomTheme.Colors.gold)
                 }
@@ -104,9 +125,9 @@ struct PropertyMarketView: View {
             
             // Reputation
             VStack(spacing: 6) {
-                Text("\(player.reputation)")
+                Text("\(propertyStatus?.player_reputation ?? 0)")
                     .font(FontStyles.headingLarge)
-                    .foregroundColor(player.reputation >= 50 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                    .foregroundColor((propertyStatus?.player_reputation ?? 0) >= 50 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
                 Text("REPUTATION")
                     .font(FontStyles.labelTiny)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
@@ -179,10 +200,12 @@ struct PropertyMarketView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(selectedLocation == location ? .white : KingdomTheme.Colors.inkDark)
                     .frame(width: 28)
+                    .fixedSize()
                 
                 Text(label)
                     .font(FontStyles.bodyMediumBold)
                     .foregroundColor(selectedLocation == location ? .white : KingdomTheme.Colors.inkDark)
+                    .fixedSize()
                 
                 Spacer()
                 
@@ -190,6 +213,7 @@ struct PropertyMarketView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(FontStyles.iconSmall)
                         .foregroundColor(.white)
+                        .fixedSize()
                 }
             }
             .frame(maxWidth: .infinity)
@@ -237,32 +261,45 @@ struct PropertyMarketView: View {
             // Price info
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Price")
+                    Text(propertyStatus?.land_price != nil ? "Land Price" : "No Kingdom")
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                        Text("~500g")
+                    if let price = propertyStatus?.land_price {
+                        HStack(spacing: 4) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 8))
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                            Text("\(price)g")
+                                .font(FontStyles.headingMedium)
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                        }
+                    } else {
+                        Text("Check in first")
                             .font(FontStyles.headingMedium)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
                 Spacer()
                 
-                Text("Varies by population")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                if propertyStatus?.current_kingdom != nil {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Population")
+                            .font(FontStyles.labelTiny)
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                        Text("\(propertyStatus?.current_kingdom?.population ?? 0)")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
             }
             .padding()
             .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
             
             // Requirements warnings
             VStack(alignment: .leading, spacing: 8) {
-                if kingdom == nil {
+                if propertyStatus?.current_kingdom == nil {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.circle.fill")
                             .font(FontStyles.iconSmall)
@@ -276,7 +313,7 @@ struct PropertyMarketView: View {
                     }
                 }
                 
-                if !hasReputation {
+                if let status = propertyStatus, !status.meets_reputation_requirement {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.circle.fill")
                             .font(FontStyles.iconSmall)
@@ -284,7 +321,35 @@ struct PropertyMarketView: View {
                             .frame(width: 24, height: 24)
                             .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                         
-                        Text("Need 50+ reputation (you have \(player.reputation))")
+                        Text("Need 50+ reputation (you have \(status.player_reputation))")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                    }
+                }
+                
+                if let status = propertyStatus, !status.can_afford, status.land_price != nil {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                        
+                        Text("Not enough gold (need \(status.land_price!)g, have \(status.player_gold)g)")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                    }
+                }
+                
+                if let status = propertyStatus, status.already_owns_property_in_current_kingdom {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                        
+                        Text("You already own property in \(status.current_kingdom?.name ?? "this kingdom")")
                             .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.buttonDanger)
                     }
@@ -321,26 +386,43 @@ struct PropertyMarketView: View {
                 .padding(.vertical, 16)
             }
             .brutalistBadge(
-                backgroundColor: (kingdom != nil && hasReputation) ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                backgroundColor: (propertyStatus?.can_purchase == true) ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
                 cornerRadius: 12,
-                shadowOffset: (kingdom != nil && hasReputation) ? 3 : 0,
+                shadowOffset: (propertyStatus?.can_purchase == true) ? 3 : 0,
                 borderWidth: 2
             )
-            .disabled(kingdom == nil || !hasReputation || isPurchasing)
+            .disabled(propertyStatus?.can_purchase != true || isPurchasing)
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
-    private var hasReputation: Bool {
-        player.reputation >= 50
-    }
-    
     // MARK: - Helper Functions
     
+    private func loadPurchaseInfo() async {
+        await MainActor.run {
+            isLoadingInfo = true
+            purchaseError = nil
+        }
+        
+        do {
+            let status = try await propertyAPI.getPropertyStatus()
+            await MainActor.run {
+                propertyStatus = status
+                isLoadingInfo = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingInfo = false
+                purchaseError = "Failed to load property info: \(error.localizedDescription)"
+            }
+            print("❌ Failed to load property status: \(error)")
+        }
+    }
+    
     private func purchaseProperty() async {
-        guard let kingdom = kingdom else {
+        guard let kingdomInfo = propertyStatus?.current_kingdom else {
             await MainActor.run {
                 purchaseError = "No kingdom selected"
             }
@@ -354,12 +436,12 @@ struct PropertyMarketView: View {
         
         do {
             let property = try await propertyAPI.purchaseLand(
-                kingdomId: kingdom.id,
-                kingdomName: kingdom.name,
+                kingdomId: kingdomInfo.id,
+                kingdomName: kingdomInfo.name,
                 location: selectedLocation
             )
             
-            print("✅ Successfully purchased property: \(property.tierName) in \(kingdom.name)")
+            print("✅ Successfully purchased property: \(property.tierName) in \(kingdomInfo.name)")
             
             await MainActor.run {
                 Task {

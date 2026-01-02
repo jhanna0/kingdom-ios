@@ -114,17 +114,119 @@ def property_to_response(prop: Property) -> PropertyResponse:
 
 # ===== Endpoints =====
 
-@router.get("", response_model=List[PropertyResponse])
-def get_player_properties(
+@router.get("/status")
+def get_property_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all properties owned by current player"""
+    """
+    Get ALL property-related data in one call (like /actions/status)
+    
+    Returns:
+    - Player's properties list
+    - Player resources (gold, reputation, level)
+    - Current kingdom context
+    - Land price for current kingdom
+    - Purchase validation flags
+    - Upgrade status for all properties
+    - Property upgrade contracts
+    """
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    
+    # Get player's properties
     properties = db.query(Property).filter(
         Property.owner_id == current_user.id
     ).all()
+    properties_list = [property_to_response(p) for p in properties]
     
-    return [property_to_response(p) for p in properties]
+    # Get current kingdom info (if checked in)
+    current_kingdom = None
+    land_price = None
+    already_owns_property_in_current_kingdom = False
+    
+    if state.current_kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if kingdom:
+            current_kingdom = {
+                "id": kingdom.id,
+                "name": kingdom.name,
+                "population": kingdom.population
+            }
+            
+            # Calculate land price for current kingdom
+            land_price = calculate_land_price(kingdom.population)
+            
+            # Check if player already owns property in THIS kingdom
+            already_owns_property_in_current_kingdom = any(
+                p.kingdom_id == kingdom.id for p in properties
+            )
+    
+    # Purchase validation flags
+    meets_reputation_requirement = state.reputation >= 50
+    can_afford = land_price is not None and state.gold >= land_price
+    can_purchase = (
+        current_kingdom is not None 
+        and not already_owns_property_in_current_kingdom
+        and meets_reputation_requirement 
+        and can_afford
+    )
+    
+    # Load property upgrade contracts
+    import json
+    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    for contract in property_contracts:
+        # Compute target_tier_name from to_tier (not stored in DB)
+        contract["target_tier_name"] = get_tier_name(contract["to_tier"])
+    
+    # Get upgrade status for each property
+    properties_upgrade_status = []
+    for prop in properties:
+        if prop.tier < 5:
+            upgrade_cost = calculate_upgrade_cost(prop.tier)
+            actions_required = calculate_upgrade_actions_required(prop.tier, state.building_skill)
+            
+            # Find active contract for this property
+            active_contract = None
+            for contract in property_contracts:
+                if contract["property_id"] == prop.id and contract["status"] == "in_progress":
+                    active_contract = contract
+                    break
+            
+            properties_upgrade_status.append({
+                "property_id": prop.id,
+                "current_tier": prop.tier,
+                "can_upgrade": prop.tier < 5,
+                "upgrade_cost": upgrade_cost,
+                "actions_required": actions_required,
+                "can_afford": state.gold >= upgrade_cost,
+                "active_contract": active_contract
+            })
+    
+    return {
+        # Player resources
+        "player_gold": state.gold,
+        "player_reputation": state.reputation,
+        "player_level": state.level,
+        "player_building_skill": state.building_skill,
+        
+        # Properties
+        "properties": properties_list,
+        "property_upgrade_contracts": property_contracts,
+        "properties_upgrade_status": properties_upgrade_status,
+        
+        # Current kingdom purchase context
+        "current_kingdom": current_kingdom,
+        "land_price": land_price,
+        "can_afford": can_afford,
+        "already_owns_property_in_current_kingdom": already_owns_property_in_current_kingdom,
+        "meets_reputation_requirement": meets_reputation_requirement,
+        "can_purchase": can_purchase
+    }
 
 
 @router.post("/purchase", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)

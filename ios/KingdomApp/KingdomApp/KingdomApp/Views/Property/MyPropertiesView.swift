@@ -457,9 +457,9 @@ struct MyPropertiesView: View {
             errorMessage = nil
             
             do {
-                let fetchedProperties = try await propertyAPI.getPlayerProperties()
+                let status = try await propertyAPI.getPropertyStatus()
                 await MainActor.run {
-                    properties = fetchedProperties
+                    properties = status.properties.map { $0.toProperty() }
                     isLoading = false
                 }
             } catch {
@@ -468,7 +468,7 @@ struct MyPropertiesView: View {
                     isLoading = false
                     properties = []
                 }
-                print("❌ Failed to load properties: \(error)")
+                print("❌ Failed to load property status: \(error)")
             }
         }
     }

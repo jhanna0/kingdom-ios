@@ -61,12 +61,57 @@ class PropertyAPI {
         }
     }
     
-    // MARK: - Get Player Properties
+    // MARK: - Get Property Status (ALL data in one call)
     
-    func getPlayerProperties() async throws -> [Property] {
-        let request = client.request(endpoint: "/properties", method: "GET")
-        let response: [PropertyResponse] = try await client.execute(request)
-        return response.map { $0.toProperty() }
+    struct PropertyStatus: Codable {
+        let player_gold: Int
+        let player_reputation: Int
+        let player_level: Int
+        let player_building_skill: Int
+        let properties: [PropertyResponse]
+        let property_upgrade_contracts: [PropertyUpgradeContract]?
+        let properties_upgrade_status: [PropertyUpgradeStatusItem]
+        let current_kingdom: CurrentKingdomInfo?
+        let land_price: Int?
+        let can_afford: Bool
+        let already_owns_property_in_current_kingdom: Bool
+        let meets_reputation_requirement: Bool
+        let can_purchase: Bool
+    }
+    
+    struct PropertyUpgradeStatusItem: Codable {
+        let property_id: String
+        let current_tier: Int
+        let can_upgrade: Bool
+        let upgrade_cost: Int
+        let actions_required: Int
+        let can_afford: Bool
+        let active_contract: ActiveUpgradeContract?
+    }
+    
+    struct PropertyUpgradeContract: Codable {
+        let contract_id: String
+        let property_id: String
+        let from_tier: Int
+        let to_tier: Int
+        let target_tier_name: String
+        let actions_required: Int
+        let actions_completed: Int
+        let cost: Int
+        let status: String
+        let started_at: String
+    }
+    
+    struct CurrentKingdomInfo: Codable {
+        let id: String
+        let name: String
+        let population: Int
+    }
+    
+    func getPropertyStatus() async throws -> PropertyStatus {
+        let request = client.request(endpoint: "/properties/status", method: "GET")
+        let response: PropertyStatus = try await client.execute(request)
+        return response
     }
     
     // MARK: - Purchase Land
