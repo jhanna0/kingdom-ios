@@ -1,6 +1,6 @@
 """
 Intelligence & Military Strength System
-- View your own kingdom's military strength
+- Rulers can view their kingdom's military strength
 - Gather intelligence on enemy kingdoms
 - Share intel with your kingdom
 """
@@ -143,8 +143,9 @@ def get_military_strength(
     """
     Get military strength of a kingdom
     
-    If it's your home kingdom: full real-time details
-    If it's enemy kingdom: only intel you've gathered (or just walls)
+    If you're the ruler: full real-time details
+    If you have intel: gathered intelligence data
+    Otherwise: only walls visible
     """
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -161,11 +162,11 @@ def get_military_strength(
             detail="Player state not found"
         )
     
-    # Check if this is user's home kingdom
-    is_home_kingdom = state.hometown_kingdom_id == kingdom_id
+    # Only rulers can view full military intelligence for a kingdom
+    is_ruler = kingdom.ruler_id == current_user.id
     
-    if is_home_kingdom:
-        # Full real-time details for own kingdom
+    if is_ruler:
+        # Full real-time details for kingdoms you rule
         total_attack = _calculate_total_attack(db, kingdom_id)
         total_defense = _calculate_total_defense(db, kingdom_id)
         active_citizens = _count_active_citizens(db, kingdom_id)
@@ -180,7 +181,8 @@ def get_military_strength(
             "total_defense_with_walls": total_defense + (kingdom.wall_level * 5),
             "active_citizens": active_citizens,
             "population": population,
-            "is_own_kingdom": True,
+            "is_own_kingdom": False,  # Not used when viewing as ruler
+            "is_ruler": True,
             "has_intel": False,
             "intel_level": None
         }

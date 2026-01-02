@@ -12,17 +12,17 @@ struct MilitaryStrengthCard: View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Header
             HStack {
-                Image(systemName: strength?.isOwnKingdom == true ? "shield.fill" : "eye.fill")
+                Image(systemName: strength?.isRuler == true ? "shield.fill" : "eye.fill")
                     .font(FontStyles.iconSmall)
                     .foregroundColor(.white)
                     .frame(width: 32, height: 32)
                     .brutalistBadge(
-                        backgroundColor: strength?.isOwnKingdom == true ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonWarning,
+                        backgroundColor: strength?.isRuler == true ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonWarning,
                         cornerRadius: 8,
                         shadowOffset: 2,
                         borderWidth: 1.5
                     )
-                Text(strength?.isOwnKingdom == true ? "Military Strength" : "Intelligence Report")
+                Text(strength?.isRuler == true ? "Military Strength" : "Intelligence Report")
                     .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 Spacer()
@@ -41,8 +41,8 @@ struct MilitaryStrengthCard: View {
             
             // Show data based on what we know
             if let strength = strength {
-                if strength.isOwnKingdom {
-                    // Full details for own kingdom
+                if strength.isRuler {
+                    // Full details for kingdoms you rule
                     ownKingdomView(strength)
                 } else if strength.hasIntel {
                     // Intel we've gathered

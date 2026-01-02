@@ -12,6 +12,7 @@ struct MilitaryStrengthResponse: Codable {
     let activeCitizens: Int?
     let population: Int?
     let isOwnKingdom: Bool
+    let isRuler: Bool?
     let hasIntel: Bool
     let intelLevel: Int?
     let intelAgeDays: Int?
@@ -31,6 +32,7 @@ struct MilitaryStrengthResponse: Codable {
         case activeCitizens = "active_citizens"
         case population
         case isOwnKingdom = "is_own_kingdom"
+        case isRuler = "is_ruler"
         case hasIntel = "has_intel"
         case intelLevel = "intel_level"
         case intelAgeDays = "intel_age_days"
@@ -121,6 +123,7 @@ struct MilitaryStrength: Identifiable {
     var population: Int?
     
     let isOwnKingdom: Bool
+    let isRuler: Bool
     let hasIntel: Bool
     let intelLevel: Int?
     let intelAgeDays: Int?
@@ -137,6 +140,7 @@ struct MilitaryStrength: Identifiable {
         self.activeCitizens = response.activeCitizens
         self.population = response.population
         self.isOwnKingdom = response.isOwnKingdom
+        self.isRuler = response.isRuler ?? false
         self.hasIntel = response.hasIntel
         self.intelLevel = response.intelLevel
         self.intelAgeDays = response.intelAgeDays

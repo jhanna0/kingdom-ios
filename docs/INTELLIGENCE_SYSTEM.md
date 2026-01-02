@@ -4,7 +4,7 @@
 
 The intelligence system transforms the map view from a static display into a strategic information warfare layer. Players can now:
 
-1. **See their own kingdom's military strength** (always visible)
+1. **View military strength as rulers** (rulers see their kingdom's full strength)
 2. **Scout enemy kingdoms** to gather intelligence
 3. **Make informed decisions** about attacks and defenses
 
@@ -16,10 +16,10 @@ The intelligence system transforms the map view from a static display into a str
 
 Every kingdom shows:
 - **Walls** - Always visible (can be seen from outside)
-- **Attack Power** - Total combat strength (if own kingdom or scouted)
-- **Defense Power** - Total defensive strength (if own kingdom or scouted)
-- **Active Citizens** - Players checked in within 24h
-- **Population** - Total citizens
+- **Attack Power** - Total combat strength (if ruler or scouted)
+- **Defense Power** - Total defensive strength (if ruler or scouted)
+- **Active Citizens** - Players checked in within 24h (if ruler or scouted)
+- **Population** - Total citizens (if ruler or scouted)
 
 ### 2. Intelligence Levels
 
@@ -77,9 +77,9 @@ Range: 10% - 90%
 5. **Recruit allies** - Share intel with your kingdom
 6. **Launch assault** - Once you have enough power
 
-### As a Defender
+### As a Defender (Ruler)
 
-1. **Monitor your strength** - Check your military stats regularly
+1. **Monitor your strength** - Check your military stats regularly (ruler privilege)
 2. **Run patrols** - Increase detection chance for enemy scouts
 3. **Build walls** - Visible deterrent + actual defense
 4. **Upgrade vault** - Makes it harder for spies to succeed
@@ -133,7 +133,7 @@ ADD COLUMN last_intelligence_action TIMESTAMP;
 
 Get military strength information for a kingdom.
 
-**Response (Own Kingdom):**
+**Response (As Ruler):**
 ```json
 {
   "kingdom_id": "ashford",
@@ -144,7 +144,8 @@ Get military strength information for a kingdom.
   "total_defense_with_walls": 135,
   "active_citizens": 25,
   "population": 30,
-  "is_own_kingdom": true,
+  "is_own_kingdom": false,
+  "is_ruler": true,
   "has_intel": false
 }
 ```
@@ -236,7 +237,7 @@ Gather intelligence on an enemy kingdom.
 ### New UI Components
 
 **`MilitaryStrengthCard.swift`:**
-- Shows military strength for own kingdoms
+- Shows military strength for kingdoms you rule
 - Shows scouted intelligence for enemy kingdoms
 - Shows "gather intelligence" button for unscouted enemies
 - Displays intel age and warning when expiring
@@ -258,11 +259,11 @@ Gather intelligence on an enemy kingdom.
 
 ## 🎨 UI/UX Features
 
-### Own Kingdom Display
+### Ruler View (Your Kingdom)
 
 ```
 ┌─────────────────────────────────────┐
-│ 🛡️ Military Strength               │
+│ 🛡️ Military Strength (Ruler View)  │
 ├─────────────────────────────────────┤
 │ 🏛️ Walls       Level 3 (+15 defense)│
 │ ⚡ Total Attack           150       │
@@ -435,13 +436,13 @@ Current formula provides:
 
 The map view is now **strategically useful**! Players can:
 
-1. **Know their strength** - See own kingdom's military power
+1. **Know their strength** - Rulers see their kingdom's military power (privileged information)
 2. **Scout enemies** - Gather intel on potential targets
 3. **Make decisions** - "Can we win this fight?"
 4. **Coordinate attacks** - Share intel with kingdom
 5. **Defend intelligently** - Run patrols to catch scouts
 
-This creates the **information warfare layer** needed before implementing coups and invasions!
+This creates the **information warfare layer** needed before implementing coups and invasions, while adding strategic importance to the ruler role!
 
 
 
