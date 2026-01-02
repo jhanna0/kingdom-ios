@@ -9,7 +9,8 @@ class AuthManager: ObservableObject {
     @Published var isCheckingAuth = true  // NEW: prevents flash
     @Published var authToken: String?
     @Published var currentUser: UserData?
-    @Published var errorMessage: String?
+    @Published var hasCriticalError = false  // Blocks UI until resolved
+    @Published var criticalErrorMessage: String?
     
     private let apiClient = APIClient.shared
     
@@ -50,7 +51,9 @@ class AuthManager: ObservableObject {
                 isAuthenticated = true
             }
         } catch {
-            errorMessage = "Sign in failed: \(error.localizedDescription)"
+            // CRITICAL ERROR - sign in failed, block everything
+            hasCriticalError = true
+            criticalErrorMessage = "Sign in failed: \(error.localizedDescription)"
         }
     }
     
@@ -81,7 +84,9 @@ class AuthManager: ObservableObject {
             await fetchUserProfile()
             isAuthenticated = true
         } catch {
-            errorMessage = "Registration failed: \(error.localizedDescription)"
+            // CRITICAL ERROR - registration failed, block everything
+            hasCriticalError = true
+            criticalErrorMessage = "Registration failed: \(error.localizedDescription)"
         }
     }
     
@@ -106,7 +111,9 @@ class AuthManager: ObservableObject {
             await fetchUserProfile()
             isAuthenticated = true
         } catch {
-            errorMessage = "Login failed: \(error.localizedDescription)"
+            // CRITICAL ERROR - login failed, block everything
+            hasCriticalError = true
+            criticalErrorMessage = "Login failed: \(error.localizedDescription)"
         }
     }
     
@@ -116,7 +123,25 @@ class AuthManager: ObservableObject {
         currentUser = nil
         isAuthenticated = false
         needsOnboarding = false
+        hasCriticalError = false
+        criticalErrorMessage = nil
         deleteToken()
+    }
+    
+    @MainActor
+    func retryAuth() async {
+        hasCriticalError = false
+        criticalErrorMessage = nil
+        await fetchUserProfile()
+        
+        if currentUser != nil && !hasCriticalError {
+            // Success - check onboarding status
+            if currentUser!.hometown_kingdom_id == nil {
+                needsOnboarding = true
+            } else {
+                isAuthenticated = true
+            }
+        }
     }
     
     // MARK: - Onboarding
@@ -142,7 +167,9 @@ class AuthManager: ObservableObject {
             needsOnboarding = false
             isAuthenticated = true
         } catch {
-            errorMessage = "Failed to complete onboarding: \(error.localizedDescription)"
+            // CRITICAL ERROR - onboarding failed, block everything
+            hasCriticalError = true
+            criticalErrorMessage = "Failed to complete onboarding: \(error.localizedDescription)"
         }
     }
     
@@ -155,9 +182,38 @@ class AuthManager: ObservableObject {
         do {
             let request = apiClient.request(endpoint: "/auth/me")
             currentUser = try await apiClient.execute(request)
+            hasCriticalError = false
+            criticalErrorMessage = nil
         } catch {
             print("Failed to fetch user: \(error)")
-            logout()
+            
+            // This is CRITICAL - user cannot proceed without profile
+            hasCriticalError = true
+            
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .serverError(let message):
+                    if message.contains("500") {
+                        criticalErrorMessage = "Server error while loading your profile. The kingdom servers may be down. Please try again."
+                    } else {
+                        criticalErrorMessage = "Failed to load profile: \(message)"
+                    }
+                case .networkError:
+                    criticalErrorMessage = "No internet connection. Please check your network and try again."
+                case .unauthorized:
+                    criticalErrorMessage = "Your session has expired. Please sign in again."
+                    logout()
+                default:
+                    criticalErrorMessage = "Failed to load your profile: \(error.localizedDescription)"
+                }
+            } else {
+                criticalErrorMessage = "Failed to load your profile: \(error.localizedDescription)"
+            }
+            
+            // Don't auto-logout on server errors - let user retry
+            if case .unauthorized = error as? APIError {
+                logout()
+            }
         }
     }
     

@@ -22,54 +22,19 @@ struct DrawnMapView: View {
                 }
                 .panZoomable(transform: $transform)
                 
-                // Error overlay - Brutalist style (same as MapView.swift)
+                // Error overlay
                 if let error = viewModel.errorMessage {
-                    VStack {
-                        Spacer()
-                        
-                        VStack(spacing: KingdomTheme.Spacing.large) {
-                            // Error icon with brutalist badge
-                            ZStack {
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 64, height: 64)
-                                    .offset(x: 3, y: 3)
-                                
-                                Circle()
-                                    .fill(KingdomTheme.Colors.buttonDanger)
-                                    .frame(width: 64, height: 64)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.black, lineWidth: 3)
-                                    )
-                                
-                                Image(systemName: "exclamationmark")
-                                    .font(.system(size: 28, weight: .black))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            Text("Map Scroll Damaged")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.black)
-                            
-                            Text(error)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.black.opacity(0.6))
-                                .multilineTextAlignment(.center)
-                            
-                            Button(action: {
-                                viewModel.refreshKingdoms()
-                            }) {
-                                Label("Repair Map", systemImage: "arrow.triangle.2.circlepath")
-                            }
-                            .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
-                        }
-                        .padding(KingdomTheme.Spacing.xxLarge)
-                        .brutalistCard(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                        .padding(.horizontal, 40)
-                        
-                        Spacer()
-                    }
+                    BlockingErrorView(
+                        title: "Map Scroll Damaged",
+                        message: error,
+                        primaryAction: .init(
+                            label: "Repair Map",
+                            icon: "arrow.triangle.2.circlepath",
+                            color: KingdomTheme.Colors.buttonPrimary,
+                            action: { viewModel.refreshKingdoms() }
+                        ),
+                        secondaryAction: nil
+                    )
                 }
             }
         }

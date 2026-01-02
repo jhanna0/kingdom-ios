@@ -32,6 +32,31 @@ struct KingdomAppApp: App {
                         .environmentObject(authManager)
                         .environmentObject(musicService)
                 }
+                
+                // BLOCKING error overlay for critical auth failures
+                if authManager.hasCriticalError {
+                    BlockingErrorView(
+                        title: "Authentication Failed",
+                        message: authManager.criticalErrorMessage ?? "Unknown error",
+                        primaryAction: .init(
+                            label: "Retry",
+                            icon: "arrow.triangle.2.circlepath",
+                            color: KingdomTheme.Colors.buttonPrimary,
+                            action: {
+                                Task {
+                                    await authManager.retryAuth()
+                                }
+                            }
+                        ),
+                        secondaryAction: .init(
+                            label: "Sign Out",
+                            icon: "rectangle.portrait.and.arrow.right",
+                            color: KingdomTheme.Colors.buttonDanger,
+                            action: { authManager.logout() }
+                        )
+                    )
+                    .background(Color.black.opacity(0.8).ignoresSafeArea())
+                }
             }
             .onAppear {
                 // Start background music when app launches

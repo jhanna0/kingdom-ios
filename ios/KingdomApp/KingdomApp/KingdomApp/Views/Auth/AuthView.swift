@@ -61,13 +61,6 @@ struct AuthView: View {
                 }
                 .padding(.horizontal, 40)
                 
-                if let error = authManager.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                        .padding()
-                }
-                
                 Spacer()
             }
         }
@@ -92,7 +85,7 @@ struct AuthView: View {
                 }
             }
         case .failure(let error):
-            authManager.errorMessage = error.localizedDescription
+            print("❌ Apple Sign In failed: \(error.localizedDescription)")
         }
     }
 }
