@@ -20,17 +20,36 @@ class LocationManager: NSObject, ObservableObject {
         "nyc": CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060),        // New York City
         "sf": CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4134),       // San Francisco (Tenderloin)
         "la": CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437),       // Los Angeles
+        "santabarbara": CLLocationCoordinate2D(latitude: 34.4208, longitude: -119.6982), // Santa Barbara
         "boston": CLLocationCoordinate2D(latitude: 42.3601, longitude: -71.0589),    // Boston
         "chicago": CLLocationCoordinate2D(latitude: 41.8781, longitude: -87.6298),   // Chicago
         "miami": CLLocationCoordinate2D(latitude: 25.7617, longitude: -80.1918),     // Miami
         "seattle": CLLocationCoordinate2D(latitude: 47.6062, longitude: -122.3321),  // Seattle
         "austin": CLLocationCoordinate2D(latitude: 30.2672, longitude: -97.7431),    // Austin
         "denver": CLLocationCoordinate2D(latitude: 39.7392, longitude: -104.9903),   // Denver
-        "portland": CLLocationCoordinate2D(latitude: 45.5152, longitude: -122.6784)  // Portland
+        "portland": CLLocationCoordinate2D(latitude: 45.5152, longitude: -122.6784), // Portland
+        "galena": CLLocationCoordinate2D(latitude: 42.4167, longitude: -90.4292),    // Galena, IL (small town near Chicago)
+        
+        // Massachusetts small towns
+        "springfield": CLLocationCoordinate2D(latitude: 42.1015, longitude: -72.5898),     // Springfield, MA (western Mass)
+        "northampton": CLLocationCoordinate2D(latitude: 42.3251, longitude: -72.6412),     // Northampton, MA (college town)
+        "amherst": CLLocationCoordinate2D(latitude: 42.3732, longitude: -72.5199),         // Amherst, MA (UMass)
+        "salem": CLLocationCoordinate2D(latitude: 42.5195, longitude: -70.8967),           // Salem, MA (historic coastal)
+        "concord": CLLocationCoordinate2D(latitude: 42.4604, longitude: -71.3489),         // Concord, MA (historic)
+        "provincetown": CLLocationCoordinate2D(latitude: 42.0533, longitude: -70.1862),    // Provincetown, MA (Cape Cod tip)
+        "greatbarrington": CLLocationCoordinate2D(latitude: 42.1959, longitude: -73.3621), // Great Barrington, MA (Berkshires)
+        "stockbridge": CLLocationCoordinate2D(latitude: 42.3084, longitude: -73.3218),     // Stockbridge, MA (Berkshires)
+        "lenox": CLLocationCoordinate2D(latitude: 42.3565, longitude: -73.2845),           // Lenox, MA (Berkshires)
+        "williamstown": CLLocationCoordinate2D(latitude: 42.7126, longitude: -73.2037),    // Williamstown, MA (northwestern)
+        "cambridge": CLLocationCoordinate2D(latitude: 42.3736, longitude: -71.1097),       // Cambridge, MA (Harvard/MIT)
+        "somerville": CLLocationCoordinate2D(latitude: 42.3876, longitude: -71.0995),      // Somerville, MA (near Boston)
+        "worcester": CLLocationCoordinate2D(latitude: 42.2626, longitude: -71.8023),       // Worcester, MA (central Mass)
+        "newburyport": CLLocationCoordinate2D(latitude: 42.8126, longitude: -70.8773),     // Newburyport, MA (north shore)
+        "plymouth": CLLocationCoordinate2D(latitude: 41.9584, longitude: -70.6673)         // Plymouth, MA (historic coastal)
     ]
     
     /// Fake location for testing (defaults to SF)
-    static var fakeLocation = testCities["sf"]!
+    static var fakeLocation = testCities["springfield"]!
     
     override init() {
         super.init()

@@ -15,6 +15,9 @@ struct MapTransformState {
     var scaleWhenZoomStarted: CGFloat = 1.0
     var offsetWhenZoomStarted: CGSize = .zero
     
+    // Track if any gesture is currently active (to prevent accidental taps)
+    var isGestureActive: Bool = false
+    
     mutating func resetZoomGestureState() {
         isZooming = false
         magnificationBaseline = 1.0
@@ -28,7 +31,7 @@ struct MapTransformState {
 
 /// Configuration for pan/zoom behavior
 struct PanZoomConfig {
-    var minScale: CGFloat = 0.2
+    var minScale: CGFloat = 0.1  // Lower value = more zoom out for bigger map areas
     var maxScale: CGFloat = 5.0
     var zoomThreshold: CGFloat = 0.06
     
@@ -54,6 +57,7 @@ struct PanZoomModifier: ViewModifier {
     private var dragGesture: some Gesture {
         DragGesture()
             .onChanged { value in
+                transform.isGestureActive = true
                 // Don't pan while actively zooming - magnification gesture manages offset
                 if !transform.isZooming {
                     transform.offset = CGSize(
@@ -65,12 +69,17 @@ struct PanZoomModifier: ViewModifier {
             .onEnded { _ in
                 transform.persistCurrentValues()
                 transform.resetZoomGestureState()
+                // Delay resetting gesture flag to prevent accidental taps
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    transform.isGestureActive = false
+                }
             }
     }
     
     private var magnificationGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
+                transform.isGestureActive = true
                 // Capture baseline on first event
                 if transform.magnificationBaseline == 1.0 {
                     transform.magnificationBaseline = value
@@ -103,6 +112,10 @@ struct PanZoomModifier: ViewModifier {
             .onEnded { _ in
                 transform.persistCurrentValues()
                 transform.resetZoomGestureState()
+                // Delay resetting gesture flag to prevent accidental taps
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    transform.isGestureActive = false
+                }
             }
     }
 }

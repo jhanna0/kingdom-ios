@@ -27,7 +27,7 @@ struct PlayerActivityFeedCard: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 42, height: 42)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 10)
                 
                 Text("Player Activity")
                     .font(FontStyles.headingMedium)
@@ -77,7 +77,7 @@ struct PlayerActivityFeedCard: View {
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(.white)
                         .frame(width: 60, height: 60)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkLight, cornerRadius: 14)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 14)
                     
                     Text("Intelligence Required")
                         .font(FontStyles.bodyMediumBold)
@@ -99,7 +99,7 @@ struct PlayerActivityFeedCard: View {
                                 .font(FontStyles.iconLarge)
                                 .foregroundColor(.white)
                                 .frame(width: 50, height: 50)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkLight, cornerRadius: 12)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 12)
                             
                             Text("No players in this kingdom")
                                 .font(FontStyles.labelMedium)

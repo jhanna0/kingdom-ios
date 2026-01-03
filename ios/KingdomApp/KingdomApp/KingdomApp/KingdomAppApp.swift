@@ -112,6 +112,20 @@ struct AuthenticatedView: View {
                     badgeCount: notificationBadgeCount
                 )
             }
+            
+            // Kingdom claim celebration popup
+            if viewModel.showClaimCelebration,
+               let kingdomName = viewModel.claimCelebrationKingdom {
+                KingdomClaimCelebration(
+                    playerName: viewModel.player.name,
+                    kingdomName: kingdomName,
+                    onDismiss: {
+                        viewModel.showClaimCelebration = false
+                        viewModel.claimCelebrationKingdom = nil
+                    }
+                )
+                .zIndex(1000)
+            }
         }
         .onReceive(locationManager.$currentLocation) { location in
             if let location = location {

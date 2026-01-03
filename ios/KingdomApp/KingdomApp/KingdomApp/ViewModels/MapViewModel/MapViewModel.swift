@@ -91,16 +91,22 @@ class MapViewModel: ObservableObject {
             let request = APIClient.shared.request(endpoint: "/auth/me")
             let userData: UserData = try await APIClient.shared.execute(request)
             
-            await MainActor.run {
-                player.playerId = userData.id  // Integer from Postgres auto-increment
-                player.name = userData.display_name
-                // Backend is source of truth - no local caching
-                
-                print("✅ Synced player ID with backend: \(userData.id)")
-                
-                // Re-sync kingdoms after ID update
-                syncPlayerKingdoms()
-            }
+        await MainActor.run {
+            player.playerId = userData.id  // Integer from Postgres auto-increment
+            player.name = userData.display_name
+            player.gold = userData.gold  // FIX: Sync gold from backend
+            player.level = userData.level
+            player.experience = userData.experience
+            player.reputation = userData.reputation
+            // Backend is source of truth - no local caching
+            
+            print("✅ Synced player ID with backend: \(userData.id)")
+            print("   - Gold: \(userData.gold)")
+            print("   - Level: \(userData.level)")
+            
+            // Re-sync kingdoms after ID update
+            syncPlayerKingdoms()
+        }
         } catch {
             print("⚠️ Failed to sync player ID from backend: \(error)")
         }

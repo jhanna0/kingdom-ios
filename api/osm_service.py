@@ -21,13 +21,11 @@ async def find_user_city_fast(lat: float, lon: float) -> Optional[Dict]:
     FAST query to find what city the user is currently in.
     Uses 'is_in' which is much faster than radius search.
     Returns just ONE city with center point (no geometry yet).
-    
-    Accepts admin_level 6 (city-counties like SF) or 8 (regular cities).
     """
     query = f"""
     [out:json][timeout:10];
     is_in({lat},{lon})->.a;
-    relation(pivot.a)["boundary"="administrative"]["admin_level"~"^(6|8)$"]["name"];
+    relation(pivot.a)["boundary"="administrative"]["admin_level"="8"]["name"];
     out center;
     """
     
@@ -73,7 +71,7 @@ async def fetch_nearby_city_ids(lat: float, lon: float) -> List[Dict]:
     Find cities that DIRECTLY BORDER the user's current city.
     
     NOT a radius search - finds cities that share boundary ways.
-    Accepts admin_level 6 (city-counties) or 8 (regular cities).
+    ONLY admin_level=8 (actual cities, not counties/states).
     """
     
     # Query finds neighbors by shared boundary ways
@@ -82,13 +80,13 @@ async def fetch_nearby_city_ids(lat: float, lon: float) -> List[Dict]:
     
     // Step 1: What city is the user in?
     is_in({lat},{lon})->.a;
-    relation(pivot.a)["boundary"="administrative"]["admin_level"~"^(6|8)$"]->.current;
+    relation(pivot.a)["boundary"="administrative"]["admin_level"="8"]->.current;
     
     // Step 2: Get the ways that form this city's boundary
     way(r.current)->.boundary_ways;
     
     // Step 3: Find ALL cities that share these boundary ways (= neighbors)
-    relation(bw.boundary_ways)["boundary"="administrative"]["admin_level"~"^(6|8)$"]["name"];
+    relation(bw.boundary_ways)["boundary"="administrative"]["admin_level"="8"]["name"];
     
     // Output with center points
     out center;
@@ -152,7 +150,7 @@ async def fetch_city_boundary_by_id(osm_id: str, name: str = "Unknown") -> Optio
     Returns full city data with accurate boundaries.
     """
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:25];
     relation({osm_id});
     out geom;
     """
@@ -161,7 +159,7 @@ async def fetch_city_boundary_by_id(osm_id: str, name: str = "Unknown") -> Optio
     
     for endpoint in OVERPASS_ENDPOINTS:
         try:
-            async with httpx.AsyncClient(timeout=50.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     endpoint,
                     data={"data": query},
@@ -219,7 +217,7 @@ async def fetch_cities_from_osm(
     lat: float, 
     lon: float, 
     radius_km: float = 30,
-    admin_levels: str = "6|8"  # Default to city-counties (6) and cities (8)
+    admin_levels: str = "8"  # Default to just cities (level 8)
 ) -> List[Dict]:
     """
     Fetch city boundaries from OpenStreetMap Overpass API
@@ -227,8 +225,7 @@ async def fetch_cities_from_osm(
     Uses bbox instead of around: for much faster queries.
     
     Admin levels:
-    - 6: City-counties (SF, NYC, etc.)
-    - 8: Cities (most common)
+    - 8: Cities (most accurate, fewest results - FAST)
     - 7,8: Counties + Cities (more results - SLOWER)
     - 8,9: Cities + Districts (more granular - SLOWER)
     """

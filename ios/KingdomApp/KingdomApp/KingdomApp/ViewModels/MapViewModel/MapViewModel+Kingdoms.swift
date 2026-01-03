@@ -6,7 +6,7 @@ import CoreLocation
 extension MapViewModel {
     
     /// Load real town data from backend API - TWO STEP for speed
-    /// Step 1: Load current city FAST (< 2s) - unblock UI
+    /// Step 1: Load current city FAST (< 2s) - unblock UI (with retry)
     /// Step 2: Load neighbors in background
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
@@ -16,40 +16,117 @@ extension MapViewModel {
         errorMessage = nil
         
         Task {
-            do {
-                // STEP 1: Get current city FAST (< 2 seconds)
-                let currentCity = try await apiService.city.fetchCurrentCity(
-                    lat: location.latitude,
-                    lon: location.longitude
-                )
-                
-                // Convert to Kingdom and show immediately
-                let kingdom = convertCityToKingdom(currentCity, index: 0)
-                
-                await MainActor.run {
-                    if let kingdom = kingdom {
-                        kingdoms = [kingdom]
-                        syncPlayerKingdoms()
-                        
-                        // Check location
-                        if let currentLocation = userLocation {
-                            checkKingdomLocation(currentLocation)
+            // STEP 1: Get current city with retry logic (up to 5 attempts)
+            let maxRetries = 5
+            var currentCity: CityBoundaryResponse?
+            var lastError: Error?
+            
+            for attempt in 1...maxRetries {
+                do {
+                    if attempt > 1 {
+                        await MainActor.run {
+                            loadingStatus = "Finding your kingdom... (attempt \(attempt)/\(maxRetries))"
                         }
-                        
-                        print("✅ Current city loaded: \(kingdom.name)")
+                        print("🔄 Retrying current city load (attempt \(attempt)/\(maxRetries))")
                     }
                     
-                    // UI IS NOW READY - user can interact
+                    currentCity = try await apiService.city.fetchCurrentCity(
+                        lat: location.latitude,
+                        lon: location.longitude
+                    )
+                    break // Success! Exit retry loop
+                    
+                } catch {
+                    lastError = error
+                    print("❌ Attempt \(attempt) failed: \(error)")
+                    
+                    // Wait before retrying (except on last attempt)
+                    if attempt < maxRetries {
+                        print("⏳ Waiting 2 seconds before retry...")
+                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    }
+                }
+            }
+            
+            // Check if we successfully loaded the current city
+            guard let city = currentCity else {
+                // Failed after all retries
+                await MainActor.run {
+                    let errorDescription = lastError?.localizedDescription ?? "Unknown error"
+                    
+                    if errorDescription.contains("No city found") {
+                        loadingStatus = ""
+                        errorMessage = "No kingdoms discovered at this location. The royal cartographers have not yet mapped this region. Try a major city or move to a different area."
+                        print("❌ Failed to load current city after \(maxRetries) attempts: \(errorDescription)")
+                    } else if errorDescription.contains("network") || errorDescription.contains("internet") {
+                        loadingStatus = "Connection to royal archives lost..."
+                        errorMessage = "Cannot reach the kingdom servers. Check your internet connection and try again."
+                        print("❌ Network error loading current city after \(maxRetries) attempts: \(errorDescription)")
+                    } else {
+                        loadingStatus = "The royal cartographers have failed..."
+                        errorMessage = "Error loading kingdom after \(maxRetries) attempts: \(errorDescription)"
+                        print("❌ Failed to load current city after \(maxRetries) attempts: \(errorDescription)")
+                    }
+                    
                     isLoading = false
-                    loadingStatus = "Loading nearby kingdoms...\n(New areas take longer to map the first time)"
+                }
+                return
+            }
+            
+            // Convert to Kingdom and show immediately
+            let kingdom = convertCityToKingdom(city, index: 0)
+            
+            await MainActor.run {
+                if let kingdom = kingdom {
+                    kingdoms = [kingdom]
+                    syncPlayerKingdoms()
+                    
+                    // Check location
+                    if let currentLocation = userLocation {
+                        checkKingdomLocation(currentLocation)
+                    }
+                    
+                    print("✅ Current city loaded: \(kingdom.name)")
                 }
                 
-                // STEP 2: Load neighbors in background (can be slower)
-                let neighbors = try await apiService.city.fetchNeighbors(
-                    lat: location.latitude,
-                    lon: location.longitude
-                )
-                
+                // UI IS NOW READY - user can interact
+                isLoading = false
+                loadingStatus = "Loading nearby kingdoms...\n(New areas take longer to map the first time)"
+            }
+            
+            // STEP 2: Load neighbors in background with retry (can be slower)
+            var neighbors: [CityBoundaryResponse]?
+            var lastNeighborError: Error?
+            
+            for attempt in 1...maxRetries {
+                do {
+                    if attempt > 1 {
+                        await MainActor.run {
+                            loadingStatus = "Loading nearby kingdoms... (attempt \(attempt)/\(maxRetries))"
+                        }
+                        print("🔄 Retrying neighbors load (attempt \(attempt)/\(maxRetries))")
+                    }
+                    
+                    neighbors = try await apiService.city.fetchNeighbors(
+                        lat: location.latitude,
+                        lon: location.longitude
+                    )
+                    break // Success! Exit retry loop
+                    
+                } catch {
+                    lastNeighborError = error
+                    print("❌ Neighbor attempt \(attempt) failed: \(error)")
+                    
+                    // Wait before retrying (except on last attempt)
+                    if attempt < maxRetries {
+                        print("⏳ Waiting 2 seconds before retry...")
+                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    }
+                }
+            }
+            
+            // Process neighbors if we got them
+            if let neighbors = neighbors {
                 let neighborKingdoms = neighbors.enumerated().compactMap { index, city in
                     convertCityToKingdom(city, index: index + 1)
                 }
@@ -68,27 +145,11 @@ extension MapViewModel {
                 
                 // Load missing boundaries in background
                 await loadMissingBoundaries()
-                
-            } catch {
+            } else {
+                // Failed after all retries - log but continue with just current city
+                print("⚠️ Failed to load neighbors after \(maxRetries) attempts: \(lastNeighborError?.localizedDescription ?? "Unknown error")")
                 await MainActor.run {
-                    // Provide specific error messages based on the error type
-                    let errorDescription = error.localizedDescription
-                    
-                    if errorDescription.contains("No city found") {
-                        loadingStatus = ""
-                        errorMessage = "No kingdoms discovered at this location. The royal cartographers have not yet mapped this region. Try a major city or move to a different area."
-                        print("❌ Failed to load cities: \(errorDescription)")
-                    } else if errorDescription.contains("network") || errorDescription.contains("internet") {
-                        loadingStatus = "Connection to royal archives lost..."
-                        errorMessage = "Cannot reach the kingdom servers. Check your internet connection and try again."
-                        print("❌ Network error loading cities: \(errorDescription)")
-                    } else {
-                        loadingStatus = "The royal cartographers have failed..."
-                        errorMessage = "Error loading kingdoms: \(errorDescription)"
-                        print("❌ Failed to load cities: \(errorDescription)")
-                    }
-                    
-                    isLoading = false
+                    loadingStatus = ""
                 }
             }
         }

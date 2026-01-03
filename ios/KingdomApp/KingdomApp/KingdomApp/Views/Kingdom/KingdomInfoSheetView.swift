@@ -148,23 +148,25 @@ struct KingdomInfoSheetView: View {
                             }
                         }
                     }) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
                             if isClaiming {
                                 ProgressView()
                                     .tint(.white)
+                                    .scaleEffect(1.2)
                             } else {
-                                Image(systemName: "flag.fill")
-                                    .font(FontStyles.iconSmall)
+                                Image(systemName: "crown.fill")
+                                    .font(.title2)
                                     .foregroundColor(.white)
                             }
-                            Text(isClaiming ? "Claiming..." : "Claim This Kingdom")
-                                .font(FontStyles.bodyMediumBold)
+                            Text(isClaiming ? "Claiming Your Kingdom..." : "Claim This Kingdom")
+                                .font(FontStyles.headingMedium)
+                                .fontWeight(.black)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(KingdomTheme.Spacing.medium)
+                        .padding(.vertical, KingdomTheme.Spacing.large)
                         .foregroundColor(.white)
                     }
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.error, cornerRadius: 12, shadowOffset: 4, borderWidth: 3)
                     .disabled(isClaiming)
                     .padding(.horizontal)
                     .alert("Claim Failed", isPresented: $showClaimError) {
@@ -213,7 +215,7 @@ struct KingdomInfoSheetView: View {
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 10)
                             
                             Text("\(kingdom.checkedInPlayers)")
                                 .font(FontStyles.headingLarge)
@@ -232,7 +234,7 @@ struct KingdomInfoSheetView: View {
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 10)
                             
                             Text("\(kingdom.weeklyUniqueCheckIns)")
                                 .font(FontStyles.headingLarge)
@@ -262,7 +264,7 @@ struct KingdomInfoSheetView: View {
                                 .font(FontStyles.iconLarge)
                                 .foregroundColor(.white)
                                 .frame(width: 48, height: 48)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 12)
                             
                             Text("\(kingdom.treasuryGold)g")
                                 .font(FontStyles.headingLarge)
@@ -304,7 +306,8 @@ struct KingdomInfoSheetView: View {
                             benefit: "+\(kingdom.wallLevel * 2) defenders",
                             buildingType: "wall",
                             kingdom: kingdom,
-                            player: player
+                            player: player,
+                            iconColor: KingdomTheme.Colors.buttonDanger
                         )
                         
                         BuildingStatCard(
@@ -315,7 +318,8 @@ struct KingdomInfoSheetView: View {
                             benefit: "\(kingdom.vaultLevel * 20)% protected",
                             buildingType: "vault",
                             kingdom: kingdom,
-                            player: player
+                            player: player,
+                            iconColor: KingdomTheme.Colors.imperialGold
                         )
                     }
                     .padding(.horizontal)
@@ -337,7 +341,8 @@ struct KingdomInfoSheetView: View {
                             benefit: "+\(kingdom.mineLevel * 5)g/hr",
                             buildingType: "mine",
                             kingdom: kingdom,
-                            player: player
+                            player: player,
+                            iconColor: KingdomTheme.Colors.buttonWarning
                         )
                         
                         BuildingStatCard(
@@ -348,7 +353,8 @@ struct KingdomInfoSheetView: View {
                             benefit: "+\(kingdom.marketLevel * 3)g/hr",
                             buildingType: "market",
                             kingdom: kingdom,
-                            player: player
+                            player: player,
+                            iconColor: KingdomTheme.Colors.buttonSuccess
                         )
                     }
                     .padding(.horizontal)

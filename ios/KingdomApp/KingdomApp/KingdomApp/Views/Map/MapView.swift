@@ -115,6 +115,7 @@ struct MapView: View {
             if viewModel.showClaimCelebration,
                let kingdomName = viewModel.claimCelebrationKingdom {
                 KingdomClaimCelebration(
+                    playerName: viewModel.player.name,
                     kingdomName: kingdomName,
                     onDismiss: {
                         viewModel.showClaimCelebration = false

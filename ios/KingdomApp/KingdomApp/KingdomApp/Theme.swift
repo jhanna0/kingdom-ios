@@ -57,6 +57,8 @@ struct KingdomTheme {
         // MARK: Royal Kingdom Management Colors
         /// ROYAL PURPLE - Building & construction management
         static let royalPurple = Color(red: 0.45, green: 0.2, blue: 0.7)
+        /// REGAL PURPLE - Claiming kingdoms, coronations, majesty
+        static let regalPurple = Color(red: 0.58, green: 0.0, blue: 0.83)
         /// IMPERIAL GOLD - Tax and treasury management
         static let imperialGold = Color(red: 0.8, green: 0.6, blue: 0.1)
         /// CRIMSON RED - Decrees and proclamations

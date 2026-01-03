@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Celebratory popup shown when a player successfully claims a kingdom
 struct KingdomClaimCelebration: View {
+    let playerName: String
     let kingdomName: String
     let onDismiss: () -> Void
     
@@ -28,7 +29,7 @@ struct KingdomClaimCelebration: View {
                         .offset(x: 4, y: 4)
                     
                     Circle()
-                        .fill(KingdomTheme.Colors.inkMedium)
+                        .fill(KingdomTheme.Colors.error)
                         .frame(width: 110, height: 110)
                         .overlay(
                             Circle()
@@ -43,10 +44,11 @@ struct KingdomClaimCelebration: View {
                 
                 // Main message
                 VStack(spacing: 8) {
-                    Text("HAIL!")
-                        .font(.system(size: 36, weight: .black))
+                    Text("HAIL \(playerName)!")
+                        .font(.system(size: 32, weight: .black))
                         .foregroundColor(.black)
                         .tracking(2)
+                        .multilineTextAlignment(.center)
                     
                     Text("Ruler of")
                         .font(.system(size: 16, weight: .medium))
@@ -150,6 +152,7 @@ struct KingdomClaimCelebration: View {
 struct KingdomClaimCelebration_Previews: PreviewProvider {
     static var previews: some View {
         KingdomClaimCelebration(
+            playerName: "Gerard",
             kingdomName: "San Francisco",
             onDismiss: {}
         )

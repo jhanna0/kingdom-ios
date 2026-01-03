@@ -77,6 +77,9 @@ struct DrawnMapView: View {
                         y: geometry.size.height / 2 + position.y * transform.scale + transform.offset.height
                     )
                     .onTapGesture {
+                        // Only allow taps when not actively panning/zooming
+                        guard !transform.isGestureActive else { return }
+                        
                         kingdomForInfoSheet = kingdom
                         if !kingdom.hasBoundaryCached {
                             Task {
