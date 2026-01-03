@@ -434,13 +434,35 @@ def get_player_profile(
         reputation = user_kingdom.local_reputation if user_kingdom else 0
     
     # Compute stats from other tables
-    # TODO: These should be computed from their respective source tables:
-    # - total_checkins: SUM(checkins_count) from user_kingdoms
-    # - total_conquests: COUNT(*) from kingdom_history
-    # - kingdoms_ruled: COUNT(*) from kingdoms WHERE ruler_id = user_id
-    # - coups_won: COUNT(*) from coup_events WHERE initiator_id = user_id AND attacker_victory = true
-    # - contracts_completed: COUNT(DISTINCT contract_id) from contract_contributions
-    # For now, use defaults until we implement the computations
+    
+    # Count kingdoms ruled
+    kingdoms_ruled = db.query(func.count(Kingdom.id)).filter(
+        Kingdom.ruler_id == user.id
+    ).scalar() or 0
+    
+    # Count coups won
+    from db.models import CoupEvent
+    coups_won = db.query(func.count(CoupEvent.id)).filter(
+        CoupEvent.initiator_id == user.id,
+        CoupEvent.attacker_victory == True
+    ).scalar() or 0
+    
+    # Count contracts completed (distinct contract_ids from contributions)
+    contracts_completed = db.query(func.count(func.distinct(ContractContribution.contract_id))).filter(
+        ContractContribution.user_id == user.id
+    ).scalar() or 0
+    
+    # Sum total check-ins across all kingdoms
+    total_checkins = db.query(func.sum(UserKingdom.checkins_count)).filter(
+        UserKingdom.user_id == user.id
+    ).scalar() or 0
+    
+    # Count total conquests (times this player became ruler via coup/invasion)
+    from db.models import KingdomHistory
+    total_conquests = db.query(func.count(KingdomHistory.id)).filter(
+        KingdomHistory.ruler_id == user.id,
+        KingdomHistory.event_type.in_(['coup', 'invasion', 'reconquest'])
+    ).scalar() or 0
     
     return PlayerPublicProfile(
         id=user.id,
@@ -451,18 +473,18 @@ def get_player_profile(
         hometown_kingdom_id=state.hometown_kingdom_id,
         level=state.level,
         reputation=reputation,
-        honor=100,  # Removed from schema - default to 100
+        honor=100,  # Default honor value
         attack_power=state.attack_power,
         defense_power=state.defense_power,
         leadership=state.leadership,
         building_skill=state.building_skill,
         intelligence=state.intelligence,
         equipment=equipment,
-        total_checkins=0,  # TODO: compute from user_kingdoms
-        total_conquests=0,  # TODO: compute from kingdom_history
-        kingdoms_ruled=0,  # TODO: compute from kingdoms
-        coups_won=0,  # TODO: compute from coup_events
-        contracts_completed=0,  # TODO: compute from contract_contributions
+        total_checkins=total_checkins,
+        total_conquests=total_conquests,
+        kingdoms_ruled=kingdoms_ruled,
+        coups_won=coups_won,
+        contracts_completed=contracts_completed,
         activity=activity,
         last_login=user.last_login,
         created_at=user.created_at

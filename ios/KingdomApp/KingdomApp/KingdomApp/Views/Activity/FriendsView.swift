@@ -310,8 +310,8 @@ struct ActivityCard: View {
                         }
                     }
                     
-                // Simple action label
-                Text(ActionIconHelper.activityDescription(for: activity.actionType))
+                // Activity description from API
+                Text(activity.description)
                         .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     

@@ -669,7 +669,7 @@ struct MyActivityRow: View {
                 .brutalistBadge(backgroundColor: activity.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
             
             VStack(alignment: .leading, spacing: 3) {
-                Text(ActionIconHelper.activityDescription(for: activity.actionType))
+                Text(activity.description)
                     .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 from typing import List
 from datetime import datetime, timedelta
 
 from db.base import get_db
-from db.models import User, Friend, PlayerState
+from db.models import User, Friend, PlayerState, ActionCooldown
 from schemas.friend import (
     FriendRequest,
     FriendResponse,
@@ -23,6 +23,40 @@ router = APIRouter(prefix="/friends", tags=["friends"])
 
 # ===== Helper Functions =====
 
+def _convert_to_friend_activity(activity) -> dict:
+    """Convert PlayerActivity to FriendActivity format for iOS"""
+    # Get the activity type
+    activity_type = activity.type if hasattr(activity, 'type') else 'idle'
+    
+    # Map activity types to icons
+    icon_map = {
+        'working': 'hammer.fill',
+        'patrolling': 'figure.walk',
+        'training': 'figure.strengthtraining.traditional',
+        'crafting': 'hammer.circle.fill',
+        'scouting': 'eye.fill',
+        'sabotage': 'exclamationmark.triangle.fill',
+        'idle': 'circle'
+    }
+    
+    # Map activity types to colors
+    color_map = {
+        'working': 'blue',
+        'patrolling': 'green',
+        'training': 'purple',
+        'crafting': 'orange',
+        'scouting': 'yellow',
+        'sabotage': 'red',
+        'idle': 'gray'
+    }
+    
+    return {
+        'icon': icon_map.get(activity_type, 'circle'),
+        'display_text': activity.details if hasattr(activity, 'details') and activity.details else activity_type.capitalize(),
+        'color': color_map.get(activity_type, 'gray')
+    }
+
+
 def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) -> FriendResponse:
     """Convert Friend model to FriendResponse with activity data"""
     # Determine which user is the friend
@@ -36,11 +70,25 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
     # Get friend's player state for activity
     friend_state = db.query(PlayerState).filter(PlayerState.user_id == friend_user_id).first()
     
-    # Check if online (active in last 10 minutes)
+    # Check if online (active in last 10 minutes) by checking most recent action from action_cooldowns
     is_online = False
     last_seen = None
-    if friend_state and friend_state.last_action_at:
-        last_action = friend_state.last_action_at
+    
+    # Get most recent action from action_cooldowns table
+    most_recent_action = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == friend_user_id
+    ).order_by(ActionCooldown.last_performed.desc()).first()
+    
+    if most_recent_action:
+        last_action = most_recent_action.last_performed
+        if isinstance(last_action, str):
+            last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
+        time_since_action = datetime.utcnow() - last_action
+        is_online = time_since_action < timedelta(minutes=10)
+        last_seen = last_action.isoformat()
+    elif friend_state and friend_state.updated_at:
+        # Fallback to player_state updated_at if no actions recorded
+        last_action = friend_state.updated_at
         if isinstance(last_action, str):
             last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
         time_since_action = datetime.utcnow() - last_action
@@ -48,10 +96,12 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
         last_seen = last_action.isoformat()
     
     # Get activity data
-    activity = None
+    activity_dict = None
     current_kingdom_name = None
     if friend_state and friendship.status == 'accepted':
-        activity = _get_player_activity(db, friend_user_id, friend_state)
+        activity_obj = _get_player_activity(db, friend_state)
+        # Convert PlayerActivity to FriendActivity format (with icon, display_text, color)
+        activity_dict = _convert_to_friend_activity(activity_obj)
         if friend_state.current_kingdom_id:
             from db.models import Kingdom
             kingdom = db.query(Kingdom).filter(Kingdom.id == friend_state.current_kingdom_id).first()
@@ -62,8 +112,8 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
         id=friendship.id,
         user_id=friendship.user_id,
         friend_user_id=friend_user_id,
-        friend_username=friend_user.username,
-        friend_display_name=friend_user.display_name or friend_user.username,
+        friend_username=friend_user.display_name,
+        friend_display_name=friend_user.display_name,
         status=friendship.status,
         created_at=friendship.created_at.isoformat(),
         updated_at=friendship.updated_at.isoformat(),
@@ -72,7 +122,7 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
         current_kingdom_id=friend_state.current_kingdom_id if friend_state and friendship.status == 'accepted' else None,
         current_kingdom_name=current_kingdom_name,
         last_seen=last_seen if friendship.status == 'accepted' else None,
-        activity=activity if friendship.status == 'accepted' else None
+        activity=activity_dict if friendship.status == 'accepted' else None
     )
 
 
@@ -128,12 +178,12 @@ def add_friend(
     db: Session = Depends(get_db)
 ):
     """
-    Send a friend request to another user by username or user_id
+    Send a friend request to another user by username (display_name) or user_id
     """
     # Find the target user
     target_user = None
     if request.username:
-        target_user = db.query(User).filter(User.username == request.username).first()
+        target_user = db.query(User).filter(User.display_name == request.username).first()
     elif request.user_id:
         target_user = db.query(User).filter(User.id == request.user_id).first()
     else:
@@ -179,7 +229,7 @@ def add_friend(
                 
                 return AddFriendResponse(
                     success=True,
-                    message=f"Accepted friend request from {target_user.username}",
+                    message=f"Accepted friend request from {target_user.display_name}",
                     friend=_get_friend_response(db, existing, current_user.id)
                 )
             else:
@@ -208,7 +258,7 @@ def add_friend(
     
     return AddFriendResponse(
         success=True,
-        message=f"Friend request sent to {target_user.username}",
+        message=f"Friend request sent to {target_user.display_name}",
         friend=_get_friend_response(db, friendship, current_user.id)
     )
 
@@ -324,7 +374,7 @@ def search_users(
     db: Session = Depends(get_db)
 ):
     """
-    Search for users by username or display name
+    Search for users by display name
     """
     if len(query) < 2:
         raise HTTPException(
@@ -332,12 +382,9 @@ def search_users(
             detail="Search query must be at least 2 characters"
         )
     
-    # Search users (case-insensitive)
+    # Search users by display_name (case-insensitive)
     users = db.query(User).filter(
-        or_(
-            User.username.ilike(f"%{query}%"),
-            User.display_name.ilike(f"%{query}%")
-        )
+        User.display_name.ilike(f"%{query}%")
     ).limit(20).all()
     
     # Get player states for levels
@@ -360,8 +407,8 @@ def search_users(
         
         user_data.append({
             "id": user.id,
-            "username": user.username,
-            "display_name": user.display_name or user.username,
+            "username": user.display_name,  # Use display_name as username
+            "display_name": user.display_name,
             "level": player_state.level if player_state else 1,
             "friendship_status": friendship_status
         })

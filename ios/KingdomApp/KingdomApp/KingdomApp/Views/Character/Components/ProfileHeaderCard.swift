@@ -5,6 +5,14 @@ struct ProfileHeaderCard: View {
     let displayName: String
     let level: Int
     let gold: Int?  // Optional - only shown for own profile
+    let rulerOf: String?  // Optional - kingdom name if they're a ruler
+    
+    init(displayName: String, level: Int, gold: Int? = nil, rulerOf: String? = nil) {
+        self.displayName = displayName
+        self.level = level
+        self.gold = gold
+        self.rulerOf = rulerOf
+    }
     
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -40,6 +48,19 @@ struct ProfileHeaderCard: View {
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .lineLimit(2)
+                
+                // Ruler status if provided
+                if let kingdom = rulerOf {
+                    HStack(spacing: 6) {
+                        Image(systemName: "crown.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        
+                        Text("Ruler of \(kingdom)")
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
                 
                 // Gold display (only if provided)
                 if let gold = gold {

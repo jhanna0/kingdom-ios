@@ -435,8 +435,8 @@ def get_friend_activities(
         
         # Add user info to activities
         for activity in friend_activities:
-            activity.username = friend_user.username
-            activity.display_name = friend_user.display_name or friend_user.username
+            activity.username = friend_user.display_name
+            activity.display_name = friend_user.display_name
             activity.user_level = friend_state.level
         
         all_activities.extend(friend_activities)
