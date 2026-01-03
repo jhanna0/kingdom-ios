@@ -23,19 +23,30 @@ struct DecreeInputView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
-                TextEditor(text: $decreeText)
-                    .font(KingdomTheme.Typography.body())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .scrollContentBackground(.hidden)
-                    .frame(height: 150)
-                    .padding(12)
-                    .background(Color.white)
-                    .cornerRadius(KingdomTheme.CornerRadius.large)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                            .stroke(KingdomTheme.Colors.inkLight.opacity(0.3), lineWidth: KingdomTheme.BorderWidth.thin)
-                    )
-                    .padding(.horizontal)
+                ZStack(alignment: .topLeading) {
+                    if decreeText.isEmpty {
+                        Text("What decree will you proclaim to your subjects?")
+                            .font(KingdomTheme.Typography.body())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.6))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 20)
+                    }
+                    
+                    TextEditor(text: $decreeText)
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .tint(KingdomTheme.Colors.inkDark)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 150)
+                        .padding(12)
+                }
+                .background(Color.white)
+                .cornerRadius(KingdomTheme.CornerRadius.large)
+                .overlay(
+                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                        .stroke(KingdomTheme.Colors.inkLight.opacity(0.3), lineWidth: KingdomTheme.BorderWidth.thin)
+                )
+                .padding(.horizontal)
                 
                 Button(action: {
                     // TODO: Send decree

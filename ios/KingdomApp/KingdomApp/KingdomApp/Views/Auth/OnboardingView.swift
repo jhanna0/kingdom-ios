@@ -229,24 +229,34 @@ struct DisplayNameStep: View {
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                TextField("Enter your name", text: $displayName)
-                    .font(FontStyles.bodyLarge)
-                    .textFieldStyle(.plain)
-                    .padding(KingdomTheme.Spacing.medium)
-                    .background(KingdomTheme.Colors.parchment)
-                    .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
-                            .stroke(
-                                showValidation && !validationResult.isValid ? 
-                                    Color.red : Color.black, 
-                                lineWidth: showValidation && !validationResult.isValid ? 3 : 2
-                            )
-                    )
-                    .onChange(of: displayName) { oldValue, newValue in
-                        showValidation = !newValue.isEmpty
-                        validationResult = UsernameValidator.validate(newValue)
+                ZStack(alignment: .leading) {
+                    if displayName.isEmpty {
+                        Text("Enter your name")
+                            .font(FontStyles.bodyLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.5))
+                            .padding(.leading, KingdomTheme.Spacing.medium)
                     }
+                    
+                    TextField("", text: $displayName)
+                        .font(FontStyles.bodyLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .textFieldStyle(.plain)
+                        .padding(KingdomTheme.Spacing.medium)
+                }
+                .background(Color.white)
+                .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
+                .overlay(
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                        .stroke(
+                            showValidation && !validationResult.isValid ? 
+                                Color.red : Color.black, 
+                            lineWidth: showValidation && !validationResult.isValid ? 3 : 2
+                        )
+                )
+                .onChange(of: displayName) { oldValue, newValue in
+                    showValidation = !newValue.isEmpty
+                    validationResult = UsernameValidator.validate(newValue)
+                }
                 
                 // Validation hints
                 if showValidation && !displayName.isEmpty {

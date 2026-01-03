@@ -24,16 +24,25 @@ struct AddFriendView: View {
                             .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        TextField("Search by username...", text: $searchQuery)
-                            .font(FontStyles.bodyMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                            .autocapitalization(.none)
-                            .autocorrectionDisabled()
-                            .onSubmit {
-                                Task {
-                                    await searchUsers()
-                                }
+                        ZStack(alignment: .leading) {
+                            if searchQuery.isEmpty {
+                                Text("Search by username...")
+                                    .font(FontStyles.bodyMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.6))
                             }
+                            
+                            TextField("", text: $searchQuery)
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .tint(KingdomTheme.Colors.inkDark)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                                .onSubmit {
+                                    Task {
+                                        await searchUsers()
+                                    }
+                                }
+                        }
                         
                         if !searchQuery.isEmpty {
                             Button(action: {

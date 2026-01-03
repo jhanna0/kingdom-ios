@@ -3,7 +3,6 @@ import SwiftUI
 struct FriendsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FriendsViewModel()
-    @State private var showAddFriend = false
     @State private var selectedFriend: Friend?
     @State private var showFriendActivity = false
     
@@ -64,14 +63,6 @@ struct FriendsView: View {
                 await viewModel.loadFriends()
                 await viewModel.loadFriendActivity()
             }
-            .sheet(isPresented: $showAddFriend) {
-                AddFriendView(onAdded: {
-                    showAddFriend = false
-                    Task {
-                        await viewModel.loadFriends()
-                    }
-                })
-            }
             .sheet(item: $selectedFriend) { friend in
                 NavigationStack {
                     PlayerProfileView(userId: friend.friendUserId)
@@ -116,23 +107,27 @@ struct FriendsView: View {
             }
             
             // Add Friend Button
-                Button(action: { showAddFriend = true }) {
-                HStack(spacing: 8) {
-                        Image(systemName: "person.badge.plus")
-                            .font(FontStyles.iconSmall)
-                        Text("Add Friend")
-                            .font(FontStyles.bodyMediumBold)
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+            NavigationLink(destination: AddFriendView(onAdded: {
+                Task {
+                    await viewModel.loadFriends()
                 }
+            })) {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.plus")
+                        .font(FontStyles.iconSmall)
+                    Text("Add Friend")
+                        .font(FontStyles.bodyMediumBold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
                 .brutalistBadge(
                     backgroundColor: KingdomTheme.Colors.buttonSuccess,
                     cornerRadius: 10,
                     shadowOffset: 3,
                     borderWidth: 2
                 )
+            }
             }
             .padding(.horizontal)
         .padding(.top, KingdomTheme.Spacing.medium)
