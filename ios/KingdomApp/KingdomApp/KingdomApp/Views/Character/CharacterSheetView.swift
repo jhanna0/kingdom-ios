@@ -28,6 +28,11 @@ struct CharacterSheetView: View {
                 // Combined combat stats and training
                 combatAndTrainingCard
                 
+                // Active Perks section
+                if player.activePerks != nil {
+                    activePerksCard
+                }
+                
                 // Crafting section
                 craftingInfoCard
                 
@@ -369,6 +374,199 @@ struct CharacterSheetView: View {
                     generator.notificationOccurred(.error)
                 }
             }
+        }
+    }
+    
+    // MARK: - Active Perks Card
+    
+    private var activePerksCard: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: "star.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Active Bonuses")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            if let perks = player.activePerks {
+                VStack(spacing: 10) {
+                    // Combine all perks into brutalist badge grid
+                    let allPerks = perks.combatPerks + perks.trainingPerks + perks.buildingPerks + 
+                                   perks.espionagePerks + perks.politicalPerks + perks.travelPerks
+                    
+                    if allPerks.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "star.slash")
+                                .font(.system(size: 32))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                            
+                            Text("No Active Bonuses")
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            Text("Upgrade skills, equip items, and join kingdoms to gain bonuses")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+                    } else {
+                        ForEach(allPerks, id: \.id) { perk in
+                            perkBadge(perk)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private func perkBadge(_ perk: Player.PerkItem) -> some View {
+        HStack(spacing: 12) {
+            // Icon with color based on source type
+            Image(systemName: perkIcon(for: perk))
+                .font(FontStyles.iconSmall)
+                .foregroundColor(.white)
+                .frame(width: 36, height: 36)
+                .brutalistBadge(
+                    backgroundColor: perkColor(for: perk),
+                    cornerRadius: 8,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+            
+            VStack(alignment: .leading, spacing: 2) {
+                // Main text
+                if let bonus = perk.bonus, let stat = perk.stat {
+                    Text("\(bonus > 0 ? "+" : "")\(bonus) \(stat.capitalized)")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                } else if let description = perk.description {
+                    Text(description)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                // Source
+                Text(perk.source)
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                // Expiration if applicable
+                if let expiresAt = perk.expiresAt {
+                    let remaining = expiresAt.timeIntervalSince(Date())
+                    if remaining > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            Text(formatDuration(remaining))
+                                .font(FontStyles.labelTiny)
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        }
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(12)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+    }
+    
+    private func perkIcon(for perk: Player.PerkItem) -> String {
+        // Use skill-specific icons based on the source
+        if perk.sourceType == "player_skill" {
+            if perk.source.contains("Attack") {
+                return "bolt.fill"
+            } else if perk.source.contains("Defense") {
+                return "shield.fill"
+            } else if perk.source.contains("Leadership") {
+                return "crown.fill"
+            } else if perk.source.contains("Building") {
+                return "hammer.fill"
+            } else if perk.source.contains("Intelligence") {
+                return "eye.fill"
+            }
+        }
+        
+        switch perk.sourceType {
+        case "equipment":
+            // Use weapon/armor specific icons
+            if perk.stat == "attack" {
+                return "bolt.fill"
+            } else {
+                return "shield.fill"
+            }
+        case "kingdom_building":
+            if perk.source.contains("Education") {
+                return "book.fill"
+            } else if perk.source.contains("Farm") {
+                return "leaf.fill"
+            } else {
+                return "building.2.fill"
+            }
+        case "property": return "house.fill"
+        case "debuff": return "exclamationmark.triangle.fill"
+        default: return "star.fill"
+        }
+    }
+    
+    private func perkColor(for perk: Player.PerkItem) -> Color {
+        // Negative = red, positive based on type
+        if let bonus = perk.bonus, bonus < 0 {
+            return KingdomTheme.Colors.buttonDanger
+        }
+        
+        // Color by skill type
+        if perk.sourceType == "player_skill" {
+            if perk.source.contains("Attack") {
+                return KingdomTheme.Colors.buttonDanger // Red for attack
+            } else if perk.source.contains("Defense") {
+                return KingdomTheme.Colors.royalBlue // Royal blue for defense
+            } else if perk.source.contains("Leadership") {
+                return KingdomTheme.Colors.royalPurple // Royal purple for leadership
+            } else if perk.source.contains("Building") {
+                return KingdomTheme.Colors.imperialGold // Imperial gold for building
+            } else if perk.source.contains("Intelligence") {
+                return KingdomTheme.Colors.royalEmerald // Royal emerald for intelligence
+            }
+        }
+        
+        switch perk.sourceType {
+        case "equipment":
+            // Match the stat type
+            if perk.stat == "attack" {
+                return KingdomTheme.Colors.buttonDanger
+            } else {
+                return KingdomTheme.Colors.royalBlue
+            }
+        case "kingdom_building": return KingdomTheme.Colors.royalPurple
+        case "property": return KingdomTheme.Colors.royalEmerald
+        case "debuff": return KingdomTheme.Colors.buttonDanger
+        default: return KingdomTheme.Colors.inkMedium
+        }
+    }
+    
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
         }
     }
     

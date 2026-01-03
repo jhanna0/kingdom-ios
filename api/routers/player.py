@@ -17,6 +17,209 @@ from routers.actions.utils import get_equipped_items, get_inventory
 router = APIRouter(prefix="/player", tags=["player"])
 
 
+def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dict:
+    """Calculate all active perks/bonuses for a player"""
+    perks = {
+        "combat": [],
+        "training": [],
+        "building": [],
+        "espionage": [],
+        "political": [],
+        "travel": [],
+        "total_power": 0
+    }
+    
+    # Get equipped items
+    equipped = get_equipped_items(db, user.id)
+    
+    # Attack skill bonus (T1+ only, T0 is base)
+    if state.attack_power >= 1:
+        perks["combat"].append({
+            "stat": "attack",
+            "bonus": state.attack_power,
+            "source": f"Attack Skill T{state.attack_power}",
+            "source_type": "player_skill"
+        })
+    
+    # Defense skill bonus (T1+ only, T0 is base)
+    if state.defense_power >= 1:
+        perks["combat"].append({
+            "stat": "defense",
+            "bonus": state.defense_power,
+            "source": f"Defense Skill T{state.defense_power}",
+            "source_type": "player_skill"
+        })
+    
+    # Equipment bonuses
+    if equipped["equipped_weapon"]:
+        weapon = equipped["equipped_weapon"]
+        bonus = get_stat_bonus_for_tier(weapon.get("tier", 1))
+        perks["combat"].append({
+            "stat": "attack",
+            "bonus": bonus,
+            "source": f"T{weapon.get('tier', 1)} {weapon.get('type', 'weapon').capitalize()}",
+            "source_type": "equipment"
+        })
+    
+    if equipped["equipped_armor"]:
+        armor = equipped["equipped_armor"]
+        bonus = get_stat_bonus_for_tier(armor.get("tier", 1))
+        perks["combat"].append({
+            "stat": "defense",
+            "bonus": bonus,
+            "source": f"T{armor.get('tier', 1)} Armor",
+            "source_type": "equipment"
+        })
+    
+    # Active debuffs
+    if state.attack_debuff > 0:
+        from datetime import datetime, timezone
+        if state.debuff_expires_at and state.debuff_expires_at > datetime.now(timezone.utc):
+            perks["combat"].append({
+                "stat": "attack",
+                "bonus": -state.attack_debuff,
+                "source": "Combat Debuff",
+                "source_type": "debuff",
+                "expires_at": state.debuff_expires_at.isoformat()
+            })
+    
+    # Kingdom bonuses (if in a kingdom)
+    if state.current_kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if kingdom:
+            # Education building reduces training time
+            if kingdom.education_level > 0:
+                reduction = kingdom.education_level * 5
+                perks["training"].append({
+                    "description": f"-{reduction}% training actions",
+                    "source": f"{kingdom.name} Education Hall T{kingdom.education_level}",
+                    "source_type": "kingdom_building"
+                })
+            
+            # Farm reduces contract time
+            if kingdom.farm_level > 0:
+                reduction_map = {1: 5, 2: 10, 3: 20, 4: 25, 5: 33}
+                reduction = reduction_map.get(kingdom.farm_level, 0)
+                perks["building"].append({
+                    "description": f"-{reduction}% contract time",
+                    "source": f"{kingdom.name} Farm T{kingdom.farm_level}",
+                    "source_type": "kingdom_building"
+                })
+    
+    # Building skill bonuses (T1+ show bonuses, T0 is base)
+    if state.building_skill >= 1:
+        bonus_map = {1: 10, 2: 20, 3: 30, 4: 40, 5: 50}
+        bonus = bonus_map.get(state.building_skill, 0)
+        if bonus > 0:
+            perks["building"].append({
+                "description": f"+{bonus}% gold from building",
+                "source": f"Building Skill T{state.building_skill}",
+                "source_type": "player_skill"
+            })
+    
+    if state.building_skill >= 2:
+        perks["building"].append({
+            "description": "+1 Assist action per day",
+            "source": f"Building Skill T2",
+            "source_type": "player_skill"
+        })
+    
+    if state.building_skill >= 3:
+        perks["building"].append({
+            "description": "10% cooldown refund chance",
+            "source": f"Building Skill T3",
+            "source_type": "player_skill"
+        })
+    
+    if state.building_skill >= 4:
+        perks["building"].append({
+            "description": "25% double progress chance",
+            "source": f"Building Skill T4",
+            "source_type": "player_skill"
+        })
+    
+    if state.building_skill >= 5:
+        perks["building"].append({
+            "description": "Instant complete 1 contract/day",
+            "source": f"Building Skill T5",
+            "source_type": "player_skill"
+        })
+    
+    # Intelligence bonuses (T1+ show bonuses, T0 is base)
+    if state.intelligence >= 1:
+        bonus = (state.intelligence + 1) * 2
+        perks["espionage"].append({
+            "description": f"+{bonus}% sabotage/scout success",
+            "source": f"Intelligence T{state.intelligence}",
+            "source_type": "player_skill"
+        })
+    
+    if state.intelligence >= 5:
+        perks["espionage"].append({
+            "description": "Vault Heist unlocked",
+            "source": "Intelligence T5",
+            "source_type": "player_skill"
+        })
+    
+    # Leadership bonuses (T1+ show bonuses, T0 is base)
+    if state.leadership >= 1:
+        vote_weight = 1.0 + (state.leadership * 0.2)
+        perks["political"].append({
+            "description": f"Vote weight: {vote_weight:.1f}x",
+            "source": f"Leadership T{state.leadership}",
+            "source_type": "player_skill"
+        })
+    
+    if state.leadership >= 1:
+        perks["political"].append({
+            "description": "+50% ruler rewards",
+            "source": "Leadership T1",
+            "source_type": "player_skill"
+        })
+    
+    if state.leadership >= 2:
+        perks["political"].append({
+            "description": "Can propose coups",
+            "source": "Leadership T2",
+            "source_type": "player_skill"
+        })
+    
+    if state.leadership >= 3:
+        perks["political"].append({
+            "description": "+100% ruler rewards",
+            "source": "Leadership T3",
+            "source_type": "player_skill"
+        })
+    
+    if state.leadership >= 5:
+        perks["political"].append({
+            "description": "-50% coup cost",
+            "source": "Leadership T5",
+            "source_type": "player_skill"
+        })
+    
+    # Property bonuses
+    properties = db.query(Property).filter(Property.owner_id == user.id).all()
+    for prop in properties:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == prop.kingdom_id).first()
+        if kingdom:
+            perks["travel"].append({
+                "description": "Free travel, instant arrival",
+                "source": f"Property in {kingdom.name}",
+                "source_type": "property"
+            })
+    
+    perks["total_power"] = 0  # Removed - meaningless number
+    
+    return perks
+
+
+def get_stat_bonus_for_tier(tier: int) -> int:
+    """Get equipment stat bonus for tier"""
+    bonus_map = {1: 1, 2: 2, 3: 3, 4: 5, 5: 8}
+    return bonus_map.get(tier, 0)
+
+
 def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
     """Get or create player state for user"""
     if not user.player_state:
@@ -42,6 +245,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         "building": calculate_training_cost(state.building_skill, total_trainings),
         "intelligence": calculate_training_cost(state.intelligence, total_trainings)
     }
+    
+    # Calculate active perks
+    active_perks = calculate_player_perks(user, state, db)
     
     # Calculate ruler status dynamically from Kingdom table (SOURCE OF TRUTH)
     ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
@@ -164,6 +370,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         
         # Travel event (if provided)
         travel_event=travel_event,
+        
+        # Active perks (dynamically calculated)
+        active_perks=active_perks,
     )
 
 

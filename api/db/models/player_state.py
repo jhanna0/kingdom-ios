@@ -37,12 +37,12 @@ class PlayerState(Base):
     experience = Column(Integer, default=0)
     skill_points = Column(Integer, default=0)
     
-    # Stats
-    attack_power = Column(Integer, default=1)
-    defense_power = Column(Integer, default=1)
-    leadership = Column(Integer, default=1)
-    building_skill = Column(Integer, default=1)
-    intelligence = Column(Integer, default=1)
+    # Stats (start at T0, upgrade to T1-T5)
+    attack_power = Column(Integer, default=0)
+    defense_power = Column(Integer, default=0)
+    leadership = Column(Integer, default=0)
+    building_skill = Column(Integer, default=0)
+    intelligence = Column(Integer, default=0)
     
     # Combat debuff (temporary)
     attack_debuff = Column(Integer, default=0)

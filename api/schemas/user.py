@@ -123,6 +123,9 @@ class PlayerState(BaseModel):
     # Travel event (only present when kingdom_id is provided to /player/state)
     travel_event: Optional[TravelEvent] = None
     
+    # Active perks (calculated dynamically)
+    active_perks: Optional[dict] = None
+    
     class Config:
         from_attributes = True
 

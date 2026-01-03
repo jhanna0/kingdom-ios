@@ -40,6 +40,9 @@ class Player: ObservableObject {
     @Published var leadershipTrainingCost: Int = 100
     @Published var buildingTrainingCost: Int = 100
     
+    // Active perks (from backend)
+    @Published var activePerks: PlayerPerks?
+    
     // Resources
     @Published var iron: Int = 0
     @Published var steel: Int = 0
@@ -264,6 +267,26 @@ class Player: ObservableObject {
             case costPaid = "cost_paid"
             case createdAt = "created_at"
         }
+    }
+    
+    struct PlayerPerks {
+        var combatPerks: [PerkItem] = []
+        var trainingPerks: [PerkItem] = []
+        var buildingPerks: [PerkItem] = []
+        var espionagePerks: [PerkItem] = []
+        var politicalPerks: [PerkItem] = []
+        var travelPerks: [PerkItem] = []
+        var totalPower: Int = 0
+    }
+    
+    struct PerkItem: Identifiable {
+        let id = UUID()
+        let stat: String?
+        let bonus: Int?
+        let description: String?
+        let source: String
+        let sourceType: String
+        let expiresAt: Date?
     }
     
     struct CraftingContractData: Codable, Identifiable {
@@ -718,9 +741,54 @@ class Player: ObservableObject {
         // Status
         isAlive = apiState.is_alive
         
+        // Active perks from backend
+        if let perksData = apiState.active_perks {
+            var perks = PlayerPerks()
+            perks.totalPower = perksData.total_power
+            
+            // Parse combat perks
+            perks.combatPerks = perksData.combat.map { parsePerkEntry($0) }
+            
+            // Parse training perks
+            perks.trainingPerks = perksData.training.map { parsePerkEntry($0) }
+            
+            // Parse building perks
+            perks.buildingPerks = perksData.building.map { parsePerkEntry($0) }
+            
+            // Parse espionage perks
+            perks.espionagePerks = perksData.espionage.map { parsePerkEntry($0) }
+            
+            // Parse political perks
+            perks.politicalPerks = perksData.political.map { parsePerkEntry($0) }
+            
+            // Parse travel perks
+            perks.travelPerks = perksData.travel.map { parsePerkEntry($0) }
+            
+            activePerks = perks
+            print("✨ Updated \(perks.totalPower) total power with perks")
+        }
+        
         // Backend is source of truth - no local caching
         
         print("✅ Player state updated from API")
+    }
+    
+    private func parsePerkEntry(_ entry: APIPlayerState.PerkEntry) -> PerkItem {
+        let expiresAt: Date? = {
+            if let expiresStr = entry.expires_at {
+                return ISO8601DateFormatter().date(from: expiresStr)
+            }
+            return nil
+        }()
+        
+        return PerkItem(
+            stat: entry.stat,
+            bonus: entry.bonus,
+            description: entry.description,
+            source: entry.source,
+            sourceType: entry.source_type,
+            expiresAt: expiresAt
+        )
     }
     
     /// Sync player state with API

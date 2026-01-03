@@ -81,6 +81,28 @@ struct APIPlayerState: Codable {
         let intelligence: Int
     }
     
+    // Active perks (calculated by backend)
+    let active_perks: ActivePerks?
+    
+    struct ActivePerks: Codable {
+        let combat: [PerkEntry]
+        let training: [PerkEntry]
+        let building: [PerkEntry]
+        let espionage: [PerkEntry]
+        let political: [PerkEntry]
+        let travel: [PerkEntry]
+        let total_power: Int
+    }
+    
+    struct PerkEntry: Codable {
+        let stat: String?
+        let bonus: Int?
+        let description: String?
+        let source: String
+        let source_type: String
+        let expires_at: String?
+    }
+    
     // Resources
     let iron: Int
     let steel: Int
