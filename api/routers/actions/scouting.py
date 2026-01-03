@@ -171,7 +171,7 @@ def scout_kingdom(
     # Return intelligence
     return {
         "success": True,
-        "message": f"Scouted {kingdom.name}!",
+        "message": f"You scouted {kingdom.name} and gathered intelligence",
         "intelligence": intelligence_data,
         "intelligence_level": player_intelligence,
         "available_actions": available_actions,

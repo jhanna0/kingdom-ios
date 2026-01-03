@@ -58,6 +58,7 @@ struct ActionStatus: Codable {
     let category: String?
     let themeColor: String?  // Maps to KingdomTheme.Colors
     let displayOrder: Int?
+    let endpoint: String?  // FULLY DYNAMIC: Backend provides complete endpoint with all params
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -76,6 +77,7 @@ struct ActionStatus: Codable {
         case title, icon, description, category
         case themeColor = "theme_color"
         case displayOrder = "display_order"
+        case endpoint
     }
 }
 
@@ -122,6 +124,36 @@ struct ActionRewards: Codable {
     let reputation: Int?
     let experience: Int?
     let iron: Int?
+}
+
+// MARK: - Generic Action Response (Dynamic Actions)
+
+/// Universal response model for all dynamic actions
+/// Backend always returns: success, message, rewards (optional)
+struct GenericActionResponse: Codable {
+    let success: Bool
+    let message: String
+    let rewards: ActionRewards?
+    
+    // Optional fields that some actions may include
+    let nextActionAvailableAt: Date?
+    let nextFarmAvailableAt: Date?
+    let nextWorkAvailableAt: Date?
+    let nextScoutAvailableAt: Date?
+    let nextSabotageAvailableAt: Date?
+    let nextTrainAvailableAt: Date?
+    let expiresAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, rewards
+        case nextActionAvailableAt = "next_action_available_at"
+        case nextFarmAvailableAt = "next_farm_available_at"
+        case nextWorkAvailableAt = "next_work_available_at"
+        case nextScoutAvailableAt = "next_scout_available_at"
+        case nextSabotageAvailableAt = "next_sabotage_available_at"
+        case nextTrainAvailableAt = "next_train_available_at"
+        case expiresAt = "expires_at"
+    }
 }
 
 

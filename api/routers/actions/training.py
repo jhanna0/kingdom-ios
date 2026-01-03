@@ -344,9 +344,9 @@ def work_on_training(
     progress_percent = min(100, int((new_actions_completed / contract.actions_required) * 100))
     
     if is_complete:
-        message = f"Training complete! {stat_name} increased to {new_value}!"
+        message = f"Training complete! {stat_name} increased to {new_value}"
     else:
-        message = f"Training action completed! {new_actions_completed}/{contract.actions_required} actions done."
+        message = f"Training session complete. Progress: {progress_percent}%"
     
     return {
         "success": True,

@@ -94,16 +94,18 @@ struct PropertyTiersView: View {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
                 sectionHeader(icon: "star.fill", title: "Benefits")
                 
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
-                        .font(FontStyles.iconSmall)
-                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
-                        .frame(width: 20)
-                    
-                    Text(tierBenefit(tier))
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
-                        .fixedSize(horizontal: false, vertical: true)
+                ForEach(tierBenefits(tier), id: \.self) { benefit in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                            .frame(width: 20)
+                        
+                        Text(benefit)
+                            .font(FontStyles.bodySmall)
+                            .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             
@@ -260,10 +262,9 @@ struct PropertyTiersView: View {
         return tierManager.propertyTierName(tier)
     }
     
-    private func tierBenefit(_ tier: Int) -> String {
+    private func tierBenefits(_ tier: Int) -> [String] {
         // Fetch from backend tier manager (single source of truth)
-        let benefits = tierManager.propertyTierBenefits(tier)
-        return benefits.joined(separator: " • ")
+        return tierManager.propertyTierBenefits(tier)
     }
     
     private func upgradeCost(_ tier: Int) -> Int {

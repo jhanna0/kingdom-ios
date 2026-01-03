@@ -74,7 +74,7 @@ struct KingdomInfoSheetView: View {
                 
                 // Ruler Actions (moved to top, after header)
                 if isPlayerInside && kingdom.rulerId == player.playerId {
-                    VStack(spacing: KingdomTheme.Spacing.small) {
+                    VStack(spacing: KingdomTheme.Spacing.medium) {
                         Button(action: onViewKingdom) {
                             HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "crown.fill")
@@ -114,7 +114,7 @@ struct KingdomInfoSheetView: View {
                                     Text("View All Kingdoms")
                                         .font(FontStyles.bodyLargeBold)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Explore your realm")
+                                    Text("Explore your empire")
                                         .font(FontStyles.labelMedium)
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }

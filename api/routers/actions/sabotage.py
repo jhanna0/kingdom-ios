@@ -276,7 +276,7 @@ def _handle_caught_saboteur(
         "response": {
             "success": False,
             "caught": True,
-            "message": f"CAUGHT! {catcher_user.username if catcher_user else 'A patrol'} caught you attempting sabotage!",
+            "message": f"Caught by {catcher_user.username if catcher_user else 'a patrol'}! You've been banned from this kingdom.",
             "detection": {
                 "active_patrols": active_patrols,
                 "detection_chance": f"{detection_chance * 100:.2f}%",
@@ -377,7 +377,7 @@ def _handle_successful_sabotage(
         "caught": False,
         "response": {
             "success": True,
-            "message": f"Successfully sabotaged {kingdom.name}'s {contract.building_type} project!",
+            "message": f"You sabotaged {kingdom.name}'s {contract.building_type} project",
             "sabotage": {
                 "target_kingdom": kingdom.name,
                 "target_contract": {
@@ -536,71 +536,4 @@ def sabotage_contract(
     return result["response"]
 
 
-@router.get("/sabotage/targets")
-def get_sabotage_targets(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get available sabotage targets (active contracts in current kingdom)
-    Only shows contracts from opposing kingdoms
-    """
-    state = current_user.player_state
-    if not state:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Player state not found"
-        )
-    
-    if not state.current_kingdom_id:
-        return {
-            "targets": [],
-            "message": "Not checked into any kingdom"
-        }
-    
-    # Check if user is in an opposing kingdom
-    if state.current_kingdom_id == state.hometown_kingdom_id:
-        return {
-            "targets": [],
-            "message": "Cannot sabotage your hometown kingdom",
-            "current_kingdom_id": state.current_kingdom_id,
-            "hometown_kingdom_id": state.hometown_kingdom_id
-        }
-    
-    # Get active contracts in current kingdom
-    contracts = db.query(Contract).filter(
-        Contract.kingdom_id == state.current_kingdom_id,
-        Contract.status.in_(["open", "in_progress"])
-    ).all()
-    
-    # Get kingdom info
-    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
-    
-    targets = []
-    for contract in contracts:
-        progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
-        targets.append({
-            "contract_id": str(contract.id),
-            "building_type": contract.building_type,
-            "building_level": contract.building_level,
-            "progress": f"{contract.actions_completed}/{contract.total_actions_required}",
-            "progress_percent": progress_percent,
-            "created_at": contract.created_at.isoformat() if contract.created_at else None,
-            "potential_delay": int(contract.total_actions_required * 0.1)  # Show how much delay would be added
-        })
-    
-    from .utils import check_cooldown_from_table
-    cooldown_status = check_cooldown_from_table(db, current_user.id, "sabotage", SABOTAGE_COOLDOWN)
-    
-    return {
-        "kingdom": {
-            "id": state.current_kingdom_id,
-            "name": kingdom.name if kingdom else "Unknown"
-        },
-        "targets": targets,
-        "sabotage_cost": 300,
-        "can_sabotage": cooldown_status["ready"] and state.gold >= 300,
-        "cooldown": cooldown_status,
-        "gold_available": state.gold
-    }
-
+# Legacy endpoint removed - kingdoms only have ONE contract, no need for target selection

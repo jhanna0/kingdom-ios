@@ -110,7 +110,7 @@ def start_patrol(
     
     return {
         "success": True,
-        "message": f"Patrol started! Guard duty for {PATROL_DURATION_MINUTES} minutes.",
+        "message": f"You're on patrol for {PATROL_DURATION_MINUTES} minutes",
         "expires_at": format_datetime_iso(patrol_end),
         "rewards": {
             "gold": None,

@@ -95,7 +95,7 @@ def perform_farming(
     
     return {
         "success": True,
-        "message": f"You worked the fields and earned {net_income} gold!",
+        "message": "You worked the farm",
         "next_farm_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)),
         "rewards": {
             "gold": net_income,

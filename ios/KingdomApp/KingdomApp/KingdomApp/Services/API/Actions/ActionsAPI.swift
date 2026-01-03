@@ -12,6 +12,15 @@ class ActionsAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Generic Action (Fully Dynamic!)
+    
+    /// Perform any action using the endpoint from ActionStatus
+    /// Backend provides complete endpoint with all params - frontend just POSTs
+    func performGenericAction(endpoint: String) async throws -> GenericActionResponse {
+        let request = client.request(endpoint: endpoint, method: "POST")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Contracts (Work)
     
     func workOnContract(contractId: Int) async throws -> WorkActionResponse {
@@ -92,11 +101,6 @@ class ActionsAPI {
     }
     
     // MARK: - Sabotage
-    
-    func getSabotageTargets() async throws -> SabotageTargetsResponse {
-        let request = client.request(endpoint: "/actions/sabotage/targets", method: "GET")
-        return try await client.execute(request)
-    }
     
     func sabotageContract(contractId: Int) async throws -> SabotageActionResponse {
         let request = client.request(endpoint: "/actions/sabotage/\(contractId)", method: "POST")

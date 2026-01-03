@@ -141,9 +141,16 @@ def work_on_contract(
         ContractContribution.user_id == current_user.id
     ).scalar()
     
+    # Build a better message
+    building_name = contract.type.capitalize()
+    if is_complete:
+        message = f"{building_name} construction complete!"
+    else:
+        message = f"You helped build the {building_name}. Progress: {progress_percent}%"
+    
     return {
         "success": True,
-        "message": "Work action completed! +1 action" + (" - Contract complete!" if is_complete else ""),
+        "message": message,
         "contract_id": str(contract_id),
         "actions_completed": new_actions_completed,
         "total_actions_required": contract.actions_required,
@@ -275,17 +282,19 @@ def work_on_property_upgrade(
     
     progress_percent = int((new_actions_completed / contract.actions_required) * 100)
     
+    # Build a better message
     if is_complete:
         if contract.tier == 1 and "|" in (contract.target_id or ""):
-            completion_msg = " - Property construction complete!"
+            message = f"Property construction complete! You now own land in the kingdom!"
         else:
-            completion_msg = " - Property upgrade complete!"
+            message = f"Property upgraded to Tier {contract.tier}! Your land grows stronger!"
     else:
-        completion_msg = ""
+        action_word = "constructing" if (contract.tier == 1 and "|" in (contract.target_id or "")) else "upgrading"
+        message = f"You worked on {action_word} your property. Progress: {progress_percent}%"
     
     return {
         "success": True,
-        "message": "Work action completed! +1 action" + completion_msg,
+        "message": message,
         "contract_id": str(contract_id),
         "property_id": contract.target_id,
         "actions_completed": new_actions_completed,

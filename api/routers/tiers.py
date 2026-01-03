@@ -15,8 +15,7 @@ PROPERTY_TIERS = {
         "name": "Land",
         "description": "Cleared land with travel benefits",
         "benefits": [
-            "Instant travel to this kingdom (no cooldown)",
-            "50% off travel cost to this kingdom"
+            "Free travel to this kingdom"
         ]
     },
     2: {
@@ -24,7 +23,7 @@ PROPERTY_TIERS = {
         "description": "Basic dwelling",
         "benefits": [
             "All Land benefits",
-            "Personal residence in kingdom"
+            "Ability to train skills in this kingdom"
         ]
     },
     3: {
@@ -32,8 +31,7 @@ PROPERTY_TIERS = {
         "description": "Crafting workshop",
         "benefits": [
             "All House benefits",
-            "Unlock equipment crafting (weapons & armor)",
-            "15% faster crafting speed"
+            "Allows crafting of weapons and armor"
         ]
     },
     4: {
@@ -41,15 +39,15 @@ PROPERTY_TIERS = {
         "description": "Luxurious property",
         "benefits": [
             "All Workshop benefits",
-            "Tax exemption in this kingdom"
+            "Pay 50% less tax on all income"
         ]
     },
     5: {
-        "name": "Estate",
+        "name": "Defensive Walls",
         "description": "Grand estate",
         "benefits": [
             "All Beautiful Property benefits",
-            "Protection during kingdom conquest (50% chance to keep property)"
+            "If your kingdom is invaded, a 50% less chance your property gets destroyed"
         ]
     }
 }

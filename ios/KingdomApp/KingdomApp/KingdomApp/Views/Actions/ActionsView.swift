@@ -12,8 +12,6 @@ struct ActionsView: View {
     @State private var showReward = false
     @State private var currentReward: Reward?
     @State private var currentTime = Date()
-    @State private var showSabotageTargets = false
-    @State private var sabotageTargets: SabotageTargetsResponse?
     
     // Cache kingdom status to avoid recalculating on every render
     @State private var isInHomeKingdom: Bool = false
@@ -76,17 +74,6 @@ struct ActionsView: View {
             if showReward, let reward = currentReward {
                 RewardDisplayView(reward: reward, isShowing: $showReward)
                     .transition(.opacity)
-            }
-        }
-        .sheet(isPresented: $showSabotageTargets) {
-            if let targets = sabotageTargets {
-                SabotageTargetSelectionView(
-                    targets: targets,
-                    onSabotage: { contractId in
-                        showSabotageTargets = false
-                        performSabotage(contractId: contractId)
-                    }
-                )
             }
         }
     }
@@ -399,7 +386,7 @@ struct ActionsView: View {
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
                 globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                onAction: { performAction(key: key) }
+                onAction: { performGenericAction(action: action) }
             )
         } else {
             LockedActionCard(
@@ -411,16 +398,52 @@ struct ActionsView: View {
         }
     }
     
-    private func performAction(key: String) {
-        switch key {
-        case "scout":
-            performScout()
-        case "sabotage":
-            showSabotageTargetSelection()
-        case "vault_heist":
-            performVaultHeist()
-        default:
-            print("⚠️ Unknown action: \(key)")
+    /// FULLY DYNAMIC ACTION HANDLER
+    /// Backend provides complete endpoint with all params - we just POST to it!
+    private func performGenericAction(action: ActionStatus) {
+        guard let endpoint = action.endpoint else {
+            errorMessage = "Action not available (no endpoint)"
+            showError = true
+            return
+        }
+        
+        Task {
+            do {
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.performGenericAction(endpoint: endpoint)
+                
+                await loadActionStatus()
+                await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: rewards.gold ?? 0,
+                            reputationReward: rewards.reputation ?? 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: previousGold,
+                            previousReputation: previousReputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
         }
     }
 }
@@ -605,104 +628,6 @@ extension ActionsView {
         }
     }
     
-    private func performScout() {
-        guard let kingdomId = currentKingdom?.id else { return }
-        
-        Task {
-            do {
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.scoutKingdom(kingdomId: kingdomId)
-                
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                viewModel.refreshCooldown()
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: rewards.gold ?? 0,
-                            reputationReward: rewards.reputation ?? 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: previousGold,
-                            previousReputation: previousReputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func showSabotageTargetSelection() {
-        Task {
-            do {
-                let targets = try await KingdomAPIService.shared.actions.getSabotageTargets()
-                await MainActor.run {
-                    sabotageTargets = targets
-                    showSabotageTargets = true
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performSabotage(contractId: Int) {
-        Task {
-            do {
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                
-                let response = try await KingdomAPIService.shared.actions.sabotageContract(contractId: contractId)
-                
-                await loadActionStatus()
-                await viewModel.refreshPlayerFromBackend()
-                viewModel.refreshCooldown()
-                
-                await MainActor.run {
-                    currentReward = Reward(
-                        goldReward: response.rewards.netGold,
-                        reputationReward: response.rewards.reputation,
-                        experienceReward: 0,
-                        message: response.message,
-                        previousGold: previousGold,
-                        previousReputation: previousReputation,
-                        previousExperience: viewModel.player.experience,
-                        currentGold: viewModel.player.gold,
-                        currentReputation: viewModel.player.reputation,
-                        currentExperience: viewModel.player.experience
-                    )
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                        showReward = true
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
     private func performTraining(contractId: String) {
         Task {
             do {
@@ -777,29 +702,6 @@ extension ActionsView {
         }
     }
     
-    private func performVaultHeist() {
-        guard let kingdomId = currentKingdom?.id else { return }
-        
-        Task {
-            do {
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                
-                // TODO: Implement vault heist API call
-                // let response = try await KingdomAPIService.shared.actions.attemptVaultHeist(kingdomId: kingdomId)
-                
-                await MainActor.run {
-                    errorMessage = "Vault heist not yet implemented"
-                    showError = true
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Timer & Kingdom Status

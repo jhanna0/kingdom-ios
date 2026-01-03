@@ -245,7 +245,8 @@ def get_action_status(
         "description": "Guard against saboteurs for 10 minutes",
         "category": "beneficial",
         "theme_color": "buttonPrimary",
-        "display_order": 20
+        "display_order": 20,
+        "endpoint": "/actions/patrol"
     }
     
     actions["farm"] = {
@@ -263,7 +264,8 @@ def get_action_status(
         "description": "Work the fields to earn gold",
         "category": "beneficial",
         "theme_color": "buttonSuccess",
-        "display_order": 30
+        "display_order": 30,
+        "endpoint": "/actions/farm"
     }
     
     actions["scout"] = {
@@ -279,7 +281,8 @@ def get_action_status(
         "description": "Gather intelligence on enemy kingdom",
         "category": "hostile",
         "theme_color": "buttonWarning",
-        "display_order": 10
+        "display_order": 10,
+        "endpoint": f"/actions/scout/{state.current_kingdom_id}" if state.current_kingdom_id else None
     }
     
     actions["training"] = {
@@ -309,6 +312,18 @@ def get_action_status(
     }
     
     # INTELLIGENCE-GATED ACTIONS - dynamically add based on requirements
+    # For sabotage, get the active contract in current kingdom (if any)
+    sabotage_endpoint = None
+    if state.current_kingdom_id:
+        from db.models.unified_contract import UnifiedContract
+        active_contract = db.query(UnifiedContract).filter(
+            UnifiedContract.kingdom_id == state.current_kingdom_id,
+            UnifiedContract.type.in_(["wall", "vault", "mine", "market", "farm", "education"]),
+            UnifiedContract.status.in_(["open", "in_progress"])
+        ).first()
+        if active_contract:
+            sabotage_endpoint = f"/actions/sabotage/{active_contract.id}"
+    
     if state.intelligence >= 4:
         actions["sabotage"] = {
             **check_cooldown_from_table(db, current_user.id, "sabotage", sabotage_cooldown),
@@ -320,7 +335,8 @@ def get_action_status(
             "icon": "flame.fill",
             "description": "Delay enemy construction projects (300g cost)",
             "category": "hostile",
-            "theme_color": "buttonDanger"  # Maps to KingdomTheme.Colors.buttonDanger
+            "theme_color": "buttonDanger",
+            "endpoint": sabotage_endpoint
         }
     else:
         actions["sabotage"] = {
@@ -334,7 +350,8 @@ def get_action_status(
             "icon": "flame.fill",
             "description": "Delay enemy construction projects",
             "category": "hostile",
-            "theme_color": "buttonDanger"
+            "theme_color": "buttonDanger",
+            "endpoint": None
         }
     
     if state.intelligence >= MIN_INTELLIGENCE_REQUIRED:
@@ -348,7 +365,8 @@ def get_action_status(
             "icon": "banknote.fill",
             "description": "Steal 10% of kingdom vault (1000g cost, 7 day cooldown)",
             "category": "hostile",
-            "theme_color": "buttonSpecial"  # Maps to KingdomTheme.Colors.buttonSpecial (purple)
+            "theme_color": "buttonSpecial",
+            "endpoint": f"/actions/vault-heist/{state.current_kingdom_id}" if state.current_kingdom_id else None
         }
     else:
         actions["vault_heist"] = {
@@ -362,7 +380,8 @@ def get_action_status(
             "icon": "banknote.fill",
             "description": "Steal from enemy kingdom vault",
             "category": "hostile",
-            "theme_color": "buttonSpecial"  # Purple for high-tier intelligence action
+            "theme_color": "buttonSpecial",
+            "endpoint": None
         }
     
     return {
