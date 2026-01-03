@@ -1,11 +1,5 @@
 import SwiftUI
 
-// MARK: - Action Type
-
-enum ActionType {
-    case work, patrol, farm, scout, sabotage
-}
-
 // MARK: - Action Card
 
 struct ActionCard: View {
@@ -15,7 +9,6 @@ struct ActionCard: View {
     let status: ActionStatus
     let fetchedAt: Date
     let currentTime: Date
-    let actionType: ActionType
     let isEnabled: Bool
     let activeCount: Int?
     let globalCooldownActive: Bool
@@ -121,7 +114,7 @@ struct ActionCard: View {
             } else {
                 CooldownTimer(
                     secondsRemaining: calculatedSecondsRemaining,
-                    totalSeconds: Int(status.cooldownMinutes * 60)
+                    totalSeconds: Int((status.cooldownMinutes ?? 120) * 60)
                 )
             }
         }
@@ -131,18 +124,13 @@ struct ActionCard: View {
     }
     
     private var iconColor: Color {
-        // Always show the vibrant color - don't gray out!
-        switch actionType {
-        case .farm:
-            return ActionIconHelper.actionColor(for: "farm")
-        case .patrol:
-            return ActionIconHelper.actionColor(for: "patrol")
-        case .scout:
-            return ActionIconHelper.actionColor(for: "scout")
-        case .sabotage:
-            return ActionIconHelper.actionColor(for: "sabotage")
-        case .work:
-            return ActionIconHelper.actionColor(for: "work")
+        // Use theme_color from API if available, otherwise fall back to action type
+        if let themeColor = status.themeColor {
+            return KingdomTheme.Colors.color(fromThemeName: themeColor)
+        } else if let actionType = status.actionType {
+            return ActionIconHelper.actionColor(for: actionType)
+        } else {
+            return KingdomTheme.Colors.inkMedium
         }
     }
     

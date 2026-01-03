@@ -327,7 +327,6 @@ struct ActionsView: View {
                 status: status.farm,
                 fetchedAt: statusFetchedAt ?? Date(),
                 currentTime: currentTime,
-                actionType: .farm,
                 isEnabled: true,
                 activeCount: nil,
                 globalCooldownActive: !status.globalCooldown.ready,
@@ -344,7 +343,6 @@ struct ActionsView: View {
                 status: status.patrol,
                 fetchedAt: statusFetchedAt ?? Date(),
                 currentTime: currentTime,
-                actionType: .patrol,
                 isEnabled: true,
                 activeCount: status.patrol.activePatrollers,
                 globalCooldownActive: !status.globalCooldown.ready,
@@ -371,39 +369,58 @@ struct ActionsView: View {
                 .padding(.horizontal)
                 .padding(.top, KingdomTheme.Spacing.medium)
             
-            // Scout
+            // DYNAMIC: Render all hostile actions from API
+            ForEach(sortedActions(status.actions, category: "hostile"), id: \.key) { key, action in
+                renderAction(key: key, action: action, status: status)
+            }
+        }
+    }
+    
+    // MARK: - Dynamic Action Rendering
+    
+    private func sortedActions(_ actions: [String: ActionStatus], category: String) -> [(key: String, value: ActionStatus)] {
+        return actions
+            .filter { $0.value.category == category }
+            .sorted { ($0.value.displayOrder ?? 999) < ($1.value.displayOrder ?? 999) }
+    }
+    
+    @ViewBuilder
+    private func renderAction(key: String, action: ActionStatus, status: AllActionStatus) -> some View {
+        if action.unlocked == true {
             ActionCard(
-                title: "Scout Kingdom",
-                icon: "magnifyingglass",
-                description: "Gather intelligence on this enemy kingdom",
-                status: status.scout,
+                title: action.title ?? key.capitalized,
+                icon: action.icon ?? "circle.fill",
+                description: action.description ?? "",
+                status: action,
                 fetchedAt: statusFetchedAt ?? Date(),
                 currentTime: currentTime,
-                actionType: .scout,
                 isEnabled: true,
-                activeCount: nil,
+                activeCount: action.activePatrollers,
                 globalCooldownActive: !status.globalCooldown.ready,
                 blockingAction: status.globalCooldown.blockingAction,
                 globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                onAction: { performScout() }
+                onAction: { performAction(key: key) }
             )
-            
-            // Sabotage
-            ActionCard(
-                title: "Sabotage Contract",
-                icon: "flame.fill",
-                description: "Delay enemy construction projects (300g cost)",
-                status: status.sabotage,
-                fetchedAt: statusFetchedAt ?? Date(),
-                currentTime: currentTime,
-                actionType: .sabotage,
-                isEnabled: true,
-                activeCount: nil,
-                globalCooldownActive: !status.globalCooldown.ready,
-                blockingAction: status.globalCooldown.blockingAction,
-                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                onAction: { showSabotageTargetSelection() }
+        } else {
+            LockedActionCard(
+                title: action.title ?? key.capitalized,
+                icon: action.icon ?? "circle.fill",
+                description: action.description ?? "",
+                requirementText: action.requirementDescription ?? "Locked"
             )
+        }
+    }
+    
+    private func performAction(key: String) {
+        switch key {
+        case "scout":
+            performScout()
+        case "sabotage":
+            showSabotageTargetSelection()
+        case "vault_heist":
+            performVaultHeist()
+        default:
+            print("⚠️ Unknown action: \(key)")
         }
     }
 }
@@ -750,6 +767,30 @@ extension ActionsView {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showReward = true
                     }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performVaultHeist() {
+        guard let kingdomId = currentKingdom?.id else { return }
+        
+        Task {
+            do {
+                let previousGold = viewModel.player.gold
+                let previousReputation = viewModel.player.reputation
+                
+                // TODO: Implement vault heist API call
+                // let response = try await KingdomAPIService.shared.actions.attemptVaultHeist(kingdomId: kingdomId)
+                
+                await MainActor.run {
+                    errorMessage = "Vault heist not yet implemented"
+                    showError = true
                 }
             } catch {
                 await MainActor.run {

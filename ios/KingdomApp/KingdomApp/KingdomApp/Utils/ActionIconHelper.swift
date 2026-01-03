@@ -16,6 +16,8 @@ struct ActionIconHelper {
             return "magnifyingglass"
         case "sabotage":
             return "flame.fill"
+        case "vault_heist", "vault heist", "heist":
+            return "banknote.fill"
         case "training", "train":
             return "figure.strengthtraining.traditional"
         case "craft", "crafting":
@@ -50,6 +52,8 @@ struct ActionIconHelper {
             return "Scout"
         case "sabotage":
             return "Sabotage"
+        case "vault_heist", "vault heist", "heist":
+            return "Vault Heist"
         case "training", "train":
             return "Training"
         case "craft", "crafting":
@@ -84,6 +88,8 @@ struct ActionIconHelper {
             return "Scouted"
         case "sabotage":
             return "Sabotaged"
+        case "vault_heist", "vault heist", "heist":
+            return "Robbed vault"
         case "training", "train":
             return "Trained"
         case "craft", "crafting":
@@ -134,6 +140,8 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.buttonWarning // Orange
         case "sabotage":
             return KingdomTheme.Colors.buttonDanger // Red
+        case "vault_heist", "vault heist", "heist":
+            return Color.purple // Purple for high-tier intelligence action
         case "training", "train":
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "craft", "crafting":

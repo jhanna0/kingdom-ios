@@ -121,7 +121,7 @@ struct WorkContractCard: View {
             } else {
                 CooldownTimer(
                     secondsRemaining: calculatedSecondsRemaining,
-                    totalSeconds: Int(status.cooldownMinutes * 60)
+                    totalSeconds: Int(status.cooldownMinutes ?? 120 * 60)
                 )
             }
         }

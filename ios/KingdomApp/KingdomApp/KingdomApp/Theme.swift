@@ -138,6 +138,45 @@ struct KingdomTheme {
                 }
             }
         }
+        
+        /// Map semantic color name from API to theme color
+        static func color(fromThemeName name: String) -> Color {
+            switch name.lowercased() {
+            // Buttons
+            case "buttonprimary": return buttonPrimary
+            case "buttonsecondary": return buttonSecondary
+            case "buttonsuccess": return buttonSuccess
+            case "buttondanger": return buttonDanger
+            case "buttonwarning": return buttonWarning
+            case "buttonspecial": return buttonSpecial
+            
+            // Ink
+            case "inkdark": return inkDark
+            case "inkmedium": return inkMedium
+            case "inklight": return inkLight
+            case "inksubtle": return inkSubtle
+            
+            // Gold
+            case "gold": return gold
+            case "goldlight": return goldLight
+            case "goldwarm": return goldWarm
+            
+            // Royal
+            case "royalpurple": return royalPurple
+            case "regalpurple": return regalPurple
+            case "imperialgold": return imperialGold
+            case "royalcrimson": return royalCrimson
+            case "royalblue": return royalBlue
+            case "royalemerald": return royalEmerald
+            
+            // Semantic
+            case "disabled": return disabled
+            case "error": return error
+            
+            default:
+                return inkMedium  // Default fallback
+            }
+        }
     }
     
     // MARK: - Typography

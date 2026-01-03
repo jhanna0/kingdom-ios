@@ -22,7 +22,9 @@ from .constants import (
     SCOUT_COOLDOWN,
     SCOUT_GOLD_REWARD,
     TRAINING_COOLDOWN,
-    PATROL_REPUTATION_REWARD
+    PATROL_REPUTATION_REWARD,
+    MIN_INTELLIGENCE_REQUIRED,
+    VAULT_HEIST_COOLDOWN_HOURS
 )
 
 
@@ -211,49 +213,170 @@ def get_action_status(
     
     # Work reward (need to calculate per contract, so we'll add it to each contract object)
     
-    return {
-        "global_cooldown": global_cooldown,  # NEW: Global action lock
-        "work": {
-            **check_cooldown_from_table(db, current_user.id, "work", work_cooldown),
-            "cooldown_minutes": work_cooldown
+    # Build list of ALL possible actions dynamically
+    actions = {}
+    
+    # ALWAYS AVAILABLE ACTIONS - API defines ALL metadata
+    actions["work"] = {
+        **check_cooldown_from_table(db, current_user.id, "work", work_cooldown),
+        "cooldown_minutes": work_cooldown,
+        "unlocked": True,
+        "action_type": "work",
+        "title": "Work on Contract",
+        "icon": "hammer.fill",
+        "description": "Build kingdom infrastructure",
+        "category": "beneficial",
+        "theme_color": "inkMedium",
+        "display_order": 10
+    }
+    
+    actions["patrol"] = {
+        **check_cooldown_from_table(db, current_user.id, "patrol", patrol_cooldown),
+        "cooldown_minutes": patrol_cooldown,
+        "is_patrolling": is_patrolling(db, current_user.id),
+        "active_patrollers": active_patrollers,
+        "expected_reward": {
+            "reputation": patrol_rep_reward
         },
-        "patrol": {
-            **check_cooldown_from_table(db, current_user.id, "patrol", patrol_cooldown),
-            "cooldown_minutes": patrol_cooldown,
-            "is_patrolling": is_patrolling(db, current_user.id),
-            "active_patrollers": active_patrollers,
-            "expected_reward": {
-                "reputation": patrol_rep_reward
-            }
+        "unlocked": True,
+        "action_type": "patrol",
+        "title": "Patrol",
+        "icon": "eye.fill",
+        "description": "Guard against saboteurs for 10 minutes",
+        "category": "beneficial",
+        "theme_color": "buttonPrimary",
+        "display_order": 20
+    }
+    
+    actions["farm"] = {
+        **check_cooldown_from_table(db, current_user.id, "farm", farm_cooldown),
+        "cooldown_minutes": farm_cooldown,
+        "expected_reward": {
+            "gold_gross": farm_gross,
+            "gold_bonus_multiplier": farm_bonus_multiplier,
+            "building_skill": state.building_skill
         },
-        "farm": {
-            **check_cooldown_from_table(db, current_user.id, "farm", farm_cooldown),
-            "cooldown_minutes": farm_cooldown,
-            "expected_reward": {
-                "gold_gross": farm_gross,
-                "gold_bonus_multiplier": farm_bonus_multiplier,
-                "building_skill": state.building_skill
-            }
+        "unlocked": True,
+        "action_type": "farm",
+        "title": "Farm",
+        "icon": "leaf.fill",
+        "description": "Work the fields to earn gold",
+        "category": "beneficial",
+        "theme_color": "buttonSuccess",
+        "display_order": 30
+    }
+    
+    actions["scout"] = {
+        **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
+        "cooldown_minutes": scout_cooldown,
+        "expected_reward": {
+            "gold": scout_reward
         },
-        "sabotage": {
+        "unlocked": True,
+        "action_type": "scout",
+        "title": "Scout Kingdom",
+        "icon": "magnifyingglass",
+        "description": "Gather intelligence on enemy kingdom",
+        "category": "hostile",
+        "theme_color": "buttonWarning",
+        "display_order": 10
+    }
+    
+    actions["training"] = {
+        **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
+        "cooldown_minutes": training_cooldown,
+        "unlocked": True,
+        "action_type": "training",
+        "title": "Training",
+        "icon": "figure.strengthtraining.traditional",
+        "description": "Train your stats",
+        "category": "personal",
+        "theme_color": "buttonPrimary",
+        "display_order": 10
+    }
+    
+    actions["crafting"] = {
+        **check_cooldown_from_table(db, current_user.id, "crafting", work_cooldown),
+        "cooldown_minutes": work_cooldown,
+        "unlocked": True,
+        "action_type": "crafting",
+        "title": "Crafting",
+        "icon": "hammer.fill",
+        "description": "Craft equipment",
+        "category": "personal",
+        "theme_color": "buttonWarning",
+        "display_order": 20
+    }
+    
+    # INTELLIGENCE-GATED ACTIONS - dynamically add based on requirements
+    if state.intelligence >= 4:
+        actions["sabotage"] = {
             **check_cooldown_from_table(db, current_user.id, "sabotage", sabotage_cooldown),
-            "cooldown_minutes": sabotage_cooldown
-        },
-        "scout": {
-            **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
-            "cooldown_minutes": scout_cooldown,
-            "expected_reward": {
-                "gold": scout_reward
-            }
-        },
-        "training": {
-            **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
-            "cooldown_minutes": training_cooldown
-        },
-        "crafting": {
-            **check_cooldown_from_table(db, current_user.id, "crafting", work_cooldown),
-            "cooldown_minutes": work_cooldown
-        },
+            "cooldown_minutes": sabotage_cooldown,
+            "unlocked": True,
+            "action_type": "sabotage",
+            "requirements_met": True,
+            "title": "Sabotage Contract",
+            "icon": "flame.fill",
+            "description": "Delay enemy construction projects (300g cost)",
+            "category": "hostile",
+            "theme_color": "buttonDanger"  # Maps to KingdomTheme.Colors.buttonDanger
+        }
+    else:
+        actions["sabotage"] = {
+            "ready": False,
+            "seconds_remaining": 0,
+            "unlocked": False,
+            "action_type": "sabotage",
+            "requirements_met": False,
+            "requirement_description": f"Requires T4 Intelligence (you: T{state.intelligence})",
+            "title": "Sabotage Contract",
+            "icon": "flame.fill",
+            "description": "Delay enemy construction projects",
+            "category": "hostile",
+            "theme_color": "buttonDanger"
+        }
+    
+    if state.intelligence >= MIN_INTELLIGENCE_REQUIRED:
+        actions["vault_heist"] = {
+            **check_cooldown_from_table(db, current_user.id, "vault_heist", VAULT_HEIST_COOLDOWN_HOURS * 60),
+            "cooldown_minutes": VAULT_HEIST_COOLDOWN_HOURS * 60,
+            "unlocked": True,
+            "action_type": "vault_heist",
+            "requirements_met": True,
+            "title": "Vault Heist",
+            "icon": "banknote.fill",
+            "description": "Steal 10% of kingdom vault (1000g cost, 7 day cooldown)",
+            "category": "hostile",
+            "theme_color": "buttonSpecial"  # Maps to KingdomTheme.Colors.buttonSpecial (purple)
+        }
+    else:
+        actions["vault_heist"] = {
+            "ready": False,
+            "seconds_remaining": 0,
+            "unlocked": False,
+            "action_type": "vault_heist",
+            "requirements_met": False,
+            "requirement_description": f"Requires Intelligence Tier {MIN_INTELLIGENCE_REQUIRED} (current: Tier {state.intelligence})",
+            "title": "Vault Heist",
+            "icon": "banknote.fill",
+            "description": "Steal from enemy kingdom vault",
+            "category": "hostile",
+            "theme_color": "buttonSpecial"  # Purple for high-tier intelligence action
+        }
+    
+    return {
+        "global_cooldown": global_cooldown,
+        "actions": actions,  # DYNAMIC ACTION LIST
+        # Legacy structure for backward compatibility
+        "work": actions["work"],
+        "patrol": actions["patrol"],
+        "farm": actions["farm"],
+        "sabotage": actions["sabotage"],
+        "scout": actions["scout"],
+        "training": actions["training"],
+        "crafting": actions["crafting"],
+        "vault_heist": actions.get("vault_heist"),
         "training_contracts": get_training_contracts_for_status(db, current_user.id),
         "training_costs": {
             "attack": calculate_training_cost(state.attack_power),
@@ -266,4 +389,3 @@ def get_action_status(
         "property_upgrade_contracts": property_contracts,
         "contracts": contracts
     }
-

@@ -39,13 +39,25 @@ struct ExpectedReward: Codable {
 struct ActionStatus: Codable {
     let ready: Bool
     let secondsRemaining: Int
-    let cooldownMinutes: Double
+    let cooldownMinutes: Double?
     let isPatrolling: Bool?
     let activePatrollers: Int?
     let currentStat: Int?
     let sessionsAvailable: Int?
     let purchaseCost: Int?
     let expectedReward: ExpectedReward?
+    
+    // Action metadata (ALL from API - frontend is dumb renderer!)
+    let unlocked: Bool?
+    let actionType: String?
+    let requirementsMet: Bool?
+    let requirementDescription: String?
+    let title: String?
+    let icon: String?
+    let description: String?
+    let category: String?
+    let themeColor: String?  // Maps to KingdomTheme.Colors
+    let displayOrder: Int?
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -57,6 +69,13 @@ struct ActionStatus: Codable {
         case sessionsAvailable = "sessions_available"
         case purchaseCost = "purchase_cost"
         case expectedReward = "expected_reward"
+        case unlocked
+        case actionType = "action_type"
+        case requirementsMet = "requirements_met"
+        case requirementDescription = "requirement_description"
+        case title, icon, description, category
+        case themeColor = "theme_color"
+        case displayOrder = "display_order"
     }
 }
 
@@ -64,6 +83,9 @@ struct ActionStatus: Codable {
 
 struct AllActionStatus: Codable {
     let globalCooldown: GlobalCooldown
+    let actions: [String: ActionStatus]  // DYNAMIC - API decides what actions are available
+    
+    // Legacy fields for backward compatibility
     let work: ActionStatus
     let patrol: ActionStatus
     let farm: ActionStatus
@@ -71,6 +93,8 @@ struct AllActionStatus: Codable {
     let scout: ActionStatus
     let training: ActionStatus
     let crafting: ActionStatus
+    let vaultHeist: ActionStatus?
+    
     let trainingContracts: [TrainingContract]
     let trainingCosts: TrainingCosts
     let craftingQueue: [CraftingContract]
@@ -79,8 +103,10 @@ struct AllActionStatus: Codable {
     let contracts: [APIContract]
     
     enum CodingKeys: String, CodingKey {
-        case work, patrol, farm, sabotage, scout, training, crafting, contracts
         case globalCooldown = "global_cooldown"
+        case actions
+        case work, patrol, farm, sabotage, scout, training, crafting, contracts
+        case vaultHeist = "vault_heist"
         case trainingContracts = "training_contracts"
         case trainingCosts = "training_costs"
         case craftingQueue = "crafting_queue"
