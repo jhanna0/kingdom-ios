@@ -63,17 +63,17 @@ struct ProfileHeaderCard: View {
                 }
                 
                 // Gold display (only if provided)
-                if let gold = gold {
-                    HStack(spacing: 4) {
-                        Text("\(gold)")
-                            .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                // if let gold = gold {
+                //     HStack(spacing: 4) {
+                //         Text("\(gold)")
+                //             .font(FontStyles.bodyMediumBold)
+                //             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        Image(systemName: "g.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                    }
-                }
+                //         Image(systemName: "g.circle.fill")
+                //             .font(FontStyles.iconMini)
+                //             .foregroundColor(KingdomTheme.Colors.goldLight)
+                //     }
+                // }
             }
             
             Spacer()

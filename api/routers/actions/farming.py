@@ -79,7 +79,7 @@ def perform_farming(
         user_id=current_user.id,
         action_type="farm",
         action_category="economy",
-        description="Farmed for gold",
+        description="Farmed",
         kingdom_id=state.current_kingdom_id,
         amount=net_income,
         details={

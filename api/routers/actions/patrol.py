@@ -68,13 +68,36 @@ def start_patrol(
     patrol_end = datetime.utcnow() + timedelta(minutes=PATROL_DURATION_MINUTES)
     set_cooldown(db, current_user.id, "patrol", patrol_end)
     
+    # Award reputation to user_kingdoms table
+    from db.models.kingdom import UserKingdom
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.kingdom_id == state.current_kingdom_id
+    ).first()
+    
+    if user_kingdom:
+        user_kingdom.local_reputation += PATROL_REPUTATION_REWARD
+    else:
+        # Create new user_kingdom record
+        user_kingdom = UserKingdom(
+            user_id=current_user.id,
+            kingdom_id=state.current_kingdom_id,
+            local_reputation=PATROL_REPUTATION_REWARD,
+            times_conquered=0,
+            total_reign_duration_hours=0.0,
+            checkins_count=0,
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(user_kingdom)
+    
     # Log activity
     log_activity(
         db=db,
         user_id=current_user.id,
         action_type="patrol",
         action_category="kingdom",
-        description="Patrolled for reputation",
+        description="Patrolled",
         kingdom_id=state.current_kingdom_id,
         amount=PATROL_REPUTATION_REWARD,
         details={

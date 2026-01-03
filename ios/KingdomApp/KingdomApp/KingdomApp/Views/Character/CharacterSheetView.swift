@@ -697,9 +697,17 @@ struct MyActivityRow: View {
                     Text("+\(amount)")
                         .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    Image(systemName: "g.circle.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                    
+                    // Show R for reputation (patrol) or G for gold
+                    if activity.actionType == "patrol" {
+                        Image(systemName: "r.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.royalPurple)
+                    } else {
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                    }
                 }
             }
         }
