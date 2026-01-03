@@ -12,7 +12,7 @@ struct MapHUD: View {
     
     // Get home kingdom name
     private var homeKingdomName: String? {
-        guard let homeKingdomId = viewModel.player.homeKingdomId else { return nil }
+        guard let homeKingdomId = viewModel.player.hometownKingdomId else { return nil }
         return viewModel.kingdoms.first(where: { $0.id == homeKingdomId })?.name
     }
     

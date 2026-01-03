@@ -461,6 +461,62 @@ ALTER TABLE player_state DROP COLUMN IF EXISTS last_check_in;
 ALTER TABLE player_state DROP COLUMN IF EXISTS last_daily_check_in;
 
 -- ============================================
+-- STEP 11: CENTRALIZE hometown_kingdom_id IN player_state
+-- ============================================
+
+-- IMPORTANT: hometown_kingdom_id should ONLY exist in player_state, not in users table
+-- This prevents the /auth/me and /player/state endpoints from returning different values
+
+-- First, ensure EVERY user with hometown_kingdom_id set also has it in their player_state
+-- Copy from users.hometown_kingdom_id to player_state.hometown_kingdom_id
+DO $$
+DECLARE
+    rows_updated INTEGER;
+BEGIN
+    UPDATE player_state ps
+    SET hometown_kingdom_id = u.hometown_kingdom_id
+    FROM users u
+    WHERE ps.user_id = u.id
+      AND u.hometown_kingdom_id IS NOT NULL
+      AND (ps.hometown_kingdom_id IS NULL OR ps.hometown_kingdom_id != u.hometown_kingdom_id);
+    
+    GET DIAGNOSTICS rows_updated = ROW_COUNT;
+    RAISE NOTICE 'Updated % player_state rows with hometown_kingdom_id from users table', rows_updated;
+END $$;
+
+-- Verify no data will be lost
+DO $$
+DECLARE
+    users_with_hometown INTEGER;
+    states_with_hometown INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO users_with_hometown 
+    FROM users 
+    WHERE hometown_kingdom_id IS NOT NULL;
+    
+    SELECT COUNT(*) INTO states_with_hometown
+    FROM player_state ps
+    JOIN users u ON ps.user_id = u.id
+    WHERE u.hometown_kingdom_id IS NOT NULL
+      AND ps.hometown_kingdom_id IS NOT NULL;
+    
+    IF users_with_hometown != states_with_hometown THEN
+        RAISE EXCEPTION 'DATA LOSS RISK: % users have hometown_kingdom_id but only % player_states have it copied. Aborting!', 
+            users_with_hometown, states_with_hometown;
+    END IF;
+    
+    RAISE NOTICE 'SAFETY CHECK PASSED: All % user hometown_kingdom_id values are safely in player_state', users_with_hometown;
+END $$;
+
+-- Drop the unique constraint that uses hometown_kingdom_id
+ALTER TABLE users DROP CONSTRAINT IF EXISTS unique_name_per_hometown;
+
+-- NOW it's safe to drop the column from users table
+ALTER TABLE users DROP COLUMN IF EXISTS hometown_kingdom_id;
+
+RAISE NOTICE 'Successfully removed hometown_kingdom_id from users table - now centralized in player_state';
+
+-- ============================================
 -- DONE! 
 -- ============================================
 
@@ -474,6 +530,7 @@ COMMIT;
 -- 5. contract_contributions: All action counts converted to individual rows
 -- 6. user_kingdoms: reputation, kingdom_reputation, check_in_history, total_checkins from player_state
 -- 7. CLEANED UP: Removed 30+ old columns from player_state
+-- 8. CENTRALIZED: hometown_kingdom_id moved from users table to player_state (single source of truth)
 
 SELECT 'Migration complete!' as status;
 SELECT 'action_cooldowns: ' || count(*) FROM action_cooldowns;

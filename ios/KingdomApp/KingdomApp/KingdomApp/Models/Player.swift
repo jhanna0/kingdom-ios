@@ -18,9 +18,7 @@ class Player: ObservableObject {
     @Published var lastCheckInLocation: CLLocationCoordinate2D?
     
     // Player History & Home
-    @Published var hometownKingdomId: String?  // Their actual hometown (for espionage/foreign status)
-    @Published var homeKingdomId: String?   // Where they spend most time
-    @Published var originKingdomId: String? // Where they started (first 300+ rep)
+    @Published var hometownKingdomId: String?  // Their hometown (set on first check-in) - used for royal blue territory color
     @Published var checkInHistory: [String: Int] = [:]  // kingdomId -> total check-ins
     
     // Power & Territory
@@ -159,11 +157,6 @@ class Player: ObservableObject {
             let current = kingdomReputation[kingdomId] ?? 0
             let newRep = current + amount
             kingdomReputation[kingdomId] = newRep
-            
-            // Track origin kingdom (first time hitting 300+ rep)
-            if originKingdomId == nil && newRep >= 300 {
-                originKingdomId = kingdomId
-            }
         }
         
         // Backend is source of truth - no local caching
@@ -590,8 +583,6 @@ class Player: ObservableObject {
         // Territory
         state["current_kingdom_id"] = currentKingdom
         state["hometown_kingdom_id"] = hometownKingdomId
-        state["home_kingdom_id"] = homeKingdomId
-        state["origin_kingdom_id"] = originKingdomId
         state["fiefs_ruled"] = Array(fiefsRuled)
         state["is_ruler"] = isRuler
         
@@ -654,15 +645,12 @@ class Player: ObservableObject {
         // Territory
         currentKingdom = apiState.current_kingdom_id
         hometownKingdomId = apiState.hometown_kingdom_id
-        homeKingdomId = apiState.home_kingdom_id
-        originKingdomId = apiState.origin_kingdom_id
         fiefsRuled = Set(apiState.fiefs_ruled ?? [])
         isRuler = apiState.is_ruler
         
         print("🌍 Player territory synced from API:")
         print("   - Current Kingdom: \(currentKingdom ?? "nil")")
-        print("   - Hometown Kingdom: \(hometownKingdomId ?? "nil")")
-        print("   - Home Kingdom: \(homeKingdomId ?? "nil")")
+        print("   - Hometown Kingdom: \(hometownKingdomId ?? "nil") [ROYAL BLUE]")
         print("   - Is Ruler: \(isRuler)")
         
         // Check-in

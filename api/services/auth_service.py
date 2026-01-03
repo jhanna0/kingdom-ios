@@ -92,25 +92,14 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
                 detail=error_msg
             )
     
-    # Check if display name is taken in this hometown
-    if apple_data.hometown_kingdom_id and display_name:
-        name_taken = db.query(User).filter(
-            User.display_name == display_name,
-            User.hometown_kingdom_id == apple_data.hometown_kingdom_id
-        ).first()
-        
-        if name_taken:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Name '{display_name}' is already taken in this city"
-            )
+    # NOTE: Display name uniqueness validation removed - names can be reused across cities
+    # Uniqueness is now tracked via player_state.hometown_kingdom_id, not enforced at DB level
     
     # Create new user - PostgreSQL will auto-generate the ID
     user = User(
         email=apple_data.email,
         apple_user_id=apple_data.apple_user_id,
         display_name=display_name,
-        hometown_kingdom_id=apple_data.hometown_kingdom_id,
     )
     
     db.add(user)
@@ -119,12 +108,10 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     # Create player state with default values
     player_state = PlayerState(
         user_id=user.id,  # Now this is a Postgres-generated integer
-        hometown_kingdom_id=apple_data.hometown_kingdom_id,
+        hometown_kingdom_id=None,  # Will be set on first check-in
         gold=100,
         level=1,
         experience=0,
-        reputation=0,
-        honor=100,
     )
     
     db.add(player_state)
@@ -162,10 +149,12 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
             )
         
         # Check if new name is taken in this hometown
-        if user.hometown_kingdom_id:
-            name_taken = db.query(User).filter(
+        player_state = user.player_state
+        if player_state and player_state.hometown_kingdom_id:
+            # Check if name is taken by another user with the same hometown
+            name_taken = db.query(User).join(PlayerState).filter(
                 User.display_name == display_name,
-                User.hometown_kingdom_id == user.hometown_kingdom_id,
+                PlayerState.hometown_kingdom_id == player_state.hometown_kingdom_id,
                 User.id != user_id  # Exclude current user
             ).first()
             
@@ -206,7 +195,7 @@ def user_to_private_response(user: User) -> dict:
         "email": user.email,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
-        "hometown_kingdom_id": user.hometown_kingdom_id,
+        "hometown_kingdom_id": player_state.hometown_kingdom_id if player_state else None,
         "gold": player_state.gold if player_state else 0,
         "level": player_state.level if player_state else 1,
         "experience": player_state.experience if player_state else 0,
@@ -275,7 +264,7 @@ def add_experience(db: Session, user_id: int, exp_amount: int) -> User:
     # Get or create player state
     state = user.player_state
     if not state:
-        state = PlayerState(user_id=user.id, hometown_kingdom_id=user.hometown_kingdom_id)
+        state = PlayerState(user_id=user.id, hometown_kingdom_id=None)
         db.add(state)
         db.flush()
     
@@ -311,7 +300,7 @@ def add_gold(db: Session, user_id: int, gold_amount: int) -> User:
     # Get or create player state
     state = user.player_state
     if not state:
-        state = PlayerState(user_id=user.id, hometown_kingdom_id=user.hometown_kingdom_id)
+        state = PlayerState(user_id=user.id, hometown_kingdom_id=None)
         db.add(state)
     
     state.gold += gold_amount

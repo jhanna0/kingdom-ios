@@ -22,7 +22,7 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
     if not user.player_state:
         player_state = DBPlayerState(
             user_id=user.id,
-            hometown_kingdom_id=user.hometown_kingdom_id
+            hometown_kingdom_id=None  # Will be set on first check-in
         )
         db.add(player_state)
         db.commit()

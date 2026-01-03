@@ -13,7 +13,6 @@ class AppleSignIn(BaseModel):
     apple_user_id: str
     email: Optional[str] = None
     display_name: Optional[str] = None
-    hometown_kingdom_id: Optional[str] = None
     
     @field_validator('display_name')
     @classmethod
@@ -67,9 +66,9 @@ class UserPrivate(BaseModel):
     email: Optional[str] = None
     display_name: str
     avatar_url: Optional[str] = None
-    hometown_kingdom_id: Optional[str] = None
     
-    # Game stats
+    # Game stats (from player_state)
+    hometown_kingdom_id: Optional[str] = None
     gold: int
     level: int
     experience: int
@@ -95,7 +94,6 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
-    hometown_kingdom_id: Optional[str] = None
     
     @field_validator('display_name')
     @classmethod

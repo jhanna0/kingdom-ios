@@ -27,9 +27,6 @@ class User(Base):
     display_name = Column(String, nullable=False)
     avatar_url = Column(String, nullable=True)
     
-    # Hometown - for unique display_name constraint
-    hometown_kingdom_id = Column(String, nullable=True, index=True)
-    
     # Account status
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
@@ -43,11 +40,6 @@ class User(Base):
     player_state = relationship("PlayerState", uselist=False, backref="user", cascade="all, delete-orphan")
     kingdoms = relationship("UserKingdom", back_populates="user")
     contracts = relationship("Contract", back_populates="creator", foreign_keys="Contract.created_by")
-    
-    # Unique constraint: display_name must be unique per hometown
-    __table_args__ = (
-        UniqueConstraint('display_name', 'hometown_kingdom_id', name='unique_name_per_hometown'),
-    )
     
     def __repr__(self):
         return f"<User(id='{self.id}', display_name='{self.display_name}')>"

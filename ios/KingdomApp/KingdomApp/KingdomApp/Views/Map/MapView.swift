@@ -296,7 +296,7 @@ struct MapView: View {
                 }
                 
                 Annotation(kingdom.name, coordinate: kingdom.territory.center) {
-                    KingdomMarkerWithActivity(kingdom: kingdom, homeKingdomId: viewModel.player.homeKingdomId, playerId: viewModel.player.playerId)
+                    KingdomMarkerWithActivity(kingdom: kingdom, homeKingdomId: viewModel.player.hometownKingdomId, playerId: viewModel.player.playerId)
                         .onTapGesture {
                             kingdomForInfoSheet = kingdom
                         }
