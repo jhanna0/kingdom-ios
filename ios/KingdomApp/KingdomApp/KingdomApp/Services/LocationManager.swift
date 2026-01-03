@@ -10,7 +10,7 @@ class LocationManager: NSObject, ObservableObject {
     
     // MARK: - Debug/Testing Features
     /// Set to true to use fake location instead of real GPS
-    static var useFakeLocation = false
+    static var useFakeLocation = true
     
     /// Test city locations for development
     /// NOTE: Not all locations may have kingdom data in the database yet.
@@ -18,7 +18,7 @@ class LocationManager: NSObject, ObservableObject {
     /// where you've previously played the game.
     static let testCities = [
         "nyc": CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060),        // New York City
-        "sf": CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),       // San Francisco
+        "sf": CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4134),       // San Francisco (Tenderloin)
         "la": CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437),       // Los Angeles
         "boston": CLLocationCoordinate2D(latitude: 42.3601, longitude: -71.0589),    // Boston
         "chicago": CLLocationCoordinate2D(latitude: 41.8781, longitude: -87.6298),   // Chicago
@@ -29,8 +29,8 @@ class LocationManager: NSObject, ObservableObject {
         "portland": CLLocationCoordinate2D(latitude: 45.5152, longitude: -122.6784)  // Portland
     ]
     
-    /// Fake location for testing (defaults to NYC)
-    static var fakeLocation = testCities["denver"]!
+    /// Fake location for testing (defaults to SF)
+    static var fakeLocation = testCities["sf"]!
     
     override init() {
         super.init()

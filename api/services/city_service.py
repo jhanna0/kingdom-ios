@@ -539,19 +539,29 @@ async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[Bou
         city.last_accessed = datetime.utcnow()
     db.commit()
     
-    # Fetch missing ones in parallel
+    # Fetch missing ones in parallel (LIMIT to 5 at a time to avoid timeouts)
     missing_ids = [osm_id for osm_id in osm_ids if osm_id not in cached_by_id]
     
     if missing_ids:
-        print(f"   🌐 Fetching {len(missing_ids)} from OSM in parallel...")
+        # Only fetch first 5 boundaries to avoid timeout
+        fetch_ids = missing_ids[:5]
+        print(f"   🌐 Fetching {len(fetch_ids)} from OSM in parallel (skipping {len(missing_ids) - len(fetch_ids)} to avoid timeout)...")
         
-        # Fetch all in parallel using asyncio.gather
-        fetch_tasks = [fetch_city_boundary_by_id(osm_id) for osm_id in missing_ids]
-        boundary_results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+        # Fetch with timeout protection
+        try:
+            fetch_tasks = [fetch_city_boundary_by_id(osm_id) for osm_id in fetch_ids]
+            boundary_results = await asyncio.wait_for(
+                asyncio.gather(*fetch_tasks, return_exceptions=True),
+                timeout=45.0
+            )
+        except asyncio.TimeoutError:
+            print(f"   ⏰ Batch fetch timed out after 45s, returning cached results only")
+            boundary_results = []
+            fetch_ids = []
         
         # Cache successful fetches
         newly_cached = {}
-        for osm_id, boundary_data in zip(missing_ids, boundary_results):
+        for osm_id, boundary_data in zip(fetch_ids, boundary_results):
             # Skip exceptions and None results
             if isinstance(boundary_data, Exception):
                 print(f"   ❌ Error fetching {osm_id}: {boundary_data}")
