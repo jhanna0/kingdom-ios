@@ -88,15 +88,15 @@ struct CharacterSheetView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     skillGridButton(
-                        iconName: "bolt.fill",
-                        displayName: "Attack",
+                        iconName: SkillConfig.get("attack").icon,
+                        displayName: SkillConfig.get("attack").displayName,
                         tier: player.attackPower,
                         skillType: "attack"
                     )
                     
                     skillGridButton(
-                        iconName: "shield.fill",
-                        displayName: "Defense",
+                        iconName: SkillConfig.get("defense").icon,
+                        displayName: SkillConfig.get("defense").displayName,
                         tier: player.defensePower,
                         skillType: "defense"
                     )
@@ -104,15 +104,15 @@ struct CharacterSheetView: View {
                 
                 HStack(spacing: 10) {
                     skillGridButton(
-                        iconName: "crown.fill",
-                        displayName: "Leadership",
+                        iconName: SkillConfig.get("leadership").icon,
+                        displayName: SkillConfig.get("leadership").displayName,
                         tier: player.leadership,
                         skillType: "leadership"
                     )
                     
                     skillGridButton(
-                        iconName: "hammer.fill",
-                        displayName: "Building",
+                        iconName: SkillConfig.get("building").icon,
+                        displayName: SkillConfig.get("building").displayName,
                         tier: player.buildingSkill,
                         skillType: "building"
                     )
@@ -120,8 +120,8 @@ struct CharacterSheetView: View {
                 
                 HStack(spacing: 10) {
                     skillGridButton(
-                        iconName: "eye.fill",
-                        displayName: "Intelligence",
+                        iconName: SkillConfig.get("intelligence").icon,
+                        displayName: SkillConfig.get("intelligence").displayName,
                         tier: player.intelligence,
                         skillType: "intelligence"
                     )
@@ -212,20 +212,7 @@ struct CharacterSheetView: View {
     }
     
     private func getSkillColor(skillType: String) -> Color {
-        switch skillType {
-        case "attack":
-            return KingdomTheme.Colors.buttonDanger // Red for attack
-        case "defense":
-            return KingdomTheme.Colors.royalBlue // Royal blue for defense
-        case "leadership":
-            return KingdomTheme.Colors.royalPurple // Royal purple for leadership/authority
-        case "building":
-            return KingdomTheme.Colors.imperialGold // Imperial gold for building
-        case "intelligence":
-            return KingdomTheme.Colors.royalEmerald // Royal emerald for intelligence
-        default:
-            return KingdomTheme.Colors.inkMedium
-        }
+        return SkillConfig.get(skillType).color
     }
     
     private func getEquipmentColor(equipmentType: String, equipped: Bool) -> Color {
@@ -488,16 +475,11 @@ struct CharacterSheetView: View {
     private func perkIcon(for perk: Player.PerkItem) -> String {
         // Use skill-specific icons based on the source
         if perk.sourceType == "player_skill" {
-            if perk.source.contains("Attack") {
-                return "bolt.fill"
-            } else if perk.source.contains("Defense") {
-                return "shield.fill"
-            } else if perk.source.contains("Leadership") {
-                return "crown.fill"
-            } else if perk.source.contains("Building") {
-                return "hammer.fill"
-            } else if perk.source.contains("Intelligence") {
-                return "eye.fill"
+            // Try to match skill name dynamically
+            for (skillType, config) in SkillConfig.all {
+                if perk.source.lowercased().contains(skillType) {
+                    return config.icon
+                }
             }
         }
         
@@ -505,9 +487,9 @@ struct CharacterSheetView: View {
         case "equipment":
             // Use weapon/armor specific icons
             if perk.stat == "attack" {
-                return "bolt.fill"
+                return SkillConfig.get("attack").icon
             } else {
-                return "shield.fill"
+                return SkillConfig.get("defense").icon
             }
         case "kingdom_building":
             if perk.source.contains("Education") {
@@ -529,18 +511,12 @@ struct CharacterSheetView: View {
             return KingdomTheme.Colors.buttonDanger
         }
         
-        // Color by skill type
+        // Color by skill type - DYNAMIC
         if perk.sourceType == "player_skill" {
-            if perk.source.contains("Attack") {
-                return KingdomTheme.Colors.buttonDanger // Red for attack
-            } else if perk.source.contains("Defense") {
-                return KingdomTheme.Colors.royalBlue // Royal blue for defense
-            } else if perk.source.contains("Leadership") {
-                return KingdomTheme.Colors.royalPurple // Royal purple for leadership
-            } else if perk.source.contains("Building") {
-                return KingdomTheme.Colors.imperialGold // Imperial gold for building
-            } else if perk.source.contains("Intelligence") {
-                return KingdomTheme.Colors.royalEmerald // Royal emerald for intelligence
+            for (skillType, config) in SkillConfig.all {
+                if perk.source.lowercased().contains(skillType) {
+                    return config.color
+                }
             }
         }
         
@@ -548,9 +524,9 @@ struct CharacterSheetView: View {
         case "equipment":
             // Match the stat type
             if perk.stat == "attack" {
-                return KingdomTheme.Colors.buttonDanger
+                return SkillConfig.get("attack").color
             } else {
-                return KingdomTheme.Colors.royalBlue
+                return SkillConfig.get("defense").color
             }
         case "kingdom_building": return KingdomTheme.Colors.royalPurple
         case "property": return KingdomTheme.Colors.royalEmerald

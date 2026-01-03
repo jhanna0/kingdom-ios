@@ -149,46 +149,46 @@ struct PlayerProfileView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Skills grid - 3 rows for all skills + reputation
+            // Skills grid - 3 rows for all skills + reputation - FULLY DYNAMIC
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     skillDisplay(
-                        icon: "bolt.fill",
-                        name: "Attack",
+                        icon: SkillConfig.get("attack").icon,
+                        name: SkillConfig.get("attack").displayName,
                         value: profile.attack_power,
-                        color: KingdomTheme.Colors.buttonDanger
+                        color: SkillConfig.get("attack").color
                     )
                     
                     skillDisplay(
-                        icon: "shield.fill",
-                        name: "Defense",
+                        icon: SkillConfig.get("defense").icon,
+                        name: SkillConfig.get("defense").displayName,
                         value: profile.defense_power,
-                        color: KingdomTheme.Colors.royalBlue
+                        color: SkillConfig.get("defense").color
                     )
                 }
                 
                 HStack(spacing: 10) {
                     skillDisplay(
-                        icon: "crown.fill",
-                        name: "Leadership",
+                        icon: SkillConfig.get("leadership").icon,
+                        name: SkillConfig.get("leadership").displayName,
                         value: profile.leadership,
-                        color: KingdomTheme.Colors.royalPurple
+                        color: SkillConfig.get("leadership").color
                     )
                     
                     skillDisplay(
-                        icon: "hammer.fill",
-                        name: "Building",
+                        icon: SkillConfig.get("building").icon,
+                        name: SkillConfig.get("building").displayName,
                         value: profile.building_skill,
-                        color: KingdomTheme.Colors.imperialGold
+                        color: SkillConfig.get("building").color
                     )
                 }
                 
                 HStack(spacing: 10) {
                     skillDisplay(
-                        icon: "eye.fill",
-                        name: "Intelligence",
+                        icon: SkillConfig.get("intelligence").icon,
+                        name: SkillConfig.get("intelligence").displayName,
                         value: profile.intelligence,
-                        color: KingdomTheme.Colors.royalEmerald
+                        color: SkillConfig.get("intelligence").color
                     )
                     
                     // Reputation display

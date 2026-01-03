@@ -39,6 +39,13 @@ def scout_kingdom(
             detail="Player state not found"
         )
     
+    # Check minimum intelligence requirement
+    if state.intelligence < INTEL_TIER_BASIC:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires Intelligence level {INTEL_TIER_BASIC} to scout. Visit your Education Center to train."
+        )
+    
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)

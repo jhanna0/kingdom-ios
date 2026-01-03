@@ -10,12 +10,14 @@ struct SkillDetailView: View {
     let onPurchase: () -> Void
     
     @State private var selectedTier: Int = 1
+    @State private var showSuccessToast: Bool = false
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Unified tier selector
-                TierSelectorCard(
+        ZStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Unified tier selector
+                    TierSelectorCard(
                     currentTier: currentTier,
                     selectedTier: $selectedTier
                 ) { tier in
@@ -117,7 +119,26 @@ struct SkillDetailView: View {
                                 statusMessage: statusMessage,
                                 action: {
                                     onPurchase()
-                                    dismiss()
+                                    
+                                    // Show success toast
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                        showSuccessToast = true
+                                    }
+                                    
+                                    // Haptic feedback
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.success)
+                                    
+                                    // Dismiss toast and view after delay
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            showSuccessToast = false
+                                        }
+                                        
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            dismiss()
+                                        }
+                                    }
                                 }
                             )
                         } else if tier > currentTier + 1 {
@@ -173,6 +194,43 @@ struct SkillDetailView: View {
             .padding()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
+            
+            // Success toast - floats at top of screen
+            if showSuccessToast {
+                VStack {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("Training purchased! Level in actions menu.")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black)
+                                .offset(x: 3, y: 3)
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(KingdomTheme.Colors.buttonSuccess)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.black, lineWidth: 2.5)
+                                )
+                        }
+                    )
+                    .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 60)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    
+                    Spacer()
+                }
+                .zIndex(999)
+            }
+        }
         .navigationTitle(skillDisplayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
@@ -199,31 +257,31 @@ struct SkillDetailView: View {
     // MARK: - Computed Properties
     
     private var skillDisplayName: String {
-        switch skillType {
-        case "attack": return "Attack Power"
-        case "defense": return "Defense Power"
-        case "leadership": return "Leadership"
-        case "building": return "Building Skill"
-        default: return skillType.capitalized
-        }
+        // FULLY DYNAMIC
+        let config = SkillConfig.get(skillType)
+        return config.displayName
     }
     
     private var currentTier: Int {
+        // FULLY DYNAMIC
         switch skillType {
         case "attack": return player.attackPower
         case "defense": return player.defensePower
         case "leadership": return player.leadership
         case "building": return player.buildingSkill
-        default: return 1
+        case "intelligence": return player.intelligence
+        default: return 0
         }
     }
     
     private var trainingCost: Int {
+        // FULLY DYNAMIC
         switch skillType {
         case "attack": return player.attackTrainingCost
         case "defense": return player.defenseTrainingCost
         case "leadership": return player.leadershipTrainingCost
         case "building": return player.buildingTrainingCost
+        case "intelligence": return player.intelligenceTrainingCost
         default: return 100
         }
     }

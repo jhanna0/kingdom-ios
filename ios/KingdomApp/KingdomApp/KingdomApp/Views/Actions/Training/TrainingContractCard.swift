@@ -23,35 +23,20 @@ struct TrainingContractCard: View {
         return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
+    var skillConfig: SkillConfig {
+        SkillConfig.get(contract.type)
+    }
+    
     var iconName: String {
-        switch contract.type {
-        case "attack": return "bolt.fill"
-        case "defense": return "shield.fill"
-        case "leadership": return "crown.fill"
-        case "building": return "hammer.fill"
-        default: return "star.fill"
-        }
+        skillConfig.icon
     }
     
     var title: String {
-        switch contract.type {
-        case "attack": return "Attack Training"
-        case "defense": return "Defense Training"
-        case "leadership": return "Leadership Training"
-        case "building": return "Building Training"
-        default: return "Training"
-        }
+        "\(skillConfig.displayName) Training"
     }
     
     var iconColor: Color {
-        // Keep specific colors for training types (not in ActionIconHelper)
-        switch contract.type {
-        case "attack": return KingdomTheme.Colors.buttonDanger
-        case "defense": return KingdomTheme.Colors.buttonPrimary
-        case "leadership": return KingdomTheme.Colors.inkMedium
-        case "building": return KingdomTheme.Colors.buttonWarning
-        default: return ActionIconHelper.actionColor(for: "training")
-        }
+        skillConfig.color
     }
     
     var body: some View {

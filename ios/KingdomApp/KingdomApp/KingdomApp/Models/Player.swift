@@ -39,6 +39,7 @@ class Player: ObservableObject {
     @Published var defenseTrainingCost: Int = 100
     @Published var leadershipTrainingCost: Int = 100
     @Published var buildingTrainingCost: Int = 100
+    @Published var intelligenceTrainingCost: Int = 100
     
     // Active perks (from backend)
     @Published var activePerks: PlayerPerks?
@@ -715,6 +716,7 @@ class Player: ObservableObject {
             defenseTrainingCost = costs.defense
             leadershipTrainingCost = costs.leadership
             buildingTrainingCost = costs.building
+            intelligenceTrainingCost = costs.intelligence
             print("💰 Updated training costs: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building)")
         } else {
             print("⚠️ No training costs in API response")

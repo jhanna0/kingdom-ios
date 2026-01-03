@@ -268,22 +268,39 @@ def get_action_status(
         "endpoint": "/actions/farm"
     }
     
-    actions["scout"] = {
-        **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
-        "cooldown_minutes": scout_cooldown,
-        "expected_reward": {
-            "gold": scout_reward
-        },
-        "unlocked": True,
-        "action_type": "scout",
-        "title": "Scout Kingdom",
-        "icon": "magnifyingglass",
-        "description": "Gather intelligence on enemy kingdom",
-        "category": "hostile",
-        "theme_color": "buttonWarning",
-        "display_order": 10,
-        "endpoint": f"/actions/scout/{state.current_kingdom_id}" if state.current_kingdom_id else None
-    }
+    # Scout - Requires Tier 1 Intelligence
+    if state.intelligence >= 1:
+        actions["scout"] = {
+            **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
+            "cooldown_minutes": scout_cooldown,
+            "expected_reward": {
+                "gold": scout_reward
+            },
+            "unlocked": True,
+            "action_type": "scout",
+            "title": "Scout Kingdom",
+            "icon": "magnifyingglass",
+            "description": "Gather intelligence on enemy kingdom",
+            "category": "hostile",
+            "theme_color": "buttonWarning",
+            "display_order": 10,
+            "endpoint": f"/actions/scout/{state.current_kingdom_id}" if state.current_kingdom_id else None
+        }
+    else:
+        actions["scout"] = {
+            "ready": False,
+            "seconds_remaining": 0,
+            "unlocked": False,
+            "action_type": "scout",
+            "requirements_met": False,
+            "requirement_description": f"Requires T1 Intelligence (you: T{state.intelligence})",
+            "title": "Scout Kingdom",
+            "icon": "magnifyingglass",
+            "description": "Gather intelligence on enemy kingdom",
+            "category": "hostile",
+            "theme_color": "buttonWarning",
+            "endpoint": None
+        }
     
     actions["training"] = {
         **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
