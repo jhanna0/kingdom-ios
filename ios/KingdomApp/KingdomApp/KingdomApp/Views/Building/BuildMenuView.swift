@@ -1,12 +1,27 @@
 import SwiftUI
 
 // Build Menu View - Brutalist Style
+// NOW DYNAMIC - Building types come from TierManager!
 struct BuildMenuView: View {
     let kingdom: Kingdom
     @ObservedObject var player: Player
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var selectedBuildingType: BuildingType?
+    private let tierManager = TierManager.shared
+    @State private var selectedBuildingTypeString: String?
+    
+    // Building categories from TierManager
+    private var economyBuildings: [String] {
+        tierManager.buildingTypesByCategory("economy")
+    }
+    
+    private var defenseBuildings: [String] {
+        tierManager.buildingTypesByCategory("defense")
+    }
+    
+    private var civicBuildings: [String] {
+        tierManager.buildingTypesByCategory("civic")
+    }
     
     var body: some View {
         ZStack {
@@ -18,116 +33,32 @@ struct BuildMenuView: View {
                     // Header with treasury
                     treasuryHeader
                     
-                    // Economic Buildings Section
-                    sectionDivider(title: "Economy")
-                    
-                    // Mine upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "hammer.fill",
-                        name: "Mine",
-                        currentLevel: kingdom.mineLevel,
-                        maxLevel: 5,
-                        benefit: mineBenefit(kingdom.mineLevel + 1),
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Mine"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.mineUpgradeCost,
-                        iconColor: KingdomTheme.Colors.buttonWarning,
-                        onCreateContract: {
-                            selectedBuildingType = .mine
+                    // Economic Buildings Section (dynamic!)
+                    if !economyBuildings.isEmpty {
+                        sectionDivider(title: "Economy")
+                        
+                        ForEach(economyBuildings, id: \.self) { buildingType in
+                            buildingCard(for: buildingType)
                         }
-                    )
+                    }
                     
-                    // Market upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "cart.fill",
-                        name: "Market",
-                        currentLevel: kingdom.marketLevel,
-                        maxLevel: 5,
-                        benefit: marketBenefit(kingdom.marketLevel + 1),
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Market"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.marketUpgradeCost,
-                        iconColor: KingdomTheme.Colors.royalPurple,
-                        onCreateContract: {
-                            selectedBuildingType = .market
+                    // Civic Buildings Section (dynamic!)
+                    if !civicBuildings.isEmpty {
+                        sectionDivider(title: "Civic")
+                        
+                        ForEach(civicBuildings, id: \.self) { buildingType in
+                            buildingCard(for: buildingType)
                         }
-                    )
+                    }
                     
-                    // Farm upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "leaf.fill",
-                        name: "Farm",
-                        currentLevel: kingdom.farmLevel,
-                        maxLevel: 5,
-                        benefit: farmBenefit(kingdom.farmLevel + 1),
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Farm"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.farmUpgradeCost,
-                        iconColor: KingdomTheme.Colors.buttonSuccess,
-                        onCreateContract: {
-                            selectedBuildingType = .farm
+                    // Defensive Buildings Section (dynamic!)
+                    if !defenseBuildings.isEmpty {
+                        sectionDivider(title: "Defense")
+                        
+                        ForEach(defenseBuildings, id: \.self) { buildingType in
+                            buildingCard(for: buildingType)
                         }
-                    )
-                    
-                    // Civic Buildings Section
-                    sectionDivider(title: "Civic")
-                    
-                    // Education upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "graduationcap.fill",
-                        name: "Education Hall",
-                        currentLevel: kingdom.educationLevel,
-                        maxLevel: 5,
-                        benefit: educationBenefit(kingdom.educationLevel + 1),
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Education"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.educationUpgradeCost,
-                        iconColor: KingdomTheme.Colors.royalBlue,
-                        onCreateContract: {
-                            selectedBuildingType = .education
-                        }
-                    )
-                    
-                    // Defensive Buildings Section
-                    sectionDivider(title: "Defense")
-                    
-                    // Walls upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "building.2.fill",
-                        name: "Walls",
-                        currentLevel: kingdom.wallLevel,
-                        maxLevel: 5,
-                        benefit: "+\((kingdom.wallLevel + 1) * 2) defenders during coups",
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Walls"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.wallUpgradeCost,
-                        iconColor: KingdomTheme.Colors.buttonDanger,
-                        onCreateContract: {
-                            selectedBuildingType = .walls
-                        }
-                    )
-                    
-                    // Vault upgrade
-                    BuildingUpgradeCardWithContract(
-                        icon: "lock.shield.fill",
-                        name: "Vault",
-                        currentLevel: kingdom.vaultLevel,
-                        maxLevel: 5,
-                        benefit: "\((kingdom.vaultLevel + 1) * 20)% treasury protected from looting",
-                        hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Vault"),
-                        hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                        kingdom: kingdom,
-                        upgradeCost: kingdom.vaultUpgradeCost,
-                        iconColor: KingdomTheme.Colors.imperialGold,
-                        onCreateContract: {
-                            selectedBuildingType = .vault
-                        }
-                    )
+                    }
                 }
                 .padding()
             }
@@ -137,21 +68,70 @@ struct BuildMenuView: View {
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
-        .navigationDestination(item: $selectedBuildingType) { buildingType in
+        .navigationDestination(item: $selectedBuildingTypeString) { buildingType in
             ContractCreationView(
                 kingdom: kingdom,
-                buildingType: buildingType,
+                buildingType: buildingTypeFromString(buildingType),
                 viewModel: viewModel,
                 onSuccess: { buildingName in
-                    // Contract created successfully!
-                    selectedBuildingType = nil
-                    
-                    // Force refresh kingdom data
+                    selectedBuildingTypeString = nil
                     Task {
                         await viewModel.loadContracts()
                     }
                 }
             )
+        }
+    }
+    
+    // MARK: - Dynamic Building Card
+    
+    @ViewBuilder
+    private func buildingCard(for buildingType: String) -> some View {
+        let info = tierManager.buildingTypeInfo(buildingType)
+        let level = kingdom.buildingLevel(buildingType)
+        let maxLevel = info?.maxTier ?? 5
+        let nextLevel = level + 1
+        
+        BuildingUpgradeCardWithContract(
+            icon: info?.icon ?? "building.fill",
+            name: info?.displayName ?? buildingType.capitalized,
+            currentLevel: level,
+            maxLevel: maxLevel,
+            benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
+            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType.capitalized),
+            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
+            kingdom: kingdom,
+            upgradeCost: kingdom.upgradeCost(buildingType),
+            iconColor: iconColor(for: buildingType),
+            onCreateContract: {
+                selectedBuildingTypeString = buildingType
+            }
+        )
+    }
+    
+    // Map string to BuildingType enum (for backwards compatibility with ContractCreationView)
+    private func buildingTypeFromString(_ type: String) -> BuildingType {
+        switch type {
+        case "wall": return .walls
+        case "vault": return .vault
+        case "mine": return .mine
+        case "market": return .market
+        case "farm": return .farm
+        case "education": return .education
+        default: return .mine  // fallback
+        }
+    }
+    
+    // Icon colors by building type
+    private func iconColor(for buildingType: String) -> Color {
+        switch buildingType {
+        case "mine": return KingdomTheme.Colors.buttonWarning
+        case "market": return KingdomTheme.Colors.royalPurple
+        case "farm": return KingdomTheme.Colors.buttonSuccess
+        case "education": return KingdomTheme.Colors.royalBlue
+        case "wall": return KingdomTheme.Colors.buttonDanger
+        case "vault": return KingdomTheme.Colors.imperialGold
+        default: return KingdomTheme.Colors.inkMedium
         }
     }
     
@@ -209,51 +189,6 @@ struct BuildMenuView: View {
                 Spacer()
             }
         }
-    }
-    
-    // Benefit descriptions
-    private func mineBenefit(_ level: Int) -> String {
-        switch level {
-        case 1: return "Unlocks Stone"
-        case 2: return "Unlocks Stone, Iron"
-        case 3: return "Unlocks Stone, Iron, Steel"
-        case 4: return "Unlocks Stone, Iron, Steel, Titanium"
-        case 5: return "All materials at 2x quantity"
-        default: return ""
-        }
-    }
-    
-    private func marketBenefit(_ level: Int) -> String {
-        let income: Int = {
-            switch level {
-            case 1: return 15
-            case 2: return 35
-            case 3: return 65
-            case 4: return 100
-            case 5: return 150
-            default: return 0
-            }
-        }()
-        return "+\(income)g per day"
-    }
-    
-    private func farmBenefit(_ level: Int) -> String {
-        let reduction: Int = {
-            switch level {
-            case 1: return 5
-            case 2: return 10
-            case 3: return 20
-            case 4: return 25
-            case 5: return 33
-            default: return 0
-            }
-        }()
-        return "Contracts complete \(reduction)% faster"
-    }
-    
-    private func educationBenefit(_ level: Int) -> String {
-        let reduction = level * 5
-        return "Citizens train skills \(reduction)% faster"
     }
     
     /// Check if kingdom has an active contract for a specific building type

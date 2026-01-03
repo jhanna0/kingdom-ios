@@ -26,10 +26,17 @@ class AppInitService: ObservableObject {
         errorMessage = nil
         
         do {
+            // Load tier data first (single source of truth for game data)
+            // This runs in parallel with user data for speed
+            async let tierTask: () = loadTierData()
+            
             // Fetch all updates from backend
             let updates: UserUpdatesResponse = try await apiClient.execute(
                 apiClient.request(endpoint: "/notifications/updates")
             )
+            
+            // Wait for tier data to finish
+            await tierTask
             
             // Update state
             playerSummary = updates.summary
@@ -52,6 +59,17 @@ class AppInitService: ObservableObject {
         }
         
         isLoading = false
+    }
+    
+    /// Load tier data from backend (single source of truth)
+    private func loadTierData() async {
+        do {
+            try await TierManager.shared.loadAllTiers()
+            print("✅ AppInitService: Loaded tier data")
+        } catch {
+            print("⚠️ AppInitService: Failed to load tier data, using defaults: \(error)")
+            // TierManager has fallback defaults, so UI won't break
+        }
     }
     
     /// Refresh data (called periodically or on app foreground)

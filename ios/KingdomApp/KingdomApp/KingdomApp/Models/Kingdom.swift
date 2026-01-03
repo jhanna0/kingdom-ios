@@ -53,23 +53,74 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     
     // Game stats
     var treasuryGold: Int
-    var wallLevel: Int
-    var vaultLevel: Int
     var checkedInPlayers: Int
     
-    // Economic buildings (generate passive income)
-    var mineLevel: Int
-    var marketLevel: Int
-    var farmLevel: Int  // Speeds up contract completion
-    var educationLevel: Int  // Reduces training actions required
+    // DYNAMIC BUILDINGS - use these for new code!
+    var buildingLevels: [String: Int] = [:]  // building_type -> level
+    var buildingUpgradeCosts: [String: BuildingUpgradeCost] = [:]  // building_type -> cost
     
-    // Building upgrade costs (calculated by backend)
-    var wallUpgradeCost: BuildingUpgradeCost?
-    var vaultUpgradeCost: BuildingUpgradeCost?
-    var mineUpgradeCost: BuildingUpgradeCost?
-    var marketUpgradeCost: BuildingUpgradeCost?
-    var farmUpgradeCost: BuildingUpgradeCost?
-    var educationUpgradeCost: BuildingUpgradeCost?
+    // Legacy building properties (kept for backwards compatibility)
+    // TODO: Migrate all code to use buildingLevels dict instead
+    var wallLevel: Int {
+        get { buildingLevels["wall"] ?? 0 }
+        set { buildingLevels["wall"] = newValue }
+    }
+    var vaultLevel: Int {
+        get { buildingLevels["vault"] ?? 0 }
+        set { buildingLevels["vault"] = newValue }
+    }
+    var mineLevel: Int {
+        get { buildingLevels["mine"] ?? 0 }
+        set { buildingLevels["mine"] = newValue }
+    }
+    var marketLevel: Int {
+        get { buildingLevels["market"] ?? 0 }
+        set { buildingLevels["market"] = newValue }
+    }
+    var farmLevel: Int {
+        get { buildingLevels["farm"] ?? 0 }
+        set { buildingLevels["farm"] = newValue }
+    }
+    var educationLevel: Int {
+        get { buildingLevels["education"] ?? 0 }
+        set { buildingLevels["education"] = newValue }
+    }
+    
+    // Legacy upgrade cost properties (kept for backwards compatibility)
+    var wallUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["wall"] }
+        set { if let v = newValue { buildingUpgradeCosts["wall"] = v } }
+    }
+    var vaultUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["vault"] }
+        set { if let v = newValue { buildingUpgradeCosts["vault"] = v } }
+    }
+    var mineUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["mine"] }
+        set { if let v = newValue { buildingUpgradeCosts["mine"] = v } }
+    }
+    var marketUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["market"] }
+        set { if let v = newValue { buildingUpgradeCosts["market"] = v } }
+    }
+    var farmUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["farm"] }
+        set { if let v = newValue { buildingUpgradeCosts["farm"] = v } }
+    }
+    var educationUpgradeCost: BuildingUpgradeCost? {
+        get { buildingUpgradeCosts["education"] }
+        set { if let v = newValue { buildingUpgradeCosts["education"] = v } }
+    }
+    
+    // Helper to get building level by type
+    func buildingLevel(_ type: String) -> Int {
+        buildingLevels[type] ?? 0
+    }
+    
+    // Helper to get upgrade cost by type
+    func upgradeCost(_ type: String) -> BuildingUpgradeCost? {
+        buildingUpgradeCosts[type]
+    }
     
     // Tax system (0-100%)
     var taxRate: Int  // Percentage of mined resources going to treasury
@@ -122,13 +173,9 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         // BACKEND ONLY - These will be set from API data immediately after init
         // Setting defaults here to satisfy Swift's requirement for initialization
         self.treasuryGold = 0
-        self.wallLevel = 0
-        self.vaultLevel = 0
         self.checkedInPlayers = 0
-        self.mineLevel = 0
-        self.marketLevel = 0
-        self.farmLevel = 0
-        self.educationLevel = 0
+        self.buildingLevels = [:]  // Will be populated from API
+        self.buildingUpgradeCosts = [:]  // Will be populated from API
         self.taxRate = 10
         self.travelFee = 10
         
@@ -142,13 +189,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.allies = []
         self.enemies = []
         
-        // Upgrade costs will be populated by API
-        self.wallUpgradeCost = nil
-        self.vaultUpgradeCost = nil
-        self.mineUpgradeCost = nil
-        self.marketUpgradeCost = nil
-        self.farmUpgradeCost = nil
-        self.educationUpgradeCost = nil
+        // Note: buildingUpgradeCosts dict already initialized above
     }
     
     /// Update boundary after lazy loading from API

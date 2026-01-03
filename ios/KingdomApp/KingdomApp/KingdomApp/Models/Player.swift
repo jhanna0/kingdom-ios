@@ -55,6 +55,14 @@ class Player: ObservableObject {
     @Published var equippedArmor: EquipmentData?
     @Published var inventory: [EquipmentData] = []
     
+    // Properties (land ownership)
+    @Published var ownedProperties: [PlayerProperty] = []
+    
+    /// Check if player has a Workshop (property tier 3+) anywhere
+    var hasWorkshop: Bool {
+        return ownedProperties.contains { $0.tier >= 3 }
+    }
+    
     // Stats
     @Published var coupsWon: Int = 0
     @Published var coupsFailed: Int = 0
@@ -738,6 +746,14 @@ class Player: ObservableObject {
             }
         }
         
+        // Properties
+        if let propertiesData = apiState.properties {
+            ownedProperties = propertiesData.map { item in
+                PlayerProperty(id: item.id, kingdomId: item.kingdom_id, tier: item.tier)
+            }
+            print("🏠 Loaded \(ownedProperties.count) properties, hasWorkshop: \(hasWorkshop)")
+        }
+        
         // Status
         isAlive = apiState.is_alive
         
@@ -874,7 +890,15 @@ class Player: ObservableObject {
         timesExecuted = 0
         executionsOrdered = 0
         lastCoupAttempt = nil
+        ownedProperties = []
         // Backend is source of truth - no local caching
     }
+}
+
+/// Simple property data for player ownership check
+struct PlayerProperty: Identifiable {
+    let id: String
+    let kingdomId: String
+    let tier: Int
 }
 

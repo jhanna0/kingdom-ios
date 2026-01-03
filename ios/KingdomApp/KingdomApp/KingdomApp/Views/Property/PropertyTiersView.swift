@@ -6,6 +6,7 @@ struct PropertyTiersView: View {
     let property: Property?  // Optional - can view tiers without owning property
     @Environment(\.dismiss) var dismiss
     @State private var selectedTier: Int = 1
+    private let tierManager = TierManager.shared
     
     private var currentTier: Int {
         property?.tier ?? 0
@@ -255,25 +256,14 @@ struct PropertyTiersView: View {
     }
     
     private func tierName(_ tier: Int) -> String {
-        switch tier {
-        case 1: return "Land"
-        case 2: return "House"
-        case 3: return "Workshop"
-        case 4: return "Beautiful Property"
-        case 5: return "Estate"
-        default: return "Tier \(tier)"
-        }
+        // Fetch from backend tier manager (single source of truth)
+        return tierManager.propertyTierName(tier)
     }
     
     private func tierBenefit(_ tier: Int) -> String {
-        switch tier {
-        case 1: return "-50% travel cost • Instant fast travel to this kingdom"
-        case 2: return "Set as personal residence • Home base for respawning"
-        case 3: return "Unlock equipment crafting • -15% crafting time"
-        case 4: return "Tax exemption • Pay 0% kingdom taxes"
-        case 5: return "Estate protection • 50% survive kingdom conquest"
-        default: return ""
-        }
+        // Fetch from backend tier manager (single source of truth)
+        let benefits = tierManager.propertyTierBenefits(tier)
+        return benefits.joined(separator: " • ")
     }
     
     private func upgradeCost(_ tier: Int) -> Int {

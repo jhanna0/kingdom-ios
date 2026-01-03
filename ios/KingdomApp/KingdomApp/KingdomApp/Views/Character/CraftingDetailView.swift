@@ -11,6 +11,11 @@ struct CraftingDetailView: View {
     
     @State private var selectedTier: Int = 1
     
+    private var hasWorkshop: Bool {
+        // Check if player has any property with tier >= 3 (Workshop)
+        return player.hasWorkshop
+    }
+    
     private var currentEquippedTier: Int {
         if equipmentType == "weapon" {
             return player.equippedWeapon?.tier ?? 0
@@ -75,7 +80,7 @@ struct CraftingDetailView: View {
                             }
                             
                             Rectangle()
-                                .fill(Color.black)
+                                .fill(KingdomTheme.Colors.border)
                                 .frame(height: 2)
                             
                             // Requirements - ALWAYS SHOW
@@ -98,7 +103,7 @@ struct CraftingDetailView: View {
                             }
                             
                             Rectangle()
-                                .fill(Color.black)
+                                .fill(KingdomTheme.Colors.border)
                                 .frame(height: 2)
                             
                             // Cost - ALWAYS SHOW
@@ -134,16 +139,38 @@ struct CraftingDetailView: View {
                                 )
                             }
                             
-                            // Action button - no collapsing
+                            // Workshop requirement warning
+                            if !hasWorkshop {
+                                Rectangle()
+                                    .fill(KingdomTheme.Colors.border)
+                                    .frame(height: 2)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(FontStyles.iconSmall)
+                                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                        Text("Workshop Required")
+                                            .font(FontStyles.bodyMediumBold)
+                                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                    }
+                                    
+                                    Text("You need a Workshop (Property Tier 3+) to craft equipment. Purchase and upgrade property first.")
+                                        .font(FontStyles.bodySmall)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                }
+                            }
+                            
+                            // Action button
                             let canAfford = canAffordTier(tierCost)
                             let hasActiveCrafting = craftingQueue.contains { $0.status != "completed" }
                             
                             UnifiedActionButton(
-                                title: "Start Crafting",
+                                title: hasWorkshop ? "Start Crafting" : "Need Workshop (Tier 3)",
                                 subtitle: nil,
                                 icon: "hammer.fill",
-                                isEnabled: canAfford && !hasActiveCrafting,
-                                statusMessage: hasActiveCrafting ? "Complete your current craft first" : !canAfford ? "Insufficient resources" : nil,
+                                isEnabled: hasWorkshop && canAfford && !hasActiveCrafting,
+                                statusMessage: !hasWorkshop ? "Upgrade property to Workshop first" : hasActiveCrafting ? "Complete your current craft first" : !canAfford ? "Insufficient resources" : nil,
                                 action: {
                                     onPurchase(tier)
                                     dismiss()

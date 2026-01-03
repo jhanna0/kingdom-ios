@@ -4,6 +4,7 @@ import SwiftUI
 /// Shows users what they're working toward with brutalist styling
 struct TierBenefitsView: View {
     @Environment(\.dismiss) var dismiss
+    private let tierManager = TierManager.shared
     
     var body: some View {
         ScrollView {
@@ -199,31 +200,13 @@ struct TierBenefitsView: View {
     }
     
     private func tierDescription(for tier: Int) -> String {
-        switch tier {
-        case 1: return "Cleared land"
-        case 2: return "Basic dwelling"
-        case 3: return "Workshop for crafting"
-        case 4: return "Luxurious estate"
-        case 5: return "Fortified estate"
-        default: return ""
-        }
+        // Fetch from backend tier manager (single source of truth)
+        return tierManager.propertyTierDescription(tier)
     }
     
     private func tierBenefits(for tier: Int) -> [String] {
-        switch tier {
-        case 1:
-            return ["Instant travel to kingdom", "Fast travel home base"]
-        case 2:
-            return ["Personal residence", "Storage space"]
-        case 3:
-            return ["Craft weapons and armor", "15% faster crafting"]
-        case 4:
-            return ["No taxes in kingdom", "Prestigious status"]
-        case 5:
-            return ["50% survive conquest", "Maximum protection"]
-        default:
-            return []
-        }
+        // Fetch from backend tier manager (single source of truth)
+        return tierManager.propertyTierBenefits(tier)
     }
     
     private func upgradeCost(from tier: Int) -> Int {

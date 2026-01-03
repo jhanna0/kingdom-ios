@@ -1,6 +1,7 @@
 import Foundation
 
 /// API service for property management
+/// NOTE: Tier info is now handled by TierManager (single source of truth at /tiers endpoint)
 class PropertyAPI {
     private let client = APIClient.shared
     

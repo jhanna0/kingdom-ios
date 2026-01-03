@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 
-from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, PlayerItem
+from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, PlayerItem, Property
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
@@ -151,6 +151,18 @@ def purchase_craft(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tier must be between 1 and 5"
+        )
+    
+    # CHECK WORKSHOP REQUIREMENT (Property Tier 3+)
+    workshop_property = db.query(Property).filter(
+        Property.owner_id == current_user.id,
+        Property.tier >= 3
+    ).first()
+    
+    if not workshop_property:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You need a Workshop (Property Tier 3+) to craft equipment. Purchase and upgrade property first."
         )
     
     # Calculate costs

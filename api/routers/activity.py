@@ -192,42 +192,52 @@ def _get_property_activities(db: Session, user_id: int, limit: int = 50) -> List
 
 
 def _get_training_activities(db: Session, user_id: int, state: PlayerState, limit: int = 20) -> List[ActivityLogEntry]:
-    """Get training activities from unified_contracts table"""
+    """Get training activities from unified_contracts table - show individual training actions"""
     activities = []
     
     # Training types
     training_types = ["attack", "defense", "leadership", "building", "intelligence"]
     
-    # Query training contracts from unified_contracts
-    contracts = db.query(UnifiedContract).filter(
-        UnifiedContract.user_id == user_id,
+    # Query individual training contributions (each action performed)
+    contributions = db.query(ContractContribution, UnifiedContract).join(
+        UnifiedContract,
+        ContractContribution.contract_id == UnifiedContract.id
+    ).filter(
+        ContractContribution.user_id == user_id,
         UnifiedContract.type.in_(training_types)
-    ).order_by(desc(UnifiedContract.created_at)).limit(limit).all()
+    ).order_by(desc(ContractContribution.performed_at)).limit(limit).all()
     
-    for contract in contracts:
-        # Count contributions = actions completed
+    for contribution, contract in contributions:
+        # Check if this completed the contract
         actions_completed = db.query(func.count(ContractContribution.id)).filter(
-            ContractContribution.contract_id == contract.id
+            ContractContribution.contract_id == contract.id,
+            ContractContribution.performed_at <= contribution.performed_at
         ).scalar()
         
-        status = "completed" if contract.status == "completed" else "in_progress"
+        completed_contract = actions_completed >= contract.actions_required
+        
+        if completed_contract:
+            # This action completed the training!
+            description = f"Leveled up {contract.type.capitalize()}"
+        else:
+            description = f"Training {contract.type.capitalize()} ({actions_completed}/{contract.actions_required})"
         
         activities.append(ActivityLogEntry(
-            id=contract.id + 5000000,  # Offset to avoid ID collisions
+            id=contribution.id + 5000000,  # Offset to avoid ID collisions
             user_id=user_id,
             action_type="train",
             action_category="combat",
-            description=f"Training {contract.type.capitalize()} ({actions_completed}/{contract.actions_required})",
+            description=description,
             kingdom_id=contract.kingdom_id,
             kingdom_name=contract.kingdom_name,
-            amount=contract.gold_paid,
+            amount=contribution.gold_earned if contribution.gold_earned > 0 else None,
             details={
                 "training_type": contract.type,
-                "cost": contract.gold_paid,
+                "tier": contract.tier,
                 "progress": f"{actions_completed}/{contract.actions_required}",
-                "status": status
+                "completed": completed_contract
             },
-            created_at=contract.created_at
+            created_at=contribution.performed_at  # Use the action's timestamp, not the contract's!
         ))
     
     return activities
@@ -246,21 +256,12 @@ def _get_checkin_activities(db: Session, user_id: int, limit: int = 50) -> List[
         kingdom = db.query(Kingdom).filter(Kingdom.id == checkin.kingdom_id).first()
         kingdom_name = kingdom.name if kingdom else checkin.kingdom_id
         
-        # Build description
-        rewards = []
-        if checkin.gold_earned > 0:
-            rewards.append(f"+{checkin.gold_earned}g")
-        if checkin.experience_earned > 0:
-            rewards.append(f"+{checkin.experience_earned} XP")
-        
-        reward_text = f" ({', '.join(rewards)})" if rewards else ""
-        
         activities.append(ActivityLogEntry(
             id=checkin.id + 6000000,  # Offset to avoid ID collision
             user_id=user_id,
             action_type="checkin",
             action_category="kingdom",
-            description=f"Checked in to {kingdom_name}{reward_text}",
+            description=f"Checked in to {kingdom_name}",
             kingdom_id=checkin.kingdom_id,
             kingdom_name=kingdom_name,
             amount=checkin.gold_earned if checkin.gold_earned > 0 else None,
@@ -283,22 +284,13 @@ def _get_action_log_activities(db: Session, user_id: int, limit: int = 50) -> Li
     ).order_by(desc(PlayerActivityLog.created_at)).limit(limit).all()
     
     for log in logs:
-        # Format description with amount if present
-        description = log.description
-        if log.amount:
-            if log.action_type == "farm":
-                description = f"{description} (+{log.amount}g)"
-            elif log.action_type == "patrol":
-                description = f"{description} (+{log.amount} rep)"
-            elif log.action_type == "scout":
-                description = f"{description} (+{log.amount}g)"
-        
+        # Use the description as-is, amount will be shown separately on the right
         activities.append(ActivityLogEntry(
             id=log.id,
             user_id=user_id,
             action_type=log.action_type,
             action_category=log.action_category,
-            description=description,
+            description=log.description,
             kingdom_id=log.kingdom_id,
             kingdom_name=log.kingdom_name,
             amount=log.amount,

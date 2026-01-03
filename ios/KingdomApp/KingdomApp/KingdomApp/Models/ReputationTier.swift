@@ -1,37 +1,27 @@
 import SwiftUI
 
 /// Reputation tier helper with display properties
-enum ReputationTier {
-    case stranger
-    case resident
-    case citizen
-    case notable
-    case champion
-    case legendary
+/// Uses TierManager as single source of truth for tier data
+enum ReputationTier: Int {
+    case stranger = 1
+    case resident = 2
+    case citizen = 3
+    case notable = 4
+    case champion = 5
+    case legendary = 6
+    
+    private var tierManager: TierManager { TierManager.shared }
     
     var displayName: String {
-        switch self {
-        case .stranger: return "Stranger"
-        case .resident: return "Resident"
-        case .citizen: return "Citizen"
-        case .notable: return "Notable"
-        case .champion: return "Champion"
-        case .legendary: return "Legendary"
-        }
+        tierManager.reputationTierName(self.rawValue)
     }
     
     var icon: String {
-        switch self {
-        case .stranger: return "person.fill"
-        case .resident: return "house.fill"
-        case .citizen: return "person.2.fill"
-        case .notable: return "star.fill"
-        case .champion: return "crown.fill"
-        case .legendary: return "sparkles"
-        }
+        tierManager.reputationTierIcon(self.rawValue)
     }
     
     var color: Color {
+        // Colors stay in frontend since they're UI-specific
         switch self {
         case .stranger: return .gray
         case .resident: return KingdomTheme.Colors.buttonPrimary
@@ -43,12 +33,8 @@ enum ReputationTier {
     }
     
     static func from(reputation: Int) -> ReputationTier {
-        if reputation >= 1000 { return .legendary }
-        if reputation >= 500 { return .champion }
-        if reputation >= 300 { return .notable }
-        if reputation >= 150 { return .citizen }
-        if reputation >= 50 { return .resident }
-        return .stranger
+        let tier = TierManager.shared.reputationTierFor(reputation: reputation)
+        return ReputationTier(rawValue: tier) ?? .stranger
     }
 }
 

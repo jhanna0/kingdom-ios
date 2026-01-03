@@ -3,16 +3,12 @@ import SwiftUI
 struct ReputationDetailView: View {
     @ObservedObject var player: Player
     @Environment(\.dismiss) var dismiss
+    private let tierManager = TierManager.shared
     
     @State private var selectedTier: Int = 1
     
     private var currentTierIndex: Int {
-        if player.reputation >= 1000 { return 6 }
-        if player.reputation >= 500 { return 5 }
-        if player.reputation >= 300 { return 4 }
-        if player.reputation >= 150 { return 3 }
-        if player.reputation >= 50 { return 2 }
-        return 1
+        tierManager.reputationTierFor(reputation: player.reputation)
     }
     
     private var currentReputationTier: ReputationTier {
@@ -293,64 +289,26 @@ struct ReputationDetailView: View {
     // MARK: - Data Helpers
     
     private func getTierData(for tier: Int) -> (name: String, requirement: Int, icon: String, color: Color, abilities: [String]) {
-        switch tier {
-        case 1:
-            return (
-                name: "Stranger",
-                requirement: 0,
-                icon: "person.fill",
-                color: .gray,
-                abilities: ["Accept building contracts", "Work on properties", "Basic game access"]
-            )
-        case 2:
-            return (
-                name: "Resident",
-                requirement: 50,
-                icon: "house.fill",
-                color: KingdomTheme.Colors.buttonPrimary,
-                abilities: ["Buy property in cities", "Upgrade owned properties", "Farm resources"]
-            )
-        case 3:
-            return (
-                name: "Citizen",
-                requirement: 150,
-                icon: "person.2.fill",
-                color: .blue,
-                abilities: ["Vote on city coups", "Join alliances", "Participate in city governance"]
-            )
-        case 4:
-            return (
-                name: "Notable",
-                requirement: 300,
-                icon: "star.fill",
-                color: .purple,
-                abilities: ["Propose city coups (with Leadership 3+)", "Lead strategic initiatives", "Enhanced influence"]
-            )
-        case 5:
-            return (
-                name: "Champion",
-                requirement: 500,
-                icon: "crown.fill",
-                color: KingdomTheme.Colors.inkMedium,
-                abilities: ["Vote weight counts 2x", "Significantly increased influence", "Respected leader status"]
-            )
-        case 6:
-            return (
-                name: "Legendary",
-                requirement: 1000,
-                icon: "sparkles",
-                color: .orange,
-                abilities: ["Vote weight counts 3x", "Maximum influence", "Most prestigious rank"]
-            )
-        default:
-            return (
-                name: "Unknown",
-                requirement: 0,
-                icon: "questionmark",
-                color: .gray,
-                abilities: []
-            )
-        }
+        // Use TierManager as single source of truth
+        let name = tierManager.reputationTierName(tier)
+        let requirement = tierManager.reputationTierRequirement(tier)
+        let icon = tierManager.reputationTierIcon(tier)
+        let abilities = tierManager.reputationTierAbilities(tier)
+        
+        // Colors stay in frontend since they're UI-specific
+        let color: Color = {
+            switch tier {
+            case 1: return .gray
+            case 2: return KingdomTheme.Colors.buttonPrimary
+            case 3: return .blue
+            case 4: return .purple
+            case 5: return KingdomTheme.Colors.inkMedium
+            case 6: return .orange
+            default: return .gray
+            }
+        }()
+        
+        return (name: name, requirement: requirement, icon: icon, color: color, abilities: abilities)
     }
 }
 

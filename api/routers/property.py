@@ -17,6 +17,9 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 
 # ===== Schemas =====
 
+
+# ===== Schemas =====
+
 from pydantic import BaseModel
 
 class PropertyResponse(BaseModel):
@@ -56,14 +59,9 @@ class PurchaseConstructionResponse(BaseModel):
 
 def get_tier_name(tier: int) -> str:
     """Get the display name for a property tier."""
-    tier_names = {
-        1: "Land",
-        2: "House", 
-        3: "Workshop",
-        4: "Beautiful Property",
-        5: "Estate"
-    }
-    return tier_names.get(tier, f"Tier {tier}")
+    # Import from unified tier system
+    from routers.tiers import PROPERTY_TIERS
+    return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
 
 
 def calculate_land_price(population: int) -> int:

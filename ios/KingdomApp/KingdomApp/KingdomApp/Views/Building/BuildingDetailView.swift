@@ -6,6 +6,7 @@ struct BuildingDetailView: View {
     let kingdom: Kingdom
     let player: Player
     @Environment(\.dismiss) var dismiss
+    private let tierManager = TierManager.shared
     
     @State private var selectedTier: Int = 1
     
@@ -213,85 +214,41 @@ struct BuildingDetailView: View {
     }
     
     private func getTierBenefits(tier: Int) -> [String] {
+        // Use TierManager building info with dynamic benefit calculation
+        // Benefits are calculated based on building type and tier
         switch buildingType {
         case "wall":
-            return getWallBenefits(tier: tier)
+            let defenders = tier * 2
+            var benefits = ["+\(defenders) defenders in battles", "Increases coup resistance"]
+            if tier >= 3 { benefits.append("Harder to invade") }
+            if tier >= 5 { benefits.append("Maximum fortification") }
+            return benefits
         case "vault":
-            return getVaultBenefits(tier: tier)
+            let protection = tier * 20
+            var benefits = ["\(protection)% of treasury protected", "Reduces gold loss from coups"]
+            if tier >= 3 { benefits.append("Better heist protection") }
+            if tier >= 5 { benefits.append("Maximum security") }
+            return benefits
         case "mine":
-            return getMineBenefits(tier: tier)
+            let hourlyIncome = tier * 5
+            var benefits = ["+\(hourlyIncome)g per hour", "Passive gold generation"]
+            if tier >= 3 { benefits.append("Significant income boost") }
+            if tier >= 5 { benefits.append("+25g/hr total passive income") }
+            return benefits
         case "market":
-            return getMarketBenefits(tier: tier)
+            let hourlyIncome = tier * 3
+            var benefits = ["+\(hourlyIncome)g per hour", "Trading hub income"]
+            if tier >= 3 { benefits.append("Attracts more traders") }
+            if tier >= 5 { benefits.append("+15g/hr total trading income") }
+            return benefits
+        case "farm":
+            let reduction = [5, 10, 20, 25, 33][min(tier - 1, 4)]
+            return ["Contracts complete \(reduction)% faster", "Increases kingdom efficiency"]
+        case "education":
+            let reduction = tier * 5
+            return ["Citizens train skills \(reduction)% faster", "Improves skill training"]
         default:
-            return []
+            return [tierManager.buildingTierDescription(buildingType, tier: tier)]
         }
-    }
-    
-    private func getWallBenefits(tier: Int) -> [String] {
-        let defenders = tier * 2
-        var benefits = [
-            "+\(defenders) defenders in battles",
-            "Increases coup resistance"
-        ]
-        
-        if tier >= 3 {
-            benefits.append("Harder to invade")
-        }
-        if tier >= 5 {
-            benefits.append("Maximum fortification")
-        }
-        
-        return benefits
-    }
-    
-    private func getVaultBenefits(tier: Int) -> [String] {
-        let protection = tier * 20
-        var benefits = [
-            "\(protection)% of treasury protected",
-            "Reduces gold loss from coups"
-        ]
-        
-        if tier >= 3 {
-            benefits.append("Better heist protection")
-        }
-        if tier >= 5 {
-            benefits.append("Maximum security")
-        }
-        
-        return benefits
-    }
-    
-    private func getMineBenefits(tier: Int) -> [String] {
-        let hourlyIncome = tier * 5
-        var benefits = [
-            "+\(hourlyIncome)g per hour",
-            "Passive gold generation"
-        ]
-        
-        if tier >= 3 {
-            benefits.append("Significant income boost")
-        }
-        if tier >= 5 {
-            benefits.append("+25g/hr total passive income")
-        }
-        
-        return benefits
-    }
-    
-    private func getMarketBenefits(tier: Int) -> [String] {
-        let hourlyIncome = tier * 3
-        var benefits = [
-            "+\(hourlyIncome)g per hour",
-            "Trading hub income"
-        ]
-        
-        if tier >= 3 {
-            benefits.append("Attracts more traders")
-        }
-        if tier >= 5 {
-            benefits.append("+15g/hr total trading income")
-        }
-        
-        return benefits
     }
 }

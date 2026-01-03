@@ -59,30 +59,15 @@ struct Equipment: Identifiable, Codable, Hashable {
         return max(0, remaining)
     }
     
-    // Stat bonuses based on tier (from docs)
-    // Tier 1: +1, Tier 2: +2, Tier 3: +3, Tier 4: +5, Tier 5: +8
+    // Stat bonuses based on tier - use TierManager as source of truth
     var attackBonus: Int {
         guard type.slot == .weapon else { return 0 }
-        switch tier {
-        case 1: return 1
-        case 2: return 2
-        case 3: return 3
-        case 4: return 5
-        case 5: return 8
-        default: return 0
-        }
+        return TierManager.shared.equipmentTierStatBonus(tier)
     }
     
     var defenseBonus: Int {
         guard type.slot == .armor || type.slot == .shield else { return 0 }
-        switch tier {
-        case 1: return 1
-        case 2: return 2
-        case 3: return 3
-        case 4: return 5
-        case 5: return 8
-        default: return 0
-        }
+        return TierManager.shared.equipmentTierStatBonus(tier)
     }
     
     // Death risk based on weapon type
@@ -119,44 +104,18 @@ struct Equipment: Identifiable, Codable, Hashable {
         }
     }
     
-    // Gold cost to start crafting
+    // Gold cost to start crafting - use TierManager as source of truth
     static func getCraftCost(tier: Int) -> Int {
-        switch tier {
-        case 1: return 100
-        case 2: return 300
-        case 3: return 700
-        case 4: return 1500
-        case 5: return 3000
-        default: return 100
-        }
+        return TierManager.shared.equipmentTierCost(tier).gold
     }
     
-    // Resource requirements (from docs - iron OR steel, not both except Tier 5)
-    // Tier 1: 10 Iron, 0 Steel
-    // Tier 2: 20 Iron, 0 Steel
-    // Tier 3: 0 Iron, 10 Steel
-    // Tier 4: 0 Iron, 20 Steel
-    // Tier 5: 10 Iron, 10 Steel (BOTH!)
+    // Resource requirements - use TierManager as source of truth
     static func getIronRequired(tier: Int) -> Int {
-        switch tier {
-        case 1: return 10
-        case 2: return 20
-        case 3: return 0   // Steel tier - no iron
-        case 4: return 0   // Steel tier - no iron
-        case 5: return 10  // Both!
-        default: return 10
-        }
+        return TierManager.shared.equipmentTierCost(tier).iron
     }
     
     static func getSteelRequired(tier: Int) -> Int {
-        switch tier {
-        case 1: return 0
-        case 2: return 0
-        case 3: return 10  // Steel tier starts
-        case 4: return 20
-        case 5: return 10  // Both!
-        default: return 0
-        }
+        return TierManager.shared.equipmentTierCost(tier).steel
     }
     
     init(type: EquipmentType, tier: Int) {

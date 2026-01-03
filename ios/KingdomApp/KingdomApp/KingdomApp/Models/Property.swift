@@ -28,14 +28,7 @@ struct Property: Identifiable, Codable, Hashable {
     }
     
     var tierName: String {
-        switch tier {
-        case 1: return "Land"
-        case 2: return "House"
-        case 3: return "Workshop"
-        case 4: return "Beautiful Property"
-        case 5: return "Estate"  // TBD
-        default: return "Property"
-        }
+        TierManager.shared.propertyTierName(tier)
     }
     
     // MARK: - T1: Land Benefits
@@ -125,46 +118,17 @@ struct Property: Identifiable, Codable, Hashable {
     }
 }
 
-// MARK: - Tier Descriptions
+// MARK: - Tier Info (Fetched from Backend)
+// NO MORE HARDCODED DESCRIPTIONS!
+// Use TierManager.shared to get tier names, descriptions, and benefits
 
 extension Property {
     var tierDescription: String {
-        switch tier {
-        case 1:
-            return "Cleared land"
-        case 2:
-            return "Basic dwelling"
-        case 3:
-            return "Workshop for crafting"
-        case 4:
-            return "Luxurious estate"
-        case 5:
-            return "Fortified estate"
-        default:
-            return "Property"
-        }
+        TierManager.shared.propertyTierDescription(tier)
     }
     
     var currentBenefits: [String] {
-        var benefits: [String] = []
-        
-        if tier >= 1 {
-            benefits.append("Instant travel")
-        }
-        if tier >= 2 {
-            benefits.append("Residence")
-        }
-        if tier >= 3 {
-            benefits.append("Crafting")
-        }
-        if tier >= 4 {
-            benefits.append("No taxes")
-        }
-        if tier >= 5 {
-            benefits.append("Conquest protection")
-        }
-        
-        return benefits
+        TierManager.shared.propertyTierBenefits(tier)
     }
 }
 
