@@ -101,9 +101,6 @@ def work_on_contract(
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     set_cooldown(db, current_user.id, "work", cooldown_expires)
     
-    # Also set legacy column for backwards compatibility during migration
-    state.last_work_action = datetime.utcnow()
-    
     # Calculate reward
     gold_per_action = (contract.reward_pool or 0) / contract.actions_required if contract.actions_required > 0 else 0
     base_gold = int(gold_per_action)
@@ -236,7 +233,6 @@ def work_on_property_upgrade(
     # Set cooldown
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     set_cooldown(db, current_user.id, "work", cooldown_expires)
-    state.last_work_action = datetime.utcnow()
     
     new_actions_completed = actions_completed + 1
     is_complete = new_actions_completed >= contract.actions_required

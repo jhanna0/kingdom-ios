@@ -12,6 +12,7 @@ from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from routers.actions.training import calculate_training_cost
+from routers.actions.utils import get_equipped_items, get_inventory
 
 router = APIRouter(prefix="/player", tags=["player"])
 
@@ -48,9 +49,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     is_ruler = len(fiefs_ruled) > 0
     kingdoms_ruled_count = len(fiefs_ruled)
     
-    # Update kingdoms_ruled count if it's out of sync
-    if state.kingdoms_ruled != kingdoms_ruled_count:
-        state.kingdoms_ruled = kingdoms_ruled_count
+    # Get equipped items and inventory from player_items table
+    equipped = get_equipped_items(db, user.id)
+    inventory = get_inventory(db, user.id)
     
     return PlayerState(
         id=user.id,
@@ -60,8 +61,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         
         # Kingdom & Territory
         hometown_kingdom_id=state.hometown_kingdom_id,
-        origin_kingdom_id=state.origin_kingdom_id,
-        home_kingdom_id=state.home_kingdom_id,
+        origin_kingdom_id=None,  # Removed from schema (was for first 300+ rep kingdom)
+        home_kingdom_id=None,  # Removed from schema (was for most check-ins)
         current_kingdom_id=state.current_kingdom_id,
         
         # Core Stats
@@ -81,56 +82,56 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         attack_debuff=state.attack_debuff,
         debuff_expires_at=state.debuff_expires_at,
         
-        # Reputation
-        reputation=state.reputation,
-        honor=state.honor,
-        kingdom_reputation=state.kingdom_reputation or {},
+        # Reputation (NOTE: Now per-kingdom in user_kingdoms table - defaulting here)
+        reputation=0,  # TODO: fetch from user_kingdoms for current kingdom
+        honor=100,  # Removed from schema
+        kingdom_reputation={},  # Removed from schema
         
-        # Check-in tracking
-        check_in_history=state.check_in_history or {},
-        last_check_in=state.last_check_in,
-        last_daily_check_in=state.last_daily_check_in,
+        # Check-in tracking (NOTE: moved to user_kingdoms table)
+        check_in_history={},  # Removed from schema
+        last_check_in=None,  # TODO: fetch from user_kingdoms
+        last_daily_check_in=None,  # TODO: implement if needed
         
-        # Activity tracking
-        total_checkins=state.total_checkins,
-        total_conquests=state.total_conquests,
+        # Activity tracking (NOTE: computed from other tables)
+        total_checkins=0,  # TODO: compute from user_kingdoms
+        total_conquests=0,  # TODO: compute from kingdom_history
         kingdoms_ruled=kingdoms_ruled_count,
-        coups_won=state.coups_won,
-        coups_failed=state.coups_failed,
-        times_executed=state.times_executed,
-        executions_ordered=state.executions_ordered,
-        last_coup_attempt=state.last_coup_attempt,
+        coups_won=0,  # TODO: compute from coup_events
+        coups_failed=0,  # TODO: compute from coup_events
+        times_executed=0,  # TODO: compute from coup_events
+        executions_ordered=0,  # TODO: compute from coup_events
+        last_coup_attempt=None,  # TODO: fetch from coup_events
         
         # Contract & Work
-        contracts_completed=state.contracts_completed,
-        total_work_contributed=state.total_work_contributed,
+        contracts_completed=0,  # TODO: compute from contract_contributions
+        total_work_contributed=0,  # TODO: compute from contract_contributions
         total_training_purchases=total_trainings,
         
         # Resources
         iron=state.iron,
         steel=state.steel,
         
-        # Daily Actions
-        last_mining_action=state.last_mining_action,
-        last_crafting_action=state.last_crafting_action,
-        last_building_action=state.last_building_action,
-        last_spy_action=state.last_spy_action,
+        # Daily Actions (NOTE: moved to action_cooldowns table)
+        last_mining_action=None,  # Removed from schema
+        last_crafting_action=None,  # Removed from schema
+        last_building_action=None,  # Removed from schema
+        last_spy_action=None,  # Removed from schema
         
-        # Equipment
-        equipped_weapon=state.equipped_weapon,
-        equipped_armor=state.equipped_armor,
-        equipped_shield=state.equipped_shield,
-        inventory=state.inventory or [],
-        crafting_queue=state.crafting_queue or [],
-        crafting_progress=state.crafting_progress or {},
+        # Equipment (from player_items table)
+        equipped_weapon=equipped["equipped_weapon"],
+        equipped_armor=equipped["equipped_armor"],
+        equipped_shield=equipped["equipped_shield"],
+        inventory=inventory,
+        crafting_queue=[],  # TODO: fetch from unified_contracts
+        crafting_progress={},  # Removed (tracked in unified_contracts)
         
-        # Properties
-        properties=state.properties or [],
+        # Properties (from properties table - TODO: query from properties table)
+        properties=[],
         
-        # Rewards
-        total_rewards_received=state.total_rewards_received,
-        last_reward_received=state.last_reward_received,
-        last_reward_amount=state.last_reward_amount,
+        # Rewards (removed - dead code)
+        total_rewards_received=0,
+        last_reward_received=None,
+        last_reward_amount=0,
         
         # Status
         is_alive=state.is_alive,
@@ -352,33 +353,16 @@ def reset_player_state(
     state.current_kingdom_id = None
     state.kingdoms_ruled = 0
     
-    # Reset activity
-    state.coups_won = 0
-    state.coups_failed = 0
-    state.times_executed = 0
-    state.executions_ordered = 0
-    state.last_coup_attempt = None
-    
     # Reset resources
     state.iron = 0
     state.steel = 0
     
-    # Reset equipment
-    state.equipped_weapon = None
-    state.equipped_armor = None
-    state.equipped_shield = None
-    state.inventory = []
-    state.crafting_queue = []
-    state.crafting_progress = {}
-    
-    # Reset properties
-    state.properties = []
-    
-    # Reset daily actions
-    state.last_mining_action = None
-    state.last_crafting_action = None
-    state.last_building_action = None
-    state.last_spy_action = None
+    # NOTE: The following have been moved to other tables and can't be reset here:
+    # - coup stats: now in coup_events table
+    # - equipment/inventory: now in player_items table
+    # - properties: now in properties table
+    # - cooldowns: now in action_cooldowns table
+    # - contracts: now in unified_contracts table
     
     # Reset status
     state.is_alive = True

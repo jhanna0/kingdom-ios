@@ -298,11 +298,10 @@ def work_on_craft(
     )
     db.add(contribution)
     
-    # Update cooldown (both new table and legacy column)
+    # Update cooldown in action_cooldowns table
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     set_cooldown(db, current_user.id, "crafting", cooldown_expires)
-    state.last_crafting_action = datetime.utcnow()
     state.experience += xp_earned
     
     # Check if complete

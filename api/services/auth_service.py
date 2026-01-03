@@ -194,6 +194,13 @@ def user_to_private_response(user: User) -> dict:
     # Get player state if it exists
     player_state = user.player_state
     
+    # NOTE: After schema migration, the following fields are no longer on player_state:
+    # - reputation: now per-kingdom in user_kingdoms table (using 0 for now)
+    # - honor: removed (dead code, defaulting to 100)
+    # - total_checkins: computed from user_kingdoms table (TODO)
+    # - total_conquests: computed from kingdom_history table (TODO)
+    # - kingdoms_ruled: computed from kingdoms table (TODO)
+    
     return {
         "id": user.id,
         "email": user.email,
@@ -203,11 +210,11 @@ def user_to_private_response(user: User) -> dict:
         "gold": player_state.gold if player_state else 0,
         "level": player_state.level if player_state else 1,
         "experience": player_state.experience if player_state else 0,
-        "reputation": player_state.reputation if player_state else 0,
-        "honor": player_state.honor if player_state else 100,
-        "total_checkins": player_state.total_checkins if player_state else 0,
-        "total_conquests": player_state.total_conquests if player_state else 0,
-        "kingdoms_ruled": player_state.kingdoms_ruled if player_state else 0,
+        "reputation": 0,  # TODO: compute from user_kingdoms for current kingdom
+        "honor": 100,  # Deprecated field, defaulting to 100
+        "total_checkins": 0,  # TODO: compute from SUM(checkins_count) in user_kingdoms
+        "total_conquests": 0,  # TODO: compute from kingdom_history
+        "kingdoms_ruled": 0,  # TODO: compute from COUNT(*) kingdoms WHERE ruler_id = user_id
         "is_verified": user.is_verified,
         "last_login": user.last_login,
         "created_at": user.created_at,

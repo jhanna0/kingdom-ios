@@ -307,10 +307,9 @@ def work_on_training(
     )
     db.add(contribution)
     
-    # Update cooldown (both new table and legacy column)
+    # Update cooldown in action_cooldowns table
     cooldown_expires = datetime.utcnow() + timedelta(hours=2)
     set_cooldown(db, current_user.id, "training", cooldown_expires)
-    state.last_training_action = datetime.utcnow()
     state.experience += xp_earned
     
     # Check if training is now complete

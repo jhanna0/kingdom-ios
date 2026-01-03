@@ -29,14 +29,18 @@ def build_player_summary(db: Session, user: User, state: PlayerState) -> Dict[st
                          and c.action_contributions 
                          and user_id_str in c.action_contributions)
     
+    # Compute kingdoms_ruled from kingdoms table
+    from db import Kingdom
+    kingdoms_ruled = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).count()
+    
     return {
         "gold": state.gold,
         "level": state.level,
         "experience": state.experience,
         "xp_to_next_level": xp_to_next_level,
         "skill_points": state.skill_points,
-        "reputation": state.reputation,
-        "kingdoms_ruled": state.kingdoms_ruled,
+        "reputation": 0,  # TODO: get from user_kingdoms for current kingdom
+        "kingdoms_ruled": kingdoms_ruled,
         "active_contracts": active_contracts,
         "ready_contracts": ready_contracts
     }

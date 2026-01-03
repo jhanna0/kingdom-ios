@@ -343,6 +343,43 @@ WHERE ps.property_upgrade_contracts IS NOT NULL
   AND ps.property_upgrade_contracts::text LIKE '[%';
 
 -- ============================================
+-- STEP 9: CLEANUP - DROP OLD COLUMNS FROM player_state
+-- ============================================
+
+-- Drop cooldown columns (now in action_cooldowns table)
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_work_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_patrol_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS patrol_expires_at;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_farm_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_sabotage_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_scout_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_training_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_crafting_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_building_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_mining_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_intelligence_action;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_spy_action;
+
+-- Drop equipment/inventory columns (now in player_items table)
+ALTER TABLE player_state DROP COLUMN IF EXISTS equipped_weapon;
+ALTER TABLE player_state DROP COLUMN IF EXISTS equipped_armor;
+ALTER TABLE player_state DROP COLUMN IF EXISTS equipped_shield;
+ALTER TABLE player_state DROP COLUMN IF EXISTS inventory;
+
+-- Drop contract columns (now in unified_contracts table)
+ALTER TABLE player_state DROP COLUMN IF EXISTS training_contracts;
+ALTER TABLE player_state DROP COLUMN IF EXISTS crafting_queue;
+ALTER TABLE player_state DROP COLUMN IF EXISTS crafting_progress;
+ALTER TABLE player_state DROP COLUMN IF EXISTS property_upgrade_contracts;
+
+-- Drop properties JSONB (properties are in properties table)
+ALTER TABLE player_state DROP COLUMN IF EXISTS properties;
+
+-- Drop old kingdom tracking columns (only hometown_kingdom_id and current_kingdom_id remain)
+ALTER TABLE player_state DROP COLUMN IF EXISTS origin_kingdom_id;
+ALTER TABLE player_state DROP COLUMN IF EXISTS home_kingdom_id;
+
+-- ============================================
 -- DONE! 
 -- ============================================
 
@@ -354,6 +391,7 @@ COMMIT;
 -- 3. unified_contracts: training_contracts, crafting_queue, property_upgrade_contracts from player_state
 -- 4. unified_contracts: All kingdom building contracts from contracts table
 -- 5. contract_contributions: All action counts converted to individual rows
+-- 6. CLEANED UP: Removed 20+ old columns from player_state
 
 SELECT 'Migration complete!' as status;
 SELECT 'action_cooldowns: ' || count(*) FROM action_cooldowns;

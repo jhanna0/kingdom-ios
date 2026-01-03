@@ -8,11 +8,11 @@ from typing import Optional
 import random
 import math
 
-from db import get_db, User, Kingdom, Contract, PlayerState
+from db import get_db, User, Kingdom, Contract, PlayerState, ActionCooldown
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
+from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown, get_cooldown
 from .constants import WORK_BASE_COOLDOWN, SABOTAGE_COOLDOWN
 from .tax_utils import apply_kingdom_tax
 
@@ -133,10 +133,19 @@ def process_sabotage_attempt(
     TUNE THIS METHOD to adjust sabotage mechanics and consequences
     """
     # Get active patrols and their intelligence
-    active_patrol_states = db.query(PlayerState).filter(
-        PlayerState.current_kingdom_id == contract.kingdom_id,
-        PlayerState.patrol_expires_at > datetime.utcnow()
+    now = datetime.utcnow()
+    
+    # Get all players in this kingdom
+    players_in_kingdom = db.query(PlayerState).filter(
+        PlayerState.current_kingdom_id == contract.kingdom_id
     ).all()
+    
+    # Filter for those with active patrol cooldowns
+    active_patrol_states = []
+    for ps in players_in_kingdom:
+        cooldown = get_cooldown(db, ps.user_id, "patrol")
+        if cooldown and cooldown.expires_at and cooldown.expires_at > now:
+            active_patrol_states.append(ps)
     
     active_patrols = len(active_patrol_states)
     
@@ -197,10 +206,18 @@ def _handle_caught_saboteur(
 ) -> dict:
     """Handle consequences when saboteur is caught"""
     # Find a random active patrol who caught them
-    active_patrol_states = db.query(PlayerState).filter(
-        PlayerState.current_kingdom_id == contract.kingdom_id,
-        PlayerState.patrol_expires_at > datetime.utcnow()
+    now = datetime.utcnow()
+    
+    # Get all players in this kingdom with active patrol cooldowns
+    players_in_kingdom = db.query(PlayerState).filter(
+        PlayerState.current_kingdom_id == contract.kingdom_id
     ).all()
+    
+    active_patrol_states = []
+    for ps in players_in_kingdom:
+        cooldown = get_cooldown(db, ps.user_id, "patrol")
+        if cooldown and cooldown.expires_at and cooldown.expires_at > now:
+            active_patrol_states.append(ps)
     
     catcher = random.choice(active_patrol_states) if active_patrol_states else None
     catcher_user = db.query(User).filter(User.id == catcher.user_id).first() if catcher else None
@@ -212,11 +229,8 @@ def _handle_caught_saboteur(
             banned_players.append(str(saboteur.id))
             kingdom.banned_players = banned_players
     
-    # Saboteur loses reputation in target kingdom
-    kingdom_rep = saboteur_state.kingdom_reputation or {}
-    current_rep = kingdom_rep.get(kingdom.id, 0)
-    kingdom_rep[kingdom.id] = current_rep - REPUTATION_LOSS
-    saboteur_state.kingdom_reputation = kingdom_rep
+    # TODO: Saboteur loses reputation in target kingdom (use user_kingdoms table)
+    # Note: kingdom_reputation removed from player_state
     
     # Reward the patrol who caught them (with tax applied to bounty)
     if catcher:
@@ -251,9 +265,10 @@ def _handle_caught_saboteur(
     game_data['total_sabotages_caught'] += 1
     
     saboteur_state.game_data = game_data
-    saboteur_state.last_sabotage_action = datetime.utcnow()
-    # NOTE: set_cooldown needs db, but we don't have Session here directly
-    # The caller (sabotage_contract) will commit and cooldown is tracked via last_sabotage_action
+    
+    # Set cooldown (tracked in action_cooldowns table)
+    from .utils import set_cooldown
+    set_cooldown(db, saboteur.id, "sabotage")
     
     return {
         "success": False,
@@ -310,8 +325,9 @@ def _handle_successful_sabotage(
     })
     contract.action_contributions = contributions
     
-    # Update player's last sabotage time
-    saboteur_state.last_sabotage_action = datetime.utcnow()
+    # Set cooldown (tracked in action_cooldowns table)
+    from .utils import set_cooldown
+    set_cooldown(db, saboteur.id, "sabotage")
     
     # Record sabotage in player's game_data
     game_data = saboteur_state.game_data or {}
@@ -351,12 +367,8 @@ def _handle_successful_sabotage(
     
     saboteur_state.gold += net_reward
     
-    # Add reputation in hometown
-    if saboteur_state.hometown_kingdom_id:
-        kingdom_rep = saboteur_state.kingdom_reputation or {}
-        current_rep = kingdom_rep.get(saboteur_state.hometown_kingdom_id, 0)
-        kingdom_rep[saboteur_state.hometown_kingdom_id] = current_rep + SABOTAGE_REP_REWARD
-        saboteur_state.kingdom_reputation = kingdom_rep
+    # TODO: Add reputation in hometown (use user_kingdoms table)
+    # Note: kingdom_reputation removed from player_state
     
     progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
     
@@ -577,7 +589,8 @@ def get_sabotage_targets(
             "potential_delay": int(contract.total_actions_required * 0.1)  # Show how much delay would be added
         })
     
-    cooldown_status = check_cooldown(state.last_sabotage_action, SABOTAGE_COOLDOWN)
+    from .utils import check_cooldown_from_table
+    cooldown_status = check_cooldown_from_table(db, current_user.id, "sabotage", SABOTAGE_COOLDOWN)
     
     return {
         "kingdom": {

@@ -56,11 +56,14 @@ def _check_coup_cooldown(state: PlayerState) -> Tuple[bool, str]:
     return True, ""
 
 
-def _get_kingdom_reputation(state: PlayerState, kingdom_id: str) -> int:
-    """Get player's reputation in a specific kingdom"""
-    if not state.kingdom_reputation:
-        return 0
-    return state.kingdom_reputation.get(kingdom_id, 0)
+def _get_kingdom_reputation(db: Session, user_id: int, kingdom_id: str) -> int:
+    """Get player's reputation in a specific kingdom from user_kingdoms table"""
+    from db.models import UserKingdom
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == user_id,
+        UserKingdom.kingdom_id == kingdom_id
+    ).first()
+    return user_kingdom.local_reputation if user_kingdom else 0
 
 
 def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> InitiatorStats:
@@ -70,10 +73,10 @@ def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> Ini
         return None
     
     state = _get_player_state(db, user)
-    kingdom_rep = _get_kingdom_reputation(state, kingdom_id)
+    kingdom_rep = _get_kingdom_reputation(db, user.id, kingdom_id)
     
     return InitiatorStats(
-        reputation=state.reputation,
+        reputation=0,  # TODO: compute from user_kingdoms for current kingdom
         kingdom_reputation=kingdom_rep,
         attack_power=state.attack_power,
         defense_power=state.defense_power,
@@ -162,14 +165,27 @@ def _apply_coup_victory_rewards(
     
     # Coup rewards are NOT taxed (you're taking over the kingdom!)
     initiator_state.gold += 1000
-    initiator_state.reputation += 50
-    initiator_state.kingdoms_ruled += 1
-    initiator_state.coups_won += 1
     
-    # Update kingdom reputation
-    kingdom_rep = initiator_state.kingdom_reputation.copy() if initiator_state.kingdom_reputation else {}
-    kingdom_rep[kingdom.id] = kingdom_rep.get(kingdom.id, 0) + 50
-    initiator_state.kingdom_reputation = kingdom_rep
+    # Update per-kingdom reputation in user_kingdoms table
+    from db.models import UserKingdom
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == initiator.id,
+        UserKingdom.kingdom_id == kingdom.id
+    ).first()
+    
+    if not user_kingdom:
+        user_kingdom = UserKingdom(
+            user_id=initiator.id,
+            kingdom_id=kingdom.id,
+            local_reputation=50
+        )
+        db.add(user_kingdom)
+    else:
+        user_kingdom.local_reputation += 50
+    
+    # NOTE: coups_won and kingdoms_ruled are now computed from other tables:
+    # - coups_won: COUNT from coup_events WHERE initiator_id = ? AND attacker_victory = true
+    # - kingdoms_ruled: COUNT from kingdoms WHERE ruler_id = ?
     
     db.commit()
     
@@ -218,26 +234,42 @@ def _apply_coup_failure_penalties(
         total_gold_seized += gold_lost
         state.gold = 0
         
-        # MAJOR reputation loss
-        state.reputation = max(0, state.reputation - 100)
+        # MAJOR reputation loss in this kingdom
+        from db.models import UserKingdom
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
         
-        # Lose reputation in this kingdom
-        kingdom_rep = state.kingdom_reputation.copy() if state.kingdom_reputation else {}
-        kingdom_rep[kingdom.id] = max(0, kingdom_rep.get(kingdom.id, 0) - 100)
-        state.kingdom_reputation = kingdom_rep
+        if user_kingdom:
+            user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - 100)
         
         # Lose ALL combat stats (executed)
         state.attack_power = 1
         state.defense_power = 1
         
-        # Track failed coup
-        state.coups_failed += 1
-        state.times_executed += 1
+        # NOTE: coups_failed and times_executed are now tracked in coup_events table
     
     # Ruler gets all seized gold
     if ruler_state:
         ruler_state.gold += total_gold_seized
-        ruler_state.reputation += 50
+        
+        # Increase ruler's reputation in this kingdom
+        from db.models import UserKingdom
+        ruler_user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == ruler.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
+        
+        if not ruler_user_kingdom:
+            ruler_user_kingdom = UserKingdom(
+                user_id=ruler.id,
+                kingdom_id=kingdom.id,
+                local_reputation=50
+            )
+            db.add(ruler_user_kingdom)
+        else:
+            ruler_user_kingdom.local_reputation += 50
     
     # Reward defenders
     for defender in defenders:
@@ -247,12 +279,23 @@ def _apply_coup_failure_penalties(
         
         state = _get_player_state(db, user)
         state.gold += 200
-        state.reputation += 30
         
         # Boost kingdom reputation
-        kingdom_rep = state.kingdom_reputation.copy() if state.kingdom_reputation else {}
-        kingdom_rep[kingdom.id] = kingdom_rep.get(kingdom.id, 0) + 30
-        state.kingdom_reputation = kingdom_rep
+        from db.models import UserKingdom
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
+        
+        if not user_kingdom:
+            user_kingdom = UserKingdom(
+                user_id=user.id,
+                kingdom_id=kingdom.id,
+                local_reputation=30
+            )
+            db.add(user_kingdom)
+        else:
+            user_kingdom.local_reputation += 30
     
     db.commit()
 
@@ -384,7 +427,7 @@ def initiate_coup(
         )
     
     # Check reputation
-    kingdom_rep = _get_kingdom_reputation(state, kingdom.id)
+    kingdom_rep = _get_kingdom_reputation(db, current_user.id, kingdom.id)
     if kingdom_rep < COUP_REPUTATION_REQUIREMENT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

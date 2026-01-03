@@ -10,7 +10,7 @@ import json
 from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
-from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
+from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling
 from .training import calculate_training_cost, TRAINING_TYPES
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (
@@ -147,9 +147,18 @@ def get_action_status(
     # Count active patrollers in current kingdom
     active_patrollers = 0
     if state.current_kingdom_id:
-        active_patrollers = db.query(PlayerState).filter(
-            PlayerState.current_kingdom_id == state.current_kingdom_id,
-            PlayerState.patrol_expires_at > datetime.utcnow()
+        from db.models.action_cooldown import ActionCooldown
+        # Get all users in this kingdom
+        user_ids_in_kingdom = db.query(PlayerState.user_id).filter(
+            PlayerState.current_kingdom_id == state.current_kingdom_id
+        ).all()
+        user_ids = [uid[0] for uid in user_ids_in_kingdom]
+        
+        # Count how many have active patrol cooldowns
+        active_patrollers = db.query(ActionCooldown).filter(
+            ActionCooldown.user_id.in_(user_ids),
+            ActionCooldown.action_type == 'patrol',
+            ActionCooldown.expires_at > datetime.utcnow()
         ).count()
     
     # Get contracts for current kingdom
@@ -163,8 +172,9 @@ def get_action_status(
         contracts = [contract_to_response(c) for c in contracts_query]
     
     # Check global action cooldown (ONE ACTION AT A TIME!)
-    global_cooldown = check_global_action_cooldown(
-        state, 
+    global_cooldown = check_global_action_cooldown_from_table(
+        db,
+        current_user.id,
         work_cooldown, 
         patrol_cooldown,
         farm_cooldown,
@@ -204,20 +214,20 @@ def get_action_status(
     return {
         "global_cooldown": global_cooldown,  # NEW: Global action lock
         "work": {
-            **check_cooldown(state.last_work_action, work_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "work", work_cooldown),
             "cooldown_minutes": work_cooldown
         },
         "patrol": {
-            **check_cooldown(state.last_patrol_action, patrol_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "patrol", patrol_cooldown),
             "cooldown_minutes": patrol_cooldown,
-            "is_patrolling": state.patrol_expires_at and state.patrol_expires_at > datetime.utcnow(),
+            "is_patrolling": is_patrolling(db, current_user.id),
             "active_patrollers": active_patrollers,
             "expected_reward": {
                 "reputation": patrol_rep_reward
             }
         },
         "farm": {
-            **check_cooldown(state.last_farm_action, farm_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "farm", farm_cooldown),
             "cooldown_minutes": farm_cooldown,
             "expected_reward": {
                 "gold_gross": farm_gross,
@@ -226,22 +236,22 @@ def get_action_status(
             }
         },
         "sabotage": {
-            **check_cooldown(state.last_sabotage_action, sabotage_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "sabotage", sabotage_cooldown),
             "cooldown_minutes": sabotage_cooldown
         },
         "scout": {
-            **check_cooldown(state.last_scout_action, scout_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
             "cooldown_minutes": scout_cooldown,
             "expected_reward": {
                 "gold": scout_reward
             }
         },
         "training": {
-            **check_cooldown(state.last_training_action, training_cooldown),
+            **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
             "cooldown_minutes": training_cooldown
         },
         "crafting": {
-            **check_cooldown(state.last_crafting_action, work_cooldown),  # Same cooldown as building work
+            **check_cooldown_from_table(db, current_user.id, "crafting", work_cooldown),
             "cooldown_minutes": work_cooldown
         },
         "training_contracts": get_training_contracts_for_status(db, current_user.id),

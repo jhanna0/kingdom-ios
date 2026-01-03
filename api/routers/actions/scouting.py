@@ -63,7 +63,6 @@ def scout_kingdom(
     # Update cooldown (both new table and legacy column)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=SCOUT_COOLDOWN)
     set_cooldown(db, current_user.id, "scout", cooldown_expires)
-    state.last_scout_action = datetime.utcnow()
     
     # Give gold reward for successful scouting (with tax)
     net_income, tax_amount, tax_rate = apply_kingdom_tax(

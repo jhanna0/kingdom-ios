@@ -44,8 +44,14 @@ def start_patrol(
             )
     
     # Check if already patrolling
-    if state.patrol_expires_at and state.patrol_expires_at > datetime.utcnow():
-        remaining = int((state.patrol_expires_at - datetime.utcnow()).total_seconds())
+    from db.models.action_cooldown import ActionCooldown
+    patrol_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type == "patrol"
+    ).first()
+    
+    if patrol_cooldown and patrol_cooldown.expires_at and patrol_cooldown.expires_at > datetime.utcnow():
+        remaining = int((patrol_cooldown.expires_at - datetime.utcnow()).total_seconds())
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Already on patrol. {remaining}s remaining"
@@ -58,14 +64,9 @@ def start_patrol(
             detail="Must be checked into a kingdom to patrol"
         )
     
-    # Start patrol (both new table and legacy columns)
+    # Start patrol
     patrol_end = datetime.utcnow() + timedelta(minutes=PATROL_DURATION_MINUTES)
     set_cooldown(db, current_user.id, "patrol", patrol_end)
-    state.last_patrol_action = datetime.utcnow()
-    state.patrol_expires_at = patrol_end
-    
-    # Award reputation for patrol (civic duty)
-    state.reputation += PATROL_REPUTATION_REWARD
     
     # Log activity
     log_activity(
@@ -87,7 +88,7 @@ def start_patrol(
     return {
         "success": True,
         "message": f"Patrol started! Guard duty for {PATROL_DURATION_MINUTES} minutes.",
-        "expires_at": format_datetime_iso(state.patrol_expires_at),
+        "expires_at": format_datetime_iso(patrol_end),
         "rewards": {
             "gold": None,
             "reputation": PATROL_REPUTATION_REWARD,

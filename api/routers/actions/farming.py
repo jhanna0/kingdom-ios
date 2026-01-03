@@ -69,10 +69,9 @@ def perform_farming(
     # Award gold to player
     state.gold += net_income
     
-    # Update cooldown (both new table and legacy column)
+    # Update cooldown
     cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
     set_cooldown(db, current_user.id, "farm", cooldown_expires)
-    state.last_farm_action = datetime.utcnow()
     
     # Log activity
     log_activity(

@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 import random
 import math
 
-from db import get_db, User, Kingdom, PlayerState
+from db import get_db, User, Kingdom, PlayerState, ActionCooldown
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
+from .utils import check_cooldown, check_cooldown_from_table, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
 from .constants import (
     WORK_BASE_COOLDOWN,
     MIN_INTELLIGENCE_REQUIRED,
@@ -111,20 +111,11 @@ def attempt_vault_heist(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
-    # Check vault heist specific cooldown
-    last_heist = None
-    if state.game_data and isinstance(state.game_data, dict):
-        last_heist_str = state.game_data.get("last_vault_heist")
-        if last_heist_str:
-            try:
-                last_heist = datetime.fromisoformat(last_heist_str.replace('Z', '+00:00'))
-            except:
-                pass
-    
-    if last_heist:
-        cooldown_status = check_cooldown(last_heist, VAULT_HEIST_COOLDOWN_HOURS * 60)
-        if not DEV_MODE and not cooldown_status["ready"]:
-            hours = cooldown_status["seconds_remaining"] // 3600
+    # Check vault heist specific cooldown (using action_cooldowns table)
+    if not DEV_MODE:
+        cooldown_check = check_cooldown_from_table(db, current_user.id, "vault_heist", VAULT_HEIST_COOLDOWN_HOURS * 60)
+        if not cooldown_check["ready"]:
+            hours = cooldown_check["seconds_remaining"] // 3600
             days = hours // 24
             hours = hours % 24
             raise HTTPException(
@@ -173,9 +164,20 @@ def attempt_vault_heist(
     state.gold -= HEIST_COST
     
     # Count active patrols
-    active_patrols = db.query(PlayerState).filter(
-        PlayerState.current_kingdom_id == kingdom_id,
-        PlayerState.patrol_expires_at > datetime.utcnow()
+    now = datetime.utcnow()
+    
+    # Get all players in this kingdom
+    players_in_kingdom = db.query(PlayerState.user_id).filter(
+        PlayerState.current_kingdom_id == kingdom_id
+    ).all()
+    
+    user_ids = [p.user_id for p in players_in_kingdom]
+    
+    # Count how many have active patrol cooldowns (expires_at > now)
+    active_patrols = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id.in_(user_ids),
+        ActionCooldown.action_type == "patrol",
+        ActionCooldown.expires_at > now
     ).count()
     
     # Calculate detection chance
@@ -188,40 +190,16 @@ def attempt_vault_heist(
     # Roll for detection
     caught = random.random() < detection_chance
     
-    # Update last heist time
-    game_data = state.game_data or {}
-    game_data["last_vault_heist"] = datetime.utcnow().isoformat()
+    # Set cooldown for vault heist
+    set_cooldown(db, current_user.id, "vault_heist")
     
     if caught:
         # CAUGHT! Severe consequences
         
-        # Lose reputation
-        kingdom_rep = state.kingdom_reputation or {}
-        current_rep = kingdom_rep.get(kingdom_id, 0)
-        kingdom_rep[kingdom_id] = current_rep - HEIST_REP_LOSS
-        state.kingdom_reputation = kingdom_rep
+        # TODO: Lose reputation in user_kingdoms table
+        # TODO: Ban from kingdom if configured (track in separate table)
+        # Note: game_data and kingdom_reputation removed from player_state
         
-        # Ban from kingdom if configured
-        if HEIST_BAN:
-            banned_kingdoms = game_data.get("banned_from_kingdoms", [])
-            if kingdom_id not in banned_kingdoms:
-                banned_kingdoms.append(kingdom_id)
-            game_data["banned_from_kingdoms"] = banned_kingdoms
-        
-        # Record in game data
-        if "heist_history" not in game_data:
-            game_data["heist_history"] = []
-        
-        game_data["heist_history"].append({
-            "kingdom_id": kingdom_id,
-            "kingdom_name": kingdom.name,
-            "timestamp": datetime.utcnow().isoformat(),
-            "caught": True,
-            "cost": HEIST_COST,
-            "detection_chance": detection_chance
-        })
-        
-        state.game_data = game_data
         db.commit()
         
         return {
@@ -242,12 +220,7 @@ def attempt_vault_heist(
         kingdom.treasury_gold -= heist_amount
         state.gold += heist_amount
         
-        # Add reputation in hometown
-        if state.hometown_kingdom_id and state.hometown_kingdom_id != kingdom_id:
-            kingdom_rep = state.kingdom_reputation or {}
-            hometown_rep = kingdom_rep.get(state.hometown_kingdom_id, 0)
-            kingdom_rep[state.hometown_kingdom_id] = hometown_rep + 100
-            state.kingdom_reputation = kingdom_rep
+        # TODO: Add reputation in hometown (use user_kingdoms table)
         
         # Award XP
         state.experience += 200
@@ -261,29 +234,9 @@ def attempt_vault_heist(
             # Level-up bonus is NOT taxed
             state.gold += 50
         
-        # Record in game data
-        if "heist_history" not in game_data:
-            game_data["heist_history"] = []
+        # TODO: Record heist history (in separate table or activity log)
+        # Note: game_data removed from player_state
         
-        game_data["heist_history"].append({
-            "kingdom_id": kingdom_id,
-            "kingdom_name": kingdom.name,
-            "timestamp": datetime.utcnow().isoformat(),
-            "caught": False,
-            "cost": HEIST_COST,
-            "stolen": heist_amount,
-            "detection_chance": detection_chance
-        })
-        
-        if "total_gold_stolen" not in game_data:
-            game_data["total_gold_stolen"] = 0
-        game_data["total_gold_stolen"] += heist_amount
-        
-        if "successful_heists" not in game_data:
-            game_data["successful_heists"] = 0
-        game_data["successful_heists"] += 1
-        
-        state.game_data = game_data
         db.commit()
         
         return {

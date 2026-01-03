@@ -13,8 +13,10 @@ import random
 
 from db.base import get_db
 from db.models import User, Kingdom, PlayerState, KingdomIntelligence
+from db import ActionCooldown
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
+from routers.actions.utils import get_cooldown, set_cooldown, check_cooldown_from_table
 from config import DEV_MODE
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
@@ -30,11 +32,11 @@ MIN_INTELLIGENCE_LEVEL = 3
 
 def _calculate_total_attack(db: Session, kingdom_id: str) -> int:
     """Calculate total attack power of all active citizens in a kingdom"""
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    # NOTE: last_check_in was removed from player_state. For now, just sum all citizens.
+    # TODO: Use user_kingdoms table or activity_log to filter active players
     
     result = db.query(func.sum(PlayerState.attack_power)).filter(
         PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.last_check_in > cutoff_time,
         PlayerState.is_alive == True
     ).scalar()
     
@@ -43,11 +45,11 @@ def _calculate_total_attack(db: Session, kingdom_id: str) -> int:
 
 def _calculate_total_defense(db: Session, kingdom_id: str) -> int:
     """Calculate total defense power of all active citizens in a kingdom"""
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    # NOTE: last_check_in was removed from player_state. For now, just sum all citizens.
+    # TODO: Use user_kingdoms table or activity_log to filter active players
     
     result = db.query(func.sum(PlayerState.defense_power)).filter(
         PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.last_check_in > cutoff_time,
         PlayerState.is_alive == True
     ).scalar()
     
@@ -55,12 +57,12 @@ def _calculate_total_defense(db: Session, kingdom_id: str) -> int:
 
 
 def _count_active_citizens(db: Session, kingdom_id: str) -> int:
-    """Count active citizens (checked in within 24h)"""
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    """Count active citizens (all citizens of this kingdom)"""
+    # NOTE: last_check_in was removed. For now counting all citizens.
+    # TODO: Use user_kingdoms or activity_log to filter recently active
     
     count = db.query(PlayerState).filter(
         PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.last_check_in > cutoff_time,
         PlayerState.is_alive == True
     ).count()
     
@@ -82,12 +84,9 @@ def _get_top_players(db: Session, kingdom_id: str, intelligence_level: int) -> O
     if intelligence_level < 6:
         return None
     
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
-    
     # Get top 5 by combined combat power
     players = db.query(PlayerState).join(User).filter(
         PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.last_check_in > cutoff_time,
         PlayerState.is_alive == True
     ).order_by(
         (PlayerState.attack_power + PlayerState.defense_power).desc()
@@ -107,9 +106,18 @@ def _count_active_patrols(db: Session, kingdom_id: str) -> int:
     """Count how many players are currently on patrol"""
     now = datetime.utcnow()
     
-    count = db.query(PlayerState).filter(
-        PlayerState.current_kingdom_id == kingdom_id,
-        PlayerState.patrol_expires_at > now
+    # Get all players in this kingdom
+    players_in_kingdom = db.query(PlayerState.user_id).filter(
+        PlayerState.current_kingdom_id == kingdom_id
+    ).all()
+    
+    user_ids = [p.user_id for p in players_in_kingdom]
+    
+    # Count how many have active patrol cooldowns (expires_at > now)
+    count = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id.in_(user_ids),
+        ActionCooldown.action_type == "patrol",
+        ActionCooldown.expires_at > now
     ).count()
     
     return count
@@ -299,15 +307,13 @@ def gather_intelligence(
             detail=f"Insufficient gold. Need {INTELLIGENCE_COST}g, have {state.gold}g"
         )
     
-    # Check cooldown
-    if state.last_intelligence_action and not DEV_MODE:
-        time_since = datetime.utcnow() - state.last_intelligence_action
-        cooldown = timedelta(hours=INTELLIGENCE_COOLDOWN_HOURS)
-        
-        if time_since < cooldown:
-            remaining = cooldown - time_since
-            hours = int(remaining.total_seconds() / 3600)
-            minutes = int((remaining.total_seconds() % 3600) / 60)
+    # Check cooldown (using action_cooldowns table)
+    if not DEV_MODE:
+        cooldown_check = check_cooldown_from_table(db, current_user.id, "intelligence", INTELLIGENCE_COOLDOWN_HOURS * 60)
+        if not cooldown_check["ready"]:
+            remaining_seconds = cooldown_check["seconds_remaining"]
+            hours = int(remaining_seconds / 3600)
+            minutes = int((remaining_seconds % 3600) / 60)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Intelligence action on cooldown. Wait {hours}h {minutes}m."
@@ -349,7 +355,7 @@ def gather_intelligence(
     
     # Deduct gold (always paid upfront)
     state.gold -= INTELLIGENCE_COST
-    state.last_intelligence_action = datetime.utcnow()
+    set_cooldown(db, current_user.id, "intelligence")
     
     # Calculate success chance
     active_patrols = _count_active_patrols(db, kingdom_id)

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
-from db.models import KingdomIntelligence
+from db.models import KingdomIntelligence, UserKingdom
 from routers.auth import get_current_user
 from sqlalchemy import func
 from schemas.player import (
@@ -29,11 +29,17 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
     now = datetime.utcnow()
     
     # Check patrol first (it's a duration-based activity)
-    if state.patrol_expires_at and state.patrol_expires_at > now:
+    from db.models.action_cooldown import ActionCooldown
+    patrol_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == state.user_id,
+        ActionCooldown.action_type == "patrol"
+    ).first()
+    
+    if patrol_cooldown and patrol_cooldown.expires_at and patrol_cooldown.expires_at > now:
         return PlayerActivity(
             type="patrolling",
             details="On patrol",
-            expires_at=state.patrol_expires_at
+            expires_at=patrol_cooldown.expires_at
         )
     
     # Training types
@@ -73,25 +79,30 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         )
     
     # Check recent actions (within last 2 minutes)
+    from db.models.action_cooldown import ActionCooldown
     recent_threshold = now - timedelta(minutes=2)
     
-    if state.last_work_action and state.last_work_action > recent_threshold:
-        return PlayerActivity(
-            type="working",
-            details="Working on construction"
-        )
+    recent_cooldowns = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == state.user_id,
+        ActionCooldown.last_performed >= recent_threshold
+    ).all()
     
-    if state.last_scout_action and state.last_scout_action > recent_threshold:
-        return PlayerActivity(
-            type="scouting",
-            details="Gathering intelligence"
-        )
-    
-    if state.last_sabotage_action and state.last_sabotage_action > recent_threshold:
-        return PlayerActivity(
-            type="sabotage",
-            details="Sabotaging enemy"
-        )
+    for cooldown in recent_cooldowns:
+        if cooldown.action_type == "work":
+            return PlayerActivity(
+                type="working",
+                details="Working on construction"
+            )
+        elif cooldown.action_type == "scout":
+            return PlayerActivity(
+                type="scouting",
+                details="Gathering intelligence"
+            )
+        elif cooldown.action_type == "sabotage":
+            return PlayerActivity(
+                type="sabotage",
+                details="Sabotaging enemy"
+            )
     
     # Default to idle
     return PlayerActivity(type="idle")
@@ -211,12 +222,19 @@ def get_players_in_kingdom(
         activity = _get_player_activity(db, state)
         is_ruler = kingdom.ruler_id == user.id
         
+        # Get per-kingdom reputation from user_kingdoms table
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == kingdom_id
+        ).first()
+        reputation = user_kingdom.local_reputation if user_kingdom else 0
+        
         players.append(PlayerInKingdom(
             id=user.id,
             display_name=user.display_name,
             avatar_url=user.avatar_url,
             level=state.level,
-            reputation=state.reputation,
+            reputation=reputation,
             attack_power=state.attack_power,
             defense_power=state.defense_power,
             leadership=state.leadership,
@@ -339,12 +357,21 @@ def get_active_players(
             if kingdom:
                 is_ruler = kingdom.ruler_id == user.id
         
+        # Get per-kingdom reputation from user_kingdoms table (for current kingdom)
+        reputation = 0
+        if state.current_kingdom_id:
+            user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == user.id,
+                UserKingdom.kingdom_id == state.current_kingdom_id
+            ).first()
+            reputation = user_kingdom.local_reputation if user_kingdom else 0
+        
         players.append(PlayerInKingdom(
             id=user.id,
             display_name=user.display_name,
             avatar_url=user.avatar_url,
             level=state.level,
-            reputation=state.reputation,
+            reputation=reputation,
             attack_power=state.attack_power,
             defense_power=state.defense_power,
             leadership=state.leadership,
@@ -394,8 +421,26 @@ def get_player_profile(
         if kingdom:
             current_kingdom_name = kingdom.name
     
-    activity = _get_player_activity(state)
-    equipment = _get_player_equipment(state)
+    activity = _get_player_activity(db, state)
+    equipment = _get_player_equipment(db, user.id)
+    
+    # Get per-kingdom reputation (for current kingdom)
+    reputation = 0
+    if state.current_kingdom_id:
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == state.current_kingdom_id
+        ).first()
+        reputation = user_kingdom.local_reputation if user_kingdom else 0
+    
+    # Compute stats from other tables
+    # TODO: These should be computed from their respective source tables:
+    # - total_checkins: SUM(checkins_count) from user_kingdoms
+    # - total_conquests: COUNT(*) from kingdom_history
+    # - kingdoms_ruled: COUNT(*) from kingdoms WHERE ruler_id = user_id
+    # - coups_won: COUNT(*) from coup_events WHERE initiator_id = user_id AND attacker_victory = true
+    # - contracts_completed: COUNT(DISTINCT contract_id) from contract_contributions
+    # For now, use defaults until we implement the computations
     
     return PlayerPublicProfile(
         id=user.id,
@@ -405,19 +450,19 @@ def get_player_profile(
         current_kingdom_name=current_kingdom_name,
         hometown_kingdom_id=state.hometown_kingdom_id,
         level=state.level,
-        reputation=state.reputation,
-        honor=state.honor,
+        reputation=reputation,
+        honor=100,  # Removed from schema - default to 100
         attack_power=state.attack_power,
         defense_power=state.defense_power,
         leadership=state.leadership,
         building_skill=state.building_skill,
         intelligence=state.intelligence,
         equipment=equipment,
-        total_checkins=state.total_checkins,
-        total_conquests=state.total_conquests,
-        kingdoms_ruled=state.kingdoms_ruled,
-        coups_won=state.coups_won,
-        contracts_completed=state.contracts_completed,
+        total_checkins=0,  # TODO: compute from user_kingdoms
+        total_conquests=0,  # TODO: compute from kingdom_history
+        kingdoms_ruled=0,  # TODO: compute from kingdoms
+        coups_won=0,  # TODO: compute from coup_events
+        contracts_completed=0,  # TODO: compute from contract_contributions
         activity=activity,
         last_login=user.last_login,
         created_at=user.created_at
