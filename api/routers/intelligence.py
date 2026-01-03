@@ -12,7 +12,7 @@ from typing import Optional
 import random
 
 from db.base import get_db
-from db.models import User, Kingdom, PlayerState, KingdomIntelligence
+from db.models import User, Kingdom, PlayerState, KingdomIntelligence, UserKingdom
 from db import ActionCooldown
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
@@ -431,11 +431,25 @@ def gather_intelligence(
             db.add(new_intel)
         
         # Reward reputation in home kingdom
-        if state.kingdom_reputation is None:
-            state.kingdom_reputation = {}
-        
-        home_rep = state.kingdom_reputation.get(state.hometown_kingdom_id, 0)
-        state.kingdom_reputation[state.hometown_kingdom_id] = home_rep + 50
+        if state.hometown_kingdom_id:
+            user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == state.user_id,
+                UserKingdom.kingdom_id == state.hometown_kingdom_id
+            ).first()
+            
+            if user_kingdom:
+                user_kingdom.local_reputation += 50
+            else:
+                # Create new user_kingdom record
+                user_kingdom = UserKingdom(
+                    user_id=state.user_id,
+                    kingdom_id=state.hometown_kingdom_id,
+                    local_reputation=50,
+                    checkins_count=0,
+                    gold_earned=0,
+                    gold_spent=0
+                )
+                db.add(user_kingdom)
         
         db.commit()
         
@@ -460,11 +474,24 @@ def gather_intelligence(
         # CAUGHT - Penalties
         
         # Lose reputation in target kingdom
-        if state.kingdom_reputation is None:
-            state.kingdom_reputation = {}
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == state.user_id,
+            UserKingdom.kingdom_id == kingdom_id
+        ).first()
         
-        target_rep = state.kingdom_reputation.get(kingdom_id, 0)
-        state.kingdom_reputation[kingdom_id] = target_rep - 200
+        if user_kingdom:
+            user_kingdom.local_reputation -= 200
+        else:
+            # Create new user_kingdom record with negative reputation
+            user_kingdom = UserKingdom(
+                user_id=state.user_id,
+                kingdom_id=kingdom_id,
+                local_reputation=-200,
+                checkins_count=0,
+                gold_earned=0,
+                gold_spent=0
+            )
+            db.add(user_kingdom)
         
         # TODO: Add temporary ban system
         

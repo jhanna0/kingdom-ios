@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 
-from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property
+from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property, UserKingdom
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
@@ -53,6 +53,15 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     equipped = get_equipped_items(db, user.id)
     inventory = get_inventory(db, user.id)
     
+    # Get reputation from user_kingdoms table for current kingdom
+    reputation = 0
+    if state.current_kingdom_id:
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == state.current_kingdom_id
+        ).first()
+        reputation = user_kingdom.local_reputation if user_kingdom else 0
+    
     return PlayerState(
         id=user.id,
         display_name=user.display_name,
@@ -82,8 +91,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         attack_debuff=state.attack_debuff,
         debuff_expires_at=state.debuff_expires_at,
         
-        # Reputation (NOTE: Now per-kingdom in user_kingdoms table - defaulting here)
-        reputation=0,  # TODO: fetch from user_kingdoms for current kingdom
+        # Reputation (from user_kingdoms table for current kingdom)
+        reputation=reputation,
         honor=100,  # Removed from schema
         kingdom_reputation={},  # Removed from schema
         
@@ -237,18 +246,35 @@ def get_player_state(
             # This prevents charging travel fee multiple times
             if is_entering_new_kingdom:
                 state.current_kingdom_id = kingdom.id
-                state.last_check_in = datetime.utcnow()
                 
-                # Update check-in history for tracking purposes
-                check_in_history = state.check_in_history or {}
-                check_in_history[kingdom.id] = check_in_history.get(kingdom.id, 0) + 1
-                state.check_in_history = check_in_history
-                state.total_checkins += 1
+                # Create or update user_kingdoms record (tracks per-kingdom reputation and check-ins)
+                user_kingdom = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == current_user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                
+                if not user_kingdom:
+                    # First time visiting this kingdom - create record with starting reputation
+                    user_kingdom = UserKingdom(
+                        user_id=current_user.id,
+                        kingdom_id=kingdom.id,
+                        local_reputation=0,  # Start at 0 reputation
+                        checkins_count=1,
+                        gold_earned=0,
+                        gold_spent=0
+                    )
+                    db.add(user_kingdom)
+                    print(f"📍 {current_user.display_name} first time entering {kingdom.name}")
+                else:
+                    # Increment check-in counter
+                    user_kingdom.checkins_count += 1
+                    print(f"📍 {current_user.display_name} entered {kingdom.name} (visit #{user_kingdom.checkins_count})")
                 
                 # Update kingdom activity
                 kingdom.last_activity = datetime.utcnow()
-                
-                print(f"📍 {current_user.display_name} entered {kingdom.name}")
+                kingdom.checked_in_players = db.query(DBPlayerState).filter(
+                    DBPlayerState.current_kingdom_id == kingdom.id
+                ).count()
                 
                 # Create travel event for response
                 from schemas.user import TravelEvent
@@ -344,10 +370,9 @@ def reset_player_state(
     state.attack_debuff = 0
     state.debuff_expires_at = None
     
-    # Reset reputation
-    state.reputation = 0
+    # NOTE: Reputation is now in user_kingdoms table, not resetting here
+    # To reset reputation, you'd need to update/delete user_kingdoms records separately
     state.honor = 100
-    state.kingdom_reputation = {}
     
     # Reset territory
     state.current_kingdom_id = None
@@ -477,31 +502,42 @@ def add_reputation(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Add reputation (global and optionally to specific kingdom)"""
+    """Add reputation to a specific kingdom (reputation is now per-kingdom in user_kingdoms)"""
     state = get_or_create_player_state(db, current_user)
     
-    # Global reputation
-    state.reputation += amount
+    if not kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="kingdom_id is required. Reputation is now per-kingdom in user_kingdoms table."
+        )
     
-    # Kingdom-specific reputation
-    if kingdom_id:
-        kingdom_rep = state.kingdom_reputation or {}
-        current_rep = kingdom_rep.get(kingdom_id, 0)
-        new_rep = current_rep + amount
-        kingdom_rep[kingdom_id] = new_rep
-        state.kingdom_reputation = kingdom_rep
-        
-        # Track origin kingdom (first time hitting 300+ rep)
-        if state.origin_kingdom_id is None and new_rep >= 300:
-            state.origin_kingdom_id = kingdom_id
+    # Update or create user_kingdom record
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.kingdom_id == kingdom_id
+    ).first()
+    
+    if not user_kingdom:
+        user_kingdom = UserKingdom(
+            user_id=current_user.id,
+            kingdom_id=kingdom_id,
+            local_reputation=amount,
+            checkins_count=0,
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(user_kingdom)
+    else:
+        user_kingdom.local_reputation += amount
     
     state.updated_at = datetime.utcnow()
     db.commit()
+    db.refresh(user_kingdom)
     
     return {
         "success": True,
-        "new_reputation": state.reputation,
-        "kingdom_reputation": state.kingdom_reputation.get(kingdom_id) if kingdom_id else None
+        "kingdom_id": kingdom_id,
+        "new_reputation": user_kingdom.local_reputation
     }
 
 
@@ -622,9 +658,32 @@ def dev_boost(
     state.gold += 10000
     state.experience += 500
     state.skill_points += 10
-    state.reputation += 500
     state.iron += 100
     state.steel += 50
+    
+    # Boost reputation in current kingdom if player is checked in
+    reputation_boosted = False
+    if state.current_kingdom_id:
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == current_user.id,
+            UserKingdom.kingdom_id == state.current_kingdom_id
+        ).first()
+        
+        if user_kingdom:
+            user_kingdom.local_reputation += 500
+            reputation_boosted = True
+        else:
+            # Create new user_kingdom record
+            user_kingdom = UserKingdom(
+                user_id=current_user.id,
+                kingdom_id=state.current_kingdom_id,
+                local_reputation=500,
+                checkins_count=0,
+                gold_earned=0,
+                gold_spent=0
+            )
+            db.add(user_kingdom)
+            reputation_boosted = True
     
     # Level up if possible
     levels_gained = 0
@@ -644,11 +703,11 @@ def dev_boost(
     
     return {
         "success": True,
-        "message": "Dev boost applied!",
+        "message": "Dev boost applied!" + (" (includes +500 reputation in current kingdom)" if reputation_boosted else ""),
         "gold": state.gold,
         "level": state.level,
         "skill_points": state.skill_points,
-        "reputation": state.reputation,
-        "levels_gained": levels_gained
+        "levels_gained": levels_gained,
+        "reputation_boosted": reputation_boosted
     }
 

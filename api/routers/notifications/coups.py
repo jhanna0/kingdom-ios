@@ -4,7 +4,7 @@ Coup notifications builder
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-from db import User, PlayerState, Kingdom, CoupEvent
+from db import User, PlayerState, Kingdom, CoupEvent, UserKingdom
 
 
 def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[Dict[str, Any]]:
@@ -27,9 +27,14 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
         
         initiator_stats = None
         if initiator and initiator_state:
-            kingdom_rep = initiator_state.kingdom_reputation.get(coup.kingdom_id, 0) if initiator_state.kingdom_reputation else 0
+            # Get initiator's reputation in this kingdom from user_kingdoms table
+            initiator_user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == coup.initiator_id,
+                UserKingdom.kingdom_id == coup.kingdom_id
+            ).first()
+            kingdom_rep = initiator_user_kingdom.local_reputation if initiator_user_kingdom else 0
+            
             initiator_stats = {
-                "reputation": initiator_state.reputation,
                 "kingdom_reputation": kingdom_rep,
                 "attack_power": initiator_state.attack_power,
                 "defense_power": initiator_state.defense_power,

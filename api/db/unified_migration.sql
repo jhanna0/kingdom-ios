@@ -343,7 +343,80 @@ WHERE ps.property_upgrade_contracts IS NOT NULL
   AND ps.property_upgrade_contracts::text LIKE '[%';
 
 -- ============================================
--- STEP 9: CLEANUP - DROP OLD COLUMNS FROM player_state
+-- STEP 9: MIGRATE REPUTATION AND CHECK-IN DATA TO user_kingdoms
+-- ============================================
+
+-- Migrate reputation and check-in data from player_state to user_kingdoms
+-- For each player's hometown_kingdom_id, update or create their user_kingdoms record
+INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation, checkins_count, gold_earned, gold_spent)
+SELECT 
+    ps.user_id,
+    ps.hometown_kingdom_id,
+    COALESCE(ps.reputation, 0),
+    COALESCE(ps.total_checkins, 0),
+    0,
+    0
+FROM player_state ps
+WHERE ps.hometown_kingdom_id IS NOT NULL
+ON CONFLICT (user_id, kingdom_id) 
+DO UPDATE SET
+    local_reputation = EXCLUDED.local_reputation,
+    checkins_count = EXCLUDED.checkins_count;
+
+-- Migrate per-kingdom reputation from kingdom_reputation JSONB
+DO $$
+DECLARE
+    ps_record RECORD;
+    kingdom_id_text TEXT;
+    rep_value INTEGER;
+BEGIN
+    FOR ps_record IN 
+        SELECT user_id, kingdom_reputation 
+        FROM player_state 
+        WHERE kingdom_reputation IS NOT NULL 
+          AND kingdom_reputation::text != '{}'
+    LOOP
+        FOR kingdom_id_text, rep_value IN 
+            SELECT key, value::integer 
+            FROM jsonb_each_text(ps_record.kingdom_reputation)
+        LOOP
+            INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation, checkins_count, gold_earned, gold_spent)
+            VALUES (ps_record.user_id, kingdom_id_text, rep_value, 0, 0, 0)
+            ON CONFLICT (user_id, kingdom_id)
+            DO UPDATE SET
+                local_reputation = GREATEST(user_kingdoms.local_reputation, EXCLUDED.local_reputation);
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- Migrate check-in history from check_in_history JSONB
+DO $$
+DECLARE
+    ps_record RECORD;
+    kingdom_id_text TEXT;
+    checkin_count INTEGER;
+BEGIN
+    FOR ps_record IN 
+        SELECT user_id, check_in_history 
+        FROM player_state 
+        WHERE check_in_history IS NOT NULL 
+          AND check_in_history::text != '{}'
+    LOOP
+        FOR kingdom_id_text, checkin_count IN 
+            SELECT key, value::integer 
+            FROM jsonb_each_text(ps_record.check_in_history)
+        LOOP
+            INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation, checkins_count, gold_earned, gold_spent)
+            VALUES (ps_record.user_id, kingdom_id_text, 0, checkin_count, 0, 0)
+            ON CONFLICT (user_id, kingdom_id)
+            DO UPDATE SET
+                checkins_count = GREATEST(user_kingdoms.checkins_count, EXCLUDED.checkins_count);
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- ============================================
+-- STEP 10: CLEANUP - DROP OLD COLUMNS FROM player_state
 -- ============================================
 
 -- Drop cooldown columns (now in action_cooldowns table)
@@ -379,6 +452,14 @@ ALTER TABLE player_state DROP COLUMN IF EXISTS properties;
 ALTER TABLE player_state DROP COLUMN IF EXISTS origin_kingdom_id;
 ALTER TABLE player_state DROP COLUMN IF EXISTS home_kingdom_id;
 
+-- Drop reputation/check-in columns (now in user_kingdoms table)
+ALTER TABLE player_state DROP COLUMN IF EXISTS reputation;
+ALTER TABLE player_state DROP COLUMN IF EXISTS kingdom_reputation;
+ALTER TABLE player_state DROP COLUMN IF EXISTS check_in_history;
+ALTER TABLE player_state DROP COLUMN IF EXISTS total_checkins;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_check_in;
+ALTER TABLE player_state DROP COLUMN IF EXISTS last_daily_check_in;
+
 -- ============================================
 -- DONE! 
 -- ============================================
@@ -391,7 +472,8 @@ COMMIT;
 -- 3. unified_contracts: training_contracts, crafting_queue, property_upgrade_contracts from player_state
 -- 4. unified_contracts: All kingdom building contracts from contracts table
 -- 5. contract_contributions: All action counts converted to individual rows
--- 6. CLEANED UP: Removed 20+ old columns from player_state
+-- 6. user_kingdoms: reputation, kingdom_reputation, check_in_history, total_checkins from player_state
+-- 7. CLEANED UP: Removed 30+ old columns from player_state
 
 SELECT 'Migration complete!' as status;
 SELECT 'action_cooldowns: ' || count(*) FROM action_cooldowns;

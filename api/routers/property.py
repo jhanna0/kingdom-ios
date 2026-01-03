@@ -9,7 +9,7 @@ from typing import List
 import uuid
 from datetime import datetime
 
-from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution
+from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution, UserKingdom
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -191,8 +191,17 @@ def get_property_status(
                         already_owns_property_in_current_kingdom = True
                         break
     
+    # Get reputation from user_kingdoms table for current kingdom
+    current_kingdom_reputation = 0
+    if state.current_kingdom_id:
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == current_user.id,
+            UserKingdom.kingdom_id == state.current_kingdom_id
+        ).first()
+        current_kingdom_reputation = user_kingdom.local_reputation if user_kingdom else 0
+    
     # Purchase validation flags
-    meets_reputation_requirement = state.reputation >= 50
+    meets_reputation_requirement = current_kingdom_reputation >= 50
     can_afford = land_price is not None and state.gold >= land_price
     can_purchase = (
         current_kingdom is not None 
@@ -227,7 +236,7 @@ def get_property_status(
     
     return {
         "player_gold": state.gold,
-        "player_reputation": state.reputation,
+        "player_reputation": current_kingdom_reputation,
         "player_level": state.level,
         "player_building_skill": state.building_skill,
         "properties": properties_list,
@@ -256,11 +265,17 @@ def purchase_land(
             detail="Player state not found"
         )
     
-    # Check reputation requirement
-    if state.reputation < 50:
+    # Check reputation requirement - get from user_kingdoms for this kingdom
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.kingdom_id == request.kingdom_id
+    ).first()
+    current_reputation = user_kingdom.local_reputation if user_kingdom else 0
+    
+    if current_reputation < 50:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Need 50+ reputation. Current: {state.reputation}"
+            detail=f"Need 50+ reputation in {request.kingdom_name}. Current: {current_reputation}"
         )
     
     # Check if player already owns property in this kingdom

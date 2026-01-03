@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from db.models.user import User
+from db.models.kingdom import UserKingdom
 from models.auth_schemas import (
     AppleSignIn,
     TokenResponse,
@@ -207,10 +208,30 @@ def get_my_kingdoms(
 
 
 @router.get("/me/stats", response_model=UserStats)
-def get_my_stats(current_user = Depends(get_current_user)):
+def get_my_stats(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get detailed statistics for current user"""
     
     state = current_user.player_state
+    
+    # Get total checkins across all kingdoms from user_kingdoms table
+    from sqlalchemy import func
+    total_checkins = db.query(func.sum(UserKingdom.checkins_count)).filter(
+        UserKingdom.user_id == current_user.id
+    ).scalar() or 0
+    
+    # Get reputation from hometown kingdom (or 0 if not available)
+    # NOTE: Reputation is now per-kingdom in user_kingdoms table
+    hometown_reputation = 0
+    if state and state.hometown_kingdom_id:
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == current_user.id,
+            UserKingdom.kingdom_id == state.hometown_kingdom_id
+        ).first()
+        hometown_reputation = user_kingdom.local_reputation if user_kingdom else 0
+    
     return UserStats(
         user_id=current_user.id,
         username=current_user.display_name,  # Use display_name as username
@@ -218,10 +239,10 @@ def get_my_stats(current_user = Depends(get_current_user)):
         total_conquests=state.total_conquests if state else 0,
         kingdoms_ruled=state.kingdoms_ruled if state else 0,
         current_kingdoms_count=state.kingdoms_ruled if state else 0,
-        total_checkins=state.total_checkins if state else 0,
+        total_checkins=total_checkins,
         gold=state.gold if state else 0,
-        reputation=state.reputation if state else 0,
-        honor=state.honor if state else 100,
+        reputation=hometown_reputation,
+        honor=100,  # honor removed from player_state, default to 100
         level=state.level if state else 1,
         experience=state.experience if state else 0,
     )

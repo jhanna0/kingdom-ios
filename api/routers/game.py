@@ -374,7 +374,7 @@ def check_in(
     state = _get_or_create_player_state(db, current_user)
     state.gold += gold_reward
     state.experience += xp_reward
-    state.total_checkins += 1
+    # NOTE: total_checkins is now tracked in user_kingdoms.checkins_count
     
     # Level up check
     required_exp = state.level * 100
@@ -490,7 +490,14 @@ def conquer_kingdom(
         if old_ruler:
             old_ruler_state = _get_or_create_player_state(db, old_ruler)
             old_ruler_state.kingdoms_ruled -= 1
-            old_ruler_state.reputation -= 10  # Lose reputation for losing kingdom
+            
+            # Lose reputation in this kingdom
+            old_ruler_user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == old_ruler_id,
+                UserKingdom.kingdom_id == kingdom.id
+            ).first()
+            if old_ruler_user_kingdom:
+                old_ruler_user_kingdom.local_reputation -= 10
         
         # Note: No need to update old ruler's user_kingdom record
         # Kingdom.ruler_id being updated is sufficient
@@ -503,8 +510,26 @@ def conquer_kingdom(
     state.gold -= conquest_cost
     state.kingdoms_ruled += 1
     state.total_conquests += 1
-    state.reputation += 20
     state.experience += 100 * kingdom.level
+    
+    # Gain reputation in conquered kingdom
+    new_ruler_user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.kingdom_id == kingdom.id
+    ).first()
+    if new_ruler_user_kingdom:
+        new_ruler_user_kingdom.local_reputation += 20
+    else:
+        # Create new user_kingdom record
+        new_ruler_user_kingdom = UserKingdom(
+            user_id=current_user.id,
+            kingdom_id=kingdom.id,
+            local_reputation=20,
+            checkins_count=0,
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(new_ruler_user_kingdom)
     
     # Update user-kingdom stats
     user_kingdom.times_conquered += 1
