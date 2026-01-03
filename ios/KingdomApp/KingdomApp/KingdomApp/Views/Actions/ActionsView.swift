@@ -12,6 +12,7 @@ struct ActionsView: View {
     @State private var showReward = false
     @State private var currentReward: Reward?
     @State private var currentTime = Date()
+    private let taskID = UUID()  // NOT @State - stable across view updates
     
     // Cache kingdom status to avoid recalculating on every render
     @State private var isInHomeKingdom: Bool = false
@@ -47,20 +48,21 @@ struct ActionsView: View {
                 }
                 .padding(.vertical)
             }
+            .animation(nil)  // Disable all implicit animations on scroll content
+        }
+        .transaction { transaction in
+            transaction.animation = nil  // Force disable animations on state updates
         }
         .navigationTitle("Actions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
-        .task {
+        .task(id: taskID) {
+            print("🎬 .task TRIGGERED in ActionsView (taskID: \(taskID))")
             await loadActionStatus()
             updateKingdomStatus()
             startUIUpdateTimer()
-        }
-        .onChange(of: currentKingdom?.id) { oldValue, newValue in
-            // Only recalculate when kingdom actually changes
-            updateKingdomStatus()
         }
         .onDisappear {
             stopUIUpdateTimer()
@@ -357,8 +359,9 @@ struct ActionsView: View {
                 .padding(.top, KingdomTheme.Spacing.medium)
             
             // DYNAMIC: Render all hostile actions from API
-            ForEach(sortedActions(status.actions, category: "hostile"), id: \.key) { key, action in
-                renderAction(key: key, action: action, status: status)
+            ForEach(Array(sortedActions(status.actions, category: "hostile").enumerated()), id: \.element.key) { index, item in
+                renderAction(key: item.key, action: item.value, status: status)
+                    .id(item.key)  // Use key as stable ID
             }
         }
     }
@@ -366,9 +369,19 @@ struct ActionsView: View {
     // MARK: - Dynamic Action Rendering
     
     private func sortedActions(_ actions: [String: ActionStatus], category: String) -> [(key: String, value: ActionStatus)] {
-        return actions
+        let sorted = actions
             .filter { $0.value.category == category }
-            .sorted { ($0.value.displayOrder ?? 999) < ($1.value.displayOrder ?? 999) }
+            .sorted { 
+                // First sort by display order
+                let order1 = $0.value.displayOrder ?? 999
+                let order2 = $1.value.displayOrder ?? 999
+                if order1 != order2 {
+                    return order1 < order2
+                }
+                // Then by key name for stability
+                return $0.key < $1.key
+            }
+        return sorted
     }
     
     @ViewBuilder
@@ -451,12 +464,32 @@ struct ActionsView: View {
 // MARK: - API Calls
 
 extension ActionsView {
-    private func loadActionStatus() async {
+    private func loadActionStatus(caller: String = #function, file: String = #file, line: Int = #line) async {
+        print("🔍 loadActionStatus CALLED from \(file.split(separator: "/").last ?? ""):\(line) - \(caller)")
+        print("   - isLoading: \(isLoading)")
+        print("   - statusFetchedAt: \(statusFetchedAt?.description ?? "nil")")
+        print("   - Time since last fetch: \(statusFetchedAt.map { Date().timeIntervalSince($0) } ?? -1) seconds")
+        
+        // Prevent duplicate requests if we just loaded (within 3 seconds)
+        if let lastFetch = statusFetchedAt, Date().timeIntervalSince(lastFetch) < 3 {
+            print("⏭️ Skipping loadActionStatus - recent data exists")
+            return
+        }
+        
+        // Prevent concurrent requests
+        guard !isLoading else {
+            print("⏭️ Skipping loadActionStatus - already loading")
+            return
+        }
+        
         isLoading = true
+        print("📡 Making API call to /actions/status...")
         do {
             let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            print("✅ Got action status response")
             actionStatus = status
             statusFetchedAt = Date()
+            print("✅ Set actionStatus and statusFetchedAt")
             
             await MainActor.run {
                 viewModel.availableContracts = status.contracts.compactMap { apiContract in

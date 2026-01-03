@@ -466,8 +466,10 @@ struct PropertyDetailView: View {
     // MARK: - Helper Functions
     
     private func loadPropertyContracts() async {
+        print("🔍 PropertyDetailView: loadPropertyContracts() CALLED")
         do {
             let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            print("✅ PropertyDetailView: Got action status response")
             await MainActor.run {
                 propertyUpgradeContracts = status.propertyUpgradeContracts ?? []
                 isLoadingContracts = false

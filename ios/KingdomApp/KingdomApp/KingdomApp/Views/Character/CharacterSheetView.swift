@@ -144,8 +144,10 @@ struct CharacterSheetView: View {
     }
     
     private func loadTrainingContracts() async {
+        print("🔍 CharacterSheetView: loadTrainingContracts() CALLED")
         do {
             let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            print("✅ CharacterSheetView: Got action status response")
             await MainActor.run {
                 trainingContracts = status.trainingContracts
                 craftingQueue = status.craftingQueue
