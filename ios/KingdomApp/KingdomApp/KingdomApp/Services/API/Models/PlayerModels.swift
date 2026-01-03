@@ -23,7 +23,8 @@ struct APIPlayerState: Codable {
     let hometown_kingdom_id: String?  // Player's hometown (used for royal blue territory color)
     let origin_kingdom_id: String?    // DEPRECATED - no longer returned by API
     let home_kingdom_id: String?      // DEPRECATED - no longer returned by API (use hometown_kingdom_id)
-    let current_kingdom_id: String?   // Where the player currently is
+    let current_kingdom_id: String?   // Where the player currently is (ID)
+    let current_kingdom_name: String? // Where the player currently is (name)
     let fiefs_ruled: [String]?
     let travel_event: TravelEvent?
     

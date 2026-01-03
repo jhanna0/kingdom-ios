@@ -11,12 +11,17 @@ struct PlayerProfileView: View {
     var body: some View {
         Group {
             if isLoading {
-                VStack {
-                    ProgressView()
-                    Text("Loading profile...")
-                        .font(.caption)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .padding(.top, 8)
+                ZStack {
+                    KingdomTheme.Colors.parchment.ignoresSafeArea()
+                    
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .tint(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("Loading profile...")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
             } else if let error = errorMessage {
                 VStack(spacing: 16) {

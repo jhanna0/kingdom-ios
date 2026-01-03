@@ -3,7 +3,6 @@ import SwiftUI
 struct FriendsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FriendsViewModel()
-    @State private var selectedFriend: Friend?
     @State private var showFriendActivity = false
     
     var body: some View {
@@ -62,11 +61,6 @@ struct FriendsView: View {
             .task {
                 await viewModel.loadFriends()
                 await viewModel.loadFriendActivity()
-            }
-            .sheet(item: $selectedFriend) { friend in
-                NavigationStack {
-                    PlayerProfileView(userId: friend.friendUserId)
-                }
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {
@@ -188,9 +182,7 @@ struct FriendsView: View {
                                 .padding(.horizontal)
                                 
                                 ForEach(viewModel.friends) { friend in
-                                    FriendCard(friend: friend, onTap: {
-                                        selectedFriend = friend
-                                    })
+                                    FriendCard(friend: friend)
                 }
             } else if !viewModel.isLoading && viewModel.pendingReceived.isEmpty {
                 emptyFriendsState
@@ -355,10 +347,9 @@ struct ActivityCard: View {
 
 struct FriendCard: View {
     let friend: Friend
-    let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
+        NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
             HStack(spacing: 12) {
                 // Avatar with online indicator
                 ZStack(alignment: .bottomTrailing) {

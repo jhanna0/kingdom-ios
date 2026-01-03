@@ -21,7 +21,8 @@ struct CharacterSheetView: View {
                 ProfileHeaderCard(
                     displayName: player.name,
                     level: player.level,
-                    gold: player.gold
+                    gold: player.gold,
+                    rulerOf: player.isRuler ? player.currentKingdomName : nil
                 )
                 
                 // Combined combat stats and training

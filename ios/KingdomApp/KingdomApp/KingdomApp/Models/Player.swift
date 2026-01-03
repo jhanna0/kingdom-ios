@@ -13,7 +13,8 @@ class Player: ObservableObject {
     @Published var gold: Int = 100  // Starting gold
     
     // Location & Check-in
-    @Published var currentKingdom: String?  // Kingdom player is currently in
+    @Published var currentKingdom: String?  // Kingdom player is currently in (ID)
+    @Published var currentKingdomName: String?  // Kingdom player is currently in (name)
     @Published var lastCheckIn: Date?
     @Published var lastCheckInLocation: CLLocationCoordinate2D?
     
@@ -644,6 +645,7 @@ class Player: ObservableObject {
         
         // Territory
         currentKingdom = apiState.current_kingdom_id
+        currentKingdomName = apiState.current_kingdom_name
         hometownKingdomId = apiState.hometown_kingdom_id
         fiefsRuled = Set(apiState.fiefs_ruled ?? [])
         isRuler = apiState.is_ruler

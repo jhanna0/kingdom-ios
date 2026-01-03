@@ -53,14 +53,20 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     equipped = get_equipped_items(db, user.id)
     inventory = get_inventory(db, user.id)
     
-    # Get reputation from user_kingdoms table for current kingdom
+    # Get reputation and kingdom name from current kingdom
     reputation = 0
+    current_kingdom_name = None
     if state.current_kingdom_id:
         user_kingdom = db.query(UserKingdom).filter(
             UserKingdom.user_id == user.id,
             UserKingdom.kingdom_id == state.current_kingdom_id
         ).first()
         reputation = user_kingdom.local_reputation if user_kingdom else 0
+        
+        # Look up kingdom name
+        kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if kingdom:
+            current_kingdom_name = kingdom.name
     
     return PlayerState(
         id=user.id,
@@ -73,6 +79,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         origin_kingdom_id=None,  # Removed from schema (was for first 300+ rep kingdom)
         home_kingdom_id=None,  # Removed from schema (was for most check-ins)
         current_kingdom_id=state.current_kingdom_id,
+        current_kingdom_name=current_kingdom_name,
         
         # Core Stats
         gold=state.gold,

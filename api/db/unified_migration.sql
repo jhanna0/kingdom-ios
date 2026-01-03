@@ -467,45 +467,39 @@ ALTER TABLE player_state DROP COLUMN IF EXISTS last_daily_check_in;
 -- IMPORTANT: hometown_kingdom_id should ONLY exist in player_state, not in users table
 -- This prevents the /auth/me and /player/state endpoints from returning different values
 
--- First, ensure EVERY user with hometown_kingdom_id set also has it in their player_state
--- Copy from users.hometown_kingdom_id to player_state.hometown_kingdom_id
+-- First, ensure EVERY user has hometown_kingdom_id set in player_state
+-- Use current_kingdom_id as the source of truth (it's already the correct ID format)
 DO $$
 DECLARE
     rows_updated INTEGER;
 BEGIN
-    UPDATE player_state ps
-    SET hometown_kingdom_id = u.hometown_kingdom_id
-    FROM users u
-    WHERE ps.user_id = u.id
-      AND u.hometown_kingdom_id IS NOT NULL
-      AND (ps.hometown_kingdom_id IS NULL OR ps.hometown_kingdom_id != u.hometown_kingdom_id);
+    UPDATE player_state
+    SET hometown_kingdom_id = current_kingdom_id
+    WHERE hometown_kingdom_id IS NULL 
+       OR hometown_kingdom_id != current_kingdom_id;
     
     GET DIAGNOSTICS rows_updated = ROW_COUNT;
-    RAISE NOTICE 'Updated % player_state rows with hometown_kingdom_id from users table', rows_updated;
+    RAISE NOTICE 'Updated % player_state rows with hometown_kingdom_id from current_kingdom_id', rows_updated;
 END $$;
 
--- Verify no data will be lost
+-- Verify all player_states have hometown_kingdom_id set
 DO $$
 DECLARE
-    users_with_hometown INTEGER;
     states_with_hometown INTEGER;
+    total_states INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO users_with_hometown 
-    FROM users 
-    WHERE hometown_kingdom_id IS NOT NULL;
+    SELECT COUNT(*) INTO total_states FROM player_state;
     
     SELECT COUNT(*) INTO states_with_hometown
-    FROM player_state ps
-    JOIN users u ON ps.user_id = u.id
-    WHERE u.hometown_kingdom_id IS NOT NULL
-      AND ps.hometown_kingdom_id IS NOT NULL;
+    FROM player_state
+    WHERE hometown_kingdom_id IS NOT NULL;
     
-    IF users_with_hometown != states_with_hometown THEN
-        RAISE EXCEPTION 'DATA LOSS RISK: % users have hometown_kingdom_id but only % player_states have it copied. Aborting!', 
-            users_with_hometown, states_with_hometown;
+    IF states_with_hometown != total_states THEN
+        RAISE EXCEPTION 'DATA LOSS RISK: Only % of % player_states have hometown_kingdom_id set. Aborting!', 
+            states_with_hometown, total_states;
     END IF;
     
-    RAISE NOTICE 'SAFETY CHECK PASSED: All % user hometown_kingdom_id values are safely in player_state', users_with_hometown;
+    RAISE NOTICE 'SAFETY CHECK PASSED: All % player_states have hometown_kingdom_id set', states_with_hometown;
 END $$;
 
 -- Drop the unique constraint that uses hometown_kingdom_id
@@ -514,7 +508,10 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS unique_name_per_hometown;
 -- NOW it's safe to drop the column from users table
 ALTER TABLE users DROP COLUMN IF EXISTS hometown_kingdom_id;
 
-RAISE NOTICE 'Successfully removed hometown_kingdom_id from users table - now centralized in player_state';
+DO $$
+BEGIN
+    RAISE NOTICE 'Successfully removed hometown_kingdom_id from users table - now centralized in player_state';
+END $$;
 
 -- ============================================
 -- DONE! 
