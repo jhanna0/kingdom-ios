@@ -71,7 +71,7 @@ struct DrawnMapView: View {
     private func kingdomMarkers(in geometry: GeometryProxy) -> some View {
         ForEach(viewModel.kingdoms) { kingdom in
             if let position = coordinateToPoint(kingdom.territory.center) {
-                KingdomMarker(kingdom: kingdom, homeKingdomId: viewModel.player.homeKingdomId, playerId: viewModel.player.playerId)
+                KingdomMarkerWithActivity(kingdom: kingdom, homeKingdomId: viewModel.player.homeKingdomId, playerId: viewModel.player.playerId)
                     .position(
                         x: geometry.size.width / 2 + position.x * transform.scale + transform.offset.width,
                         y: geometry.size.height / 2 + position.y * transform.scale + transform.offset.height
