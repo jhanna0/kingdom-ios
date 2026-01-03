@@ -19,12 +19,7 @@ struct BuildMenuView: View {
                     treasuryHeader
                     
                     // Economic Buildings Section
-                    buildingSection(
-                        icon: "dollarsign.circle.fill",
-                        title: "Economic Buildings",
-                        subtitle: "Generate passive income for the city treasury",
-                        iconColor: KingdomTheme.Colors.inkMedium
-                    )
+                    sectionDivider(title: "Economy")
                     
                     // Mine upgrade
                     BuildingUpgradeCardWithContract(
@@ -37,6 +32,7 @@ struct BuildMenuView: View {
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.mineUpgradeCost,
+                        iconColor: KingdomTheme.Colors.buttonWarning,
                         onCreateContract: {
                             selectedBuildingType = .mine
                         }
@@ -48,11 +44,12 @@ struct BuildMenuView: View {
                         name: "Market",
                         currentLevel: kingdom.marketLevel,
                         maxLevel: 5,
-                        benefit: marketIncomeBenefit(kingdom.marketLevel + 1),
+                        benefit: marketBenefit(kingdom.marketLevel + 1),
                         hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Market"),
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.marketUpgradeCost,
+                        iconColor: KingdomTheme.Colors.royalPurple,
                         onCreateContract: {
                             selectedBuildingType = .market
                         }
@@ -69,18 +66,14 @@ struct BuildMenuView: View {
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.farmUpgradeCost,
+                        iconColor: KingdomTheme.Colors.buttonSuccess,
                         onCreateContract: {
                             selectedBuildingType = .farm
                         }
                     )
                     
                     // Civic Buildings Section
-                    buildingSection(
-                        icon: "graduationcap.fill",
-                        title: "Civic Buildings",
-                        subtitle: "Support your citizens' development",
-                        iconColor: .blue
-                    )
+                    sectionDivider(title: "Civic")
                     
                     // Education upgrade
                     BuildingUpgradeCardWithContract(
@@ -93,18 +86,14 @@ struct BuildMenuView: View {
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.educationUpgradeCost,
+                        iconColor: KingdomTheme.Colors.royalBlue,
                         onCreateContract: {
                             selectedBuildingType = .education
                         }
                     )
                     
                     // Defensive Buildings Section
-                    buildingSection(
-                        icon: "shield.fill",
-                        title: "Defensive Buildings",
-                        subtitle: "Protect your kingdom from coups",
-                        iconColor: KingdomTheme.Colors.buttonDanger
-                    )
+                    sectionDivider(title: "Defense")
                     
                     // Walls upgrade
                     BuildingUpgradeCardWithContract(
@@ -112,11 +101,12 @@ struct BuildMenuView: View {
                         name: "Walls",
                         currentLevel: kingdom.wallLevel,
                         maxLevel: 5,
-                        benefit: "Adds \((kingdom.wallLevel + 1) * 2) defenders during coups",
+                        benefit: "+\((kingdom.wallLevel + 1) * 2) defenders during coups",
                         hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Walls"),
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.wallUpgradeCost,
+                        iconColor: KingdomTheme.Colors.buttonDanger,
                         onCreateContract: {
                             selectedBuildingType = .walls
                         }
@@ -128,11 +118,12 @@ struct BuildMenuView: View {
                         name: "Vault",
                         currentLevel: kingdom.vaultLevel,
                         maxLevel: 5,
-                        benefit: "Protects \((kingdom.vaultLevel + 1) * 20)% of treasury from looting",
+                        benefit: "\((kingdom.vaultLevel + 1) * 20)% treasury protected from looting",
                         hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: "Vault"),
                         hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                         kingdom: kingdom,
                         upgradeCost: kingdom.vaultUpgradeCost,
+                        iconColor: KingdomTheme.Colors.imperialGold,
                         onCreateContract: {
                             selectedBuildingType = .vault
                         }
@@ -177,7 +168,7 @@ struct BuildMenuView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Kingdom Treasury")
                     .font(FontStyles.bodyMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("\(kingdom.treasuryGold) gold")
                     .font(FontStyles.headingLarge)
@@ -201,46 +192,38 @@ struct BuildMenuView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Section Header
+    // MARK: - Section Divider
     
-    private func buildingSection(icon: String, title: String, subtitle: String, iconColor: Color) -> some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
-            Image(systemName: icon)
-                .font(FontStyles.iconMedium)
-                .foregroundColor(.white)
-                .frame(width: 42, height: 42)
-                .brutalistBadge(backgroundColor: iconColor, cornerRadius: 10)
+    private func sectionDivider(title: String) -> some View {
+        VStack(spacing: 8) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(subtitle)
-                    .font(FontStyles.labelMedium)
+            HStack {
+                Text(title.uppercased())
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .tracking(1.5)
+                
+                Spacer()
             }
-            
-            Spacer()
         }
     }
     
-    // Income benefit descriptions
+    // Benefit descriptions
     private func mineBenefit(_ level: Int) -> String {
-        let materials: [String] = {
-            switch level {
-            case 1: return ["Stone"]
-            case 2: return ["Stone", "Iron"]
-            case 3: return ["Stone", "Iron", "Steel"]
-            case 4: return ["Stone", "Iron", "Steel", "Titanium"]
-            case 5: return ["All materials at 2x quantity"]
-            default: return []
-            }
-        }()
-        return "Unlocks: " + materials.joined(separator: ", ")
+        switch level {
+        case 1: return "Unlocks Stone"
+        case 2: return "Unlocks Stone, Iron"
+        case 3: return "Unlocks Stone, Iron, Steel"
+        case 4: return "Unlocks Stone, Iron, Steel, Titanium"
+        case 5: return "All materials at 2x quantity"
+        default: return ""
+        }
     }
     
-    private func marketIncomeBenefit(_ level: Int) -> String {
+    private func marketBenefit(_ level: Int) -> String {
         let income: Int = {
             switch level {
             case 1: return 15
@@ -251,7 +234,7 @@ struct BuildMenuView: View {
             default: return 0
             }
         }()
-        return "+\(income)g/day from trade activity"
+        return "+\(income)g per day"
     }
     
     private func farmBenefit(_ level: Int) -> String {
@@ -265,12 +248,12 @@ struct BuildMenuView: View {
             default: return 0
             }
         }()
-        return "Citizens complete contracts \(reduction)% faster"
+        return "Contracts complete \(reduction)% faster"
     }
     
     private func educationBenefit(_ level: Int) -> String {
         let reduction = level * 5
-        return "-\(reduction)% training actions required (citizens train faster)"
+        return "Citizens train skills \(reduction)% faster"
     }
     
     /// Check if kingdom has an active contract for a specific building type

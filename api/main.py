@@ -1,14 +1,20 @@
 """
 Kingdom Game API - Main application setup
 """
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from services.auth_service import decode_access_token
 
 from db import init_db
 from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
+# Setup logging
+logger = logging.getLogger("kingdom_api")
+logging.basicConfig(level=logging.ERROR)
 
 # Create FastAPI app
 app = FastAPI(
@@ -16,6 +22,49 @@ app = FastAPI(
     description="Backend API for Kingdom iOS app",
     version="1.0.0"
 )
+
+# Before request - extract username from JWT
+@app.middleware("http")
+async def extract_user_from_token(request: Request, call_next):
+    """Extract username from JWT token before each request (like Flask's @app.before_request)"""
+    request.state.username = "anonymous"
+    
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split()[1]
+            payload = decode_access_token(token)
+            apple_user_id = payload.get("sub")
+            if apple_user_id:
+                request.state.username = apple_user_id
+    except:
+        pass
+    
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        # Get the traceback to find the actual function where error occurred
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        
+        # Find the last frame in /app/ (our code, not libraries)
+        error_location = "unknown"
+        for frame in reversed(tb):
+            if "/app/" in frame.filename:
+                filename = frame.filename.split("/app/")[-1]
+                error_location = f"{filename}:{frame.name}() line {frame.lineno}"
+                break
+        
+        # Clean, readable error log
+        logger.error(
+            f"❌ {request.method} {request.url.path}\n"
+            f"   User: {request.state.username}\n"
+            f"   Location: {error_location}\n"
+            f"   Error: {type(e).__name__}: {str(e)}"
+        )
+        
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # Initialize database on startup

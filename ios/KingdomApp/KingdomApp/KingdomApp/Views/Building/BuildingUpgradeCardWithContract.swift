@@ -10,6 +10,7 @@ struct BuildingUpgradeCardWithContract: View {
     let hasAnyActiveContract: Bool  // Kingdom has ANY active contract
     let kingdom: Kingdom
     let upgradeCost: BuildingUpgradeCost?  // From backend
+    let iconColor: Color  // Color for the icon badge
     let onCreateContract: () -> Void
     
     var isMaxLevel: Bool {
@@ -38,7 +39,7 @@ struct BuildingUpgradeCardWithContract: View {
                     .foregroundColor(.white)
                     .frame(width: 52, height: 52)
                     .brutalistBadge(
-                        backgroundColor: isMaxLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonPrimary,
+                        backgroundColor: iconColor,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
