@@ -10,7 +10,7 @@ import math
 from db import get_db, User, Kingdom, PlayerState
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
 from .constants import (
     WORK_BASE_COOLDOWN,
     MIN_INTELLIGENCE_REQUIRED,
@@ -99,7 +99,7 @@ def attempt_vault_heist(
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]

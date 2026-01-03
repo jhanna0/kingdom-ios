@@ -16,6 +16,11 @@ from .models import (
     KingdomHistory,
     Alliance,
     PlayerActivityLog,
+    # New unified models
+    UnifiedContract,
+    ContractContribution,
+    PlayerItem,
+    ActionCooldown,
 )
 
 __all__ = [
@@ -37,5 +42,10 @@ __all__ = [
     "KingdomHistory",
     "Alliance",
     "PlayerActivityLog",
+    # New unified models
+    "UnifiedContract",
+    "ContractContribution",
+    "PlayerItem",
+    "ActionCooldown",
 ]
 

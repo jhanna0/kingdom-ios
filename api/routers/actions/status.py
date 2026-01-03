@@ -3,15 +3,16 @@ Action status endpoint - Get cooldown status for all actions
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime
 import json
 
-from db import get_db, User, PlayerState, Contract
+from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from .utils import check_cooldown, calculate_cooldown, check_global_action_cooldown
-from .training import calculate_training_cost
-from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus
+from .training import calculate_training_cost, TRAINING_TYPES
+from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (
     WORK_BASE_COOLDOWN,
     PATROL_COOLDOWN,
@@ -26,6 +27,100 @@ from .constants import (
 
 
 router = APIRouter()
+
+
+def get_training_contracts_for_status(db: Session, user_id: int) -> list:
+    """Get training contracts from unified_contracts table for status endpoint"""
+    contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.type.in_(TRAINING_TYPES),
+        UnifiedContract.status == 'in_progress'
+    ).all()
+    
+    result = []
+    for contract in contracts:
+        # Count contributions = actions completed
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == contract.id
+        ).scalar()
+        
+        result.append({
+            "id": str(contract.id),  # String for backwards compatibility
+            "type": contract.type,
+            "actions_required": contract.actions_required,
+            "actions_completed": actions_completed,
+            "cost_paid": contract.gold_paid,
+            "created_at": contract.created_at.isoformat() if contract.created_at else None,
+            "status": contract.status
+        })
+    
+    return result
+
+
+def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
+    """Get crafting contracts from unified_contracts table for status endpoint"""
+    contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.type.in_(CRAFTING_TYPES),
+        UnifiedContract.status == 'in_progress'
+    ).all()
+    
+    result = []
+    for contract in contracts:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == contract.id
+        ).scalar()
+        
+        result.append({
+            "id": str(contract.id),
+            "equipment_type": contract.type,
+            "tier": contract.tier,
+            "actions_required": contract.actions_required,
+            "actions_completed": actions_completed,
+            "gold_paid": contract.gold_paid,
+            "iron_paid": contract.iron_paid,
+            "steel_paid": contract.steel_paid,
+            "created_at": contract.created_at.isoformat() if contract.created_at else None,
+            "status": contract.status
+        })
+    
+    return result
+
+
+def get_property_contracts_for_status(db: Session, user_id: int) -> list:
+    """Get property contracts from unified_contracts table for status endpoint"""
+    contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.status == 'in_progress'
+    ).all()
+    
+    result = []
+    for contract in contracts:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == contract.id
+        ).scalar()
+        
+        # Parse target_id to get property_id
+        target_parts = contract.target_id.split("|") if contract.target_id else []
+        property_id = target_parts[0] if target_parts else contract.target_id
+        
+        result.append({
+            "contract_id": str(contract.id),
+            "property_id": property_id,
+            "kingdom_id": contract.kingdom_id,
+            "kingdom_name": contract.kingdom_name,
+            "from_tier": (contract.tier or 1) - 1,
+            "to_tier": contract.tier or 1,
+            "target_tier_name": get_tier_name(contract.tier or 1),
+            "actions_required": contract.actions_required,
+            "actions_completed": actions_completed,
+            "cost": contract.gold_paid,
+            "status": contract.status,
+            "started_at": contract.created_at.isoformat() if contract.created_at else None
+        })
+    
+    return result
 
 
 @router.get("/status")
@@ -89,11 +184,8 @@ def get_action_status(
             "stat_bonus": get_stat_bonus(tier)
         }
     
-    # Load property upgrade contracts and add computed tier names
-    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
-    for contract in property_contracts:
-        # Compute target_tier_name from to_tier (not stored in DB!)
-        contract["target_tier_name"] = get_tier_name(contract["to_tier"])
+    # Load property upgrade contracts from unified_contracts table
+    property_contracts = get_property_contracts_for_status(db, current_user.id)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward
@@ -152,14 +244,14 @@ def get_action_status(
             **check_cooldown(state.last_crafting_action, work_cooldown),  # Same cooldown as building work
             "cooldown_minutes": work_cooldown
         },
-        "training_contracts": state.training_contracts or [],
+        "training_contracts": get_training_contracts_for_status(db, current_user.id),
         "training_costs": {
             "attack": calculate_training_cost(state.attack_power),
             "defense": calculate_training_cost(state.defense_power),
             "leadership": calculate_training_cost(state.leadership),
             "building": calculate_training_cost(state.building_skill)
         },
-        "crafting_queue": state.crafting_queue or [],
+        "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,
         "property_upgrade_contracts": property_contracts,
         "contracts": contracts

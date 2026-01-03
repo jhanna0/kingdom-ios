@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown, log_activity
+from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, log_activity, set_cooldown
 from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD
 
 
@@ -31,7 +31,7 @@ def start_patrol(
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -58,9 +58,11 @@ def start_patrol(
             detail="Must be checked into a kingdom to patrol"
         )
     
-    # Start patrol
+    # Start patrol (both new table and legacy columns)
+    patrol_end = datetime.utcnow() + timedelta(minutes=PATROL_DURATION_MINUTES)
+    set_cooldown(db, current_user.id, "patrol", patrol_end)
     state.last_patrol_action = datetime.utcnow()
-    state.patrol_expires_at = datetime.utcnow() + timedelta(minutes=PATROL_DURATION_MINUTES)
+    state.patrol_expires_at = patrol_end
     
     # Award reputation for patrol (civic duty)
     state.reputation += PATROL_REPUTATION_REWARD

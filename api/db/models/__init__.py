@@ -16,6 +16,11 @@ from .alliance import Alliance
 from .friend import Friend
 from .activity_log import PlayerActivityLog
 
+# New unified models
+from .unified_contract import UnifiedContract, ContractContribution
+from .player_item import PlayerItem
+from .action_cooldown import ActionCooldown
+
 __all__ = [
     "User",
     "PlayerState",
@@ -32,5 +37,10 @@ __all__ = [
     "Alliance",
     "Friend",
     "PlayerActivityLog",
+    # New unified models
+    "UnifiedContract",
+    "ContractContribution",
+    "PlayerItem",
+    "ActionCooldown",
 ]
 

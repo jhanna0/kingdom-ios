@@ -1,29 +1,38 @@
 """
 Work on contract action (kingdom buildings and property upgrades)
+Uses unified contract system with contract_contributions table
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta
-import json
 
-from db import get_db, User, PlayerState, Kingdom, Contract, Property
+from db import get_db, User, PlayerState, Kingdom, Property, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import calculate_cooldown, check_cooldown, check_global_action_cooldown, format_datetime_iso
+from .utils import (
+    calculate_cooldown, 
+    check_global_action_cooldown_from_table, 
+    format_datetime_iso,
+    set_cooldown
+)
 from .constants import WORK_BASE_COOLDOWN
 from .tax_utils import apply_kingdom_tax_with_bonus
 
 
 router = APIRouter()
 
+# Building types that are kingdom buildings
+BUILDING_TYPES = ["wall", "vault", "mine", "market", "farm", "education"]
+
 
 @router.post("/work/{contract_id}")
 def work_on_contract(
-    contract_id: str,
+    contract_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Contribute one action to a contract (base 2hr cooldown, reduced by building skill)"""
+    """Contribute one action to a kingdom building contract"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -31,12 +40,10 @@ def work_on_contract(
             detail="Player state not found"
         )
     
-    # Check cooldown
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
-    # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=cooldown_minutes)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=cooldown_minutes)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -48,8 +55,12 @@ def work_on_contract(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
-    # Get contract
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    # Get contract from unified_contracts (kingdom buildings)
+    contract = db.query(UnifiedContract).filter(
+        UnifiedContract.id == contract_id,
+        UnifiedContract.type.in_(BUILDING_TYPES)
+    ).first()
+    
     if not contract:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -62,34 +73,42 @@ def work_on_contract(
             detail="Contract is already completed"
         )
     
-    # Check if user is checked into the kingdom
     if state.current_kingdom_id != contract.kingdom_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must be checked into the kingdom to work on contracts"
         )
     
-    # Increment action count
-    contract.actions_completed += 1
+    # Count current actions
+    actions_completed = db.query(func.count(ContractContribution.id)).filter(
+        ContractContribution.contract_id == contract.id
+    ).scalar()
     
-    # Track contribution per user
-    contributions = contract.action_contributions or {}
-    user_id_str = str(current_user.id)
-    contributions[user_id_str] = contributions.get(user_id_str, 0) + 1
-    contract.action_contributions = contributions
+    if actions_completed >= contract.actions_required:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract already has all required actions"
+        )
     
-    # Update player state
+    # Add contribution
+    contribution = ContractContribution(
+        contract_id=contract.id,
+        user_id=current_user.id
+    )
+    db.add(contribution)
+    
+    # Set cooldown in action_cooldowns table
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    set_cooldown(db, current_user.id, "work", cooldown_expires)
+    
+    # Also set legacy column for backwards compatibility during migration
     state.last_work_action = datetime.utcnow()
-    state.total_work_contributed += 1
     
-    # Calculate reward per action (gold per action = reward_pool / total_actions_required)
-    gold_per_action = contract.reward_pool / contract.total_actions_required
+    # Calculate reward
+    gold_per_action = (contract.reward_pool or 0) / contract.actions_required if contract.actions_required > 0 else 0
     base_gold = int(gold_per_action)
-    
-    # Apply building skill bonus (2% per level above 1)
     bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
     
-    # Apply tax AFTER bonuses
     net_income, tax_amount, tax_rate, gross_income = apply_kingdom_tax_with_bonus(
         db=db,
         kingdom_id=contract.kingdom_id,
@@ -98,43 +117,39 @@ def work_on_contract(
         bonus_multiplier=bonus_multiplier
     )
     
-    # Award net gold (after tax) to player
     state.gold += net_income
     
-    # Check if contract is complete
-    is_complete = contract.actions_completed >= contract.total_actions_required
+    new_actions_completed = actions_completed + 1
+    is_complete = new_actions_completed >= contract.actions_required
     
     if is_complete:
         contract.status = "completed"
         contract.completed_at = datetime.utcnow()
         
-        # Mark contract as completed for all contributors
-        for worker_id_str in contributions.keys():
-            worker_id = int(worker_id_str)
-            worker_state = db.query(PlayerState).filter(PlayerState.user_id == worker_id).first()
-            if worker_state:
-                worker_state.contracts_completed += 1
-        
         # Upgrade the building
         kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
         if kingdom:
-            building_attr = f"{contract.building_type.lower()}_level"
+            building_attr = f"{contract.type.lower()}_level"
             if hasattr(kingdom, building_attr):
                 current_level = getattr(kingdom, building_attr, 0)
                 setattr(kingdom, building_attr, current_level + 1)
     
     db.commit()
-    db.refresh(contract)
     
-    progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
-    user_contribution = contributions.get(user_id_str, 0)
+    progress_percent = int((new_actions_completed / contract.actions_required) * 100)
+    
+    # Get user's contribution count
+    user_contribution = db.query(func.count(ContractContribution.id)).filter(
+        ContractContribution.contract_id == contract.id,
+        ContractContribution.user_id == current_user.id
+    ).scalar()
     
     return {
         "success": True,
         "message": "Work action completed! +1 action" + (" - Contract complete!" if is_complete else ""),
-        "contract_id": contract_id,
-        "actions_completed": contract.actions_completed,
-        "total_actions_required": contract.total_actions_required,
+        "contract_id": str(contract_id),
+        "actions_completed": new_actions_completed,
+        "total_actions_required": contract.actions_required,
         "progress_percent": progress_percent,
         "your_contribution": user_contribution,
         "is_complete": is_complete,
@@ -153,16 +168,11 @@ def work_on_contract(
 
 @router.post("/work-property/{contract_id}")
 def work_on_property_upgrade(
-    contract_id: str,
+    contract_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Contribute one action to a property upgrade/construction contract (same cooldown as building contracts)
-    
-    Handles both:
-    - New construction (from_tier=0): Creates property when complete
-    - Upgrades (from_tier>0): Upgrades existing property tier
-    """
+    """Contribute one action to a property upgrade/construction contract"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -170,12 +180,10 @@ def work_on_property_upgrade(
             detail="Player state not found"
         )
     
-    # Check cooldown (same as building work)
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
-    # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=cooldown_minutes)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=cooldown_minutes)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -187,56 +195,72 @@ def work_on_property_upgrade(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
-    # Get property upgrade contracts
-    property_contracts = json.loads(state.property_upgrade_contracts or "[]")
+    # Get contract from unified_contracts (property contracts)
+    # Property contracts use type='property', tier=1 for construction, tier>1 for upgrades
+    contract = db.query(UnifiedContract).filter(
+        UnifiedContract.id == contract_id,
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == "property"
+    ).first()
     
-    # Find the contract
-    contract_idx = None
-    contract_data = None
-    for idx, contract in enumerate(property_contracts):
-        if contract["contract_id"] == contract_id:
-            contract_idx = idx
-            contract_data = contract
-            break
-    
-    if contract_data is None:
+    if not contract:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Property upgrade contract not found"
         )
     
-    if contract_data["status"] == "completed":
+    if contract.status == "completed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contract is already completed"
         )
     
-    # Increment action count
-    contract_data["actions_completed"] += 1
+    # Count current actions
+    actions_completed = db.query(func.count(ContractContribution.id)).filter(
+        ContractContribution.contract_id == contract.id
+    ).scalar()
     
-    # Update player state
+    if actions_completed >= contract.actions_required:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract already has all required actions"
+        )
+    
+    # Add contribution
+    contribution = ContractContribution(
+        contract_id=contract.id,
+        user_id=current_user.id
+    )
+    db.add(contribution)
+    
+    # Set cooldown
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    set_cooldown(db, current_user.id, "work", cooldown_expires)
     state.last_work_action = datetime.utcnow()
-    state.total_work_contributed += 1
     
-    # Check if contract is complete
-    is_complete = contract_data["actions_completed"] >= contract_data["actions_required"]
+    new_actions_completed = actions_completed + 1
+    is_complete = new_actions_completed >= contract.actions_required
     
     if is_complete:
-        contract_data["status"] = "completed"
-        contract_data["completed_at"] = datetime.utcnow().isoformat()
+        contract.status = "completed"
+        contract.completed_at = datetime.utcnow()
         
-        # Check if this is a new construction (from_tier=0) or an upgrade
-        if contract_data.get("from_tier") == 0:
+        # tier=1 means new construction, tier>1 means upgrade
+        if contract.tier == 1 and "|" in (contract.target_id or ""):
             # NEW CONSTRUCTION: Create the property
-            from db.models import Property
+            # target_id is encoded as "property_id|location"
+            parts = contract.target_id.split("|")
+            property_id = parts[0]
+            location = parts[1] if len(parts) > 1 else "center"
+            
             new_property = Property(
-                id=contract_data["property_id"],
-                kingdom_id=contract_data["kingdom_id"],
-                kingdom_name=contract_data["kingdom_name"],
+                id=property_id,
+                kingdom_id=contract.kingdom_id,
+                kingdom_name=contract.kingdom_name,
                 owner_id=current_user.id,
                 owner_name=current_user.display_name,
                 tier=1,
-                location=contract_data["location"],
+                location=location,
                 purchased_at=datetime.utcnow(),
                 last_upgraded=None
             )
@@ -244,27 +268,19 @@ def work_on_property_upgrade(
         else:
             # UPGRADE: Update existing property tier
             property = db.query(Property).filter(
-                Property.id == contract_data["property_id"]
+                Property.id == contract.target_id
             ).first()
             
             if property:
-                property.tier = contract_data["to_tier"]
+                property.tier = contract.tier
                 property.last_upgraded = datetime.utcnow()
-        
-        # Mark contract as completed
-        state.contracts_completed += 1
-    
-    # Save updated contracts
-    property_contracts[contract_idx] = contract_data
-    state.property_upgrade_contracts = json.dumps(property_contracts)
     
     db.commit()
     
-    progress_percent = int((contract_data["actions_completed"] / contract_data["actions_required"]) * 100)
+    progress_percent = int((new_actions_completed / contract.actions_required) * 100)
     
-    # Determine message based on contract type
     if is_complete:
-        if contract_data.get("from_tier") == 0:
+        if contract.tier == 1 and "|" in (contract.target_id or ""):
             completion_msg = " - Property construction complete!"
         else:
             completion_msg = " - Property upgrade complete!"
@@ -274,13 +290,12 @@ def work_on_property_upgrade(
     return {
         "success": True,
         "message": "Work action completed! +1 action" + completion_msg,
-        "contract_id": contract_id,
-        "property_id": contract_data["property_id"],
-        "actions_completed": contract_data["actions_completed"],
-        "actions_required": contract_data["actions_required"],
+        "contract_id": str(contract_id),
+        "property_id": contract.target_id,
+        "actions_completed": new_actions_completed,
+        "actions_required": contract.actions_required,
         "progress_percent": progress_percent,
         "is_complete": is_complete,
-        "new_tier": contract_data["to_tier"] if is_complete else None,
+        "new_tier": contract.tier if is_complete else None,
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes))
     }
-

@@ -12,7 +12,7 @@ from db import get_db, User, Kingdom, Contract, PlayerState
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown
+from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
 from .constants import WORK_BASE_COOLDOWN, SABOTAGE_COOLDOWN
 from .tax_utils import apply_kingdom_tax
 
@@ -252,6 +252,8 @@ def _handle_caught_saboteur(
     
     saboteur_state.game_data = game_data
     saboteur_state.last_sabotage_action = datetime.utcnow()
+    # NOTE: set_cooldown needs db, but we don't have Session here directly
+    # The caller (sabotage_contract) will commit and cooldown is tracked via last_sabotage_action
     
     return {
         "success": False,
@@ -423,7 +425,7 @@ def sabotage_contract(
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -511,6 +513,10 @@ def sabotage_contract(
         sabotage_cost=SABOTAGE_COST
     )
     
+    # Set cooldown in action_cooldowns table
+    cooldown_expires = datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)
+    set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
+    
     # Commit all changes
     db.commit()
     
@@ -562,7 +568,7 @@ def get_sabotage_targets(
     for contract in contracts:
         progress_percent = int((contract.actions_completed / contract.total_actions_required) * 100)
         targets.append({
-            "contract_id": contract.id,
+            "contract_id": str(contract.id),
             "building_type": contract.building_type,
             "building_level": contract.building_level,
             "progress": f"{contract.actions_completed}/{contract.total_actions_required}",

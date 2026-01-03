@@ -8,8 +8,9 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 
 from db.base import get_db
-from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, CheckInHistory
+from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, CheckInHistory, UnifiedContract, ContractContribution
 from db.models.activity_log import PlayerActivityLog
+from sqlalchemy import func
 from routers.auth import get_current_user
 from schemas.activity import ActivityLogEntry, PlayerActivityResponse
 
@@ -40,7 +41,7 @@ def _get_contract_activities(db: Session, user_id: int, limit: int = 50) -> List
                 kingdom_name=contract.kingdom_name,
                 amount=contributions,
                 details={
-                    "contract_id": contract.id,
+                    "contract_id": str(contract.id),
                     "building_type": contract.building_type,
                     "building_level": contract.building_level,
                     "actions_contributed": contributions,
@@ -191,44 +192,43 @@ def _get_property_activities(db: Session, user_id: int, limit: int = 50) -> List
 
 
 def _get_training_activities(db: Session, user_id: int, state: PlayerState, limit: int = 20) -> List[ActivityLogEntry]:
-    """Get training activities from player state"""
+    """Get training activities from unified_contracts table"""
     activities = []
     
-    # Check training contracts
-    if state.training_contracts:
-        for idx, contract in enumerate(state.training_contracts):
-            training_type = contract.get('type', 'unknown')
-            cost = contract.get('cost_paid', 0)
-            actions_completed = contract.get('actionsCompleted', 0)
-            actions_required = contract.get('actionsRequired', 0)
-            
-            # Use created_at if available, otherwise last_training_action
-            created_at = state.last_training_action or datetime.utcnow()
-            if 'created_at' in contract:
-                try:
-                    created_at = datetime.fromisoformat(contract['created_at'].replace('Z', '+00:00'))
-                except:
-                    pass
-            
-            status = "completed" if actions_completed >= actions_required else "in_progress"
-            
-            activities.append(ActivityLogEntry(
-                id=hash(f"{user_id}_{training_type}_{idx}") % 1000000 + 5000000,
-                user_id=user_id,
-                action_type="train",
-                action_category="combat",
-                description=f"Training {training_type.capitalize()} ({actions_completed}/{actions_required})",
-                kingdom_id=state.current_kingdom_id,
-                kingdom_name=None,  # Could look up if needed
-                amount=cost,
-                details={
-                    "training_type": training_type,
-                    "cost": cost,
-                    "progress": f"{actions_completed}/{actions_required}",
-                    "status": status
-                },
-                created_at=created_at
-            ))
+    # Training types
+    training_types = ["attack", "defense", "leadership", "building", "intelligence"]
+    
+    # Query training contracts from unified_contracts
+    contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.type.in_(training_types)
+    ).order_by(desc(UnifiedContract.created_at)).limit(limit).all()
+    
+    for contract in contracts:
+        # Count contributions = actions completed
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == contract.id
+        ).scalar()
+        
+        status = "completed" if contract.status == "completed" else "in_progress"
+        
+        activities.append(ActivityLogEntry(
+            id=contract.id + 5000000,  # Offset to avoid ID collisions
+            user_id=user_id,
+            action_type="train",
+            action_category="combat",
+            description=f"Training {contract.type.capitalize()} ({actions_completed}/{contract.actions_required})",
+            kingdom_id=contract.kingdom_id,
+            kingdom_name=contract.kingdom_name,
+            amount=contract.gold_paid,
+            details={
+                "training_type": contract.type,
+                "cost": contract.gold_paid,
+                "progress": f"{actions_completed}/{contract.actions_required}",
+                "status": status
+            },
+            created_at=contract.created_at
+        ))
     
     return activities
 

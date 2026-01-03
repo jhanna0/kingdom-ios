@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown, format_datetime_iso, calculate_cooldown, log_activity
+from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, log_activity, set_cooldown
 from .constants import WORK_BASE_COOLDOWN, FARM_COOLDOWN, FARM_GOLD_REWARD
 from .tax_utils import apply_kingdom_tax_with_bonus
 
@@ -32,7 +32,7 @@ def perform_farming(
     # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown(state, work_cooldown=work_cooldown)
+        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=work_cooldown)
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -69,7 +69,9 @@ def perform_farming(
     # Award gold to player
     state.gold += net_income
     
-    # Update last farm action
+    # Update cooldown (both new table and legacy column)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
+    set_cooldown(db, current_user.id, "farm", cooldown_expires)
     state.last_farm_action = datetime.utcnow()
     
     # Log activity

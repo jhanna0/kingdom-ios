@@ -7,9 +7,10 @@ from sqlalchemy import desc
 from datetime import datetime, timedelta
 from typing import Optional
 
-from db import get_db, User, PlayerState, Kingdom
+from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
 from db.models import KingdomIntelligence
 from routers.auth import get_current_user
+from sqlalchemy import func
 from schemas.player import (
     PlayerPublicProfile, 
     PlayerInKingdom, 
@@ -23,7 +24,7 @@ from schemas.player import (
 router = APIRouter(prefix="/players", tags=["players"])
 
 
-def _get_player_activity(state: PlayerState) -> PlayerActivity:
+def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
     """Determine what a player is currently doing"""
     now = datetime.utcnow()
     
@@ -35,30 +36,41 @@ def _get_player_activity(state: PlayerState) -> PlayerActivity:
             expires_at=state.patrol_expires_at
         )
     
-    # Check training contracts
-    if state.training_contracts:
-        for contract in state.training_contracts:
-            if contract.get("status") != "completed":
-                training_type = contract.get("type", "").capitalize()
-                completed = contract.get("actionsCompleted", 0)
-                required = contract.get("actionsRequired", 0)
-                return PlayerActivity(
-                    type="training",
-                    details=f"Training {training_type} ({completed}/{required})"
-                )
+    # Training types
+    training_types = ["attack", "defense", "leadership", "building", "intelligence"]
     
-    # Check crafting queue
-    if state.crafting_queue:
-        for craft in state.crafting_queue:
-            if craft.get("status") != "completed":
-                equipment_type = craft.get("equipmentType", "").capitalize()
-                tier = craft.get("tier", 0)
-                completed = craft.get("actionsCompleted", 0)
-                required = craft.get("actionsRequired", 0)
-                return PlayerActivity(
-                    type="crafting",
-                    details=f"Crafting T{tier} {equipment_type} ({completed}/{required})"
-                )
+    # Check training contracts from unified_contracts table
+    active_training = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == state.user_id,
+        UnifiedContract.type.in_(training_types),
+        UnifiedContract.status == 'in_progress'
+    ).first()
+    
+    if active_training:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == active_training.id
+        ).scalar()
+        return PlayerActivity(
+            type="training",
+            details=f"Training {active_training.type.capitalize()} ({actions_completed}/{active_training.actions_required})"
+        )
+    
+    # Check crafting contracts from unified_contracts table
+    crafting_types = ["weapon", "armor"]
+    active_crafting = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == state.user_id,
+        UnifiedContract.type.in_(crafting_types),
+        UnifiedContract.status == 'in_progress'
+    ).first()
+    
+    if active_crafting:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == active_crafting.id
+        ).scalar()
+        return PlayerActivity(
+            type="crafting",
+            details=f"Crafting T{active_crafting.tier} {active_crafting.type.capitalize()} ({actions_completed}/{active_crafting.actions_required})"
+        )
     
     # Check recent actions (within last 2 minutes)
     recent_threshold = now - timedelta(minutes=2)
@@ -85,21 +97,28 @@ def _get_player_activity(state: PlayerState) -> PlayerActivity:
     return PlayerActivity(type="idle")
 
 
-def _get_player_equipment(state: PlayerState) -> PlayerEquipment:
-    """Extract equipment data from player state"""
-    equipped_weapon = None
-    equipped_armor = None
+def _get_player_equipment(db: Session, user_id: int) -> PlayerEquipment:
+    """Get equipped items from player_items table"""
+    from db import PlayerItem
     
-    if state.equipped_weapon:
-        equipped_weapon = state.equipped_weapon
-    if state.equipped_armor:
-        equipped_armor = state.equipped_armor
+    equipped = db.query(PlayerItem).filter(
+        PlayerItem.user_id == user_id,
+        PlayerItem.is_equipped == True
+    ).all()
+    
+    weapon = None
+    armor = None
+    for item in equipped:
+        if item.type == "weapon":
+            weapon = item
+        elif item.type == "armor":
+            armor = item
     
     return PlayerEquipment(
-        weapon_tier=equipped_weapon.get("tier") if equipped_weapon else None,
-        weapon_attack_bonus=equipped_weapon.get("attackBonus") if equipped_weapon else None,
-        armor_tier=equipped_armor.get("tier") if equipped_armor else None,
-        armor_defense_bonus=equipped_armor.get("defenseBonus") if equipped_armor else None
+        weapon_tier=weapon.tier if weapon else None,
+        weapon_attack_bonus=weapon.attack_bonus if weapon else None,
+        armor_tier=armor.tier if armor else None,
+        armor_defense_bonus=armor.defense_bonus if armor else None
     )
 
 
@@ -189,7 +208,7 @@ def get_players_in_kingdom(
         if is_online:
             online_count += 1
         
-        activity = _get_player_activity(state)
+        activity = _get_player_activity(db, state)
         is_ruler = kingdom.ruler_id == user.id
         
         players.append(PlayerInKingdom(
@@ -310,7 +329,7 @@ def get_active_players(
         if not state:
             continue
         
-        activity = _get_player_activity(state)
+        activity = _get_player_activity(db, state)
         is_online = _is_player_online(user)
         is_ruler = False
         
