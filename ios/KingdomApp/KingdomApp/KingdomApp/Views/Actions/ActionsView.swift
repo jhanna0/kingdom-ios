@@ -428,7 +428,7 @@ struct ActionsView: View {
                 
                 let response = try await KingdomAPIService.shared.actions.performGenericAction(endpoint: endpoint)
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
@@ -464,14 +464,14 @@ struct ActionsView: View {
 // MARK: - API Calls
 
 extension ActionsView {
-    private func loadActionStatus(caller: String = #function, file: String = #file, line: Int = #line) async {
+    private func loadActionStatus(force: Bool = false, caller: String = #function, file: String = #file, line: Int = #line) async {
         print("🔍 loadActionStatus CALLED from \(file.split(separator: "/").last ?? ""):\(line) - \(caller)")
-        print("   - isLoading: \(isLoading)")
+        print("   - isLoading: \(isLoading), force: \(force)")
         print("   - statusFetchedAt: \(statusFetchedAt?.description ?? "nil")")
         print("   - Time since last fetch: \(statusFetchedAt.map { Date().timeIntervalSince($0) } ?? -1) seconds")
         
-        // Prevent duplicate requests if we just loaded (within 3 seconds)
-        if let lastFetch = statusFetchedAt, Date().timeIntervalSince(lastFetch) < 3 {
+        // Prevent duplicate requests if we just loaded (within 3 seconds) - UNLESS forced
+        if !force, let lastFetch = statusFetchedAt, Date().timeIntervalSince(lastFetch) < 3 {
             print("⏭️ Skipping loadActionStatus - recent data exists")
             return
         }
@@ -539,7 +539,7 @@ extension ActionsView {
                 
                 let response = try await KingdomAPIService.shared.actions.workOnContract(contractId: contractId)
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.loadContracts()
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
@@ -581,7 +581,7 @@ extension ActionsView {
                 
                 let response = try await KingdomAPIService.shared.actions.startPatrol()
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
@@ -622,7 +622,7 @@ extension ActionsView {
                 
                 let response = try await KingdomAPIService.shared.actions.performFarming()
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
@@ -668,7 +668,7 @@ extension ActionsView {
                 
                 let response = try await KingdomAPIService.shared.actions.workOnTraining(contractId: contractId)
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
@@ -705,7 +705,7 @@ extension ActionsView {
             do {
                 let response = try await KingdomAPIService.shared.actions.workOnPropertyUpgrade(contractId: contractId)
                 
-                await loadActionStatus()
+                await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 

@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 # Training types that map to player stats
-TRAINING_TYPES = ["attack", "defense", "leadership", "building", "intelligence"]
+TRAINING_TYPES = ["attack", "defense", "leadership", "building", "intelligence", "science", "faith"]
 
 
 def calculate_training_cost(stat_level: int, total_trainings: int = 0) -> int:
@@ -49,7 +49,9 @@ def get_stat_value(state, training_type: str) -> int:
         "defense": state.defense_power,
         "leadership": state.leadership,
         "building": state.building_skill,
-        "intelligence": state.intelligence
+        "intelligence": state.intelligence,
+        "science": state.science,
+        "faith": state.faith
     }
     return stat_map.get(training_type, 1)
 
@@ -71,6 +73,12 @@ def increment_stat(state, training_type: str) -> tuple[str, int]:
     elif training_type == "intelligence":
         state.intelligence += 1
         return "Intelligence", state.intelligence
+    elif training_type == "science":
+        state.science += 1
+        return "Science", state.science
+    elif training_type == "faith":
+        state.faith += 1
+        return "Faith", state.faith
     return "Unknown", 0
 
 
@@ -96,14 +104,18 @@ def get_training_costs(
             "defense": calculate_training_cost(state.defense_power, total_trainings),
             "leadership": calculate_training_cost(state.leadership, total_trainings),
             "building": calculate_training_cost(state.building_skill, total_trainings),
-            "intelligence": calculate_training_cost(state.intelligence, total_trainings)
+            "intelligence": calculate_training_cost(state.intelligence, total_trainings),
+            "science": calculate_training_cost(state.science, total_trainings),
+            "faith": calculate_training_cost(state.faith, total_trainings)
         },
         "current_stats": {
             "attack": state.attack_power,
             "defense": state.defense_power,
             "leadership": state.leadership,
             "building": state.building_skill,
-            "intelligence": state.intelligence
+            "intelligence": state.intelligence,
+            "science": state.science,
+            "faith": state.faith
         },
         "gold": state.gold
     }

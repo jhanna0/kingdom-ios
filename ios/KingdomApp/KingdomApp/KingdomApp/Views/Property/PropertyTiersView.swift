@@ -18,7 +18,8 @@ struct PropertyTiersView: View {
                 // Tier selector with picker
                 TierSelectorCard(
                     currentTier: currentTier,
-                    selectedTier: $selectedTier
+                    selectedTier: $selectedTier,
+                    accentColor: KingdomTheme.Colors.buttonSuccess
                 ) { tier in
                     tierContent(tier: tier)
                 }
@@ -113,17 +114,40 @@ struct PropertyTiersView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Cost
-            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+            // Cost section
+            if let cost = tierManager.propertyTierCost(tier), let actions = tierManager.propertyTierActions(tier) {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    sectionHeader(icon: "dollarsign.circle.fill", title: "Base Cost")
+                    
+                    HStack(spacing: 12) {
+                        // Gold cost
+                        HStack(spacing: 6) {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                            Text("\(cost)g")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                        
+                        Text("•")
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        // Actions required
+                        HStack(spacing: 6) {
+                            Image(systemName: "hammer.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            Text("\(actions) actions")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                    }
+                }
                 
-                ResourceRow(
-                    icon: "g.circle.fill",
-                    iconColor: KingdomTheme.Colors.goldLight,
-                    label: "Gold",
-                    required: upgradeCost(tier),
-                    available: player.gold
-                )
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
             }
             
             // Status indicator - MapHUD style
@@ -157,7 +181,7 @@ struct PropertyTiersView: View {
                     Text("Purchase land to unlock")
                         .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
@@ -203,7 +227,7 @@ struct PropertyTiersView: View {
                     Text("Available to Upgrade")
                         .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
@@ -227,7 +251,7 @@ struct PropertyTiersView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -247,14 +271,8 @@ struct PropertyTiersView: View {
     }
     
     private func tierColor(_ tier: Int) -> Color {
-        switch tier {
-        case 1: return KingdomTheme.Colors.buttonSecondary
-        case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return Color(red: 0.45, green: 0.35, blue: 0.25)
-        case 4: return Color(red: 0.6, green: 0.4, blue: 0.2)
-        case 5: return KingdomTheme.Colors.inkMedium
-        default: return KingdomTheme.Colors.inkDark
-        }
+        // Consistent green for all property tiers
+        return KingdomTheme.Colors.buttonSuccess
     }
     
     private func tierName(_ tier: Int) -> String {
@@ -265,16 +283,5 @@ struct PropertyTiersView: View {
     private func tierBenefits(_ tier: Int) -> [String] {
         // Fetch from backend tier manager (single source of truth)
         return tierManager.propertyTierBenefits(tier)
-    }
-    
-    private func upgradeCost(_ tier: Int) -> Int {
-        // Approximate costs
-        switch tier {
-        case 2: return 100
-        case 3: return 300
-        case 4: return 600
-        case 5: return 1000
-        default: return 0
-        }
     }
 }

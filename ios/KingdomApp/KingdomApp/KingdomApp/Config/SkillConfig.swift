@@ -36,8 +36,20 @@ struct SkillConfig {
         "intelligence": SkillConfig(
             type: "intelligence",
             displayName: "Intelligence",
-            icon: "brain.head.profile",
+            icon: "eye.fill",
             color: KingdomTheme.Colors.royalEmerald
+        ),
+        "science": SkillConfig(
+            type: "science",
+            displayName: "Science",
+            icon: "flask.fill",
+            color: Color(red: 0.4, green: 0.7, blue: 1.0)  // Light blue
+        ),
+        "faith": SkillConfig(
+            type: "faith",
+            displayName: "Faith",
+            icon: "hands.sparkles.fill",
+            color: Color(red: 0.65, green: 0.55, blue: 0.95)  // Deep lavender - holy vibes with better visibility
         )
     ]
     

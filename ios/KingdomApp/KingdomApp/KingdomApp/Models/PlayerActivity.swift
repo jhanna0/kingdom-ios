@@ -14,6 +14,7 @@ struct ActivityLogEntry: Codable, Identifiable {
     let amount: Int?
     let visibility: String
     let createdAt: String
+    let details: ActivityDetails?
     
     // Optional user info (for friend feeds)
     let username: String?
@@ -21,7 +22,7 @@ struct ActivityLogEntry: Codable, Identifiable {
     let userLevel: Int?
     
     enum CodingKeys: String, CodingKey {
-        case id, description, amount, visibility, username
+        case id, description, amount, visibility, username, details
         case userId = "user_id"
         case actionType = "action_type"
         case actionCategory = "action_category"
@@ -30,6 +31,27 @@ struct ActivityLogEntry: Codable, Identifiable {
         case createdAt = "created_at"
         case displayName = "display_name"
         case userLevel = "user_level"
+    }
+}
+
+// MARK: - Activity Details
+
+struct ActivityDetails: Codable {
+    // Training-specific
+    let trainingType: String?
+    let tier: Int?
+    let progress: String?
+    let completed: Bool?
+    
+    // Equipment crafting
+    let equipmentType: String?
+    
+    // Can add more fields as needed for other action types
+    
+    enum CodingKeys: String, CodingKey {
+        case trainingType = "training_type"
+        case equipmentType = "equipment_type"
+        case tier, progress, completed
     }
 }
 
@@ -45,10 +67,52 @@ struct PlayerActivityResponse: Codable {
 
 extension ActivityLogEntry {
     var icon: String {
+        // For training, use the specific skill icon if available
+        if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
+            if let trainingType = details?.trainingType {
+                return SkillConfig.get(trainingType).icon
+            }
+        }
+        
+        // For crafting, use equipment-specific icons
+        if actionType.lowercased() == "craft" || actionType.lowercased() == "crafting" {
+            if let equipmentType = details?.equipmentType {
+                switch equipmentType {
+                case "weapon":
+                    return "bolt.fill"
+                case "armor":
+                    return "shield.fill"
+                default:
+                    break
+                }
+            }
+        }
+        
         return ActionIconHelper.icon(for: actionType)
     }
     
     var color: Color {
+        // For training, use the specific skill color if available
+        if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
+            if let trainingType = details?.trainingType {
+                return SkillConfig.get(trainingType).color
+            }
+        }
+        
+        // For crafting, use equipment-specific colors
+        if actionType.lowercased() == "craft" || actionType.lowercased() == "crafting" {
+            if let equipmentType = details?.equipmentType {
+                switch equipmentType {
+                case "weapon":
+                    return KingdomTheme.Colors.buttonDanger
+                case "armor":
+                    return KingdomTheme.Colors.royalBlue
+                default:
+                    break
+                }
+            }
+        }
+        
         return ActionIconHelper.actionColor(for: actionType)
     }
     

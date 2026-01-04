@@ -82,44 +82,70 @@ struct MyPropertiesView: View {
     }
     
     private func propertyUnderConstructionCard(contract: PropertyAPI.PropertyUpgradeContract) -> some View {
-        let targetTier = contract.to_tier
         let progress = Float(contract.actions_completed) / Float(contract.actions_required)
         
         return VStack(spacing: 0) {
-            // Top section - Property visual with construction badge
-            ZStack(alignment: .topTrailing) {
-                // Property icon showcase
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(tierColor(for: targetTier).opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.black, lineWidth: 2)
+            // Top section - Icon badge with construction overlay
+            HStack(spacing: 14) {
+                // Property icon in brutalist badge with construction overlay
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: tierIconName(for: contract.to_tier))
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                            cornerRadius: 10,
+                            shadowOffset: 2,
+                            borderWidth: 2
                         )
                     
-                    // Show the ACTUAL property icon (square outline for land, etc)
-                    tierIcon(for: targetTier)
-                        .opacity(0.4 + (Double(progress) * 0.6)) // Fade in as construction progresses
+                    // Construction indicator
+                    Circle()
+                        .fill(KingdomTheme.Colors.buttonWarning)
+                        .frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                        .offset(x: 2, y: -2)
                 }
-                .frame(height: 140)
                 
-                // Construction badge overlay
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(contract.target_tier_name)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    if let location = contract.location, let kingdomName = contract.kingdom_name {
+                        HStack(spacing: 6) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(FontStyles.iconMini)
+                            Text("\(location.capitalized) Side • \(kingdomName)")
+                                .font(FontStyles.labelMedium)
+                        }
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+                
+                Spacer()
+                
+                // Building badge
                 HStack(spacing: 4) {
                     Image(systemName: "hammer.fill")
                         .font(FontStyles.iconMini)
                     Text("Building")
-                        .font(FontStyles.labelBold)
+                        .font(FontStyles.labelSmall)
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.buttonWarning,
-                    cornerRadius: 6,
-                    shadowOffset: 3,
-                    borderWidth: 2
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.black)
+                            .offset(x: 1, y: 1)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(KingdomTheme.Colors.buttonSuccess)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 1.5))
+                    }
                 )
-                .padding(12)
             }
             .padding(.horizontal)
             .padding(.top)
@@ -182,7 +208,7 @@ struct MyPropertiesView: View {
                             // Progress fill with animated stripes
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(KingdomTheme.Colors.buttonWarning)
+                                    .fill(KingdomTheme.Colors.buttonSuccess)
                                 
                                 AnimatedStripes()
                                     .clipShape(RoundedRectangle(cornerRadius: 3))
@@ -198,10 +224,10 @@ struct MyPropertiesView: View {
                 }
                 
                 // Instruction text
-                HStack(spacing: 6) {
+                    HStack(spacing: 6) {
                     Image(systemName: "arrow.right.circle.fill")
                         .font(FontStyles.iconSmall)
-                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                     
                     Text("Complete work actions in the Actions tab")
                         .font(FontStyles.labelMedium)
@@ -219,108 +245,13 @@ struct MyPropertiesView: View {
     private var propertySection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             if let property = properties.first {
-                // Property overview card - brutalist style
-                propertyOverviewCard(property: property)
-                
-                // Action button - navigate to detail/upgrade
+                // Property card - tap to view details
                 NavigationLink(value: PropertyDestination.detail(property)) {
-                    propertyActionButton(property: property)
+                    PropertyCard(property: property)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
         }
-    }
-    
-    private func propertyOverviewCard(property: Property) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Tier visual with brutalist style
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(tierColor(for: property.tier).opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-                    .frame(height: 100)
-                
-                tierIcon(for: property.tier)
-            }
-            
-            // Tier name and progress
-            VStack(spacing: 8) {
-                Text(property.tierName)
-                    .font(FontStyles.displaySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if let location = property.location {
-                    HStack(spacing: 6) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(FontStyles.iconMini)
-                        Text("\(location.capitalized) Side • \(property.kingdomName)")
-                            .font(FontStyles.labelMedium)
-                    }
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-                // Tier progress dots with brutalist style
-                HStack(spacing: 8) {
-                    ForEach(1...5, id: \.self) { tier in
-                        Circle()
-                            .fill(tier <= property.tier ? tierColor(for: property.tier) : KingdomTheme.Colors.inkDark.opacity(0.15))
-                            .frame(width: 12, height: 12)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black, lineWidth: tier <= property.tier ? 1.5 : 0.5)
-                            )
-                    }
-                }
-                
-                Text("Tier \(property.tier) of 5")
-                    .font(FontStyles.labelBold)
-                    .foregroundColor(tierColor(for: property.tier))
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func propertyActionButton(property: Property) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: tierIconName(for: property.tier))
-                .font(FontStyles.iconMedium)
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .brutalistBadge(
-                    backgroundColor: tierColor(for: property.tier),
-                    cornerRadius: 10,
-                    shadowOffset: 2,
-                    borderWidth: 2
-                )
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(property.tier < 5 ? "Upgrade Property" : "View Property")
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(property.tier < 5 ? "Next: Tier \(property.tier + 1) - \(tierName(for: property.tier + 1))" : "Maximum tier reached")
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Text("T\(property.tier)")
-                    .font(FontStyles.headingLarge)
-                    .foregroundColor(tierColor(for: property.tier))
-                
-                Image(systemName: "chevron.right")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment)
     }
     
     // MARK: - View All Tiers Button
@@ -332,7 +263,7 @@ struct MyPropertiesView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("View All Tiers")
@@ -365,7 +296,7 @@ struct MyPropertiesView: View {
                     .font(.system(size: 50, weight: .bold))
                     .foregroundColor(.white)
                     .frame(width: 80, height: 80)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
                 
                 Text("No Property Yet")
                     .font(FontStyles.displaySmall)
@@ -417,18 +348,8 @@ struct MyPropertiesView: View {
         }
     }
     
-    // MARK: - Helper Functions
     
-    private func tierName(for tier: Int) -> String {
-        switch tier {
-        case 1: return "Land"
-        case 2: return "House"
-        case 3: return "Workshop"
-        case 4: return "Beautiful Property"
-        case 5: return "Estate"
-        default: return "Property"
-        }
-    }
+    // MARK: - Helper Functions
     
     private func tierIconName(for tier: Int) -> String {
         switch tier {
@@ -438,58 +359,6 @@ struct MyPropertiesView: View {
         case 4: return "building.columns.fill"
         case 5: return "crown.fill"
         default: return "building.fill"
-        }
-    }
-    
-    private func tierColor(for tier: Int) -> Color {
-        switch tier {
-        case 1: return KingdomTheme.Colors.buttonSecondary
-        case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.inkMedium
-        case 4: return KingdomTheme.Colors.inkMedium
-        case 5: return KingdomTheme.Colors.inkMedium
-        default: return KingdomTheme.Colors.inkDark
-        }
-    }
-    
-    @ViewBuilder
-    private func tierIcon(for tier: Int) -> some View {
-        switch tier {
-        case 1:
-            Image(systemName: "rectangle.dashed")
-                .font(.system(size: 50, weight: .light))
-                .foregroundColor(tierColor(for: tier))
-        case 2:
-            Image(systemName: "house.fill")
-                .font(.system(size: 50))
-                .foregroundColor(tierColor(for: tier))
-        case 3:
-            HStack(spacing: 8) {
-                Image(systemName: "house.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(tierColor(for: tier))
-                Image(systemName: "hammer.fill")
-                    .font(.system(size: 35))
-                    .foregroundColor(tierColor(for: tier).opacity(0.8))
-                    .offset(y: 10)
-            }
-        case 4:
-            Image(systemName: "building.columns.fill")
-                .font(.system(size: 50))
-                .foregroundColor(tierColor(for: tier))
-        case 5:
-            VStack(spacing: -5) {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 25))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Image(systemName: "building.columns.fill")
-                    .font(.system(size: 45))
-                    .foregroundColor(tierColor(for: tier))
-            }
-        default:
-            Image(systemName: "questionmark")
-                .font(.system(size: 50))
-                .foregroundColor(tierColor(for: tier))
         }
     }
     

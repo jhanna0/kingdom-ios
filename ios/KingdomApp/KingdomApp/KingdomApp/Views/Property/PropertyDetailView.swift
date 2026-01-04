@@ -41,26 +41,6 @@ struct PropertyDetailView: View {
                 // Location info
                 locationCard
                 
-                // View all tiers button
-                NavigationLink(destination: PropertyTiersView(player: player, property: property)) {
-                    HStack {
-                        Image(systemName: "list.number")
-                            .font(FontStyles.iconMedium)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("View All Tiers")
-                                .font(FontStyles.bodyMediumBold)
-                            Text("See upgrade path & benefits")
-                                .font(FontStyles.labelSmall)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(FontStyles.iconSmall)
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                }
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 12)
-                
                 // Upgrade section
                 if property.tier < 5 {
                     upgradeCard
@@ -209,14 +189,8 @@ struct PropertyDetailView: View {
     }
     
     private var tierColor: Color {
-        switch property.tier {
-        case 1: return KingdomTheme.Colors.buttonSecondary
-        case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return KingdomTheme.Colors.inkMedium
-        case 4: return KingdomTheme.Colors.inkMedium
-        case 5: return KingdomTheme.Colors.inkMedium
-        default: return KingdomTheme.Colors.inkDark
-        }
+        // Consistent green for all property tiers
+        return KingdomTheme.Colors.buttonSuccess
     }
     
     // MARK: - Location Card
@@ -228,7 +202,7 @@ struct PropertyDetailView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 40, height: 40)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(property.kingdomName)
@@ -276,13 +250,13 @@ struct PropertyDetailView: View {
             if let contract = activeContract {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        Image(systemName: "hourglass")
+                        Image(systemName: "hammer.fill")
                             .font(FontStyles.iconSmall)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                         
                         Text("Upgrade In Progress")
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                     }
                     
                     // Progress bar
@@ -307,7 +281,7 @@ struct PropertyDetailView: View {
                                     .overlay(Rectangle().stroke(Color.black, lineWidth: 1))
                                 
                                 Rectangle()
-                                    .fill(KingdomTheme.Colors.buttonWarning)
+                                    .fill(KingdomTheme.Colors.buttonSuccess)
                                     .frame(width: geometry.size.width * contract.progress, height: 8)
                             }
                         }
@@ -319,7 +293,7 @@ struct PropertyDetailView: View {
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.15), cornerRadius: 8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.15), cornerRadius: 8)
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .opacity
@@ -329,7 +303,7 @@ struct PropertyDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.buttonPrimary))
+                            .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.buttonSuccess))
                             .scaleEffect(1.2)
                         
                         VStack(alignment: .leading, spacing: 4) {
@@ -346,7 +320,7 @@ struct PropertyDetailView: View {
                     }
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary.opacity(0.15), cornerRadius: 8)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.15), cornerRadius: 8)
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .scale.combined(with: .opacity)
@@ -358,13 +332,16 @@ struct PropertyDetailView: View {
                         .padding()
                 } else if let status = upgradeStatus {
                     Button(action: purchaseUpgrade) {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
+                                .font(.system(size: 14, weight: .bold))
                             Text("Start Upgrade (\(status.upgrade_cost)g)")
+                                .font(.system(size: 14, weight: .bold))
                         }
                     }
-                    .buttonStyle(.medieval(
-                        color: (status.player_gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkDark.opacity(0.3),
+                    .buttonStyle(.brutalist(
+                        backgroundColor: (status.player_gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                        foregroundColor: .white,
                         fullWidth: true
                     ))
                     .disabled(status.player_gold < status.upgrade_cost || hasAnyPropertyUpgradeInProgress)
@@ -426,7 +403,7 @@ struct PropertyDetailView: View {
                 .font(FontStyles.iconExtraLarge)
                 .foregroundColor(.white)
                 .frame(width: 60, height: 60)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 16)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 16)
             
             Text("Maximum Level")
                 .font(FontStyles.headingMedium)
@@ -439,7 +416,7 @@ struct PropertyDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.inkMedium.opacity(0.1))
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.1))
     }
     
     

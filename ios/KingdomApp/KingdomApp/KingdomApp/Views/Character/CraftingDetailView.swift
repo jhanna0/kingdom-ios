@@ -53,7 +53,8 @@ struct CraftingDetailView: View {
                 TierSelectorCard(
                     currentTier: currentEquippedTier,
                     selectedTier: $selectedTier,
-                    showCurrentBadge: false
+                    showCurrentBadge: false,
+                    accentColor: craftingColor
                 ) { tier in
                     if let costs = craftingCosts, let tierCost = costs.cost(for: tier) {
                         VStack(alignment: .leading, spacing: 16) {
@@ -69,7 +70,7 @@ struct CraftingDetailView: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .foregroundColor(craftingColor)
                                         .frame(width: 20)
                                     
                                     Text("+\(tierCost.statBonus) \(equipmentType == "weapon" ? "Attack" : "Defense")")
@@ -80,7 +81,7 @@ struct CraftingDetailView: View {
                             }
                             
                             Rectangle()
-                                .fill(KingdomTheme.Colors.border)
+                                .fill(craftingColor.opacity(0.3))
                                 .frame(height: 2)
                             
                             // Requirements - ALWAYS SHOW
@@ -90,7 +91,7 @@ struct CraftingDetailView: View {
                                 HStack {
                                     Image(systemName: "figure.walk")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                        .foregroundColor(craftingColor.opacity(0.5))
                                         .frame(width: 20)
                                     Text("\(tierCost.actionsRequired) actions")
                                         .font(FontStyles.bodySmall)
@@ -103,7 +104,7 @@ struct CraftingDetailView: View {
                             }
                             
                             Rectangle()
-                                .fill(KingdomTheme.Colors.border)
+                                .fill(craftingColor.opacity(0.3))
                                 .frame(height: 2)
                             
                             // Cost - ALWAYS SHOW
@@ -142,7 +143,7 @@ struct CraftingDetailView: View {
                             // Workshop requirement warning
                             if !hasWorkshop {
                                 Rectangle()
-                                    .fill(KingdomTheme.Colors.border)
+                                    .fill(craftingColor.opacity(0.3))
                                     .frame(height: 2)
                                 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -200,7 +201,7 @@ struct CraftingDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(craftingColor.opacity(0.5))
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -208,6 +209,10 @@ struct CraftingDetailView: View {
     }
     
     // MARK: - Computed Properties
+    
+    private var craftingColor: Color {
+        return EquipmentConfig.get(equipmentType).color
+    }
     
     private var currentEquipment: Player.EquipmentData? {
         if equipmentType == "weapon" {

@@ -124,15 +124,7 @@ struct BuildMenuView: View {
     
     // Icon colors by building type
     private func iconColor(for buildingType: String) -> Color {
-        switch buildingType {
-        case "mine": return KingdomTheme.Colors.buttonWarning
-        case "market": return KingdomTheme.Colors.royalPurple
-        case "farm": return KingdomTheme.Colors.buttonSuccess
-        case "education": return KingdomTheme.Colors.royalBlue
-        case "wall": return KingdomTheme.Colors.buttonDanger
-        case "vault": return KingdomTheme.Colors.imperialGold
-        default: return KingdomTheme.Colors.inkMedium
-        }
+        return BuildingConfig.get(buildingType).color
     }
     
     // MARK: - Treasury Header

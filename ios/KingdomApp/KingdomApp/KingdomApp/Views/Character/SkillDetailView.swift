@@ -19,7 +19,8 @@ struct SkillDetailView: View {
                     // Unified tier selector
                     TierSelectorCard(
                     currentTier: currentTier,
-                    selectedTier: $selectedTier
+                    selectedTier: $selectedTier,
+                    accentColor: skillColor
                 ) { tier in
                     VStack(alignment: .leading, spacing: 16) {
                         // Tier name
@@ -29,13 +30,13 @@ struct SkillDetailView: View {
                         
                         // Benefits
                         VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader(icon: "star.fill", title: "Benefits")
+                            sectionHeader(icon: skillIcon, title: "Benefits")
                             
                             ForEach(getTierBenefits(tier: tier), id: \.self) { benefit in
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .foregroundColor(tier <= currentTier ? skillColor : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(benefit)
@@ -47,7 +48,7 @@ struct SkillDetailView: View {
                         }
                         
                         Rectangle()
-                            .fill(Color.black)
+                            .fill(skillColor.opacity(0.3))
                             .frame(height: 2)
                         
                         // Requirements - ALWAYS SHOW
@@ -57,7 +58,7 @@ struct SkillDetailView: View {
                                 HStack {
                                     Image(systemName: "figure.walk")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark.opacity(0.7))
+                                        .foregroundColor(skillColor.opacity(0.5))
                                         .frame(width: 20)
                                     Text("\(getActionsRequired(tier: tier)) actions")
                                         .font(FontStyles.bodySmall)
@@ -70,7 +71,7 @@ struct SkillDetailView: View {
                         }
                         
                         Rectangle()
-                            .fill(Color.black)
+                            .fill(skillColor.opacity(0.3))
                             .frame(height: 2)
                         
                         // Cost - ALWAYS SHOW
@@ -247,7 +248,7 @@ struct SkillDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(skillColor.opacity(0.5))
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -262,6 +263,14 @@ struct SkillDetailView: View {
         return config.displayName
     }
     
+    private var skillColor: Color {
+        return SkillConfig.get(skillType).color
+    }
+    
+    private var skillIcon: String {
+        return SkillConfig.get(skillType).icon
+    }
+    
     private var currentTier: Int {
         // FULLY DYNAMIC
         switch skillType {
@@ -270,6 +279,8 @@ struct SkillDetailView: View {
         case "leadership": return player.leadership
         case "building": return player.buildingSkill
         case "intelligence": return player.intelligence
+        case "science": return player.science
+        case "faith": return player.faith
         default: return 0
         }
     }
@@ -282,6 +293,8 @@ struct SkillDetailView: View {
         case "leadership": return player.leadershipTrainingCost
         case "building": return player.buildingTrainingCost
         case "intelligence": return player.intelligenceTrainingCost
+        case "science": return player.scienceTrainingCost
+        case "faith": return player.faithTrainingCost
         default: return 100
         }
     }

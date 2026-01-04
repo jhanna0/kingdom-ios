@@ -112,7 +112,7 @@ struct PlayerProfileView: View {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
-                    .brutalistBadge(backgroundColor: activityColor(profile.activity.color), cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+                    .brutalistBadge(backgroundColor: profile.activity.actualColor, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(profile.activity.displayText)
@@ -189,6 +189,22 @@ struct PlayerProfileView: View {
                         name: SkillConfig.get("intelligence").displayName,
                         value: profile.intelligence,
                         color: SkillConfig.get("intelligence").color
+                    )
+                    
+                    skillDisplay(
+                        icon: SkillConfig.get("science").icon,
+                        name: SkillConfig.get("science").displayName,
+                        value: profile.science,
+                        color: SkillConfig.get("science").color
+                    )
+                }
+                
+                HStack(spacing: 10) {
+                    skillDisplay(
+                        icon: SkillConfig.get("faith").icon,
+                        name: SkillConfig.get("faith").displayName,
+                        value: profile.faith,
+                        color: SkillConfig.get("faith").color
                     )
                     
                     // Reputation display

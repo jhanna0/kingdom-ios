@@ -61,7 +61,8 @@ struct BuildingUpgradeCardWithContract: View {
                             maxLevel: maxLevel,
                             benefitForLevel: { level in benefit },
                             costForLevel: { level in constructionCost },
-                            detailedBenefits: getDetailedBenefitsForBuilding(name: name)
+                            detailedBenefits: getDetailedBenefitsForBuilding(name: name),
+                            accentColor: iconColor
                         )) {
                             HStack(spacing: 4) {
                                 Text("All Levels")

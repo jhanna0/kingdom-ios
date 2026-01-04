@@ -26,11 +26,11 @@ class TierManager {
     private func loadDefaults() {
         // Property defaults
         properties = PropertyTiersData(maxTier: 5, tiers: [
-            1: PropertyTierInfo(name: "Land", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"]),
-            2: PropertyTierInfo(name: "House", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"]),
-            3: PropertyTierInfo(name: "Workshop", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"]),
-            4: PropertyTierInfo(name: "Beautiful Property", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"]),
-            5: PropertyTierInfo(name: "Estate", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"])
+            1: PropertyTierInfo(name: "Land", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil),
+            2: PropertyTierInfo(name: "House", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil),
+            3: PropertyTierInfo(name: "Workshop", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil),
+            4: PropertyTierInfo(name: "Beautiful Property", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil),
+            5: PropertyTierInfo(name: "Estate", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil)
         ])
         
         // Skill tier names
@@ -77,7 +77,9 @@ class TierManager {
                         tiers[tier] = PropertyTierInfo(
                             name: value.name,
                             description: value.description,
-                            benefits: value.benefits
+                            benefits: value.benefits,
+                            baseGoldCost: value.base_gold_cost,
+                            baseActionsRequired: value.base_actions_required
                         )
                     }
                 }
@@ -112,6 +114,12 @@ class TierManager {
                     }
                 }
                 self.skillTierNames = names
+                
+                // Load skill benefits from backend (single source of truth!)
+                if let benefits = skillData.skill_benefits {
+                    self.skillBenefits = benefits
+                    print("   - Loaded \(benefits.count) skill benefit definitions from backend")
+                }
             }
             
             // Buildings - parse full building type info
@@ -190,6 +198,14 @@ class TierManager {
         properties?.tiers[tier]?.benefits ?? []
     }
     
+    func propertyTierCost(_ tier: Int) -> Int? {
+        properties?.tiers[tier]?.baseGoldCost
+    }
+    
+    func propertyTierActions(_ tier: Int) -> Int? {
+        properties?.tiers[tier]?.baseActionsRequired
+    }
+    
     // MARK: - Equipment Accessors
     
     func equipmentTierName(_ tier: Int) -> String {
@@ -214,63 +230,13 @@ class TierManager {
     }
     
     func skillBenefitsFor(_ skill: String, tier: Int) -> [String] {
-        // Dynamic skill benefits based on skill type
-        switch skill {
-        case "attack":
-            return ["+\(tier) Attack Power in coups", "Increases coup success chance", "Stacks with equipment bonuses"]
-        case "defense":
-            return ["+\(tier) Defense Power in coups", "Reduces coup damage taken", "Helps defend your kingdom"]
-        case "leadership":
-            return getLeadershipBenefits(tier: tier)
-        case "building":
-            return getBuildingBenefits(tier: tier)
-        case "intelligence":
-            return getIntelligenceBenefits(tier: tier)
-        default:
+        // Use backend data as single source of truth - ONLY tier_bonuses matter!
+        guard let skillData = skillBenefits[skill] else {
             return []
         }
-    }
-    
-    private func getLeadershipBenefits(tier: Int) -> [String] {
-        var benefits: [String] = []
-        let voteWeight = 1.0 + (Double(tier - 1) * 0.2)
-        benefits.append("Vote weight: +\(String(format: "%.1f", voteWeight))")
         
-        switch tier {
-        case 1: benefits.append("Can vote on coups (with rep)")
-        case 2: benefits.append("+50% rewards from ruler distributions")
-        case 3: benefits.append("Can propose coups (300+ rep)")
-        case 4: benefits.append("+100% rewards from ruler")
-        case 5: benefits.append("-50% coup cost (500g instead of 1000g)")
-        default: break
-        }
-        return benefits
-    }
-    
-    private func getBuildingBenefits(tier: Int) -> [String] {
-        var benefits: [String] = []
-        benefits.append("-\(tier * 5)% property upgrade costs")
-        
-        switch tier {
-        case 1: benefits.append("Work on contracts & properties")
-        case 2: benefits.append("+10% gold from building contracts")
-        case 3: benefits.append(contentsOf: ["+20% gold from contracts", "+1 daily Assist action"])
-        case 4: benefits.append(contentsOf: ["+30% gold from contracts", "10% chance to refund action cooldown"])
-        case 5: benefits.append(contentsOf: ["+40% gold from contracts", "25% chance to double contract progress"])
-        default: break
-        }
-        return benefits
-    }
-    
-    private func getIntelligenceBenefits(tier: Int) -> [String] {
-        var benefits: [String] = []
-        let bonus = tier * 2
-        benefits.append("-\(bonus)% detection when sabotaging")
-        benefits.append("+\(bonus)% catch chance when patrolling")
-        if tier >= 5 {
-            benefits.append("Vault Heist: Steal 10% of enemy vault (1000g cost)")
-        }
-        return benefits
+        // Return ONLY the tier-specific bonuses - nothing else!
+        return skillData.tierBonuses[tier] ?? []
     }
     
     // MARK: - Reputation Accessors
@@ -367,6 +333,8 @@ struct PropertyTierInfoResponse: Codable {
     let name: String
     let description: String
     let benefits: [String]
+    let base_gold_cost: Int?
+    let base_actions_required: Int?
 }
 
 struct EquipmentTiersResponseData: Codable {
@@ -387,6 +355,7 @@ struct EquipmentTierInfoResponse: Codable {
 struct SkillTiersResponseData: Codable {
     let max_tier: Int
     let tier_names: [String: String]  // String keys because JSON
+    let skill_benefits: [String: SkillBenefitsData]?
 }
 
 struct BuildingTiersResponseData: Codable {
@@ -434,6 +403,8 @@ struct PropertyTierInfo {
     let name: String
     let description: String
     let benefits: [String]
+    let baseGoldCost: Int?
+    let baseActionsRequired: Int?
 }
 
 struct EquipmentTiersData {
@@ -490,9 +461,25 @@ struct ReputationTierInfo {
     let abilities: [String]
 }
 
-struct SkillBenefitsData {
-    let perTier: String
-    let benefits: [String]
+struct SkillBenefitsData: Codable {
     let tierBonuses: [Int: [String]]
+    
+    enum CodingKeys: String, CodingKey {
+        case tierBonuses = "tier_bonuses"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode tier_bonuses with string keys and convert to Int keys
+        let tierBonusesStringKeys = try container.decodeIfPresent([String: [String]].self, forKey: .tierBonuses) ?? [:]
+        var intKeyDict: [Int: [String]] = [:]
+        for (key, value) in tierBonusesStringKeys {
+            if let intKey = Int(key) {
+                intKeyDict[intKey] = value
+            }
+        }
+        tierBonuses = intKeyDict
+    }
 }
 

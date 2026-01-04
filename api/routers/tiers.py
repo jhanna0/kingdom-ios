@@ -311,43 +311,73 @@ REPUTATION_TIERS = {
 
 SKILL_BENEFITS = {
     "attack": {
-        "per_tier": "+{tier} Attack Power in coups",
-        "benefits": [
-            "Increases coup success chance",
-            "Stacks with equipment bonuses"
-        ]
+        "per_tier": "",
+        "tier_bonuses": {
+            1: ["+1 Attack Power in coups", "Increases coup success chance"],
+            2: ["+2 Attack Power in coups", "Increases coup success chance"],
+            3: ["+3 Attack Power in coups", "Increases coup success chance"],
+            4: ["+4 Attack Power in coups", "Increases coup success chance"],
+            5: ["+5 Attack Power in coups", "Increases coup success chance"]
+        }
     },
     "defense": {
-        "per_tier": "+{tier} Defense Power in coups",
-        "benefits": [
-            "Reduces coup damage taken",
-            "Helps defend your kingdom"
-        ]
+        "per_tier": "",
+        "tier_bonuses": {
+            1: ["+1 Defense Power in coups", "Reduces coup damage taken"],
+            2: ["+2 Defense Power in coups", "Reduces coup damage taken"],
+            3: ["+3 Defense Power in coups", "Reduces coup damage taken"],
+            4: ["+4 Defense Power in coups", "Reduces coup damage taken"],
+            5: ["+5 Defense Power in coups", "Reduces coup damage taken"]
+        }
     },
     "leadership": {
-        "per_tier": "Vote weight: +{weight}",
+        "per_tier": "",
         "tier_bonuses": {
-            1: ["Can vote on coups (with rep)"],
-            2: ["+50% rewards from ruler distributions"],
-            3: ["Can propose coups (300+ rep)"],
-            4: ["+100% rewards from ruler"],
-            5: ["-50% coup cost (500g instead of 1000g)"]
+            1: ["Vote weight: 1.0", "Can vote on coups (with rep)"],
+            2: ["Vote weight: 1.2", "+50% rewards from ruler distributions"],
+            3: ["Vote weight: 1.4", "Can propose coups (300+ rep)"],
+            4: ["Vote weight: 1.6", "+100% rewards from ruler"],
+            5: ["Vote weight: 1.8", "-50% coup cost (500g instead of 1000g)"]
         }
     },
     "building": {
-        "per_tier": "-{discount}% property upgrade costs",
+        "per_tier": "",
         "tier_bonuses": {
-            1: ["Work on contracts & properties"],
-            2: ["+10% gold from building contracts"],
-            3: ["+20% gold from contracts", "+1 daily Assist action"],
-            4: ["+30% gold from contracts", "10% chance to refund action cooldown"],
-            5: ["+40% gold from contracts", "25% chance to double contract progress"]
+            1: ["-5% property upgrade costs", "Work on contracts & properties"],
+            2: ["-10% property upgrade costs", "+10% gold from building contracts"],
+            3: ["-15% property upgrade costs", "+20% gold from contracts", "+1 daily Assist action"],
+            4: ["-20% property upgrade costs", "+30% gold from contracts", "10% chance to refund action cooldown"],
+            5: ["-25% property upgrade costs", "+40% gold from contracts", "25% chance to double contract progress"]
         }
     },
     "intelligence": {
-        "per_tier": "-{bonus}% detection when sabotaging, +{bonus}% catch chance when patrolling",
+        "per_tier": "",
         "tier_bonuses": {
-            5: ["Vault Heist: Steal 10% of enemy vault (1000g cost)"]
+            1: ["-2% detection when sabotaging", "+2% catch chance when patrolling"],
+            2: ["-4% detection when sabotaging", "+4% catch chance when patrolling"],
+            3: ["-6% detection when sabotaging", "+6% catch chance when patrolling"],
+            4: ["-8% detection when sabotaging", "+8% catch chance when patrolling"],
+            5: ["-10% detection when sabotaging", "+10% catch chance when patrolling", "Vault Heist: Steal 10% of enemy vault (1000g cost)"]
+        }
+    },
+    "science": {
+        "per_tier": "",
+        "tier_bonuses": {
+            1: ["+1 to all equipped weapon/armor stats"],
+            2: ["+2 to all equipped weapon/armor stats", "10% chance equipment doesn't break on death"],
+            3: ["+3 to all equipped weapon/armor stats", "Your weapons deal +1 extra damage in battle"],
+            4: ["+4 to all equipped weapon/armor stats", "Your armor blocks +1 extra damage"],
+            5: ["+5 to all equipped weapon/armor stats", "Weapons and armor 50% more effective"]
+        }
+    },
+    "faith": {
+        "per_tier": "",
+        "tier_bonuses": {
+            1: ["5% chance: random ally in battle gets +1 attack OR enemy gets -1 attack"],
+            2: ["10% chance: random ally gets +2 attack OR enemy gets -2 defense"],
+            3: ["15% chance: random ally gets +3 defense OR enemy gets -3 defense"],
+            4: ["20% chance: 2 random allies get +2 attack OR 2 enemies get -2 attack"],
+            5: ["25% chance: Revive 3s allies or smite 3 enemies during a battle"]
         }
     }
 }
@@ -393,7 +423,7 @@ def get_all_tiers():
 @router.get("/properties")
 def get_property_tiers():
     """Get property tier info with costs"""
-    tiers = []
+    tiers_dict = {}
     for tier in range(1, 6):
         info = PROPERTY_TIERS[tier]
         
@@ -405,7 +435,7 @@ def get_property_tiers():
         
         base_actions = 5 + ((tier - 1) * 2)
         
-        tiers.append({
+        tiers_dict[str(tier)] = {
             "tier": tier,
             "name": info["name"],
             "description": info["description"],
@@ -413,10 +443,11 @@ def get_property_tiers():
             "base_gold_cost": base_cost,
             "base_actions_required": base_actions,
             "unlocks_crafting": tier >= 3
-        })
+        }
     
     return {
-        "tiers": tiers,
+        "max_tier": 5,
+        "tiers": tiers_dict,
         "notes": {
             "land_purchase": "Tier 1 land cost varies by kingdom population (base 500g)",
             "upgrade_costs": "Tier 2-5 costs shown are for upgrading from previous tier",
@@ -549,31 +580,9 @@ def get_skill_benefits(skill_name: str):
     tiers = []
     
     for tier in range(1, 6):
-        benefits = []
-        
-        # Add per-tier benefit with interpolation
-        per_tier = skill_data.get("per_tier", "")
-        if per_tier:
-            if skill_name == "leadership":
-                weight = 1.0 + (tier - 1) * 0.2
-                benefits.append(per_tier.format(weight=f"{weight:.1f}"))
-            elif skill_name == "building":
-                discount = tier * 5
-                benefits.append(per_tier.format(discount=discount))
-            elif skill_name == "intelligence":
-                bonus = tier * 2
-                benefits.append(per_tier.format(bonus=bonus))
-            else:
-                benefits.append(per_tier.format(tier=tier))
-        
-        # Add static benefits
-        for b in skill_data.get("benefits", []):
-            benefits.append(b)
-        
-        # Add tier-specific bonuses
+        # ONLY use tier_bonuses - nothing else!
         tier_bonuses = skill_data.get("tier_bonuses", {})
-        if tier in tier_bonuses:
-            benefits.extend(tier_bonuses[tier])
+        benefits = tier_bonuses.get(tier, [])
         
         tiers.append({
             "tier": tier,

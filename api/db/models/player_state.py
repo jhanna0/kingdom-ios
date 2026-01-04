@@ -43,6 +43,8 @@ class PlayerState(Base):
     leadership = Column(Integer, default=0)
     building_skill = Column(Integer, default=0)
     intelligence = Column(Integer, default=0)
+    science = Column(Integer, default=0)
+    faith = Column(Integer, default=0)
     
     # Combat debuff (temporary)
     attack_debuff = Column(Integer, default=0)

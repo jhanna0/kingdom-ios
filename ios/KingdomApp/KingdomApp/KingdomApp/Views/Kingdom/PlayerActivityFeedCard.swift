@@ -345,7 +345,7 @@ struct PlayerActivityRow: View {
                         .font(FontStyles.iconMini)
                         .foregroundColor(.white)
                         .frame(width: 18, height: 18)
-                        .background(activityColor(playerData.activity.color))
+                        .background(playerData.activity.actualColor)
                         .cornerRadius(4)
                         .overlay(
                             RoundedRectangle(cornerRadius: 4)

@@ -239,7 +239,7 @@ struct PlayerRowCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: playerData.activity.icon)
                             .font(.caption2)
-                            .foregroundColor(activityColor(playerData.activity.color))
+                            .foregroundColor(playerData.activity.actualColor)
                         
                         Text(playerData.activity.displayText)
                             .font(.caption)

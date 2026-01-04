@@ -220,14 +220,8 @@ struct TierBenefitsView: View {
     }
     
     private func tierColor(for tier: Int) -> Color {
-        switch tier {
-        case 1: return KingdomTheme.Colors.buttonSecondary
-        case 2: return KingdomTheme.Colors.buttonPrimary
-        case 3: return Color(red: 0.45, green: 0.35, blue: 0.25)
-        case 4: return Color(red: 0.6, green: 0.4, blue: 0.2)
-        case 5: return KingdomTheme.Colors.inkMedium
-        default: return KingdomTheme.Colors.inkDark
-        }
+        // Consistent green for all property tiers
+        return KingdomTheme.Colors.buttonSuccess
     }
     
     @ViewBuilder

@@ -28,32 +28,74 @@ def _convert_to_friend_activity(activity) -> dict:
     # Get the activity type
     activity_type = activity.type if hasattr(activity, 'type') else 'idle'
     
-    # Map activity types to icons
-    icon_map = {
-        'working': 'hammer.fill',
-        'patrolling': 'figure.walk',
-        'training': 'figure.strengthtraining.traditional',
-        'crafting': 'hammer.circle.fill',
-        'scouting': 'eye.fill',
-        'sabotage': 'exclamationmark.triangle.fill',
-        'idle': 'circle'
-    }
+    # Default icon and color
+    icon = 'circle'
+    color = 'gray'
     
-    # Map activity types to colors
-    color_map = {
-        'working': 'blue',
-        'patrolling': 'green',
-        'training': 'purple',
-        'crafting': 'orange',
-        'scouting': 'yellow',
-        'sabotage': 'red',
-        'idle': 'gray'
-    }
+    # Handle skill-based training activities
+    if activity_type == 'training' and hasattr(activity, 'training_type') and activity.training_type:
+        # Map skill types to icons (must match SkillConfig)
+        skill_icon_map = {
+            'attack': 'bolt.fill',
+            'defense': 'shield.fill',
+            'leadership': 'crown.fill',
+            'building': 'hammer.fill',
+            'intelligence': 'eye.fill',
+            'science': 'flask.fill',
+            'faith': 'hands.sparkles.fill'
+        }
+        # Map skill types to colors (only valid: blue, green, purple, orange, yellow, red)
+        skill_color_map = {
+            'attack': 'red',
+            'defense': 'blue',
+            'leadership': 'purple',
+            'building': 'orange',
+            'intelligence': 'green',
+            'science': 'blue',
+            'faith': 'purple'
+        }
+        icon = skill_icon_map.get(activity.training_type, 'figure.strengthtraining.traditional')
+        color = skill_color_map.get(activity.training_type, 'purple')
+    
+    # Handle equipment-based crafting activities
+    elif activity_type == 'crafting' and hasattr(activity, 'equipment_type') and activity.equipment_type:
+        if activity.equipment_type == 'weapon':
+            icon = 'bolt.fill'
+            color = 'red'
+        elif activity.equipment_type == 'armor':
+            icon = 'shield.fill'
+            color = 'blue'
+        else:
+            icon = 'hammer.circle.fill'
+            color = 'orange'
+    
+    # Default icon/color for other activity types
+    else:
+        icon_map = {
+            'working': 'hammer.fill',
+            'patrolling': 'figure.walk',
+            'training': 'figure.strengthtraining.traditional',
+            'crafting': 'hammer.circle.fill',
+            'scouting': 'eye.fill',
+            'sabotage': 'exclamationmark.triangle.fill',
+            'idle': 'circle'
+        }
+        color_map = {
+            'working': 'blue',
+            'patrolling': 'green',
+            'training': 'purple',
+            'crafting': 'orange',
+            'scouting': 'yellow',
+            'sabotage': 'red',
+            'idle': 'gray'
+        }
+        icon = icon_map.get(activity_type, 'circle')
+        color = color_map.get(activity_type, 'gray')
     
     return {
-        'icon': icon_map.get(activity_type, 'circle'),
+        'icon': icon,
         'display_text': activity.details if hasattr(activity, 'details') and activity.details else activity_type.capitalize(),
-        'color': color_map.get(activity_type, 'gray')
+        'color': color
     }
 
 

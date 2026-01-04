@@ -11,6 +11,11 @@ class PlayerActivity(BaseModel):
     type: str  # "idle", "working", "patrolling", "training", "crafting", "scouting"
     details: Optional[str] = None  # e.g., "Training Attack", "Working on Wall Level 5"
     expires_at: Optional[datetime] = None  # For time-limited activities
+    
+    # Structured data for specific activity types
+    training_type: Optional[str] = None  # "attack", "defense", "leadership", "building", "intelligence", "science", "faith"
+    equipment_type: Optional[str] = None  # "weapon", "armor"
+    tier: Optional[int] = None  # For crafting/training tiers
 
 
 class PlayerEquipment(BaseModel):
@@ -44,6 +49,8 @@ class PlayerPublicProfile(BaseModel):
     leadership: int
     building_skill: int
     intelligence: int
+    science: int
+    faith: int
     
     # Equipment
     equipment: PlayerEquipment

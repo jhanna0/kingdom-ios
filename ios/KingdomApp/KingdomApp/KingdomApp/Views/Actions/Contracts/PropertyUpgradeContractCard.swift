@@ -26,14 +26,8 @@ struct PropertyUpgradeContractCard: View {
     }
     
     var iconColor: Color {
-        // Tier-based colors for property upgrades (visual progression)
-        switch contract.toTier {
-        case 2: return KingdomTheme.Colors.buttonSuccess
-        case 3: return ActionIconHelper.actionColor(for: "property_upgrade")
-        case 4: return KingdomTheme.Colors.buttonPrimary
-        case 5: return KingdomTheme.Colors.inkMedium
-        default: return KingdomTheme.Colors.buttonSuccess
-        }
+        // Consistent green for all property upgrades
+        return KingdomTheme.Colors.buttonSuccess
     }
     
     var body: some View {
@@ -84,7 +78,7 @@ struct PropertyUpgradeContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.inkMedium)
+                            .fill(KingdomTheme.Colors.buttonSuccess)
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

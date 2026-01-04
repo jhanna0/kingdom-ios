@@ -40,6 +40,8 @@ class Player: ObservableObject {
     @Published var leadershipTrainingCost: Int = 100
     @Published var buildingTrainingCost: Int = 100
     @Published var intelligenceTrainingCost: Int = 100
+    @Published var scienceTrainingCost: Int = 100
+    @Published var faithTrainingCost: Int = 100
     
     // Active perks (from backend)
     @Published var activePerks: PlayerPerks?
@@ -82,6 +84,8 @@ class Player: ObservableObject {
     @Published var leadership: Int = 1          // Vote weight multiplier
     @Published var buildingSkill: Int = 1       // Building efficiency & cost reduction
     @Published var intelligence: Int = 1        // Sabotage/patrol efficiency
+    @Published var science: Int = 1             // Better weapons/armor crafting
+    @Published var faith: Int = 1               // Divine interventions and battle buffs
     
     // Kingdom-specific reputation
     @Published var kingdomReputation: [String: Int] = [:]  // kingdomId -> rep
@@ -664,6 +668,8 @@ class Player: ObservableObject {
         leadership = apiState.leadership
         buildingSkill = apiState.building_skill
         intelligence = apiState.intelligence
+        science = apiState.science
+        faith = apiState.faith
         
         // Debuffs
         attackDebuff = apiState.attack_debuff
@@ -717,7 +723,9 @@ class Player: ObservableObject {
             leadershipTrainingCost = costs.leadership
             buildingTrainingCost = costs.building
             intelligenceTrainingCost = costs.intelligence
-            print("💰 Updated training costs: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building)")
+            scienceTrainingCost = costs.science
+            faithTrainingCost = costs.faith
+            print("💰 Updated training costs: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building), science=\(costs.science), faith=\(costs.faith)")
         } else {
             print("⚠️ No training costs in API response")
         }

@@ -40,6 +40,8 @@ struct APIPlayerState: Codable {
     let leadership: Int
     let building_skill: Int
     let intelligence: Int
+    let science: Int
+    let faith: Int
     
     // Debuffs
     let attack_debuff: Int
@@ -79,6 +81,8 @@ struct APIPlayerState: Codable {
         let leadership: Int
         let building: Int
         let intelligence: Int
+        let science: Int
+        let faith: Int
     }
     
     // Active perks (calculated by backend)

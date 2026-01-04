@@ -9,6 +9,7 @@ struct BuildingLevelsView: View {
     let benefitForLevel: (Int) -> String
     let costForLevel: (Int) -> Int
     let detailedBenefits: ((Int) -> [String])?
+    let accentColor: Color?
     @Environment(\.dismiss) var dismiss
     @State private var selectedLevel: Int = 1
     
@@ -19,7 +20,8 @@ struct BuildingLevelsView: View {
                 TierSelectorCard(
                     currentTier: currentLevel,
                     maxTier: maxLevel,
-                    selectedTier: $selectedLevel
+                    selectedTier: $selectedLevel,
+                    accentColor: accentColor ?? KingdomTheme.Colors.royalPurple
                 ) { level in
                     levelContent(level: level)
                 }
@@ -87,7 +89,7 @@ struct BuildingLevelsView: View {
             }
             
             Rectangle()
-                .fill(Color.black)
+                .fill((accentColor ?? KingdomTheme.Colors.royalPurple).opacity(0.3))
                 .frame(height: 2)
             
             // Benefits
@@ -99,7 +101,7 @@ struct BuildingLevelsView: View {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                                 .font(FontStyles.iconSmall)
-                                .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                                .foregroundColor(level <= currentLevel ? (accentColor ?? KingdomTheme.Colors.royalPurple) : KingdomTheme.Colors.inkDark.opacity(0.3))
                                 .frame(width: 20)
                             
                             Text(benefit)
@@ -112,7 +114,7 @@ struct BuildingLevelsView: View {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: level <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                             .font(FontStyles.iconSmall)
-                            .foregroundColor(level <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                            .foregroundColor(level <= currentLevel ? (accentColor ?? KingdomTheme.Colors.royalPurple) : KingdomTheme.Colors.inkDark.opacity(0.3))
                             .frame(width: 20)
                         
                         Text(benefitForLevel(level))
@@ -124,7 +126,7 @@ struct BuildingLevelsView: View {
             }
             
             Rectangle()
-                .fill(Color.black)
+                .fill((accentColor ?? KingdomTheme.Colors.royalPurple).opacity(0.3))
                 .frame(height: 2)
             
             // Cost
@@ -227,7 +229,7 @@ struct BuildingLevelsView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor((accentColor ?? KingdomTheme.Colors.royalPurple).opacity(0.5))
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -235,12 +237,13 @@ struct BuildingLevelsView: View {
     }
     
     private func levelColor(_ level: Int) -> Color {
+        let color = accentColor ?? KingdomTheme.Colors.royalPurple
         if level <= currentLevel {
-            return KingdomTheme.Colors.inkMedium
+            return color
         } else if level == currentLevel + 1 {
-            return KingdomTheme.Colors.buttonPrimary
+            return color.opacity(0.7)
         } else {
-            return KingdomTheme.Colors.inkLight
+            return color.opacity(0.3)
         }
     }
 }

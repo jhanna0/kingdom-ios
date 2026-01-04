@@ -126,6 +126,22 @@ struct CharacterSheetView: View {
                         skillType: "intelligence"
                     )
                     
+                    skillGridButton(
+                        iconName: SkillConfig.get("science").icon,
+                        displayName: SkillConfig.get("science").displayName,
+                        tier: player.science,
+                        skillType: "science"
+                    )
+                }
+                
+                HStack(spacing: 10) {
+                    skillGridButton(
+                        iconName: SkillConfig.get("faith").icon,
+                        displayName: SkillConfig.get("faith").displayName,
+                        tier: player.faith,
+                        skillType: "faith"
+                    )
+                    
                     // Reputation button
                     reputationGridButton
                 }

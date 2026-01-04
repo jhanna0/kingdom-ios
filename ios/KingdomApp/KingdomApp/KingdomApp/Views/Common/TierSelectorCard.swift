@@ -6,6 +6,7 @@ struct TierSelectorCard<Content: View>: View {
     let maxTier: Int
     @Binding var selectedTier: Int
     let showCurrentBadge: Bool
+    let accentColor: Color
     let content: (Int) -> Content
     
     init(
@@ -13,12 +14,14 @@ struct TierSelectorCard<Content: View>: View {
         maxTier: Int = 5,
         selectedTier: Binding<Int>,
         showCurrentBadge: Bool = true,
+        accentColor: Color = KingdomTheme.Colors.buttonPrimary,
         @ViewBuilder content: @escaping (Int) -> Content
     ) {
         self.currentTier = currentTier
         self.maxTier = maxTier
         self._selectedTier = selectedTier
         self.showCurrentBadge = showCurrentBadge
+        self.accentColor = accentColor
         self.content = content
     }
     
@@ -109,7 +112,7 @@ struct TierSelectorCard<Content: View>: View {
                 // Status text
                 Text(statusText(tier))
                     .font(FontStyles.labelTiny)
-                    .foregroundColor(statusColor(tier))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
             }
         }
         .buttonStyle(.plain)
@@ -117,11 +120,11 @@ struct TierSelectorCard<Content: View>: View {
     
     private func tierColor(_ tier: Int) -> Color {
         if tier <= currentTier {
-            return KingdomTheme.Colors.inkMedium
+            return accentColor
         } else if tier == selectedTier {
-            return KingdomTheme.Colors.buttonPrimary
+            return accentColor.opacity(0.7)
         } else {
-            return KingdomTheme.Colors.inkLight
+            return accentColor.opacity(0.3)
         }
     }
     
@@ -134,16 +137,6 @@ struct TierSelectorCard<Content: View>: View {
             return "Next"
         } else {
             return "Locked"
-        }
-    }
-    
-    private func statusColor(_ tier: Int) -> Color {
-        if tier <= currentTier {
-            return KingdomTheme.Colors.inkMedium
-        } else if tier == selectedTier {
-            return KingdomTheme.Colors.buttonPrimary
-        } else {
-            return KingdomTheme.Colors.inkLight
         }
     }
 }

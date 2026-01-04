@@ -243,7 +243,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         "defense": calculate_training_cost(state.defense_power, total_trainings),
         "leadership": calculate_training_cost(state.leadership, total_trainings),
         "building": calculate_training_cost(state.building_skill, total_trainings),
-        "intelligence": calculate_training_cost(state.intelligence, total_trainings)
+        "intelligence": calculate_training_cost(state.intelligence, total_trainings),
+        "science": calculate_training_cost(state.science, total_trainings),
+        "faith": calculate_training_cost(state.faith, total_trainings)
     }
     
     # Calculate active perks

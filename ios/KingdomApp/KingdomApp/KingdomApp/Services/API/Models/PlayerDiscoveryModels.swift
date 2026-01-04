@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Player Activity
 
@@ -6,6 +7,11 @@ struct PlayerActivity: Codable, Equatable {
     let type: String  // "idle", "working", "patrolling", "training", "crafting", "scouting"
     let details: String?
     let expires_at: String?  // ISO8601 datetime
+    
+    // Structured data for specific activity types
+    let training_type: String?  // "attack", "defense", "leadership", etc.
+    let equipment_type: String?  // "weapon", "armor"
+    let tier: Int?
     
     var displayText: String {
         details ?? type.capitalized
@@ -18,8 +24,16 @@ struct PlayerActivity: Codable, Equatable {
         case "patrolling":
             return "figure.walk"
         case "training":
+            // Use SkillConfig for training
+            if let trainingType = training_type {
+                return SkillConfig.get(trainingType).icon
+            }
             return "figure.strengthtraining.traditional"
         case "crafting":
+            // Use equipment-specific icons
+            if let equipmentType = equipment_type {
+                return equipmentType == "weapon" ? "bolt.fill" : "shield.fill"
+            }
             return "hammer.circle.fill"
         case "scouting":
             return "eye.fill"
@@ -37,7 +51,7 @@ struct PlayerActivity: Codable, Equatable {
         case "patrolling":
             return "green"
         case "training":
-            return "purple"
+            return "purple"  // Default fallback
         case "crafting":
             return "orange"
         case "scouting":
@@ -46,6 +60,34 @@ struct PlayerActivity: Codable, Equatable {
             return "red"
         default:
             return "gray"
+        }
+    }
+    
+    // Return the actual SwiftUI Color (like ActivityLogEntry does)
+    var actualColor: Color {
+        switch type {
+        case "working":
+            return KingdomTheme.Colors.imperialGold
+        case "patrolling":
+            return KingdomTheme.Colors.buttonSuccess
+        case "training":
+            // Use SkillConfig colors directly!
+            if let trainingType = training_type {
+                return SkillConfig.get(trainingType).color
+            }
+            return KingdomTheme.Colors.buttonSpecial
+        case "crafting":
+            // Use equipment colors
+            if let equipmentType = equipment_type {
+                return equipmentType == "weapon" ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
+            }
+            return KingdomTheme.Colors.buttonWarning
+        case "scouting":
+            return KingdomTheme.Colors.buttonWarning
+        case "sabotage":
+            return KingdomTheme.Colors.buttonDanger
+        default:
+            return KingdomTheme.Colors.inkMedium
         }
     }
 }
@@ -83,6 +125,8 @@ struct PlayerPublicProfile: Codable, Identifiable {
     let leadership: Int
     let building_skill: Int
     let intelligence: Int
+    let science: Int
+    let faith: Int
     
     // Equipment
     let equipment: PlayerEquipmentData

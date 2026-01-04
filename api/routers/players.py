@@ -58,7 +58,9 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         ).scalar()
         return PlayerActivity(
             type="training",
-            details=f"Training {active_training.type.capitalize()} ({actions_completed}/{active_training.actions_required})"
+            details=f"Training {active_training.type.capitalize()} ({actions_completed}/{active_training.actions_required})",
+            training_type=active_training.type,  # "attack", "defense", etc.
+            tier=active_training.tier
         )
     
     # Check crafting contracts from unified_contracts table
@@ -75,7 +77,9 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         ).scalar()
         return PlayerActivity(
             type="crafting",
-            details=f"Crafting T{active_crafting.tier} {active_crafting.type.capitalize()} ({actions_completed}/{active_crafting.actions_required})"
+            details=f"Crafting T{active_crafting.tier} {active_crafting.type.capitalize()} ({actions_completed}/{active_crafting.actions_required})",
+            equipment_type=active_crafting.type,  # "weapon", "armor"
+            tier=active_crafting.tier
         )
     
     # Check recent actions (within last 2 minutes)
@@ -479,6 +483,8 @@ def get_player_profile(
         leadership=state.leadership,
         building_skill=state.building_skill,
         intelligence=state.intelligence,
+        science=state.science,
+        faith=state.faith,
         equipment=equipment,
         total_checkins=total_checkins,
         total_conquests=total_conquests,

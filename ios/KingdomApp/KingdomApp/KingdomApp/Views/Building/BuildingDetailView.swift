@@ -16,7 +16,8 @@ struct BuildingDetailView: View {
                 // Unified tier selector
                 TierSelectorCard(
                     currentTier: currentLevel,
-                    selectedTier: $selectedTier
+                    selectedTier: $selectedTier,
+                    accentColor: buildingColor
                 ) { tier in
                     VStack(alignment: .leading, spacing: 16) {
                         // Tier name
@@ -32,7 +33,7 @@ struct BuildingDetailView: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: tier <= currentLevel ? "checkmark.circle.fill" : "lock.circle.fill")
                                         .font(FontStyles.iconSmall)
-                                        .foregroundColor(tier <= currentLevel ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkDark.opacity(0.3))
+                                        .foregroundColor(tier <= currentLevel ? buildingColor : KingdomTheme.Colors.inkDark.opacity(0.3))
                                         .frame(width: 20)
                                     
                                     Text(benefit)
@@ -44,7 +45,7 @@ struct BuildingDetailView: View {
                         }
                         
                         Rectangle()
-                            .fill(Color.black)
+                            .fill(buildingColor.opacity(0.3))
                             .frame(height: 2)
                         
                         // Cost
@@ -178,7 +179,7 @@ struct BuildingDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .foregroundColor(buildingColor.opacity(0.5))
             Text(title)
                 .font(FontStyles.bodyMediumBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -188,13 +189,11 @@ struct BuildingDetailView: View {
     // MARK: - Computed Properties
     
     private var buildingDisplayName: String {
-        switch buildingType {
-        case "wall": return "Walls"
-        case "vault": return "Vault"
-        case "mine": return "Mine"
-        case "market": return "Market"
-        default: return buildingType.capitalized
-        }
+        return BuildingConfig.get(buildingType).displayName
+    }
+    
+    private var buildingColor: Color {
+        return BuildingConfig.get(buildingType).color
     }
     
     private func getUpgradeCost(tier: Int) -> Int {
