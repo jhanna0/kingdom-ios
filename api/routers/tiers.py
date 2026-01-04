@@ -71,6 +71,12 @@ SKILL_TIER_NAMES = {
 
 # ===== BUILDING TYPES - SINGLE SOURCE OF TRUTH =====
 # Add new building types HERE and they'll appear everywhere!
+#
+# IMPORTANT: Keys MUST match database column prefixes exactly!
+# e.g., key "wall" maps to Kingdom.wall_level
+# e.g., key "education" maps to Kingdom.education_level
+#
+# Use "display_name" for UI/human-readable names.
 
 BUILDING_TYPES = {
     "wall": {

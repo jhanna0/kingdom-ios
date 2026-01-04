@@ -18,13 +18,10 @@ from .utils import (
 )
 from .constants import WORK_BASE_COOLDOWN
 from .tax_utils import apply_kingdom_tax_with_bonus
-from routers.tiers import BUILDING_TYPES as BUILDING_TYPES_DICT
+from routers.tiers import BUILDING_TYPES
 
 
 router = APIRouter()
-
-# Extract building type keys from the SINGLE SOURCE OF TRUTH (tiers.py)
-BUILDING_TYPES = list(BUILDING_TYPES_DICT.keys())
 
 
 @router.post("/work/{contract_id}")

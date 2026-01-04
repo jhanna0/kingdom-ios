@@ -8,6 +8,9 @@ struct APIContract: Codable {
     let kingdom_name: String
     let building_type: String
     let building_level: Int
+    let building_benefit: String? // e.g. "Gather 10 wood per action"
+    let building_icon: String? // e.g. "tree.fill"
+    let building_display_name: String? // e.g. "Lumbermill"
     let base_population: Int
     let base_hours_required: Double
     let work_started_at: String?

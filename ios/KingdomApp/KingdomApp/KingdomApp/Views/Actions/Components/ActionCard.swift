@@ -65,16 +65,18 @@ struct ActionCard: View {
                                 borderWidth: 1.5
                             )
                         }
+                        
+                        Spacer()
+                        
+                        // Show expected rewards inline
+                        if let reward = status.expectedReward {
+                            expectedRewardViewInline(reward: reward)
+                        }
                     }
                     
                     Text(description)
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    // Show expected rewards
-                    if let reward = status.expectedReward {
-                        expectedRewardView(reward: reward)
-                    }
                 }
                 
                 Spacer()
@@ -135,26 +137,26 @@ struct ActionCard: View {
     }
     
     @ViewBuilder
-    private func expectedRewardView(reward: ExpectedReward) -> some View {
-        HStack(spacing: 8) {
+    private func expectedRewardViewInline(reward: ExpectedReward) -> some View {
+        HStack(spacing: 6) {
             if let gold = reward.gold {
-                    HStack(spacing: 4) {
-                        Text("\(gold)")
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Image(systemName: "g.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                    }
+                HStack(spacing: 4) {
+                    Text("\(gold)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Image(systemName: "g.circle.fill")
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                }
             } else if let goldGross = reward.goldGross {
-                    HStack(spacing: 4) {
-                        Text("\(goldGross)")
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Image(systemName: "g.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                    }
+                HStack(spacing: 4) {
+                    Text("\(goldGross)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Image(systemName: "g.circle.fill")
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                }
             }
             
             if let reputation = reward.reputation {
@@ -162,7 +164,7 @@ struct ActionCard: View {
                     Image(systemName: "star.fill")
                         .font(FontStyles.iconMini)
                         .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                    Text("\(reputation) rep")
+                    Text("\(reputation)")
                         .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
@@ -173,13 +175,12 @@ struct ActionCard: View {
                     Image(systemName: "sparkles")
                         .font(FontStyles.iconMini)
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                    Text("\(experience) xp")
+                    Text("\(experience)")
                         .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                 }
             }
         }
-        .padding(.top, 2)
     }
 }
 

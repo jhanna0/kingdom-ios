@@ -11,7 +11,7 @@ import math
 
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
-from routers.tiers import BUILDING_TYPES as BUILDING_TYPES_DICT
+from routers.tiers import BUILDING_TYPES
 from config import DEV_MODE
 from schemas.contract import ContractCreate
 
@@ -70,12 +70,26 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         
         action_contributions = {str(user_id): count for user_id, count in contrib_counts}
     
+    # Get building benefit information from tiers.py
+    building_benefit = None
+    building_icon = None
+    building_display_name = None
+    if contract.type in BUILDING_TYPES:
+        building_data = BUILDING_TYPES[contract.type]
+        building_display_name = building_data.get("display_name")
+        building_icon = building_data.get("icon")
+        tier_data = building_data.get("tiers", {}).get(contract.tier, {})
+        building_benefit = tier_data.get("benefit")
+    
     return {
         "id": str(contract.id),  # String for consistency with other contract endpoints
         "kingdom_id": contract.kingdom_id,
         "kingdom_name": contract.kingdom_name,
         "building_type": contract.type,
         "building_level": contract.tier,
+        "building_benefit": building_benefit,  # e.g. "Gather 10 wood per action"
+        "building_icon": building_icon,  # e.g. "tree.fill"
+        "building_display_name": building_display_name,  # e.g. "Lumbermill"
         "base_population": 0,  # Not stored in unified contracts
         "base_hours_required": 0,  # Not stored in unified contracts
         "work_started_at": contract.created_at,
@@ -90,10 +104,6 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "completed_at": contract.completed_at,
         "status": contract.status
     }
-
-
-# Building types that are kingdom buildings (just the keys for validation)
-BUILDING_TYPES = list(BUILDING_TYPES_DICT.keys())
 
 
 @router.get("")
@@ -188,15 +198,15 @@ def create_contract(
         )
     
     # SECURITY: Validate building type is valid
-    building_type_lower = building_type.lower()
-    if building_type_lower not in BUILDING_TYPES_DICT:
+    # Keys are lowercase matching DB column prefixes (e.g., "wall", "education", "lumbermill")
+    if building_type not in BUILDING_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid building type: {building_type}. Valid types: {', '.join(BUILDING_TYPES_DICT.keys())}"
+            detail=f"Invalid building type: {building_type}. Valid types: {', '.join(BUILDING_TYPES.keys())}"
         )
     
-    # Get the proper display name from BUILDING_TYPES (e.g., "Lumbermill" not "lumbermill")
-    building_display_name = BUILDING_TYPES_DICT[building_type_lower]["display_name"]
+    # Get the display name for UI (e.g., "Education Hall" for key "education")
+    building_display_name = BUILDING_TYPES[building_type]["display_name"]
     
     # SECURITY: Validate building level is in valid range (1-5)
     if building_level < 1 or building_level > 5:
@@ -207,7 +217,8 @@ def create_contract(
     
     # SECURITY: Check that kingdom's current building level is exactly building_level - 1
     # Can't skip tiers (e.g., can't upgrade from 0 to 2, must go 0→1→2)
-    current_level = getattr(kingdom, f"{building_type_lower}_level", None)
+    # Keys already match DB column prefixes: "wall" → "wall_level", "education" → "education_level"
+    current_level = getattr(kingdom, f"{building_type}_level", None)
     if current_level is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -237,7 +248,7 @@ def create_contract(
     if total_actions_required:
         actions_required = total_actions_required
     else:
-        actions_required = calculate_actions_required(building_type_lower, building_level, base_population)
+        actions_required = calculate_actions_required(building_type, building_level, base_population)
     
     # Calculate upfront cost: actions_required × action_reward
     upfront_cost = actions_required * action_reward
@@ -256,7 +267,7 @@ def create_contract(
         kingdom_id=kingdom_id,
         kingdom_name=kingdom_name,
         category='kingdom_building',
-        type=building_display_name,  # Store the proper display name (e.g., "Lumbermill")
+        type=building_type,  # Store the key (e.g., "wall", "education") - matches DB column prefix
         tier=building_level,
         actions_required=actions_required,
         gold_paid=upfront_cost,  # What ruler paid upfront
@@ -311,9 +322,10 @@ def complete_contract(
     contract.completed_at = datetime.utcnow()
     
     # Upgrade the building
+    # contract.type is now stored as lowercase key (e.g., "wall", "education")
     kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
     if kingdom:
-        building_attr = f"{contract.type.lower()}_level"
+        building_attr = f"{contract.type}_level"
         if hasattr(kingdom, building_attr):
             current_level = getattr(kingdom, building_attr, 0)
             setattr(kingdom, building_attr, current_level + 1)
@@ -325,9 +337,12 @@ def complete_contract(
         ContractContribution.contract_id == contract.id
     ).scalar()
     
+    # Get display name for message
+    display_name = BUILDING_TYPES.get(contract.type, {}).get("display_name", contract.type)
+    
     return {
         "success": True,
-        "message": f"Contract completed! {contract.type} upgraded.",
+        "message": f"Contract completed! {display_name} upgraded.",
         "total_actions": actions_completed,
         "contributors": contributor_count
     }

@@ -122,9 +122,10 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             is_enemy = bool(user_kingdom_ids & kingdom_enemies)
         
         # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
+        # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
         buildings = []
         for building_type, building_meta in BUILDING_TYPES.items():
-            # Get level from kingdom model (e.g. kingdom.wall_level)
+            # Get level from kingdom model (e.g. kingdom.wall_level, kingdom.education_level)
             level_attr = f"{building_type}_level"
             level = getattr(kingdom, level_attr, 0)
             

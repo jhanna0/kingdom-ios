@@ -88,7 +88,7 @@ struct BuildMenuView: View {
                 currentLevel: level,
                 maxLevel: metadata.maxLevel,
                 benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
-                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: metadata.displayName),
+                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType),  // Use key, not displayName
                 hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                 kingdom: kingdom,
                 upgradeCost: kingdom.upgradeCost(buildingType),

@@ -38,9 +38,28 @@ struct WorkContractCard: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(contract.buildingType)
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack {
+                        Text(contract.buildingDisplayName ?? contract.buildingType)
+                            .font(FontStyles.headingMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 4) {
+                            Text("\(contract.actionReward)")
+                                .font(FontStyles.labelBold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                        }
+                    }
+                    
+                    if let benefit = contract.buildingBenefit {
+                        Text("Unlocks: \(benefit)")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                     
                     HStack(spacing: 4) {
                         Text("\(contract.actionsCompleted)/\(contract.totalActionsRequired) actions")
@@ -53,14 +72,6 @@ struct WorkContractCard: View {
                         
                         Text("\(Int(contract.progress * 100))%")
                             .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        Text("•")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        Text("\(contract.rewardPool)g pool")
-                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }

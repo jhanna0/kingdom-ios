@@ -132,7 +132,8 @@ def get_action_status(
 ):
     """Get cooldown status for all actions AND available contracts in current kingdom"""
     # Import here to avoid circular imports
-    from routers.contracts import contract_to_response, BUILDING_TYPES
+    from routers.contracts import contract_to_response
+    from routers.tiers import BUILDING_TYPES
     
     state = current_user.player_state
     if not state:

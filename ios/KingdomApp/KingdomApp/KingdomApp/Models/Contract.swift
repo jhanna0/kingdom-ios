@@ -11,6 +11,9 @@ struct Contract: Identifiable, Codable, Hashable {
     // What's being built
     let buildingType: String
     let buildingLevel: Int
+    let buildingBenefit: String? // e.g. "Gather 10 wood per action"
+    let buildingIcon: String? // e.g. "tree.fill"
+    let buildingDisplayName: String? // e.g. "Lumbermill"
     
     // Time requirements (scaled by population and building level)
     let basePopulation: Int // Population when contract was created
@@ -155,6 +158,9 @@ struct Contract: Identifiable, Codable, Hashable {
             kingdomName: kingdomName,
             buildingType: buildingType,
             buildingLevel: buildingLevel,
+            buildingBenefit: nil,  // Will be populated from API
+            buildingIcon: nil,  // Will be populated from API
+            buildingDisplayName: nil,  // Will be populated from API
             basePopulation: population,
             baseHoursRequired: totalHours,
             workStartedAt: nil,
