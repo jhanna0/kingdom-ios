@@ -47,6 +47,10 @@ class CityBoundary(Base):
     neighbor_ids = Column(JSONB, nullable=True)  # List of neighboring city OSM IDs
     neighbors_updated_at = Column(DateTime, nullable=True)  # When neighbors were last fetched
     
+    # Weather caching - hourly weather data per city
+    weather_data = Column(JSONB, nullable=True)  # Current weather data
+    weather_cached_at = Column(DateTime, nullable=True)  # When weather was last fetched
+    
     # Optional: Store original OSM data for reference
     osm_metadata = Column(JSONB, nullable=True)
     

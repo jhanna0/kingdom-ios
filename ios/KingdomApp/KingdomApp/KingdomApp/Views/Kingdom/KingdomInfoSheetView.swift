@@ -13,6 +13,7 @@ struct KingdomInfoSheetView: View {
     @State private var showClaimError = false
     @State private var claimErrorMessage = ""
     @State private var isClaiming = false
+    @State private var weather: WeatherData?
     
     var body: some View {
         ScrollView {
@@ -251,6 +252,10 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
+                // WEATHER CARD
+                SimpleWeatherCard(weather: weather)
+                    .padding(.horizontal)
+                
                 // Player Activity Feed
                 PlayerActivityFeedCard(kingdomId: kingdom.id)
                     .padding(.horizontal)
@@ -465,6 +470,16 @@ struct KingdomInfoSheetView: View {
             .padding(.top)
         }
         .background(KingdomTheme.Colors.parchment)
+        .task {
+            // Load weather
+            do {
+                let response = try await KingdomAPIService.shared.weather.getKingdomWeather(kingdomId: kingdom.id)
+                weather = response.weather
+                print("✅ Weather loaded: \(weather?.display_description ?? "none")")
+            } catch {
+                print("⚠️ Weather error: \(error)")
+            }
+        }
     }
 }
 

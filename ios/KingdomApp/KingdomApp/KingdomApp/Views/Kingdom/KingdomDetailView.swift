@@ -14,6 +14,7 @@ struct KingdomDetailView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var decreeText = ""
+    @State private var weather: WeatherData?
     
     // Get the live kingdom from viewModel
     private var kingdom: Kingdom {
@@ -80,6 +81,10 @@ struct KingdomDetailView: View {
                 .frame(maxWidth: .infinity)
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)
+                
+                // WEATHER CARD - PROOF OF CONCEPT!
+                SimpleWeatherCard(weather: weather)
+                    .padding(.horizontal)
                 
                 // Active Kingdom Bonuses
                 activeKingdomBonusesCard
@@ -224,6 +229,9 @@ struct KingdomDetailView: View {
         .task {
             // Refresh kingdom data with upgrade costs when sheet opens
             await viewModel.refreshKingdom(id: kingdomId)
+            
+            // Load weather data
+            await loadWeather()
         }
     }
     
@@ -413,6 +421,18 @@ struct KingdomDetailView: View {
         case 4: return 100
         case 5: return 150
         default: return 0
+        }
+    }
+    
+    // MARK: - Weather Loading
+    
+    @MainActor
+    private func loadWeather() async {
+        do {
+            let response = try await KingdomAPIService.shared.weather.getKingdomWeather(kingdomId: kingdomId)
+            weather = response.weather
+        } catch {
+            print("⚠️ Weather error: \(error)")
         }
     }
     

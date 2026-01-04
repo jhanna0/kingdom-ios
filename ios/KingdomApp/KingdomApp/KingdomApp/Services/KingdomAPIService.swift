@@ -23,6 +23,7 @@ class KingdomAPIService: ObservableObject {
     let actions = ActionsAPI()
     let notifications: NotificationsAPI
     let friends = FriendsService()
+    let weather = WeatherAPI()
     
     // MARK: - Shared Client
     private let client = APIClient.shared
