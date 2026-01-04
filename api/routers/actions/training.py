@@ -220,6 +220,7 @@ def purchase_training(
     # Create the contract in the database
     contract = UnifiedContract(
         user_id=current_user.id,
+        category='personal_training',
         type=training_type,
         actions_required=actions_required,
         gold_paid=training_cost,

@@ -12,7 +12,7 @@ class ContractCreate(BaseModel):
     kingdom_name: str
     building_type: str
     building_level: int
-    reward_pool: int
+    action_reward: int  # Gold per action (ruler sets this)
     base_population: int = 0
     total_actions_required: Optional[int] = None  # Auto-calculated if not provided
 
@@ -36,6 +36,7 @@ class ContractResponse(BaseModel):
     # Costs & Rewards
     construction_cost: int = 0  # What ruler paid upfront to START building
     reward_pool: int
+    action_reward: int = 0  # Gold per action
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None

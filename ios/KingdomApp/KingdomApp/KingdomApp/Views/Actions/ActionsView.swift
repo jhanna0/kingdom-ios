@@ -507,6 +507,7 @@ extension ActionsView {
                         actionContributions: apiContract.action_contributions,
                         constructionCost: apiContract.construction_cost ?? 0,  // Default to 0 for old contracts
                         rewardPool: apiContract.reward_pool,
+                        actionReward: apiContract.action_reward,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },

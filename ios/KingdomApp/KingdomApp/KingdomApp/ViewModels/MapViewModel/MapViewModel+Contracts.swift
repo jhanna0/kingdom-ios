@@ -4,7 +4,7 @@ import Foundation
 extension MapViewModel {
     
     /// Create a new contract for building upgrade - FULLY DYNAMIC, uses string building types
-    func createContract(kingdom: Kingdom, buildingType: String, rewardPool: Int) async throws -> Bool {
+    func createContract(kingdom: Kingdom, buildingType: String, actionReward: Int) async throws -> Bool {
         guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
             print("❌ Kingdom not found")
             throw NSError(domain: "MapViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kingdom not found"])
@@ -35,7 +35,7 @@ extension MapViewModel {
                 kingdomName: kingdom.name,
                 buildingType: buildingType,
                 buildingLevel: nextLevel,
-                rewardPool: rewardPool,
+                actionReward: actionReward,  // Ruler sets price per action
                 basePopulation: kingdoms[index].checkedInPlayers
             )
             
@@ -86,6 +86,7 @@ extension MapViewModel {
                         actionContributions: apiContract.action_contributions,
                         constructionCost: apiContract.construction_cost ?? 0,  // Default to 0 for old contracts
                         rewardPool: apiContract.reward_pool,
+                        actionReward: apiContract.action_reward,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },

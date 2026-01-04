@@ -40,3 +40,4 @@ WHERE id IN (
     SELECT kingdom_id FROM user_kingdoms WHERE user_id = 1 AND times_conquered > 0
 );
 
+

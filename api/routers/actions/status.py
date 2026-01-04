@@ -172,7 +172,7 @@ def get_action_status(
         # Query UnifiedContract table (not old Contract table!)
         contracts_query = db.query(UnifiedContract).filter(
             UnifiedContract.kingdom_id == state.current_kingdom_id,
-            UnifiedContract.type.in_(BUILDING_TYPES),  # Only building contracts
+            UnifiedContract.category == 'kingdom_building',  # Only building contracts
             UnifiedContract.status.in_(["open", "in_progress"])
         ).all()
         contracts = [contract_to_response(c, db) for c in contracts_query]
@@ -382,7 +382,7 @@ def get_action_status(
         # UnifiedContract already imported at top of file
         active_contract = db.query(UnifiedContract).filter(
             UnifiedContract.kingdom_id == state.current_kingdom_id,
-            UnifiedContract.type.in_(BUILDING_TYPES),  # Use the constant from contracts.py
+            UnifiedContract.category == 'kingdom_building',
             UnifiedContract.status.in_(["open", "in_progress"])
         ).first()
         if active_contract:

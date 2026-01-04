@@ -158,36 +158,16 @@ struct BuildingUpgradeCardWithContract: View {
                             .stroke(Color.black.opacity(0.1), lineWidth: 1)
                     )
                 } else {
-                    // Cost and action button
+                    // Action button
                     VStack(spacing: 12) {
-                        // Stats row
-                        HStack(spacing: 0) {
-                            // Cost
+                        // Stats row - Actions and Treasury
+                        HStack(spacing: 12) {
+                            // Actions required
                             VStack(spacing: 4) {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "building.columns.fill")
+                                    Image(systemName: "hammer.fill")
                                         .font(FontStyles.iconMini)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    Text("\(constructionCost)g")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(canAfford ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.buttonDanger)
-                                }
-                                Text("COST")
-                                    .font(FontStyles.labelTiny)
-                                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
-                            
-                            Spacer().frame(width: 10)
-                            
-                            // Actions
-                            VStack(spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "figure.walk")
-                                        .font(FontStyles.iconMini)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
                                     Text("\(actionsRequired)")
                                         .font(FontStyles.bodyLargeBold)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -200,13 +180,16 @@ struct BuildingUpgradeCardWithContract: View {
                             .padding(.vertical, 10)
                             .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
                             
-                            Spacer().frame(width: 10)
-                            
                             // Treasury balance
                             VStack(spacing: 4) {
-                                Text("\(kingdom.treasuryGold)g")
-                                    .font(FontStyles.bodyLargeBold)
-                                    .foregroundColor(canAfford ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "building.columns.fill")
+                                        .font(FontStyles.iconMini)
+                                        .foregroundColor(KingdomTheme.Colors.imperialGold)
+                                    Text("\(kingdom.treasuryGold)g")
+                                        .font(FontStyles.bodyLargeBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                }
                                 Text("TREASURY")
                                     .font(FontStyles.labelTiny)
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
@@ -229,12 +212,11 @@ struct BuildingUpgradeCardWithContract: View {
                             .padding(.vertical, 14)
                         }
                         .brutalistBadge(
-                            backgroundColor: canAfford ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled,
+                            backgroundColor: KingdomTheme.Colors.buttonPrimary,
                             cornerRadius: 12,
-                            shadowOffset: canAfford ? 3 : 0,
+                            shadowOffset: 3,
                             borderWidth: 2
                         )
-                        .disabled(!canAfford)
                     }
                 }
             } else {

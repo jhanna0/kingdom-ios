@@ -20,6 +20,7 @@ struct APIContract: Codable {
     // Costs & Rewards
     let construction_cost: Int?  // Optional - only for kingdom building contracts
     let reward_pool: Int
+    let action_reward: Int  // Gold per action (ruler-set)
     let created_by: Int  // Changed from String to Int - backend uses integer user ID
     let created_at: String
     let completed_at: String?
@@ -31,7 +32,7 @@ struct ContractCreateRequest: Codable {
     let kingdom_name: String
     let building_type: String
     let building_level: Int
-    let reward_pool: Int
+    let action_reward: Int  // Gold per action (ruler sets this)
     let base_population: Int
 }
 

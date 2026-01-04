@@ -83,6 +83,7 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "action_contributions": action_contributions,
         "construction_cost": contract.gold_paid or 0,
         "reward_pool": contract.reward_pool or 0,
+        "action_reward": contract.action_reward or 0,
         "created_by": contract.user_id,  # The ruler who created it
         "created_at": contract.created_at,
         "completed_at": contract.completed_at,
@@ -104,7 +105,7 @@ def list_contracts(
 ):
     """List building contracts, optionally filtered by kingdom or status"""
     query = db.query(UnifiedContract).filter(
-        UnifiedContract.type.in_(BUILDING_TYPES)
+        UnifiedContract.category == 'kingdom_building'
     )
     
     if kingdom_id:
@@ -130,7 +131,7 @@ def get_my_contracts(
     
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.id.in_(contributed_contract_ids),
-        UnifiedContract.type.in_(BUILDING_TYPES),
+        UnifiedContract.category == 'kingdom_building',
         UnifiedContract.status.in_(["open", "in_progress"])
     ).all()
     
@@ -142,7 +143,7 @@ def get_contract(contract_id: int, db: Session = Depends(get_db)):
     """Get contract by ID"""
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
-        UnifiedContract.type.in_(BUILDING_TYPES)
+        UnifiedContract.category == 'kingdom_building'
     ).first()
     
     if not contract:
@@ -167,7 +168,7 @@ def create_contract(
     building_type = request.building_type
     building_level = request.building_level
     base_population = request.base_population
-    reward_pool = request.reward_pool
+    action_reward = request.action_reward  # Gold per action (ruler-set)
     total_actions_required = request.total_actions_required
     
     # Verify user is the ruler
@@ -218,7 +219,7 @@ def create_contract(
     # Check if kingdom already has an active contract
     existing_contract = db.query(UnifiedContract).filter(
         UnifiedContract.kingdom_id == kingdom_id,
-        UnifiedContract.type.in_(BUILDING_TYPES),
+        UnifiedContract.category == 'kingdom_building',
         UnifiedContract.status.in_(["open", "in_progress"])
     ).first()
     
@@ -228,32 +229,35 @@ def create_contract(
             detail=f"Kingdom already has an active contract for {existing_contract.type}"
         )
     
-    # Calculate costs
-    construction_cost = calculate_construction_cost(building_level, base_population)
-    
-    if kingdom.treasury_gold < construction_cost:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient treasury funds. Need {construction_cost}g. Have: {kingdom.treasury_gold}g"
-        )
-    
-    kingdom.treasury_gold -= construction_cost
-    
     # Calculate actions required
     if total_actions_required:
         actions_required = total_actions_required
     else:
         actions_required = calculate_actions_required(building_type_lower, building_level, base_population)
     
+    # Calculate upfront cost: actions_required × action_reward
+    upfront_cost = actions_required * action_reward
+    
+    if kingdom.treasury_gold < upfront_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient treasury funds. Need {upfront_cost}g ({actions_required} actions × {action_reward}g/action). Have: {kingdom.treasury_gold}g"
+        )
+    
+    # Deduct upfront cost from treasury
+    kingdom.treasury_gold -= upfront_cost
+    
     contract = UnifiedContract(
         user_id=current_user.id,  # The ruler who created it
         kingdom_id=kingdom_id,
         kingdom_name=kingdom_name,
+        category='kingdom_building',
         type=building_type_lower,
         tier=building_level,
         actions_required=actions_required,
-        gold_paid=construction_cost,
-        reward_pool=reward_pool,
+        gold_paid=upfront_cost,  # What ruler paid upfront
+        reward_pool=upfront_cost,  # Same as gold_paid - this is what workers draw from
+        action_reward=action_reward,  # Gold per action
         status="open"
     )
     
@@ -273,7 +277,7 @@ def complete_contract(
     """Complete a contract (auto-triggered when ready)"""
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
-        UnifiedContract.type.in_(BUILDING_TYPES)
+        UnifiedContract.category == 'kingdom_building'
     ).first()
     
     if not contract:
@@ -334,7 +338,7 @@ def cancel_contract(
     """Cancel a contract (ruler only)"""
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
-        UnifiedContract.type.in_(BUILDING_TYPES)
+        UnifiedContract.category == 'kingdom_building'
     ).first()
     
     if not contract:

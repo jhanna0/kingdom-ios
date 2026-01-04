@@ -10,3 +10,4 @@ ADD COLUMN IF NOT EXISTS faith INT DEFAULT 0;
 UPDATE player_state SET science = 0 WHERE science IS NULL;
 UPDATE player_state SET faith = 0 WHERE faith IS NULL;
 
+

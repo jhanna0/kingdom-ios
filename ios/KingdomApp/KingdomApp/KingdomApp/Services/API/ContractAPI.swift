@@ -37,7 +37,7 @@ class ContractAPI {
         kingdomName: String,
         buildingType: String,
         buildingLevel: Int,
-        rewardPool: Int,
+        actionReward: Int,  // Gold per action (ruler sets this)
         basePopulation: Int
     ) async throws -> APIContract {
         guard client.isAuthenticated else {
@@ -49,7 +49,7 @@ class ContractAPI {
             kingdom_name: kingdomName,
             building_type: buildingType,
             building_level: buildingLevel,
-            reward_pool: rewardPool,
+            action_reward: actionReward,
             base_population: basePopulation
         )
         

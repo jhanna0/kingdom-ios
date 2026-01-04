@@ -206,6 +206,7 @@ def purchase_craft(
     # Create the contract
     contract = UnifiedContract(
         user_id=current_user.id,
+        category='personal_crafting',
         type=equipment_type,
         tier=tier,
         actions_required=actions_required,

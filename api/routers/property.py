@@ -369,6 +369,7 @@ def purchase_land(
         user_id=current_user.id,
         kingdom_id=request.kingdom_id,
         kingdom_name=request.kingdom_name,
+        category='personal_property',
         type='property',
         tier=1,  # Building to tier 1
         target_id=property_id,  # Store future property ID
@@ -470,6 +471,7 @@ def start_property_upgrade(
         user_id=current_user.id,
         kingdom_id=property.kingdom_id,
         kingdom_name=property.kingdom_name,
+        category='personal_property',
         type='property',
         tier=next_tier,
         target_id=property_id,

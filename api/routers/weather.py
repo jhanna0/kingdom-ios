@@ -93,3 +93,4 @@ async def get_current_weather(
         "weather": weather_data
     }
 
+

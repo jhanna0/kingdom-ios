@@ -56,10 +56,10 @@ def work_on_contract(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
-    # Get contract from unified_contracts (kingdom buildings)
+    # Get contract from unified_contracts (kingdom buildings only)
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
-        UnifiedContract.type.in_(BUILDING_TYPES)
+        UnifiedContract.category == 'kingdom_building'
     ).first()
     
     if not contract:
@@ -102,9 +102,10 @@ def work_on_contract(
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     set_cooldown(db, current_user.id, "work", cooldown_expires)
     
-    # Calculate reward
-    gold_per_action = (contract.reward_pool or 0) / contract.actions_required if contract.actions_required > 0 else 0
-    base_gold = int(gold_per_action)
+    # Calculate reward - use the ruler-set action_reward
+    # NOTE: This only applies to kingdom building contracts (filtered above by BUILDING_TYPES)
+    # Property/training/crafting contracts have action_reward = 0 and earn no gold
+    base_gold = contract.action_reward or 0
     bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
     
     net_income, tax_amount, tax_rate, gross_income = apply_kingdom_tax_with_bonus(
@@ -116,6 +117,7 @@ def work_on_contract(
     )
     
     state.gold += net_income
+    contribution.gold_earned = net_income  # Store what they actually earned after taxes
     
     new_actions_completed = actions_completed + 1
     is_complete = new_actions_completed >= contract.actions_required

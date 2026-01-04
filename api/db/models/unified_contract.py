@@ -25,6 +25,7 @@ class UnifiedContract(Base):
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=True, index=True)
     
     # What's being built/trained
+    category = Column(String(32), nullable=False)  # 'kingdom_building', 'personal_property', 'personal_training', 'personal_crafting'
     type = Column(String(32), nullable=False)  # 'attack', 'weapon', 'wall', 'property', etc.
     tier = Column(Integer, nullable=True)  # Level/tier if applicable
     target_id = Column(String(128), nullable=True)  # Property ID, etc. if needed
@@ -40,6 +41,7 @@ class UnifiedContract(Base):
     
     # Reward pool (for kingdom contracts)
     reward_pool = Column(Integer, default=0)
+    action_reward = Column(Integer, default=0)  # Gold per action (ruler-set for kingdom contracts)
     
     # Status: 'open', 'in_progress', 'completed', 'cancelled'
     status = Column(String(16), nullable=False, default='in_progress', index=True)
