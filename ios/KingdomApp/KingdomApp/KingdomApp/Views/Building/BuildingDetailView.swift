@@ -56,7 +56,7 @@ struct BuildingDetailView: View {
                                 icon: "g.circle.fill",
                                 iconColor: KingdomTheme.Colors.goldLight,
                                 label: "Gold",
-                                required: getUpgradeCost(tier: tier),
+                                required: getBackendUpgradeCost(tier: tier),
                                 available: kingdom.treasuryGold
                             )
                         }
@@ -188,28 +188,31 @@ struct BuildingDetailView: View {
     
     // MARK: - Computed Properties
     
+    // FULLY DYNAMIC - Get from kingdom metadata
     private var buildingDisplayName: String {
-        return BuildingConfig.get(buildingType).displayName
+        if let meta = kingdom.buildingMetadata(buildingType) {
+            return meta.displayName
+        }
+        return buildingType.capitalized
     }
     
     private var buildingColor: Color {
-        return BuildingConfig.get(buildingType).color
+        if let meta = kingdom.buildingMetadata(buildingType),
+           let color = Color(hex: meta.colorHex) {
+            return color
+        }
+        return KingdomTheme.Colors.inkMedium
     }
     
-    private func getUpgradeCost(tier: Int) -> Int {
-        // Base costs scale exponentially
-        let baseCost: Int
-        switch buildingType {
-        case "wall", "vault":
-            baseCost = 500 // Defense buildings more expensive
-        case "mine", "market":
-            baseCost = 300 // Economy buildings cheaper
-        default:
-            baseCost = 400
+    private func getBackendUpgradeCost(tier: Int) -> Int {
+        // Backend is source of truth - NO frontend calculations
+        if tier == currentLevel + 1 {
+            if let upgradeCost = kingdom.upgradeCost(buildingType) {
+                return upgradeCost.constructionCost
+            }
         }
-        
-        // Exponential scaling: tier^2 * base
-        return tier * tier * baseCost
+        // For future tiers, just show 0 or hide them
+        return 0
     }
     
     private func getTierBenefits(tier: Int) -> [String] {

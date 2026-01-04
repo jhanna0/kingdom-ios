@@ -240,9 +240,25 @@ struct PropertyDetailView: View {
                 Spacer()
                 
                 if let status = upgradeStatus {
-                    Text("\(status.upgrade_cost) gold")
-                        .font(FontStyles.headingSmall)
-                        .foregroundColor(status.player_gold >= status.upgrade_cost ? KingdomTheme.Colors.inkMedium : .red)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "dollarsign.circle.fill")
+                                .font(.system(size: 12))
+                            Text("\(status.upgrade_cost)g")
+                                .font(FontStyles.headingSmall)
+                        }
+                        .foregroundColor(status.has_enough_gold ? KingdomTheme.Colors.inkMedium : .red)
+                        
+                        if status.wood_required > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "tree.fill")
+                                    .font(.system(size: 12))
+                                Text("\(status.wood_required) wood")
+                                    .font(FontStyles.labelMedium)
+                            }
+                            .foregroundColor(status.has_enough_wood ? KingdomTheme.Colors.inkMedium : .red)
+                        }
+                    }
                 }
             }
             
@@ -335,23 +351,29 @@ struct PropertyDetailView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
                                 .font(.system(size: 14, weight: .bold))
-                            Text("Start Upgrade (\(status.upgrade_cost)g)")
-                                .font(.system(size: 14, weight: .bold))
+                            if status.wood_required > 0 {
+                                Text("Start Upgrade (\(status.upgrade_cost)g, \(status.wood_required) wood)")
+                                    .font(.system(size: 14, weight: .bold))
+                            } else {
+                                Text("Start Upgrade (\(status.upgrade_cost)g)")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
                         }
                     }
                     .buttonStyle(.brutalist(
-                        backgroundColor: (status.player_gold >= status.upgrade_cost && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                        backgroundColor: (status.can_afford && !hasAnyPropertyUpgradeInProgress) ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
                         foregroundColor: .white,
                         fullWidth: true
                     ))
-                    .disabled(status.player_gold < status.upgrade_cost || hasAnyPropertyUpgradeInProgress)
+                    .disabled(!status.can_afford || hasAnyPropertyUpgradeInProgress)
                     .transition(.opacity)
                     
                     Text("Like training, upgrades require work actions to complete")
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
-                    if status.player_gold < status.upgrade_cost {
+                    // Show missing resources
+                    if !status.has_enough_gold {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .font(FontStyles.iconMini)
@@ -359,7 +381,19 @@ struct PropertyDetailView: View {
                                 .font(FontStyles.labelSmall)
                         }
                         .foregroundColor(.red)
-                    } else if hasAnyPropertyUpgradeInProgress {
+                    }
+                    
+                    if !status.has_enough_wood && status.wood_required > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(FontStyles.iconMini)
+                            Text("Need \(status.wood_required) wood. Chop wood at a lumbermill!")
+                                .font(FontStyles.labelSmall)
+                        }
+                        .foregroundColor(.red)
+                    }
+                    
+                    if hasAnyPropertyUpgradeInProgress {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(FontStyles.iconMini)

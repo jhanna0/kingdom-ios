@@ -107,6 +107,8 @@ def list_kingdoms(
 def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     """Get kingdom details with building upgrade costs"""
     from routers.contracts import calculate_actions_required, calculate_construction_cost
+    from routers.tiers import BUILDING_TYPES
+    from schemas.common import BUILDING_COLORS
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -123,6 +125,24 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         if ruler:
             ruler_name = ruler.display_name
     
+    # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
+    buildings = []
+    for building_type, building_meta in BUILDING_TYPES.items():
+        # Get level from kingdom model (e.g. kingdom.wall_level)
+        level_attr = f"{building_type}_level"
+        level = getattr(kingdom, level_attr, 0)
+        
+        buildings.append({
+            "type": building_type,
+            "display_name": building_meta["display_name"],
+            "icon": building_meta["icon"],
+            "color": BUILDING_COLORS.get(building_type, "#666666"),
+            "category": building_meta["category"],
+            "description": building_meta["description"],
+            "level": level,
+            "max_level": building_meta["max_tier"]
+        })
+    
     # Convert to dict and add calculated upgrade costs
     kingdom_dict = {
         "id": kingdom.id,
@@ -134,12 +154,14 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "level": kingdom.level,
         "treasury_gold": kingdom.treasury_gold,
         "checked_in_players": kingdom.checked_in_players,
+        "buildings": buildings,  # DYNAMIC BUILDINGS with metadata
         "wall_level": kingdom.wall_level,
         "vault_level": kingdom.vault_level,
         "mine_level": kingdom.mine_level,
         "market_level": kingdom.market_level,
         "farm_level": kingdom.farm_level,
         "education_level": kingdom.education_level,
+        "lumbermill_level": kingdom.lumbermill_level,
         "tax_rate": kingdom.tax_rate,
         "travel_fee": kingdom.travel_fee,
         "subject_reward_rate": kingdom.subject_reward_rate,
@@ -158,7 +180,8 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         ("mine", kingdom.mine_level),
         ("market", kingdom.market_level),
         ("farm", kingdom.farm_level),
-        ("education", kingdom.education_level)
+        ("education", kingdom.education_level),
+        ("lumbermill", kingdom.lumbermill_level)
     ]
     
     for building_name, current_level in building_types:

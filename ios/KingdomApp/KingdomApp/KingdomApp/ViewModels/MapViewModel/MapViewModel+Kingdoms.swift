@@ -193,12 +193,34 @@ extension MapViewModel {
         
         if let kingdomData = city.kingdom {
             kingdom.treasuryGold = kingdomData.treasury_gold
+            
+            // DYNAMIC BUILDINGS - Populate metadata from backend
+            if let buildings = kingdomData.buildings {
+                for building in buildings {
+                    // Store metadata
+                    kingdom.buildingMetadata[building.type] = BuildingMetadata(
+                        type: building.type,
+                        displayName: building.display_name,
+                        icon: building.icon,
+                        colorHex: building.color,
+                        category: building.category,
+                        description: building.description,
+                        level: building.level,
+                        maxLevel: building.max_level
+                    )
+                    // Store level in dynamic dict
+                    kingdom.buildingLevels[building.type] = building.level
+                }
+            }
+            
+            // Legacy: BACKEND IS SOURCE OF TRUTH - all building levels from API
             kingdom.wallLevel = kingdomData.wall_level
             kingdom.vaultLevel = kingdomData.vault_level
             kingdom.mineLevel = kingdomData.mine_level
             kingdom.marketLevel = kingdomData.market_level
             kingdom.farmLevel = kingdomData.farm_level
             kingdom.educationLevel = kingdomData.education_level
+            kingdom.buildingLevels["lumbermill"] = kingdomData.lumbermill_level ?? 0
             kingdom.travelFee = kingdomData.travel_fee
             kingdom.checkedInPlayers = kingdomData.population
         }
@@ -256,6 +278,7 @@ extension MapViewModel {
                 kingdoms[index].marketLevel = apiKingdom.market_level
                 kingdoms[index].farmLevel = apiKingdom.farm_level
                 kingdoms[index].educationLevel = apiKingdom.education_level
+                kingdoms[index].buildingLevels["lumbermill"] = apiKingdom.lumbermill_level
                 kingdoms[index].taxRate = apiKingdom.tax_rate
                 kingdoms[index].travelFee = apiKingdom.travel_fee
                 kingdoms[index].checkedInPlayers = apiKingdom.population
@@ -278,6 +301,9 @@ extension MapViewModel {
                         BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     kingdoms[index].educationUpgradeCost = apiKingdom.education_upgrade_cost.map {
+                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
+                    }
+                    kingdoms[index].buildingUpgradeCosts["lumbermill"] = apiKingdom.lumbermill_upgrade_cost.map {
                         BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
                     }
                     

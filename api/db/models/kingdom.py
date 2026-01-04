@@ -39,6 +39,7 @@ class Kingdom(Base):
     market_level = Column(Integer, default=0)  # Passive income + material purchase hub
     farm_level = Column(Integer, default=0)  # Speeds up contract completion
     education_level = Column(Integer, default=0)  # Reduces training actions required
+    lumbermill_level = Column(Integer, default=0)  # Unlocks wood gathering
     
     # Tax & Income
     tax_rate = Column(Integer, default=10)  # 0-100%

@@ -80,6 +80,21 @@ def calculate_upgrade_cost(current_tier: int) -> int:
     return base_price * (2 ** (next_tier - 2))
 
 
+def calculate_wood_required(current_tier: int) -> int:
+    """Calculate wood required for next tier (T1 land clearing doesn't need wood)"""
+    next_tier = current_tier + 1
+    if next_tier <= 1:
+        return 0  # T1 land clearing doesn't need wood
+    # T2-T5 need increasing amounts of wood
+    wood_requirements = {
+        2: 20,   # House needs 20 wood
+        3: 50,   # Workshop needs 50 wood
+        4: 100,  # Beautiful Property needs 100 wood
+        5: 200   # Defensive Walls needs 200 wood
+    }
+    return wood_requirements.get(next_tier, 0)
+
+
 def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 0) -> int:
     """Calculate how many actions required to complete property upgrade"""
     base_actions = 5 + (current_tier * 2)
@@ -213,6 +228,7 @@ def get_property_status(
     for prop in properties:
         if prop.tier < 5:
             upgrade_cost = calculate_upgrade_cost(prop.tier)
+            wood_required = calculate_wood_required(prop.tier)
             actions_required = calculate_upgrade_actions_required(prop.tier, state.building_skill)
             
             # Find active contract for this property
@@ -227,13 +243,17 @@ def get_property_status(
                 "current_tier": prop.tier,
                 "can_upgrade": prop.tier < 5,
                 "upgrade_cost": upgrade_cost,
+                "wood_required": wood_required,
                 "actions_required": actions_required,
-                "can_afford": state.gold >= upgrade_cost,
+                "can_afford": state.gold >= upgrade_cost and state.wood >= wood_required,
+                "has_enough_gold": state.gold >= upgrade_cost,
+                "has_enough_wood": state.wood >= wood_required,
                 "active_contract": active_contract
             })
     
     return {
         "player_gold": state.gold,
+        "player_wood": state.wood,
         "player_reputation": current_kingdom_reputation,
         "player_level": state.level,
         "player_building_skill": state.building_skill,
@@ -426,11 +446,20 @@ def start_property_upgrade(
         )
     
     upgrade_cost = calculate_upgrade_cost(property.tier)
+    wood_required = calculate_wood_required(property.tier)
     
     if state.gold < upgrade_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Not enough gold. Need {upgrade_cost}g, have {state.gold}g"
+        )
+    
+    # Check wood requirements (ensure wood is not None)
+    player_wood = state.wood if state.wood is not None else 0
+    if player_wood < wood_required:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough wood. Need {wood_required} wood, have {state.wood} wood. Chop wood at a lumbermill!"
         )
     
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill)
@@ -446,11 +475,13 @@ def start_property_upgrade(
         target_id=property_id,
         actions_required=actions_required,
         gold_paid=upgrade_cost,
+        wood_paid=wood_required,
         status='in_progress'
     )
     db.add(contract)
     
     state.gold -= upgrade_cost
+    state.wood -= wood_required
     
     db.commit()
     db.refresh(contract)
@@ -465,6 +496,7 @@ def start_property_upgrade(
         "from_tier": property.tier,
         "to_tier": next_tier,
         "cost": upgrade_cost,
+        "wood_cost": wood_required,
         "actions_required": actions_required
     }
 
@@ -539,7 +571,10 @@ def get_property_upgrade_status(
         }
     
     upgrade_cost = calculate_upgrade_cost(property.tier) if property.tier < 5 else 0
+    wood_required = calculate_wood_required(property.tier) if property.tier < 5 else 0
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < 5 else 0
+    
+    player_wood = state.wood if state.wood is not None else 0
     
     return {
         "property_id": property_id,
@@ -547,8 +582,13 @@ def get_property_upgrade_status(
         "max_tier": 5,
         "can_upgrade": property.tier < 5,
         "upgrade_cost": upgrade_cost,
+        "wood_required": wood_required,
         "actions_required": actions_required,
+        "can_afford": state.gold >= upgrade_cost and player_wood >= wood_required,
+        "has_enough_gold": state.gold >= upgrade_cost,
+        "has_enough_wood": player_wood >= wood_required,
         "active_contract": active_contract_data,
         "player_gold": state.gold,
+        "player_wood": player_wood,
         "player_building_skill": state.building_skill
     }

@@ -1,6 +1,29 @@
 import Foundation
 import CoreLocation
 
+// DYNAMIC Building metadata from backend
+struct BuildingMetadata: Codable, Hashable {
+    let type: String  // e.g. "wall", "vault", "mine"
+    let displayName: String  // e.g. "Walls", "Vault"
+    let icon: String  // SF Symbol name
+    let colorHex: String  // Hex color code
+    let category: String  // "economy", "defense", "civic"
+    let description: String
+    let level: Int
+    let maxLevel: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case displayName = "display_name"
+        case icon
+        case colorHex = "color"
+        case category
+        case description
+        case level
+        case maxLevel = "max_level"
+    }
+}
+
 // Building upgrade cost information
 struct BuildingUpgradeCost: Codable, Hashable {
     let actionsRequired: Int
@@ -58,6 +81,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // DYNAMIC BUILDINGS - use these for new code!
     var buildingLevels: [String: Int] = [:]  // building_type -> level
     var buildingUpgradeCosts: [String: BuildingUpgradeCost] = [:]  // building_type -> cost
+    var buildingMetadata: [String: BuildingMetadata] = [:]  // building_type -> metadata (from backend)
     
     // Legacy building properties (kept for backwards compatibility)
     // TODO: Migrate all code to use buildingLevels dict instead
@@ -120,6 +144,16 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Helper to get upgrade cost by type
     func upgradeCost(_ type: String) -> BuildingUpgradeCost? {
         buildingUpgradeCosts[type]
+    }
+    
+    // Helper to get building metadata by type (with fallback to BuildingConfig)
+    func buildingMetadata(_ type: String) -> BuildingMetadata? {
+        buildingMetadata[type]
+    }
+    
+    // Get all building types - FULLY DYNAMIC from backend metadata
+    func allBuildingTypes() -> [String] {
+        return Array(buildingMetadata.keys).sorted()
     }
     
     // Tax system (0-100%)

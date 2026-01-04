@@ -3,8 +3,8 @@ import Foundation
 // MARK: - Contract System
 extension MapViewModel {
     
-    /// Create a new contract for building upgrade
-    func createContract(kingdom: Kingdom, buildingType: BuildingType, rewardPool: Int) async throws -> Bool {
+    /// Create a new contract for building upgrade - FULLY DYNAMIC, uses string building types
+    func createContract(kingdom: Kingdom, buildingType: String, rewardPool: Int) async throws -> Bool {
         guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
             print("❌ Kingdom not found")
             throw NSError(domain: "MapViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kingdom not found"])
@@ -16,11 +16,12 @@ extension MapViewModel {
             throw NSError(domain: "MapViewModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "You don't rule this kingdom"])
         }
         
-        // Get building type string and next level
-        let (buildingTypeStr, currentLevel) = getBuildingInfo(kingdom: kingdoms[index], buildingType: buildingType)
+        // Get current level from kingdom
+        let currentLevel = kingdoms[index].buildingLevel(buildingType)
         
         // Check if building can be upgraded
-        if currentLevel >= 5 {
+        let maxLevel = kingdoms[index].buildingMetadata(buildingType)?.maxLevel ?? 5
+        if currentLevel >= maxLevel {
             print("❌ Building already at max level")
             throw NSError(domain: "MapViewModel", code: 3, userInfo: [NSLocalizedDescriptionKey: "Building already at max level"])
         }
@@ -32,7 +33,7 @@ extension MapViewModel {
             let apiContract = try await contractAPI.createContract(
                 kingdomId: kingdom.id,
                 kingdomName: kingdom.name,
-                buildingType: buildingTypeStr,
+                buildingType: buildingType,
                 buildingLevel: nextLevel,
                 rewardPool: rewardPool,
                 basePopulation: kingdoms[index].checkedInPlayers
@@ -98,23 +99,6 @@ extension MapViewModel {
         }
     }
     
-    // Helper to get building info
-    func getBuildingInfo(kingdom: Kingdom, buildingType: BuildingType) -> (String, Int) {
-        switch buildingType {
-        case .walls:
-            return ("Walls", kingdom.wallLevel)
-        case .vault:
-            return ("Vault", kingdom.vaultLevel)
-        case .mine:
-            return ("Mine", kingdom.mineLevel)
-        case .market:
-            return ("Market", kingdom.marketLevel)
-        case .farm:
-            return ("Farm", kingdom.farmLevel)
-        case .education:
-            return ("Education", kingdom.educationLevel)
-        }
-    }
 }
 
 

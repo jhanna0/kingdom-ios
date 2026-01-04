@@ -1,59 +1,54 @@
 import SwiftUI
 
-/// SINGLE SOURCE OF TRUTH for all building types
+/// FULLY DYNAMIC - NO HARDCODED BUILDINGS!
+/// All building data comes from backend via Kingdom.buildingMetadata
+/// This is just a helper for SwiftUI rendering
 struct BuildingConfig {
     let type: String
     let displayName: String
     let icon: String
     let color: Color
     
-    static let all: [String: BuildingConfig] = [
-        "wall": BuildingConfig(
-            type: "wall",
-            displayName: "Walls",
-            icon: "rectangle.stack.fill",
-            color: Color(red: 0.42, green: 0.58, blue: 0.60) // Steel blue (defensive)
-        ),
-        "vault": BuildingConfig(
-            type: "vault",
-            displayName: "Vault",
-            icon: "lock.shield.fill",
-            color: KingdomTheme.Colors.imperialGold // Gold (treasury)
-        ),
-        "mine": BuildingConfig(
-            type: "mine",
-            displayName: "Mine",
-            icon: "mountain.2.fill",
-            color: Color(red: 0.55, green: 0.45, blue: 0.35) // Brown (mining)
-        ),
-        "market": BuildingConfig(
-            type: "market",
-            displayName: "Market",
-            icon: "cart.fill",
-            color: KingdomTheme.Colors.royalEmerald // Green (commerce)
-        ),
-        "farm": BuildingConfig(
-            type: "farm",
-            displayName: "Farm",
-            icon: "leaf.fill",
-            color: Color(red: 0.55, green: 0.60, blue: 0.45) // Sage green (agriculture)
-        ),
-        "education": BuildingConfig(
-            type: "education",
-            displayName: "Education",
-            icon: "book.fill",
-            color: KingdomTheme.Colors.royalPurple // Purple (learning)
+    /// Convert BuildingMetadata from backend to BuildingConfig
+    static func from(metadata: BuildingMetadata) -> BuildingConfig {
+        return BuildingConfig(
+            type: metadata.type,
+            displayName: metadata.displayName,
+            icon: metadata.icon,
+            color: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium
         )
-    ]
+    }
     
-    /// Get config for a building type - FULLY DYNAMIC with fallback
-    static func get(_ type: String) -> BuildingConfig {
-        return all[type] ?? BuildingConfig(
+    /// Emergency fallback if backend metadata is missing (should never happen)
+    static func fallback(_ type: String) -> BuildingConfig {
+        return BuildingConfig(
             type: type,
             displayName: type.capitalized,
             icon: "building.2.fill",
             color: KingdomTheme.Colors.inkMedium
         )
+    }
+}
+
+// MARK: - Color Extension for Hex Support
+
+extension Color {
+    /// Initialize Color from hex string (e.g. "#FF5733" or "FF5733")
+    init?(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+        
+        var rgb: UInt64 = 0
+        
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else {
+            return nil
+        }
+        
+        let r = Double((rgb & 0xFF0000) >> 16) / 255.0
+        let g = Double((rgb & 0x00FF00) >> 8) / 255.0
+        let b = Double(rgb & 0x0000FF) / 255.0
+        
+        self.init(red: r, green: g, blue: b)
     }
 }
 

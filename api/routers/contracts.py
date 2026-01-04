@@ -90,7 +90,7 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
 
 
 # Building types that are kingdom buildings
-BUILDING_TYPES = ["wall", "vault", "mine", "market", "farm", "education"]
+BUILDING_TYPES = ["wall", "vault", "mine", "market", "farm", "education", "lumbermill"]
 
 
 @router.get("")

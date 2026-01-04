@@ -8,8 +8,8 @@ import Foundation
 // MARK: - Ruler Actions (Building Upgrades & Income)
 extension MapViewModel {
     
-    /// Upgrade a building (uses kingdom treasury, not player gold)
-    func upgradeBuilding(kingdom: Kingdom, buildingType: BuildingType, cost: Int) {
+    /// Upgrade a building (uses kingdom treasury, not player gold) - FULLY DYNAMIC with string building types
+    func upgradeBuilding(kingdom: Kingdom, buildingType: String, cost: Int) {
         guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
             print("❌ Kingdom not found")
             return
@@ -30,38 +30,14 @@ extension MapViewModel {
         // Deduct from kingdom treasury
         kingdoms[index].treasuryGold -= cost
         
-        // Upgrade the building
-        switch buildingType {
-        case .walls:
-            if kingdoms[index].wallLevel < 5 {
-                kingdoms[index].wallLevel += 1
-                print("🏰 Upgraded walls to level \(kingdoms[index].wallLevel)")
-            }
-        case .vault:
-            if kingdoms[index].vaultLevel < 5 {
-                kingdoms[index].vaultLevel += 1
-                print("🔒 Upgraded vault to level \(kingdoms[index].vaultLevel)")
-            }
-        case .mine:
-            if kingdoms[index].mineLevel < 5 {
-                kingdoms[index].mineLevel += 1
-                print("⛏️ Upgraded mine to level \(kingdoms[index].mineLevel) (unlocks materials)")
-            }
-        case .market:
-            if kingdoms[index].marketLevel < 5 {
-                kingdoms[index].marketLevel += 1
-                print("🏪 Upgraded market to level \(kingdoms[index].marketLevel) (+income)")
-            }
-        case .farm:
-            if kingdoms[index].farmLevel < 5 {
-                kingdoms[index].farmLevel += 1
-                print("🌾 Upgraded farm to level \(kingdoms[index].farmLevel) (faster contracts)")
-            }
-        case .education:
-            if kingdoms[index].educationLevel < 5 {
-                kingdoms[index].educationLevel += 1
-                print("📚 Upgraded education to level \(kingdoms[index].educationLevel) (faster training)")
-            }
+        // Upgrade the building - FULLY DYNAMIC using metadata
+        let currentLevel = kingdoms[index].buildingLevel(buildingType)
+        let maxLevel = kingdoms[index].buildingMetadata(buildingType)?.maxLevel ?? 5
+        
+        if currentLevel < maxLevel {
+            kingdoms[index].buildingLevels[buildingType] = currentLevel + 1
+            let displayName = kingdoms[index].buildingMetadata(buildingType)?.displayName ?? buildingType.capitalized
+            print("✅ Upgraded \(displayName) to level \(currentLevel + 1)")
         }
         
         // Update currentKingdomInside if it's the same kingdom

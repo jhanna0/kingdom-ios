@@ -2,6 +2,18 @@ import Foundation
 
 // MARK: - Kingdom Models
 
+/// DYNAMIC Building data from backend - includes metadata
+struct APIBuildingData: Codable {
+    let type: String  // e.g. "wall", "vault", "mine"
+    let display_name: String  // e.g. "Walls", "Vault"
+    let icon: String  // SF Symbol name
+    let color: String  // Hex color code
+    let category: String  // "economy", "defense", "civic"
+    let description: String  // Building description
+    let level: Int  // Current building level
+    let max_level: Int  // Maximum level
+}
+
 struct APIBuildingUpgradeCost: Codable {
     let actions_required: Int
     let construction_cost: Int
@@ -18,12 +30,19 @@ struct APIKingdom: Codable {
     let level: Int
     let treasury_gold: Int
     let checked_in_players: Int
+    
+    // DYNAMIC BUILDINGS - Array with full metadata from backend
+    let buildings: [APIBuildingData]?
+    
+    // Legacy building levels (kept for backwards compatibility)
     let wall_level: Int
     let vault_level: Int
     let mine_level: Int
     let market_level: Int
     let farm_level: Int
     let education_level: Int
+    let lumbermill_level: Int
+    
     let tax_rate: Int
     let travel_fee: Int
     let subject_reward_rate: Int
@@ -39,6 +58,7 @@ struct APIKingdom: Codable {
     let market_upgrade_cost: APIBuildingUpgradeCost?
     let farm_upgrade_cost: APIBuildingUpgradeCost?
     let education_upgrade_cost: APIBuildingUpgradeCost?
+    let lumbermill_upgrade_cost: APIBuildingUpgradeCost?
 }
 
 struct APIKingdomSimple: Codable {
@@ -64,12 +84,19 @@ struct CityKingdomData: Codable {
     let level: Int
     let population: Int
     let treasury_gold: Int
+    
+    // DYNAMIC BUILDINGS - Array with full metadata from backend
+    let buildings: [APIBuildingData]?
+    
+    // Legacy building levels (kept for backwards compatibility)
     let wall_level: Int
     let vault_level: Int
     let mine_level: Int
     let market_level: Int
     let farm_level: Int
     let education_level: Int
+    let lumbermill_level: Int?  // Optional for backwards compatibility
+    
     let travel_fee: Int
     let can_claim: Bool  // Backend determines if current user can claim
     let can_declare_war: Bool  // Backend determines if current user can declare war

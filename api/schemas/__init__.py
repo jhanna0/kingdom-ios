@@ -31,6 +31,8 @@ from .common import (
     CityQuickResponse,
     BoundaryResponse,
     KingdomData,
+    BuildingData,
+    BUILDING_COLORS,
 )
 from .coup import (
     CoupInitiateRequest,
@@ -97,6 +99,8 @@ __all__ = [
     "CityQuickResponse",
     "BoundaryResponse",
     "KingdomData",
+    "BuildingData",
+    "BUILDING_COLORS",
     # Coup
     "CoupInitiateRequest",
     "CoupInitiateResponse",

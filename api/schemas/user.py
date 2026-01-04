@@ -81,6 +81,7 @@ class PlayerState(BaseModel):
     # Resources
     iron: int = 0
     steel: int = 0
+    wood: int = 0
     
     # Daily Actions
     last_mining_action: Optional[datetime] = None

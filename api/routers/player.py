@@ -334,6 +334,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         # Resources
         iron=state.iron,
         steel=state.steel,
+        wood=state.wood,
         
         # Daily Actions (NOTE: moved to action_cooldowns table)
         last_mining_action=None,  # Removed from schema

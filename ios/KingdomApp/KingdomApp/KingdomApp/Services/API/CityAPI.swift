@@ -108,6 +108,27 @@ class CityAPI {
         
         if let kingdomData = city.kingdom {
             kingdom.treasuryGold = kingdomData.treasury_gold
+            
+            // DYNAMIC BUILDINGS - Populate metadata from backend
+            if let buildings = kingdomData.buildings {
+                for building in buildings {
+                    // Store metadata
+                    kingdom.buildingMetadata[building.type] = BuildingMetadata(
+                        type: building.type,
+                        displayName: building.display_name,
+                        icon: building.icon,
+                        colorHex: building.color,
+                        category: building.category,
+                        description: building.description,
+                        level: building.level,
+                        maxLevel: building.max_level
+                    )
+                    // Store level in dynamic dict
+                    kingdom.buildingLevels[building.type] = building.level
+                }
+            }
+            
+            // Legacy: Also populate individual building levels for backwards compatibility
             kingdom.wallLevel = kingdomData.wall_level
             kingdom.vaultLevel = kingdomData.vault_level
             kingdom.mineLevel = kingdomData.mine_level

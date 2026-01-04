@@ -10,17 +10,19 @@ struct BuildMenuView: View {
     private let tierManager = TierManager.shared
     @State private var selectedBuildingTypeString: String?
     
-    // Building categories from TierManager
-    private var economyBuildings: [String] {
-        tierManager.buildingTypesByCategory("economy")
-    }
-    
-    private var defenseBuildings: [String] {
-        tierManager.buildingTypesByCategory("defense")
-    }
-    
-    private var civicBuildings: [String] {
-        tierManager.buildingTypesByCategory("civic")
+    // FULLY DYNAMIC - Group buildings by whatever categories backend provides!
+    private var buildingsByCategory: [(category: String, buildings: [String])] {
+        // Get all unique categories from metadata
+        let categories = Set(kingdom.buildingMetadata.values.map { $0.category })
+        
+        // Group buildings by category
+        return categories.sorted().map { category in
+            let buildings = kingdom.buildingMetadata.values
+                .filter { $0.category == category }
+                .map { $0.type }
+                .sorted()
+            return (category: category, buildings: buildings)
+        }
     }
     
     var body: some View {
@@ -33,30 +35,14 @@ struct BuildMenuView: View {
                     // Header with treasury
                     treasuryHeader
                     
-                    // Economic Buildings Section (dynamic!)
-                    if !economyBuildings.isEmpty {
-                        sectionDivider(title: "Economy")
-                        
-                        ForEach(economyBuildings, id: \.self) { buildingType in
-                            buildingCard(for: buildingType)
-                        }
-                    }
-                    
-                    // Civic Buildings Section (dynamic!)
-                    if !civicBuildings.isEmpty {
-                        sectionDivider(title: "Civic")
-                        
-                        ForEach(civicBuildings, id: \.self) { buildingType in
-                            buildingCard(for: buildingType)
-                        }
-                    }
-                    
-                    // Defensive Buildings Section (dynamic!)
-                    if !defenseBuildings.isEmpty {
-                        sectionDivider(title: "Defense")
-                        
-                        ForEach(defenseBuildings, id: \.self) { buildingType in
-                            buildingCard(for: buildingType)
+                    // FULLY DYNAMIC - Render whatever categories backend provides!
+                    ForEach(buildingsByCategory, id: \.category) { categoryData in
+                        if !categoryData.buildings.isEmpty {
+                            sectionDivider(title: categoryData.category.capitalized)
+                            
+                            ForEach(categoryData.buildings, id: \.self) { buildingType in
+                                buildingCard(for: buildingType)
+                            }
                         }
                     }
                 }
@@ -71,7 +57,7 @@ struct BuildMenuView: View {
         .navigationDestination(item: $selectedBuildingTypeString) { buildingType in
             ContractCreationView(
                 kingdom: kingdom,
-                buildingType: buildingTypeFromString(buildingType),
+                buildingType: buildingType,  // FULLY DYNAMIC - pass string directly
                 viewModel: viewModel,
                 onSuccess: { buildingName in
                     selectedBuildingTypeString = nil
@@ -87,44 +73,31 @@ struct BuildMenuView: View {
     
     @ViewBuilder
     private func buildingCard(for buildingType: String) -> some View {
-        let info = tierManager.buildingTypeInfo(buildingType)
-        let level = kingdom.buildingLevel(buildingType)
-        let maxLevel = info?.maxTier ?? 5
-        let nextLevel = level + 1
-        
-        BuildingUpgradeCardWithContract(
-            icon: info?.icon ?? "building.fill",
-            name: info?.displayName ?? buildingType.capitalized,
-            currentLevel: level,
-            maxLevel: maxLevel,
-            benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
-            hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType.capitalized),
-            hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-            kingdom: kingdom,
-            upgradeCost: kingdom.upgradeCost(buildingType),
-            iconColor: iconColor(for: buildingType),
-            onCreateContract: {
-                selectedBuildingTypeString = buildingType
-            }
-        )
-    }
-    
-    // Map string to BuildingType enum (for backwards compatibility with ContractCreationView)
-    private func buildingTypeFromString(_ type: String) -> BuildingType {
-        switch type {
-        case "wall": return .walls
-        case "vault": return .vault
-        case "mine": return .mine
-        case "market": return .market
-        case "farm": return .farm
-        case "education": return .education
-        default: return .mine  // fallback
+        // FULLY DYNAMIC - Get metadata from kingdom (populated from backend)
+        if let metadata = kingdom.buildingMetadata(buildingType) {
+            let level = kingdom.buildingLevel(buildingType)
+            let nextLevel = level + 1
+            
+            BuildingUpgradeCardWithContract(
+                icon: metadata.icon,
+                name: metadata.displayName,
+                currentLevel: level,
+                maxLevel: metadata.maxLevel,
+                benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
+                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType.capitalized),
+                hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
+                kingdom: kingdom,
+                upgradeCost: kingdom.upgradeCost(buildingType),
+                iconColor: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium,
+                onCreateContract: {
+                    selectedBuildingTypeString = buildingType
+                }
+            )
+        } else {
+            // Should never happen if backend is working properly
+            Text("Building data unavailable")
+                .foregroundColor(.red)
         }
-    }
-    
-    // Icon colors by building type
-    private func iconColor(for buildingType: String) -> Color {
-        return BuildingConfig.get(buildingType).color
     }
     
     // MARK: - Treasury Header
@@ -154,8 +127,11 @@ struct BuildMenuView: View {
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                 
-                let totalLevels = kingdom.mineLevel + kingdom.marketLevel + kingdom.farmLevel + kingdom.educationLevel + kingdom.wallLevel + kingdom.vaultLevel
-                Text("\(totalLevels)/30")
+                // FULLY DYNAMIC - calculate from kingdom metadata or fallback
+                let allBuildingTypes = kingdom.allBuildingTypes()
+                let totalLevels = allBuildingTypes.reduce(0) { $0 + kingdom.buildingLevel($1) }
+                let maxPossibleLevels = allBuildingTypes.count * 5  // Dynamic count x 5 levels
+                Text("\(totalLevels)/\(maxPossibleLevels)")
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
@@ -203,11 +179,3 @@ struct BuildMenuView: View {
     }
 }
 
-enum BuildingType: Hashable {
-    case walls
-    case vault
-    case mine
-    case market
-    case farm
-    case education
-}

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContractCreationView: View {
     let kingdom: Kingdom
-    let buildingType: BuildingType
+    let buildingType: String  // FULLY DYNAMIC - just a string from backend
     @ObservedObject var viewModel: MapViewModel
     let onSuccess: (String) -> Void
     @Environment(\.dismiss) var dismiss
@@ -12,36 +12,21 @@ struct ContractCreationView: View {
     @State private var isCreating = false
     
     private var buildingName: String {
-        switch buildingType {
-        case .walls: return "Walls"
-        case .vault: return "Vault"
-        case .mine: return "Mine"
-        case .market: return "Market"
-        case .farm: return "Farm"
-        case .education: return "Education"
+        // FULLY DYNAMIC - Get from kingdom metadata
+        if let meta = kingdom.buildingMetadata(buildingType) {
+            return meta.displayName
         }
+        return buildingType.capitalized
     }
     
     private var currentLevel: Int {
-        switch buildingType {
-        case .walls: return kingdom.wallLevel
-        case .vault: return kingdom.vaultLevel
-        case .mine: return kingdom.mineLevel
-        case .market: return kingdom.marketLevel
-        case .farm: return kingdom.farmLevel
-        case .education: return kingdom.educationLevel
-        }
+        // BACKEND IS SOURCE OF TRUTH - dynamic dictionary
+        return kingdom.buildingLevel(buildingType)
     }
     
     private var upgradeCost: BuildingUpgradeCost? {
-        switch buildingType {
-        case .walls: return kingdom.wallUpgradeCost
-        case .vault: return kingdom.vaultUpgradeCost
-        case .mine: return kingdom.mineUpgradeCost
-        case .market: return kingdom.marketUpgradeCost
-        case .farm: return kingdom.farmUpgradeCost
-        case .education: return kingdom.educationUpgradeCost
-        }
+        // BACKEND IS SOURCE OF TRUTH - dynamic dictionary
+        return kingdom.upgradeCost(buildingType)
     }
     
     private var nextLevel: Int {
@@ -226,6 +211,7 @@ struct ContractCreationView: View {
         // Call the create contract method asynchronously
         Task {
             do {
+                // FULLY DYNAMIC - pass string directly
                 _ = try await viewModel.createContract(kingdom: kingdom, buildingType: buildingType, rewardPool: 0)  // Reward pool deprecated
                 
                 // Success! Dismiss and call success handler
@@ -242,6 +228,5 @@ struct ContractCreationView: View {
             }
         }
     }
-}
-
-
+    
+    }

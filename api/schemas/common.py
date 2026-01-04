@@ -4,6 +4,17 @@ Common/shared schemas
 from pydantic import BaseModel
 from typing import List, Optional
 
+# Building colors for frontend - matches BuildingConfig colors
+BUILDING_COLORS = {
+    "wall": "#6B949C",  # Steel blue
+    "vault": "#D4AF37",  # Imperial gold
+    "mine": "#8C7359",  # Brown
+    "market": "#50C878",  # Royal emerald
+    "farm": "#8C9973",  # Sage green
+    "education": "#7851A9",  # Royal purple
+    "lumbermill": "#73593F"  # Dark brown
+}
+
 
 class CheckInRequest(BaseModel):
     """Check-in request"""
@@ -25,6 +36,18 @@ class CheckInResponse(BaseModel):
     rewards: CheckInRewards
 
 
+class BuildingData(BaseModel):
+    """Building data with metadata - FULLY DYNAMIC from backend"""
+    type: str  # e.g. "wall", "vault", "mine"
+    display_name: str  # e.g. "Walls", "Vault"
+    icon: str  # SF Symbol name
+    color: str  # Hex color code
+    category: str  # "economy", "defense", "civic"
+    description: str  # Building description
+    level: int  # Current building level
+    max_level: int  # Maximum level
+
+
 class KingdomData(BaseModel):
     """Kingdom data attached to a city"""
     id: str
@@ -33,12 +56,19 @@ class KingdomData(BaseModel):
     level: int
     population: int
     treasury_gold: int
+    
+    # DYNAMIC BUILDINGS - All building data with metadata
+    buildings: List['BuildingData'] = []
+    
+    # Legacy building levels (kept for backwards compatibility)
     wall_level: int
     vault_level: int
     mine_level: int
     market_level: int
     farm_level: int = 0
     education_level: int = 0
+    lumbermill_level: int = 0  # FULLY DYNAMIC - add new buildings without iOS changes
+    
     travel_fee: int = 10
     can_claim: bool = False  # Backend determines if current user can claim this kingdom
     can_declare_war: bool = False  # Backend determines if current user can declare war on this kingdom

@@ -162,6 +162,21 @@ BUILDING_TYPES = {
             4: {"name": "Institute", "benefit": "Train 20% faster", "reduction": 20, "description": "Elite institution"},
             5: {"name": "Grand Library", "benefit": "Train 25% faster", "reduction": 25, "description": "Knowledge center"},
         }
+    },
+    "lumbermill": {
+        "display_name": "Lumbermill",
+        "icon": "tree.fill",
+        "category": "economy",
+        "description": "Produces wood resources for construction",
+        "max_tier": 5,
+        "benefit_formula": "Unlocks wood gathering at each level",
+        "tiers": {
+            1: {"name": "Logging Camp", "benefit": "Gather 10 wood per action", "wood_per_action": 10, "description": "Basic logging operation"},
+            2: {"name": "Sawmill", "benefit": "Gather 20 wood per action", "wood_per_action": 20, "description": "Improved wood processing"},
+            3: {"name": "Lumber Yard", "benefit": "Gather 35 wood per action", "wood_per_action": 35, "description": "Large-scale lumber operation"},
+            4: {"name": "Industrial Mill", "benefit": "Gather 50 wood per action", "wood_per_action": 50, "description": "Advanced lumber processing"},
+            5: {"name": "Lumber Empire", "benefit": "Gather 75 wood per action", "wood_per_action": 75, "description": "Massive wood production"},
+        }
     }
 }
 

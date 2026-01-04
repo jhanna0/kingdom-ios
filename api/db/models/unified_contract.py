@@ -36,6 +36,7 @@ class UnifiedContract(Base):
     gold_paid = Column(Integer, default=0)
     iron_paid = Column(Integer, default=0)
     steel_paid = Column(Integer, default=0)
+    wood_paid = Column(Integer, default=0)
     
     # Reward pool (for kingdom contracts)
     reward_pool = Column(Integer, default=0)

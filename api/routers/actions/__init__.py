@@ -11,10 +11,11 @@ This module organizes action endpoints into logical groupings:
 - crafting: Purchase and craft weapons/armor
 - sabotage: Sabotage enemy kingdom contracts
 - vault_heist: Steal from enemy kingdom vaults (Intelligence T5)
+- wood_chopping: Chop wood at lumbermill for construction
 """
 from fastapi import APIRouter
 
-from . import status, contracts, patrol, farming, scouting, training, crafting, sabotage, vault_heist
+from . import status, contracts, patrol, farming, scouting, training, crafting, sabotage, vault_heist, wood_chopping
 
 # Main actions router
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -29,4 +30,5 @@ router.include_router(training.router)
 router.include_router(crafting.router)
 router.include_router(sabotage.router)
 router.include_router(vault_heist.router)
+router.include_router(wood_chopping.router)
 

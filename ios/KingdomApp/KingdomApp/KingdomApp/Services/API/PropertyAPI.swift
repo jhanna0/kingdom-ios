@@ -88,6 +88,7 @@ class PropertyAPI {
     
     struct PropertyStatus: Codable {
         let player_gold: Int
+        let player_wood: Int
         let player_reputation: Int
         let player_level: Int
         let player_building_skill: Int
@@ -107,8 +108,11 @@ class PropertyAPI {
         let current_tier: Int
         let can_upgrade: Bool
         let upgrade_cost: Int
+        let wood_required: Int
         let actions_required: Int
         let can_afford: Bool
+        let has_enough_gold: Bool
+        let has_enough_wood: Bool
         let active_contract: ActiveUpgradeContract?
     }
     
@@ -173,9 +177,14 @@ class PropertyAPI {
         let max_tier: Int
         let can_upgrade: Bool
         let upgrade_cost: Int
+        let wood_required: Int
         let actions_required: Int
+        let can_afford: Bool
+        let has_enough_gold: Bool
+        let has_enough_wood: Bool
         let active_contract: ActiveUpgradeContract?
         let player_gold: Int
+        let player_wood: Int
         let player_building_skill: Int
     }
     

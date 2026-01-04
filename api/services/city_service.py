@@ -12,12 +12,13 @@ import math
 import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BUILDING_COLORS
 from osm_service import (
     find_user_city_fast,
     fetch_nearby_city_ids,
     fetch_city_boundary_by_id,
 )
+from routers.tiers import BUILDING_TYPES
 
 
 def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -120,6 +121,24 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             is_allied = bool(user_kingdom_ids & kingdom_allies)
             is_enemy = bool(user_kingdom_ids & kingdom_enemies)
         
+        # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
+        buildings = []
+        for building_type, building_meta in BUILDING_TYPES.items():
+            # Get level from kingdom model (e.g. kingdom.wall_level)
+            level_attr = f"{building_type}_level"
+            level = getattr(kingdom, level_attr, 0)
+            
+            buildings.append(BuildingData(
+                type=building_type,
+                display_name=building_meta["display_name"],
+                icon=building_meta["icon"],
+                color=BUILDING_COLORS.get(building_type, "#666666"),  # Fallback gray
+                category=building_meta["category"],
+                description=building_meta["description"],
+                level=level,
+                max_level=building_meta["max_tier"]
+            ))
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
@@ -127,12 +146,14 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             level=kingdom.level,
             population=kingdom.population,
             treasury_gold=kingdom.treasury_gold,
+            buildings=buildings,  # DYNAMIC BUILDINGS with metadata
             wall_level=kingdom.wall_level,
             vault_level=kingdom.vault_level,
             mine_level=kingdom.mine_level,
             market_level=kingdom.market_level,
             farm_level=kingdom.farm_level,
             education_level=kingdom.education_level,
+            lumbermill_level=kingdom.lumbermill_level,  # FULLY DYNAMIC from DB
             travel_fee=kingdom.travel_fee,
             can_claim=can_claim,
             can_declare_war=can_interact,

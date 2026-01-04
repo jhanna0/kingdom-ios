@@ -31,6 +31,7 @@ class PlayerState(Base):
     gold = Column(Integer, default=100)
     iron = Column(Integer, default=0)
     steel = Column(Integer, default=0)
+    wood = Column(Integer, default=0)
     
     # Progression
     level = Column(Integer, default=1)
