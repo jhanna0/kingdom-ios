@@ -77,7 +77,9 @@ def get_current_user(
         )
     
     # Look up user by apple_user_id (stable identifier, survives DB migrations)
-    user = db.query(User).filter(User.apple_user_id == apple_user_id).first()
+    # EAGER LOAD player_state to avoid N+1 query and improve /auth/me performance
+    from sqlalchemy.orm import joinedload
+    user = db.query(User).options(joinedload(User.player_state)).filter(User.apple_user_id == apple_user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -112,7 +114,9 @@ def get_current_user_optional(
         if not apple_user_id:
             return None
         
-        user = db.query(User).filter(User.apple_user_id == apple_user_id).first()
+        # EAGER LOAD player_state for better performance
+        from sqlalchemy.orm import joinedload
+        user = db.query(User).options(joinedload(User.player_state)).filter(User.apple_user_id == apple_user_id).first()
         if not user or not user.is_active:
             return None
         

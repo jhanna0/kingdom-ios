@@ -32,7 +32,6 @@ ACTION_TYPES = {
         "always_unlocked": True,
         "requirements": None,
         "rewards": {
-            "gold": 5,
             "reputation": 5
         }
     },
@@ -41,7 +40,7 @@ ACTION_TYPES = {
         "icon": "leaf.fill",
         "description": "Work the fields to earn gold",
         "category": "beneficial",
-        "cooldown_minutes": 1,
+        "cooldown_minutes": 10,
         "theme_color": "buttonSuccess",
         "display_order": 30,
         "endpoint": "/actions/farm",
@@ -205,7 +204,10 @@ def get_all_action_types() -> list:
 
 
 # ===== LEGACY CONSTANTS (for backwards compatibility) =====
-# These pull from ACTION_TYPES to maintain compatibility with existing code
+# TODO: Migrate all code to use ACTION_TYPES directly via get_action_config()
+# These module-level constants are fragile - they're evaluated at import time
+# and break if the ACTION_TYPES structure changes.
+# Better approach: Use get_action_config("patrol")["rewards"].get("gold", 0) directly in code
 
 WORK_BASE_COOLDOWN = ACTION_TYPES["work"]["cooldown_minutes"]
 PATROL_COOLDOWN = ACTION_TYPES["patrol"]["cooldown_minutes"]
@@ -229,11 +231,11 @@ PATROL_BONUS = 0.02
 HEIST_REP_LOSS = 500
 HEIST_BAN = True
 
-# Action rewards
-FARM_GOLD_REWARD = ACTION_TYPES["farm"]["rewards"]["gold"]
-SCOUT_GOLD_REWARD = ACTION_TYPES["scout"]["rewards"]["gold"]
-PATROL_GOLD_REWARD = ACTION_TYPES["patrol"]["rewards"]["gold"]
-PATROL_REPUTATION_REWARD = ACTION_TYPES["patrol"]["rewards"]["reputation"]
+# Action rewards (use .get() for safety - rewards structure may vary)
+FARM_GOLD_REWARD = ACTION_TYPES["farm"]["rewards"].get("gold", 0)
+SCOUT_GOLD_REWARD = ACTION_TYPES["scout"]["rewards"].get("gold", 0)
+PATROL_GOLD_REWARD = ACTION_TYPES["patrol"]["rewards"].get("gold", 0)
+PATROL_REPUTATION_REWARD = ACTION_TYPES["patrol"]["rewards"].get("reputation", 0)
 
 # Patrol duration
 PATROL_DURATION_MINUTES = ACTION_TYPES["patrol"]["duration_minutes"]

@@ -27,7 +27,7 @@ def calculate_training_cost(stat_level: int, total_trainings: int = 0) -> int:
     Formula: 100 * (level^1.5) * (1.15^total_trainings)
     """
     base_cost = 100.0 * pow(float(stat_level), 1.5)
-    global_multiplier = pow(1.15, float(total_trainings))
+    global_multiplier = pow(1.5, float(total_trainings))
     return int(base_cost * global_multiplier)
 
 

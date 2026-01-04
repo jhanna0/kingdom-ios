@@ -123,10 +123,9 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     """Get user by ID"""
-    return db.query(User).filter(User.id == user_id).first()
-
-
-
+    # EAGER LOAD player_state to avoid N+1 query problem
+    from sqlalchemy.orm import joinedload
+    return db.query(User).options(joinedload(User.player_state)).filter(User.id == user_id).first()
 
 def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     """Update user profile"""
