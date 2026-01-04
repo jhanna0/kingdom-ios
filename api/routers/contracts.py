@@ -11,6 +11,7 @@ import math
 
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
+from routers.tiers import BUILDING_TYPES as BUILDING_TYPES_DICT
 from config import DEV_MODE
 from schemas.contract import ContractCreate
 
@@ -91,8 +92,8 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
     }
 
 
-# Building types that are kingdom buildings
-BUILDING_TYPES = ["wall", "vault", "mine", "market", "farm", "education", "lumbermill"]
+# Building types that are kingdom buildings (just the keys for validation)
+BUILDING_TYPES = list(BUILDING_TYPES_DICT.keys())
 
 
 @router.get("")
@@ -188,11 +189,14 @@ def create_contract(
     
     # SECURITY: Validate building type is valid
     building_type_lower = building_type.lower()
-    if building_type_lower not in BUILDING_TYPES:
+    if building_type_lower not in BUILDING_TYPES_DICT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid building type: {building_type}. Valid types: {', '.join(BUILDING_TYPES)}"
+            detail=f"Invalid building type: {building_type}. Valid types: {', '.join(BUILDING_TYPES_DICT.keys())}"
         )
+    
+    # Get the proper display name from BUILDING_TYPES (e.g., "Lumbermill" not "lumbermill")
+    building_display_name = BUILDING_TYPES_DICT[building_type_lower]["display_name"]
     
     # SECURITY: Validate building level is in valid range (1-5)
     if building_level < 1 or building_level > 5:
@@ -252,7 +256,7 @@ def create_contract(
         kingdom_id=kingdom_id,
         kingdom_name=kingdom_name,
         category='kingdom_building',
-        type=building_type_lower,
+        type=building_display_name,  # Store the proper display name (e.g., "Lumbermill")
         tier=building_level,
         actions_required=actions_required,
         gold_paid=upfront_cost,  # What ruler paid upfront

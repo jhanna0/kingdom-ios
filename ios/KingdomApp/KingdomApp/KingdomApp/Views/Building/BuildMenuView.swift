@@ -54,6 +54,10 @@ struct BuildMenuView: View {
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .task {
+            // Load contracts when view appears so we can check for active contracts
+            await viewModel.loadContracts()
+        }
         .navigationDestination(item: $selectedBuildingTypeString) { buildingType in
             ContractCreationView(
                 kingdom: kingdom,
@@ -84,7 +88,7 @@ struct BuildMenuView: View {
                 currentLevel: level,
                 maxLevel: metadata.maxLevel,
                 benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
-                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType.capitalized),
+                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: metadata.displayName),
                 hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
                 kingdom: kingdom,
                 upgradeCost: kingdom.upgradeCost(buildingType),

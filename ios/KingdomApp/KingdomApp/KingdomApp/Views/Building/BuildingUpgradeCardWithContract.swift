@@ -124,12 +124,12 @@ struct BuildingUpgradeCardWithContract: View {
                             .font(FontStyles.iconMedium)
                             .foregroundColor(.white)
                             .frame(width: 36, height: 36)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 8)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Contract in Progress")
                                 .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                             Text("Citizens are working on this upgrade")
                                 .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -137,7 +137,12 @@ struct BuildingUpgradeCardWithContract: View {
                         Spacer()
                     }
                     .padding()
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning.opacity(0.12), cornerRadius: 10)
+                    .background(KingdomTheme.Colors.buttonSuccess.opacity(0.08))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(KingdomTheme.Colors.buttonSuccess, lineWidth: 2)
+                    )
                 } else if hasAnyActiveContract {
                     // Blocked by another contract
                     HStack(spacing: 10) {
