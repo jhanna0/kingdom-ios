@@ -17,7 +17,7 @@ def build_contract_updates(db: Session, user: User) -> Dict[str, List[Dict[str, 
     # Ready to complete - contracts user contributed to that are now completed
     ready_contracts_list = []
     for contract in all_contracts:
-        if (contract.status == 'completed' and 
+        if (contract.completed_at is not None and 
             contract.action_contributions and 
             user_id_str in contract.action_contributions):
             
@@ -38,7 +38,7 @@ def build_contract_updates(db: Session, user: User) -> Dict[str, List[Dict[str, 
     # In progress - contracts user is currently contributing to
     in_progress_list = []
     for contract in all_contracts:
-        if (contract.status == 'in_progress' and 
+        if (contract.completed_at is None and 
             contract.action_contributions and 
             user_id_str in contract.action_contributions):
             

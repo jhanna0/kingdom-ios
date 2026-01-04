@@ -81,6 +81,9 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         tier_data = building_data.get("tiers", {}).get(contract.tier, {})
         building_benefit = tier_data.get("benefit")
     
+    # Derive status from completion state (for backwards compatibility with clients)
+    status = "completed" if contract.completed_at else "open"
+    
     return {
         "id": str(contract.id),  # String for consistency with other contract endpoints
         "kingdom_id": contract.kingdom_id,
@@ -102,28 +105,25 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "created_by": contract.user_id,  # The ruler who created it
         "created_at": contract.created_at,
         "completed_at": contract.completed_at,
-        "status": contract.status
+        "status": status  # Computed from completed_at, not stored in DB
     }
 
 
 @router.get("")
 def list_contracts(
     kingdom_id: Optional[str] = None,
-    status_filter: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
-    """List building contracts, optionally filtered by kingdom or status"""
+    """List ACTIVE building contracts (not completed) - always returns only contracts you can work on"""
     query = db.query(UnifiedContract).filter(
-        UnifiedContract.category == 'kingdom_building'
+        UnifiedContract.category == 'kingdom_building',
+        UnifiedContract.completed_at.is_(None)  # ONLY active contracts
     )
     
     if kingdom_id:
         query = query.filter(UnifiedContract.kingdom_id == kingdom_id)
-    
-    if status_filter:
-        query = query.filter(UnifiedContract.status == status_filter)
     
     contracts = query.order_by(UnifiedContract.created_at.desc()).offset(skip).limit(limit).all()
     return [contract_to_response(c, db) for c in contracts]
@@ -140,10 +140,11 @@ def get_my_contracts(
         ContractContribution.user_id == current_user.id
     ).distinct().subquery()
     
+    # Only show active (not completed) contracts
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.id.in_(contributed_contract_ids),
         UnifiedContract.category == 'kingdom_building',
-        UnifiedContract.status.in_(["open", "in_progress"])
+        UnifiedContract.completed_at.is_(None)
     ).all()
     
     return [contract_to_response(c, db) for c in contracts]
@@ -231,11 +232,11 @@ def create_contract(
             detail=f"{building_type.capitalize()} is currently level {current_level}. Cannot upgrade to level {building_level}. Must upgrade to level {current_level + 1} first."
         )
     
-    # Check if kingdom already has an active contract
+    # Check if kingdom already has an active (not completed) contract
     existing_contract = db.query(UnifiedContract).filter(
         UnifiedContract.kingdom_id == kingdom_id,
         UnifiedContract.category == 'kingdom_building',
-        UnifiedContract.status.in_(["open", "in_progress"])
+        UnifiedContract.completed_at.is_(None)
     ).first()
     
     if existing_contract:
@@ -272,8 +273,7 @@ def create_contract(
         actions_required=actions_required,
         gold_paid=upfront_cost,  # What ruler paid upfront
         reward_pool=upfront_cost,  # Same as gold_paid - this is what workers draw from
-        action_reward=action_reward,  # Gold per action
-        status="open"
+        action_reward=action_reward  # Gold per action
     )
     
     db.add(contract)
@@ -301,13 +301,14 @@ def complete_contract(
             detail="Contract not found"
         )
     
-    if contract.status == "completed":
+    # Check if already completed using completed_at timestamp
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contract is already completed"
         )
     
-    # Count actions completed
+    # Count actions completed from ContractContribution table
     actions_completed = db.query(func.count(ContractContribution.id)).filter(
         ContractContribution.contract_id == contract.id
     ).scalar()
@@ -318,7 +319,7 @@ def complete_contract(
             detail=f"Contract not complete. {actions_completed}/{contract.actions_required} actions done."
         )
     
-    contract.status = "completed"
+    # Mark as completed
     contract.completed_at = datetime.utcnow()
     
     # Upgrade the building
@@ -354,7 +355,7 @@ def cancel_contract(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Cancel a contract (ruler only)"""
+    """Cancel a contract (ruler only) - DELETES the contract"""
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
         UnifiedContract.category == 'kingdom_building'
@@ -372,13 +373,18 @@ def cancel_contract(
             detail="Only the creator can cancel this contract"
         )
     
-    if contract.status == "completed":
+    # Check if already completed
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot cancel completed contract"
         )
     
-    contract.status = "cancelled"
+    # Delete the contract and all contributions
+    db.query(ContractContribution).filter(
+        ContractContribution.contract_id == contract.id
+    ).delete()
+    db.delete(contract)
     db.commit()
     
     return {"success": True, "message": "Contract cancelled"}

@@ -142,7 +142,7 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,
-            "status": contract.status,
+            "status": "completed" if contract.completed_at else "in_progress",
             "started_at": contract.created_at.isoformat() if contract.created_at else None,
             "completed_at": contract.completed_at.isoformat() if contract.completed_at else None
         })
@@ -314,7 +314,7 @@ def purchase_land(
         UnifiedContract.type == 'property',
         UnifiedContract.tier == 1,  # tier 1 = new construction
         UnifiedContract.kingdom_id == request.kingdom_id,
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).first()
     
     if pending_construction:
@@ -327,7 +327,7 @@ def purchase_land(
     active_contract = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == current_user.id,
         UnifiedContract.type == 'property',
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).first()
     
     if active_contract:
@@ -437,7 +437,7 @@ def start_property_upgrade(
     active_contract = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == current_user.id,
         UnifiedContract.type == 'property',
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).first()
     
     if active_contract:
@@ -555,7 +555,7 @@ def get_property_upgrade_status(
         UnifiedContract.user_id == current_user.id,
         UnifiedContract.type == 'property',
         UnifiedContract.target_id.contains(property_id),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).first()
     
     if contract:
@@ -569,7 +569,7 @@ def get_property_upgrade_status(
             "to_tier": contract.tier,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "status": contract.status
+            "status": "completed" if contract.completed_at else "in_progress"
         }
     
     upgrade_cost = calculate_upgrade_cost(property.tier) if property.tier < 5 else 0

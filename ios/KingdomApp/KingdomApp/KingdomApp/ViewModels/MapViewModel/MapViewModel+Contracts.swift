@@ -62,16 +62,13 @@ extension MapViewModel {
     func loadContracts() async {
         do {
             print("🔄 Loading contracts from API...")
-            // Load both open AND in_progress contracts so users can see their active work
-            let openContracts = try await contractAPI.listContracts(kingdomId: nil, status: "open")
-            print("   📋 Open contracts: \(openContracts.count)")
-            let inProgressContracts = try await contractAPI.listContracts(kingdomId: nil, status: "in_progress")
-            print("   📋 In-progress contracts: \(inProgressContracts.count)")
-            let allContracts = openContracts + inProgressContracts
+            // Backend returns ONLY active contracts (not completed)
+            let apiContracts = try await contractAPI.listContracts(kingdomId: nil)
+            print("   📋 Active contracts: \(apiContracts.count)")
             
             await MainActor.run {
                 // Convert APIContract to local Contract model
-                self.availableContracts = allContracts.compactMap { apiContract in
+                self.availableContracts = apiContracts.compactMap { apiContract in
                     Contract(
                         id: apiContract.id,
                         kingdomId: apiContract.kingdom_id,
@@ -96,7 +93,7 @@ extension MapViewModel {
                         status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
                     )
                 }
-                print("✅ Loaded \(self.availableContracts.count) contracts from API (open: \(openContracts.count), in_progress: \(inProgressContracts.count))")
+                print("✅ Loaded \(self.availableContracts.count) active contracts from API")
             }
         } catch {
             print("❌ Failed to load contracts: \(error)")

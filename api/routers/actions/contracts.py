@@ -65,7 +65,8 @@ def work_on_contract(
             detail="Contract not found"
         )
     
-    if contract.status == "completed":
+    # Check if already completed using completed_at timestamp
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contract is already completed"
@@ -120,7 +121,7 @@ def work_on_contract(
     is_complete = new_actions_completed >= contract.actions_required
     
     if is_complete:
-        contract.status = "completed"
+        # Mark as completed
         contract.completed_at = datetime.utcnow()
         
         # Upgrade the building
@@ -146,7 +147,7 @@ def work_on_contract(
     if is_complete:
         message = f"{building_name} construction complete!"
     else:
-        message = f"You helped build the {building_name}. Progress: {progress_percent}%"
+        message = f"You helped build the {building_name}!"
     
     return {
         "success": True,
@@ -213,7 +214,8 @@ def work_on_property_upgrade(
             detail="Property upgrade contract not found"
         )
     
-    if contract.status == "completed":
+    # Check if already completed using completed_at timestamp
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contract is already completed"
@@ -245,7 +247,7 @@ def work_on_property_upgrade(
     is_complete = new_actions_completed >= contract.actions_required
     
     if is_complete:
-        contract.status = "completed"
+        # Mark as completed
         contract.completed_at = datetime.utcnow()
         
         # tier=1 means new construction, tier>1 means upgrade

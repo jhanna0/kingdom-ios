@@ -36,7 +36,7 @@ def get_training_contracts_for_status(db: Session, user_id: int) -> list:
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type.in_(TRAINING_TYPES),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).all()
     
     result = []
@@ -53,7 +53,7 @@ def get_training_contracts_for_status(db: Session, user_id: int) -> list:
             "actions_completed": actions_completed,
             "cost_paid": contract.gold_paid,
             "created_at": contract.created_at.isoformat() if contract.created_at else None,
-            "status": contract.status
+            "status": "completed" if contract.completed_at else "in_progress"
         })
     
     return result
@@ -64,7 +64,7 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type.in_(CRAFTING_TYPES),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).all()
     
     result = []
@@ -83,7 +83,7 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
             "iron_paid": contract.iron_paid,
             "steel_paid": contract.steel_paid,
             "created_at": contract.created_at.isoformat() if contract.created_at else None,
-            "status": contract.status
+            "status": "completed" if contract.completed_at else "in_progress"
         })
     
     return result
@@ -94,7 +94,7 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property',
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).all()
     
     result = []
@@ -118,7 +118,7 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,
-            "status": contract.status,
+            "status": "completed" if contract.completed_at else "in_progress",
             "started_at": contract.created_at.isoformat() if contract.created_at else None
         })
     
@@ -174,7 +174,7 @@ def get_action_status(
         contracts_query = db.query(UnifiedContract).filter(
             UnifiedContract.kingdom_id == state.current_kingdom_id,
             UnifiedContract.category == 'kingdom_building',  # Only building contracts
-            UnifiedContract.status.in_(["open", "in_progress"])
+            UnifiedContract.completed_at.is_(None)  # Active contracts only
         ).all()
         contracts = [contract_to_response(c, db) for c in contracts_query]
     
@@ -384,7 +384,7 @@ def get_action_status(
         active_contract = db.query(UnifiedContract).filter(
             UnifiedContract.kingdom_id == state.current_kingdom_id,
             UnifiedContract.category == 'kingdom_building',
-            UnifiedContract.status.in_(["open", "in_progress"])
+            UnifiedContract.completed_at.is_(None)  # Active contracts only
         ).first()
         if active_contract:
             sabotage_endpoint = f"/actions/sabotage/{active_contract.id}"

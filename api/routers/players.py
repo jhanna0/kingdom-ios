@@ -45,11 +45,11 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
     # Training types
     training_types = ["attack", "defense", "leadership", "building", "intelligence"]
     
-    # Check training contracts from unified_contracts table
+    # Check training contracts from unified_contracts table (active = not completed)
     active_training = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == state.user_id,
         UnifiedContract.type.in_(training_types),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)
     ).first()
     
     if active_training:
@@ -63,12 +63,12 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
             tier=active_training.tier
         )
     
-    # Check crafting contracts from unified_contracts table
+    # Check crafting contracts from unified_contracts table (active = not completed)
     crafting_types = ["weapon", "armor"]
     active_crafting = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == state.user_id,
         UnifiedContract.type.in_(crafting_types),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)
     ).first()
     
     if active_crafting:

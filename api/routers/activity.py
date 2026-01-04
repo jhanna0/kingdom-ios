@@ -45,7 +45,7 @@ def _get_contract_activities(db: Session, user_id: int, limit: int = 50) -> List
                     "building_type": contract.building_type,
                     "building_level": contract.building_level,
                     "actions_contributed": contributions,
-                    "status": contract.status
+                    "status": "completed" if contract.completed_at else "open"
                 },
                 created_at=contract.work_started_at or contract.created_at
             ))

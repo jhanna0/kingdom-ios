@@ -478,11 +478,11 @@ def sabotage_contract(
             detail="Contract must be in the kingdom you're checked into"
         )
     
-    # Verify this is an active contract
-    if contract.status not in ["open", "in_progress"]:
+    # Verify this is an active contract (not completed)
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Contract is {contract.status}, not active"
+            detail=f"Contract is already completed"
         )
     
     # Check if this is an opposing kingdom (not their hometown)

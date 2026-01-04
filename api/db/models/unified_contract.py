@@ -43,9 +43,6 @@ class UnifiedContract(Base):
     reward_pool = Column(Integer, default=0)
     action_reward = Column(Integer, default=0)  # Gold per action (ruler-set for kingdom contracts)
     
-    # Status: 'open', 'in_progress', 'completed', 'cancelled'
-    status = Column(String(16), nullable=False, default='in_progress', index=True)
-    
     # Metadata
     kingdom_name = Column(String(256), nullable=True)  # Denormalized for display
     
@@ -56,11 +53,11 @@ class UnifiedContract(Base):
     # Relationships
     contributions = relationship("ContractContribution", back_populates="contract", cascade="all, delete-orphan")
     
-    # Indexes
+    # Indexes for queries filtering on completion
     __table_args__ = (
-        Index('idx_unified_contracts_user_status', 'user_id', 'status'),
-        Index('idx_unified_contracts_kingdom_status', 'kingdom_id', 'status'),
-        Index('idx_unified_contracts_type_status', 'type', 'status'),
+        Index('idx_unified_contracts_user_completed', 'user_id', 'completed_at'),
+        Index('idx_unified_contracts_kingdom_completed', 'kingdom_id', 'completed_at'),
+        Index('idx_unified_contracts_category_completed', 'category', 'completed_at'),
     )
     
     @property
@@ -81,7 +78,8 @@ class UnifiedContract(Base):
         return min(100, int((self.actions_completed / self.actions_required) * 100))
     
     def __repr__(self):
-        return f"<UnifiedContract(id={self.id}, type='{self.type}', status='{self.status}')>"
+        status = "completed" if self.completed_at else "active"
+        return f"<UnifiedContract(id={self.id}, type='{self.type}', {status})>"
 
 
 class ContractContribution(Base):

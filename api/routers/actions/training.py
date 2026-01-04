@@ -152,7 +152,7 @@ def get_training_contracts(
             "type": contract.type,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "status": contract.status,
+            "status": "completed" if contract.completed_at else "in_progress",
             "gold_paid": contract.gold_paid,
             "created_at": contract.created_at.isoformat() if contract.created_at else None,
             "completed_at": contract.completed_at.isoformat() if contract.completed_at else None,
@@ -187,7 +187,7 @@ def purchase_training(
     active_contract = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == current_user.id,
         UnifiedContract.type.in_(TRAINING_TYPES),
-        UnifiedContract.status == 'in_progress'
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).first()
     
     if active_contract:
@@ -294,7 +294,7 @@ def work_on_training(
             detail="Training contract not found"
         )
     
-    if contract.status == "completed":
+    if contract.completed_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Training contract already completed"
@@ -333,7 +333,6 @@ def work_on_training(
     new_value = None
     
     if is_complete:
-        contract.status = "completed"
         contract.completed_at = datetime.utcnow()
         
         # Increment the stat
