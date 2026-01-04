@@ -292,7 +292,7 @@ def work_on_property_upgrade(
             message = f"Property upgraded to Tier {contract.tier}! Your land grows stronger!"
     else:
         action_word = "constructing" if (contract.tier == 1 and "|" in (contract.target_id or "")) else "upgrading"
-        message = f"You worked on {action_word} your property. Progress: {progress_percent}%"
+        message = f"You worked on {action_word} your property!"
     
     return {
         "success": True,

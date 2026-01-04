@@ -213,7 +213,6 @@ def purchase_craft(
         gold_paid=gold_cost,
         iron_paid=iron_required,
         steel_paid=steel_required,
-        status='in_progress',
         kingdom_id=state.current_kingdom_id
     )
     db.add(contract)

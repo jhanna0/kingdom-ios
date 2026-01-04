@@ -309,7 +309,19 @@ struct PropertyDetailView: View {
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.15), cornerRadius: 8)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .opacity
@@ -336,7 +348,19 @@ struct PropertyDetailView: View {
                     }
                 }
                 .padding()
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.15), cornerRadius: 8)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
                     removal: .scale.combined(with: .opacity)
@@ -406,7 +430,19 @@ struct PropertyDetailView: View {
             }
         }
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
     }
     
     private var nextTierName: String {

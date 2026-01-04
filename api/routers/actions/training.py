@@ -224,7 +224,6 @@ def purchase_training(
         type=training_type,
         actions_required=actions_required,
         gold_paid=training_cost,
-        status='in_progress',
         kingdom_id=state.current_kingdom_id
     )
     db.add(contract)
@@ -358,7 +357,7 @@ def work_on_training(
     if is_complete:
         message = f"Training complete! {stat_name} increased to {new_value}"
     else:
-        message = f"Training session complete. Progress: {progress_percent}%"
+        message = f"You begin training!"
     
     return {
         "success": True,

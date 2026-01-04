@@ -374,8 +374,7 @@ def purchase_land(
         tier=1,  # Building to tier 1
         target_id=property_id,  # Store future property ID
         actions_required=actions_required,
-        gold_paid=land_price,
-        status='in_progress'
+        gold_paid=land_price
     )
     db.add(contract)
     
@@ -477,8 +476,7 @@ def start_property_upgrade(
         target_id=property_id,
         actions_required=actions_required,
         gold_paid=upgrade_cost,
-        wood_paid=wood_required,
-        status='in_progress'
+        wood_paid=wood_required
     )
     db.add(contract)
     
