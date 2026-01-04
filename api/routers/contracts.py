@@ -12,6 +12,7 @@ import math
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
+from schemas.contract import ContractCreate
 
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
@@ -69,7 +70,7 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         action_contributions = {str(user_id): count for user_id, count in contrib_counts}
     
     return {
-        "id": str(contract.id),
+        "id": str(contract.id),  # String for consistency with other contract endpoints
         "kingdom_id": contract.kingdom_id,
         "kingdom_name": contract.kingdom_name,
         "building_type": contract.type,
@@ -155,17 +156,20 @@ def get_contract(contract_id: int, db: Session = Depends(get_db)):
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_contract(
-    kingdom_id: str,
-    kingdom_name: str,
-    building_type: str,
-    building_level: int,
-    base_population: int,
-    reward_pool: int = 0,
-    total_actions_required: Optional[int] = None,
+    request: ContractCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new building contract (ruler only)"""
+    # Extract fields from request
+    kingdom_id = request.kingdom_id
+    kingdom_name = request.kingdom_name
+    building_type = request.building_type
+    building_level = request.building_level
+    base_population = request.base_population
+    reward_pool = request.reward_pool
+    total_actions_required = request.total_actions_required
+    
     # Verify user is the ruler
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -179,6 +183,36 @@ def create_contract(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the ruler can create contracts"
+        )
+    
+    # SECURITY: Validate building type is valid
+    building_type_lower = building_type.lower()
+    if building_type_lower not in BUILDING_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid building type: {building_type}. Valid types: {', '.join(BUILDING_TYPES)}"
+        )
+    
+    # SECURITY: Validate building level is in valid range (1-5)
+    if building_level < 1 or building_level > 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid building level: {building_level}. Must be between 1 and 5"
+        )
+    
+    # SECURITY: Check that kingdom's current building level is exactly building_level - 1
+    # Can't skip tiers (e.g., can't upgrade from 0 to 2, must go 0→1→2)
+    current_level = getattr(kingdom, f"{building_type_lower}_level", None)
+    if current_level is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Building type {building_type} not found on kingdom"
+        )
+    
+    if current_level != building_level - 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{building_type.capitalize()} is currently level {current_level}. Cannot upgrade to level {building_level}. Must upgrade to level {current_level + 1} first."
         )
     
     # Check if kingdom already has an active contract
@@ -209,13 +243,13 @@ def create_contract(
     if total_actions_required:
         actions_required = total_actions_required
     else:
-        actions_required = calculate_actions_required(building_type, building_level, base_population)
+        actions_required = calculate_actions_required(building_type_lower, building_level, base_population)
     
     contract = UnifiedContract(
         user_id=current_user.id,  # The ruler who created it
         kingdom_id=kingdom_id,
         kingdom_name=kingdom_name,
-        type=building_type.lower(),
+        type=building_type_lower,
         tier=building_level,
         actions_required=actions_required,
         gold_paid=construction_cost,

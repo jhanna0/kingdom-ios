@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Contract Models
 
 struct APIContract: Codable {
-    let id: Int
+    let id: String  // String to match all other contract endpoints
     let kingdom_id: String
     let kingdom_name: String
     let building_type: String

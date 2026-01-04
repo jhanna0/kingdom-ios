@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Sabotage Target
 
 struct SabotageTarget: Codable, Identifiable {
-    let contractId: Int
+    let contractId: String
     let buildingType: String
     let buildingLevel: Int
     let progress: String
@@ -11,7 +11,7 @@ struct SabotageTarget: Codable, Identifiable {
     let createdAt: String?
     let potentialDelay: Int
     
-    var id: Int { contractId }
+    var id: String { contractId }
     
     enum CodingKeys: String, CodingKey {
         case contractId = "contract_id"

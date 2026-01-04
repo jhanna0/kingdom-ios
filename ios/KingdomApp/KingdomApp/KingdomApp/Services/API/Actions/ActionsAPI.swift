@@ -23,7 +23,7 @@ class ActionsAPI {
     
     // MARK: - Contracts (Work)
     
-    func workOnContract(contractId: Int) async throws -> WorkActionResponse {
+    func workOnContract(contractId: String) async throws -> WorkActionResponse {
         let request = client.request(endpoint: "/actions/work/\(contractId)", method: "POST")
         return try await client.execute(request)
     }
@@ -102,7 +102,7 @@ class ActionsAPI {
     
     // MARK: - Sabotage
     
-    func sabotageContract(contractId: Int) async throws -> SabotageActionResponse {
+    func sabotageContract(contractId: String) async throws -> SabotageActionResponse {
         let request = client.request(endpoint: "/actions/sabotage/\(contractId)", method: "POST")
         return try await client.execute(request)
     }

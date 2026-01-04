@@ -7,7 +7,7 @@ from sqlalchemy import func
 from datetime import datetime
 import json
 
-from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution
+from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling
@@ -131,6 +131,9 @@ def get_action_status(
     db: Session = Depends(get_db)
 ):
     """Get cooldown status for all actions AND available contracts in current kingdom"""
+    # Import here to avoid circular imports
+    from routers.contracts import contract_to_response, BUILDING_TYPES
+    
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -163,15 +166,16 @@ def get_action_status(
             ActionCooldown.expires_at > datetime.utcnow()
         ).count()
     
-    # Get contracts for current kingdom
+    # Get contracts for current kingdom (from UnifiedContract table)
     contracts = []
     if state.current_kingdom_id:
-        from routers.contracts import contract_to_response
-        contracts_query = db.query(Contract).filter(
-            Contract.kingdom_id == state.current_kingdom_id,
-            Contract.status.in_(["open", "in_progress"])
+        # Query UnifiedContract table (not old Contract table!)
+        contracts_query = db.query(UnifiedContract).filter(
+            UnifiedContract.kingdom_id == state.current_kingdom_id,
+            UnifiedContract.type.in_(BUILDING_TYPES),  # Only building contracts
+            UnifiedContract.status.in_(["open", "in_progress"])
         ).all()
-        contracts = [contract_to_response(c) for c in contracts_query]
+        contracts = [contract_to_response(c, db) for c in contracts_query]
     
     # Check global action cooldown (ONE ACTION AT A TIME!)
     global_cooldown = check_global_action_cooldown_from_table(
@@ -269,7 +273,6 @@ def get_action_status(
     }
     
     # Chop Wood - Available if kingdom has lumbermill
-    from db import Kingdom
     kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
     lumbermill_level = kingdom.lumbermill_level if kingdom and hasattr(kingdom, 'lumbermill_level') else 0
     
@@ -376,10 +379,10 @@ def get_action_status(
     # For sabotage, get the active contract in current kingdom (if any)
     sabotage_endpoint = None
     if state.current_kingdom_id:
-        from db.models.unified_contract import UnifiedContract
+        # UnifiedContract already imported at top of file
         active_contract = db.query(UnifiedContract).filter(
             UnifiedContract.kingdom_id == state.current_kingdom_id,
-            UnifiedContract.type.in_(["wall", "vault", "mine", "market", "farm", "education"]),
+            UnifiedContract.type.in_(BUILDING_TYPES),  # Use the constant from contracts.py
             UnifiedContract.status.in_(["open", "in_progress"])
         ).first()
         if active_contract:

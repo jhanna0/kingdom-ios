@@ -530,7 +530,7 @@ extension ActionsView {
         isLoading = false
     }
     
-    private func performWork(contractId: Int) {
+    private func performWork(contractId: String) {
         Task {
             do {
                 let previousGold = viewModel.player.gold

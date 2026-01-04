@@ -47,144 +47,219 @@ struct ContractCreationView: View {
                 .ignoresSafeArea()
             
             ScrollView {
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.large) {
-                    // Header
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
+                    // Header - Bold title
                     VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                        Text("Create Contract")
-                            .font(KingdomTheme.Typography.title2())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.badge.plus")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.royalPurple)
+                            
+                            Text("Create Contract")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                         
                         Text("Post a contract for workers to complete")
-                            .font(KingdomTheme.Typography.body())
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
-                    .padding(.horizontal)
+                    .padding()
                     
-                    // Building info
+                    // Building info - Brutalist card
                     VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Building")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
                         HStack {
-                            Text("\(buildingName) → Level \(nextLevel)")
-                                .font(KingdomTheme.Typography.title3())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("BUILDING")
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                                .tracking(1)
                             
                             Spacer()
+                            
+                            // Level badge
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("LVL \(nextLevel)")
+                                    .font(.system(size: 12, weight: .black, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.royalPurple,
+                                cornerRadius: 6,
+                                shadowOffset: 2,
+                                borderWidth: 2
+                            )
                         }
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: "hammer.fill")
-                                .font(.caption)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(actionsRequired) actions required")
-                                .font(KingdomTheme.Typography.body())
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                        
-                        Text("Actions scale with population (\(kingdom.checkedInPlayers) in city)")
-                            .font(KingdomTheme.Typography.caption())
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                    }
-                    .padding()
-                    .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    .padding(.horizontal)
-                    
-                    // Cost summary
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-                        Text("Construction Cost")
-                            .font(KingdomTheme.Typography.headline())
+                        Text(buildingName)
+                            .font(.system(size: 24, weight: .black, design: .rounded))
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("From Treasury")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        // Actions required badge
+                        HStack(spacing: 8) {
+                            Image(systemName: "hammer.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            
+                            Text("\(actionsRequired) ACTIONS REQUIRED")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
+                        
+                        // Population info
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.3.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                            
+                            Text("Scales with \(kingdom.checkedInPlayers) citizens")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                        }
+                    }
+                    .padding(KingdomTheme.Spacing.large)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    .padding(.horizontal)
+                    
+                    // Cost summary - Brutalist card with gold accent
+                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                        Text("CONSTRUCTION COST")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                            .tracking(1)
+                        
+                        HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                            // Cost
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("COST")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                                    .tracking(0.5)
                                 
                                 HStack(spacing: 6) {
-                                    Image(systemName: "hammer.fill")
+                                    Image(systemName: "hammer.circle.fill")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.imperialGold)
+                                    
+                                    Text("\(constructionCost)")
+                                        .font(.system(size: 32, weight: .black, design: .rounded))
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                    
+                                    Text("g")
+                                        .font(.system(size: 20, weight: .bold, design: .rounded))
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    Text("\(constructionCost)g")
-                                        .font(KingdomTheme.Typography.title2())
-                                        .fontWeight(.bold)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        .offset(y: 4)
                                 }
                             }
                             
                             Spacer()
                             
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("Treasury")
-                                    .font(KingdomTheme.Typography.caption())
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            // Treasury status
+                            VStack(alignment: .trailing, spacing: 6) {
+                                Text("TREASURY")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                                    .tracking(0.5)
                                 
-                                HStack(spacing: 4) {
-                                    Image(systemName: "building.columns.fill")
-                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkMedium : .red)
-                                    Text("\(kingdom.treasuryGold)g")
-                                        .font(KingdomTheme.Typography.title3())
-                                        .fontWeight(.semibold)
+                                HStack(spacing: 6) {
+                                    Text("\(kingdom.treasuryGold)")
+                                        .font(.system(size: 28, weight: .black, design: .rounded))
                                         .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkDark : .red)
+                                    
+                                    Text("g")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkMedium : .red)
+                                        .offset(y: 2)
+                                    
+                                    Image(systemName: "building.columns.fill")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.imperialGold : .red)
                                 }
                             }
                         }
                         
+                        // Insufficient funds warning
                         if constructionCost > kingdom.treasuryGold {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(.red)
-                                Text("Insufficient treasury funds")
-                                    .font(KingdomTheme.Typography.caption())
+                                
+                                Text("INSUFFICIENT FUNDS")
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
                                     .foregroundColor(.red)
+                                    .tracking(0.5)
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .brutalistBadge(
+                                backgroundColor: Color.red.opacity(0.1),
+                                cornerRadius: 8,
+                                shadowOffset: 2,
+                                borderWidth: 2
+                            )
                         }
                     }
-                    .padding()
-                    .parchmentCard()
+                    .padding(KingdomTheme.Spacing.large)
+                    .brutalistCard(
+                        backgroundColor: constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.parchmentHighlight : KingdomTheme.Colors.parchmentMuted
+                    )
                     .padding(.horizontal)
                     
-                    // How it works
-                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                        Text("How Contracts Work")
-                            .font(KingdomTheme.Typography.headline())
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    // How it works - Brutalist info box
+                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                        Text("HOW IT WORKS")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                            .tracking(1)
                         
-                        BenefitRow(icon: "doc.text.fill", text: "Workers contribute actions to complete")
-                        BenefitRow(icon: "person.2.fill", text: "More workers = faster completion")
-                        BenefitRow(icon: "crown.fill", text: "Workers earn rewards per action")
-                        BenefitRow(icon: "building.2.fill", text: "Building upgrades when all actions complete")
+                        VStack(spacing: KingdomTheme.Spacing.small) {
+                            BrutalistBenefitRow(icon: "doc.text.fill", text: "Workers contribute actions", color: KingdomTheme.Colors.buttonPrimary)
+                            BrutalistBenefitRow(icon: "person.2.fill", text: "More workers = faster build", color: KingdomTheme.Colors.buttonSuccess)
+                            BrutalistBenefitRow(icon: "crown.fill", text: "Workers earn rewards", color: KingdomTheme.Colors.imperialGold)
+                            BrutalistBenefitRow(icon: "building.2.fill", text: "Building upgrades on complete", color: KingdomTheme.Colors.royalPurple)
+                        }
                     }
-                    .padding()
-                    .parchmentCard(backgroundColor: KingdomTheme.Colors.parchmentRich)
+                    .padding(KingdomTheme.Spacing.large)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentDark)
                     .padding(.horizontal)
                     
-                    // Create button
+                    // Create button - Big brutalist button
                     Button(action: createContract) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             if isCreating {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                Text("Posting...")
-                                    .fontWeight(.medium)
+                                    .scaleEffect(1.2)
+                                
+                                Text("POSTING...")
+                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .tracking(1)
                             } else {
                                 Image(systemName: "doc.badge.plus")
-                                Text("Post Contract")
-                                    .fontWeight(.medium)
+                                    .font(.system(size: 22, weight: .bold))
+                                
+                                Text("POST CONTRACT")
+                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .tracking(1)
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.buttonWarning : Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(KingdomTheme.CornerRadius.medium)
                     }
+                    .buttonStyle(
+                        .brutalist(
+                            backgroundColor: constructionCost <= kingdom.treasuryGold ? KingdomTheme.Colors.royalPurple : KingdomTheme.Colors.disabled,
+                            foregroundColor: .white,
+                            fullWidth: true
+                        )
+                    )
                     .disabled(constructionCost > kingdom.treasuryGold || isCreating)
                     .padding(.horizontal)
                     .padding(.bottom, KingdomTheme.Spacing.xLarge)
                 }
-                .padding(.top)
+                .padding(.top, KingdomTheme.Spacing.medium)
             }
         }
         .navigationTitle("Create Contract")
@@ -228,5 +303,40 @@ struct ContractCreationView: View {
             }
         }
     }
+}
+
+// MARK: - Brutalist Benefit Row Component
+struct BrutalistBenefitRow: View {
+    let icon: String
+    let text: String
+    let color: Color
     
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon badge
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(
+                    ZStack {
+                        Circle()
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        Circle()
+                            .fill(color)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
+            
+            Text(text)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Spacer()
+        }
     }
+}
