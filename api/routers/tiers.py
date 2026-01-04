@@ -1,6 +1,6 @@
 """
 UNIFIED TIER SYSTEM - Single Source of Truth for ALL game tier descriptions
-Handles: Properties, Skills, Buildings, Crafting, Training
+Handles: Properties, Skills, Buildings, Crafting, Training, Actions
 NO MORE HARDCODING DESCRIPTIONS IN FRONTEND!
 """
 from fastapi import APIRouter
@@ -412,6 +412,8 @@ def get_all_tiers():
     Get ALL tier information for the entire game
     Single source of truth - NO MORE HARDCODING IN FRONTEND!
     """
+    from .actions.action_config import ACTION_TYPES
+    
     return {
         "properties": {
             "max_tier": 5,
@@ -437,6 +439,10 @@ def get_all_tiers():
         "reputation": {
             "max_tier": 6,
             "tiers": {str(k): v for k, v in REPUTATION_TIERS.items()}
+        },
+        "actions": {
+            "types": ACTION_TYPES,
+            "categories": ["beneficial", "hostile", "training", "crafting", "property"]
         }
     }
 
@@ -615,5 +621,45 @@ def get_skill_benefits(skill_name: str):
         "skill": skill_name,
         "max_tier": 5,
         "tiers": tiers
+    }
+
+
+@router.get("/actions")
+def get_all_actions():
+    """
+    Get ALL action configurations including cooldowns, icons, descriptions
+    Single source of truth for action metadata - NO MORE HARDCODING!
+    """
+    from .actions.action_config import ACTION_TYPES, get_actions_by_category
+    
+    return {
+        "actions": ACTION_TYPES,
+        "categories": {
+            "beneficial": get_actions_by_category("beneficial"),
+            "hostile": get_actions_by_category("hostile"),
+            "training": get_actions_by_category("training"),
+            "crafting": get_actions_by_category("crafting"),
+            "property": get_actions_by_category("property")
+        },
+        "notes": {
+            "cooldowns": "All cooldown_minutes values are in minutes",
+            "endpoints": "Use the endpoint field for API calls (may include path params like {contract_id})",
+            "requirements": "Check requirements field for unlock conditions"
+        }
+    }
+
+
+@router.get("/actions/{action_type}")
+def get_action_config_endpoint(action_type: str):
+    """Get configuration for a specific action type"""
+    from .actions.action_config import get_action_config
+    
+    config = get_action_config(action_type)
+    if not config:
+        return {"error": f"Unknown action type: {action_type}"}
+    
+    return {
+        "action_type": action_type,
+        **config
     }
 

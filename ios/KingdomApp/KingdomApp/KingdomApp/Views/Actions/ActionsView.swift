@@ -432,6 +432,9 @@ struct ActionsView: View {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: action.title ?? "Action")
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
@@ -548,6 +551,9 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Work")
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
@@ -589,6 +595,9 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Patrol")
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
@@ -629,6 +638,9 @@ extension ActionsView {
                 await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
+                
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Farming")
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -676,6 +688,9 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Training")
+                
                 await MainActor.run {
                     if let rewards = response.rewards {
                         currentReward = Reward(
@@ -713,6 +728,9 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Property Upgrade")
+                
                 await MainActor.run {
                     currentReward = Reward(
                         goldReward: 0,
@@ -736,6 +754,25 @@ extension ActionsView {
                     showError = true
                 }
             }
+        }
+    }
+    
+    // MARK: - Centralized Notification Helper
+    
+    /// Schedule notification for action cooldown completion
+    /// Reads the current global cooldown and schedules a local notification
+    private func scheduleNotificationForCooldown(actionName: String) async {
+        guard let status = actionStatus else { return }
+        
+        // Get cooldown seconds from global cooldown
+        let cooldownSeconds = status.globalCooldown.secondsRemaining ?? 0
+        
+        // Schedule notification if there's a cooldown
+        if cooldownSeconds > 0 {
+            await NotificationManager.shared.scheduleActionCooldownNotification(
+                actionName: actionName,
+                cooldownSeconds: cooldownSeconds
+            )
         }
     }
     

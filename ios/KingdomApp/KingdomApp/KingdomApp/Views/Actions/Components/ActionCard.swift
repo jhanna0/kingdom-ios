@@ -68,6 +68,11 @@ struct ActionCard: View {
                         
                         Spacer()
                         
+                        // Cooldown time with hourglass
+                        if let cooldownMinutes = status.cooldownMinutes {
+                            cooldownBadge(minutes: cooldownMinutes)
+                        }
+                        
                         // Show expected rewards inline
                         if let reward = status.expectedReward {
                             expectedRewardViewInline(reward: reward)
@@ -78,8 +83,6 @@ struct ActionCard: View {
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-                
-                Spacer()
             }
             
             if globalCooldownActive {
@@ -137,26 +140,77 @@ struct ActionCard: View {
     }
     
     @ViewBuilder
+    private func cooldownBadge(minutes: Double) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "hourglass")
+                .font(FontStyles.iconMini)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            if minutes >= 60 {
+                let hours = minutes / 60
+                if hours >= 24 {
+                    let days = hours / 24
+                    Text(String(format: "%.0fd", days))
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                } else {
+                    Text(String(format: "%.0fh", hours))
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+            } else {
+                Text("\(Int(minutes))m")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
+    }
+    
+    @ViewBuilder
     private func expectedRewardViewInline(reward: ExpectedReward) -> some View {
         HStack(spacing: 6) {
             if let gold = reward.gold {
                 HStack(spacing: 4) {
+                    Image(systemName: "g.circle.fill")
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(KingdomTheme.Colors.goldLight)
                     Text("\(gold)")
                         .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    Image(systemName: "g.circle.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 6,
+                    shadowOffset: 1,
+                    borderWidth: 1.5
+                )
             } else if let goldGross = reward.goldGross {
                 HStack(spacing: 4) {
-                    Text("\(goldGross)")
-                        .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Image(systemName: "g.circle.fill")
                         .font(FontStyles.iconMini)
                         .foregroundColor(KingdomTheme.Colors.goldLight)
+                    Text("\(goldGross)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 6,
+                    shadowOffset: 1,
+                    borderWidth: 1.5
+                )
             }
             
             if let reputation = reward.reputation {
@@ -166,8 +220,16 @@ struct ActionCard: View {
                         .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                     Text("\(reputation)")
                         .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 6,
+                    shadowOffset: 1,
+                    borderWidth: 1.5
+                )
             }
             
             if let experience = reward.experience {
@@ -177,8 +239,16 @@ struct ActionCard: View {
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                     Text("\(experience)")
                         .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchment,
+                    cornerRadius: 6,
+                    shadowOffset: 1,
+                    borderWidth: 1.5
+                )
             }
         }
     }

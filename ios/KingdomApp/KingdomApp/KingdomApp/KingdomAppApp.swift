@@ -61,6 +61,11 @@ struct KingdomAppApp: App {
             .onAppear {
                 // Start background music when app launches
                 musicService.playBackgroundMusic(filename: "ambient_background_full.mp3", volume: 0.25)
+                
+                // Request notification permission for action cooldowns
+                Task {
+                    _ = await NotificationManager.shared.requestPermission()
+                }
             }
         }
     }
@@ -160,6 +165,9 @@ struct AuthenticatedView: View {
             Task {
                 await appInit.refresh()
                 await loadNotificationBadge()
+                
+                // Clear delivered notifications when app comes to foreground
+                NotificationManager.shared.clearDeliveredNotifications()
             }
         }
         .sheet(isPresented: $showMyKingdoms) {

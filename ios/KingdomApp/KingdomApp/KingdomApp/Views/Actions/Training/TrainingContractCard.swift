@@ -55,9 +55,18 @@ struct TrainingContractCard: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack {
+                        Text(title)
+                            .font(FontStyles.headingMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        // Cooldown time with hourglass
+                        if let cooldownMinutes = status.cooldownMinutes {
+                            cooldownBadge(minutes: cooldownMinutes)
+                        }
+                    }
                     
                     HStack(spacing: 4) {
                         Text("\(contract.actionsCompleted)/\(contract.actionsRequired) actions")
@@ -73,8 +82,6 @@ struct TrainingContractCard: View {
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
-                
-                Spacer()
             }
             
             // Progress bar - brutalist style
@@ -145,6 +152,41 @@ struct TrainingContractCard: View {
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private func cooldownBadge(minutes: Double) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "hourglass")
+                .font(FontStyles.iconMini)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            if minutes >= 60 {
+                let hours = minutes / 60
+                if hours >= 24 {
+                    let days = hours / 24
+                    Text(String(format: "%.0fd", days))
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                } else {
+                    Text(String(format: "%.0fh", hours))
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+            } else {
+                Text("\(Int(minutes))m")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
     }
 }
 
