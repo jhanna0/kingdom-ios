@@ -14,6 +14,8 @@ class TravelEvent(BaseModel):
     kingdom_name: str
     travel_fee_paid: int  # Amount paid (0 if free)
     free_travel_reason: Optional[str] = None  # "ruler", "property_owner", "allied", or None
+    denied: bool = False  # Whether entry was denied
+    denial_reason: Optional[str] = None  # Why entry was denied
     
     
 class PlayerState(BaseModel):

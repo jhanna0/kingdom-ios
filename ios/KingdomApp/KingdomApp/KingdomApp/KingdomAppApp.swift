@@ -81,6 +81,8 @@ struct AuthenticatedView: View {
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
     @State private var hasShownInitialKingdom = false
+    @State private var showTravelNotification = false
+    @State private var displayedTravelEvent: TravelEvent?
     
     var body: some View {
         ZStack {
@@ -125,6 +127,28 @@ struct AuthenticatedView: View {
                     }
                 )
                 .zIndex(1000)
+            }
+            
+            // Travel notification toast
+            if showTravelNotification, let travelEvent = displayedTravelEvent {
+                VStack {
+                    TravelNotificationToast(
+                        travelEvent: travelEvent,
+                        onDismiss: {
+                            withAnimation {
+                                showTravelNotification = false
+                                displayedTravelEvent = nil
+                            }
+                            // Clear the event from viewModel to avoid re-showing
+                            viewModel.latestTravelEvent = nil
+                        }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 60)
+                    
+                    Spacer()
+                }
+                .zIndex(999)
             }
         }
         .onReceive(locationManager.$currentLocation) { location in
@@ -230,6 +254,27 @@ struct AuthenticatedView: View {
                     if let kingdom = viewModel.currentKingdomInside {
                         kingdomForInfoSheet = kingdom
                         hasShownInitialKingdom = true
+                    }
+                }
+            }
+        }
+        .onChange(of: viewModel.latestTravelEvent) { oldValue, newValue in
+            // Show travel notification when travel event occurs
+            if let travelEvent = newValue {
+                displayedTravelEvent = travelEvent
+                withAnimation {
+                    showTravelNotification = true
+                }
+                
+                // Auto-dismiss after 4 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation {
+                        showTravelNotification = false
+                    }
+                    // Clear after animation completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        displayedTravelEvent = nil
+                        viewModel.latestTravelEvent = nil
                     }
                 }
             }

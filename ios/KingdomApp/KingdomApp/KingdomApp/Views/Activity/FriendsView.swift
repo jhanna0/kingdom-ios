@@ -328,7 +328,9 @@ struct ActivityCard: View {
             // Amount
                 if let amount = activity.amount {
                 HStack(spacing: 4) {
-                    Text("+\(amount)")
+                    // Show minus for spending (travel_fee), plus for earning
+                    let prefix = activity.actionType == "travel_fee" ? "-" : "+"
+                    Text("\(prefix)\(amount)")
                             .font(FontStyles.headingSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     

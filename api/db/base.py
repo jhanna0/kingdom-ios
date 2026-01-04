@@ -12,8 +12,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@localhost:543
 # Create engine with Lambda-optimized settings
 engine = create_engine(
     DATABASE_URL,
-    pool_size=10,  # TEMPORARY: Increased for testing/development
-    max_overflow=10,  # TEMPORARY: Increased for testing/development
+    pool_size=1,  # Small pool for Lambda
+    max_overflow=0,  # No overflow connections
     pool_pre_ping=True,  # Verify connection before using
     pool_recycle=3600,  # Recycle connections after 1 hour
     connect_args={

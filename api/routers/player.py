@@ -12,7 +12,7 @@ from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from routers.actions.training import calculate_training_cost
-from routers.actions.utils import get_equipped_items, get_inventory
+from routers.actions.utils import get_equipped_items, get_inventory, log_activity
 
 router = APIRouter(prefix="/player", tags=["player"])
 
@@ -449,16 +449,41 @@ def get_player_state(
                 else:
                     # Check if player has enough gold
                     if state.gold < kingdom.travel_fee:
-                        raise HTTPException(
-                            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                            detail=f"Insufficient gold. Need {kingdom.travel_fee}g to enter {kingdom.name}"
+                        # Can't afford - deny entry
+                        from schemas.user import TravelEvent
+                        travel_event = TravelEvent(
+                            entered_kingdom=False,
+                            kingdom_name=kingdom.name,
+                            travel_fee_paid=0,
+                            free_travel_reason=None,
+                            denied=True,
+                            denial_reason=f"Insufficient gold. Need {kingdom.travel_fee}g to enter."
                         )
-                    
-                    # Charge travel fee
-                    travel_fee_paid = kingdom.travel_fee
-                    state.gold -= kingdom.travel_fee
-                    kingdom.treasury_gold += kingdom.travel_fee
-                    print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+                        print(f"❌ {current_user.display_name} cannot afford {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+                        # Skip the kingdom entry logic - just return current state with denial event
+                        is_entering_new_kingdom = False
+                    else:
+                        # Charge travel fee
+                        travel_fee_paid = kingdom.travel_fee
+                        state.gold -= kingdom.travel_fee
+                        kingdom.treasury_gold += kingdom.travel_fee
+                        print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+                        
+                        # Log travel fee payment
+                        log_activity(
+                            db=db,
+                            user_id=current_user.id,
+                            action_type="travel_fee",
+                            action_category="kingdom",
+                            description=f"Paid {kingdom.travel_fee}g to enter {kingdom.name}",
+                            kingdom_id=kingdom.id,
+                            amount=kingdom.travel_fee,
+                            details={
+                                "to_kingdom": kingdom.name,
+                                "fee_paid": kingdom.travel_fee
+                            },
+                            visibility="public"
+                        )
             
             # Update current kingdom IMMEDIATELY (even if on cooldown)
             # This prevents charging travel fee multiple times

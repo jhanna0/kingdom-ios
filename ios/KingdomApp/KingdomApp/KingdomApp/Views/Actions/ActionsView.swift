@@ -12,7 +12,7 @@ struct ActionsView: View {
     @State private var showReward = false
     @State private var currentReward: Reward?
     @State private var currentTime = Date()
-    private let taskID = UUID()  // NOT @State - stable across view updates
+    @State private var taskID = UUID()  // Persists across view recreations
     
     // Cache kingdom status to avoid recalculating on every render
     @State private var isInHomeKingdom: Bool = false

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
 
 from db import init_db
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -73,6 +73,7 @@ async def startup_event():
     try:
         init_db()
         print("🚀 Kingdom API started")
+        print("📱 App Config: /app-config (version checking)")
         print("🔐 Authentication: /auth/apple-signin")
         print("📍 City boundaries: /cities")
         print("🎮 Game endpoints: /my-kingdoms, /kingdoms, /checkin")
@@ -106,6 +107,7 @@ app.add_middleware(
 
 
 # Include routers
+app.include_router(app_config.router)  # No auth required - called on startup
 app.include_router(auth.router)
 app.include_router(cities.router)
 app.include_router(game.router)

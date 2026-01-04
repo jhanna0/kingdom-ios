@@ -17,6 +17,14 @@ class AppInitService: ObservableObject {
     /// Load all user data when app starts
     @MainActor
     func initialize() async {
+        // FIRST: Check version requirements before doing anything else
+        let versionCheckPassed = await VersionManager.shared.performStartupCheck()
+        if !versionCheckPassed {
+            print("❌ AppInitService: Version check failed, blocking app")
+            isLoading = false
+            return
+        }
+        
         guard apiClient.isAuthenticated else {
             print("⚠️ AppInitService: Not authenticated, skipping init")
             return

@@ -7,6 +7,8 @@ struct TravelEvent: Codable, Equatable {
     let kingdom_name: String
     let travel_fee_paid: Int
     let free_travel_reason: String?
+    let denied: Bool?
+    let denial_reason: String?
 }
 
 // MARK: - Player State Models

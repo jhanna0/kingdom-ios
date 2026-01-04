@@ -67,6 +67,11 @@ struct PlayerActivityResponse: Codable {
 
 extension ActivityLogEntry {
     var icon: String {
+        // For travel fees, show gold coin icon
+        if actionType == "travel_fee" {
+            return "g.circle.fill"
+        }
+        
         // For training, use the specific skill icon if available
         if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
             if let trainingType = details?.trainingType {
@@ -92,6 +97,11 @@ extension ActivityLogEntry {
     }
     
     var color: Color {
+        // For travel fees, use gold color
+        if actionType == "travel_fee" {
+            return KingdomTheme.Colors.imperialGold
+        }
+        
         // For training, use the specific skill color if available
         if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
             if let trainingType = details?.trainingType {

@@ -246,6 +246,14 @@ class AuthManager: ObservableObject {
     
     @MainActor
     private func checkSavedAuth() async {
+        // FIRST: Check version requirements before authentication
+        let versionCheckPassed = await VersionManager.shared.performStartupCheck()
+        if !versionCheckPassed {
+            print("❌ AuthManager: Version check failed, blocking app")
+            isCheckingAuth = false
+            return
+        }
+        
         if let token = loadToken() {
             authToken = token
             // Centralized: Set token in APIClient for all API calls
