@@ -81,7 +81,24 @@ class APIClient: ObservableObject {
             // Try to parse error message
             if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let detail = errorJson["detail"] as? String {
+                // Handle specific status codes
+                if httpResponse.statusCode == 403 {
+                    throw APIError.forbidden(detail)
+                } else if httpResponse.statusCode == 404 {
+                    throw APIError.notFound(detail)
+                } else if httpResponse.statusCode == 401 {
+                    throw APIError.unauthorized
+                }
                 throw APIError.serverError(detail)
+            }
+            
+            // No detail message, use status code
+            if httpResponse.statusCode == 403 {
+                throw APIError.forbidden("Access denied")
+            } else if httpResponse.statusCode == 404 {
+                throw APIError.notFound("Resource not found")
+            } else if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
             }
             throw APIError.serverError("HTTP \(httpResponse.statusCode)")
         }
@@ -135,7 +152,24 @@ class APIClient: ObservableObject {
         guard (200...299).contains(httpResponse.statusCode) else {
             if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let detail = errorJson["detail"] as? String {
+                // Handle specific status codes
+                if httpResponse.statusCode == 403 {
+                    throw APIError.forbidden(detail)
+                } else if httpResponse.statusCode == 404 {
+                    throw APIError.notFound(detail)
+                } else if httpResponse.statusCode == 401 {
+                    throw APIError.unauthorized
+                }
                 throw APIError.serverError(detail)
+            }
+            
+            // No detail message, use status code
+            if httpResponse.statusCode == 403 {
+                throw APIError.forbidden("Access denied")
+            } else if httpResponse.statusCode == 404 {
+                throw APIError.notFound("Resource not found")
+            } else if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
             }
             throw APIError.serverError("HTTP \(httpResponse.statusCode)")
         }
@@ -203,6 +237,7 @@ enum APIError: LocalizedError {
     case serverError(String)
     case notFound(String)
     case unauthorized
+    case forbidden(String)
     case networkError(Error)
     case decodingError(Error)
     
@@ -216,6 +251,8 @@ enum APIError: LocalizedError {
             return "Not found: \(message)"
         case .unauthorized:
             return "Not authenticated"
+        case .forbidden(let message):
+            return "Access denied: \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .decodingError(let error):

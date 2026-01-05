@@ -12,6 +12,7 @@ struct KingdomMarkerWithActivity: View {
     @State private var refreshTimer: Timer?
     @State private var pendingActivities: [PlayerActivity] = []
     @State private var isTrickling = false
+    @State private var hasAccess: Bool = true  // Track if we have permission to view this kingdom
     
     // Polling configuration
     private let pollInterval: TimeInterval = 8.0
@@ -69,12 +70,24 @@ struct KingdomMarkerWithActivity: View {
     }
     
     private func fetchAndProcessActivity() async {
+        // Don't poll if we've already determined we don't have access
+        guard hasAccess else { return }
+        
         do {
             let response = try await KingdomAPIService.shared.player.getPlayersInKingdom(kingdom.id, limit: 10)
             
             await MainActor.run {
                 processNewActivity(players: response.players)
             }
+        } catch let error as APIError {
+            // If we get a 403 Forbidden, stop polling this kingdom
+            if case .forbidden = error {
+                await MainActor.run {
+                    hasAccess = false
+                    stopPolling()  // Stop polling to prevent spam
+                }
+            }
+            // Other errors are silently ignored - marker still shows normally
         } catch {
             // Silently fail - no activity icons if we can't fetch
             // This is fine - the marker still shows normally

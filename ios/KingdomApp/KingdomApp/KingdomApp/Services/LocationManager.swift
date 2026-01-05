@@ -49,7 +49,7 @@ class LocationManager: NSObject, ObservableObject {
     ]
     
     /// Fake location for testing (defaults to SF)
-    static var fakeLocation = testCities["springfield"]!
+    static var fakeLocation = testCities["concord"]!
     
     override init() {
         super.init()
