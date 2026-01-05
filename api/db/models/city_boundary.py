@@ -43,9 +43,9 @@ class CityBoundary(Base):
     # Usage tracking
     access_count = Column(Integer, default=0, nullable=False)
     
-    # Neighbor caching - avoids slow OSM queries for neighbor lists
-    neighbor_ids = Column(JSONB, nullable=True)  # List of neighboring city OSM IDs
-    neighbors_updated_at = Column(DateTime, nullable=True)  # When neighbors were last fetched
+    # Neighbor caching - stores CANDIDATES from OSM, re-filtered dynamically based on cached boundaries
+    neighbor_ids = Column(JSONB, nullable=True)  # List of candidate cities [{osm_id, name, center_lat, center_lon, admin_level}, ...]
+    neighbors_updated_at = Column(DateTime, nullable=True)  # When candidates were last fetched from OSM
     
     # Weather caching - hourly weather data per city
     weather_data = Column(JSONB, nullable=True)  # Current weather data

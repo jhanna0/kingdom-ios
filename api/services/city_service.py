@@ -15,8 +15,10 @@ from db import CityBoundary, Kingdom, User, get_db
 from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BUILDING_COLORS
 from osm_service import (
     find_user_city_fast,
-    fetch_nearby_city_ids,
+    fetch_nearby_city_candidates,
     fetch_city_boundary_by_id,
+    _distance_to_polygon_edge,
+    _min_distance_between_polygons,
 )
 from routers.tiers import BUILDING_TYPES
 
@@ -209,31 +211,38 @@ async def get_current_city(
         CityBoundary.center_lon.between(lon - lon_delta, lon + lon_delta)
     ).all()
     
-    # Check which cached city user is inside
+    # Check which cached cities user is inside - collect ALL matches
+    matching_cities = []
     for city in cached_cities:
         boundary = city.boundary_geojson.get("coordinates", [])
         if boundary and _is_point_in_polygon(lat, lon, boundary):
-            print(f"   💾 Found in cache: {city.name}")
-            city.access_count += 1
-            city.last_accessed = datetime.utcnow()
-            db.commit()
-            
-            # Get kingdom data
-            _ensure_kingdom_exists(db, city.osm_id, city.name)
-            kingdoms = _get_kingdom_data(db, [city.osm_id], current_user)
-            
-            return CityBoundaryResponse(
-                osm_id=city.osm_id,
-                name=city.name,
-                admin_level=city.admin_level,
-                center_lat=city.center_lat,
-                center_lon=city.center_lon,
-                boundary=boundary,
-                radius_meters=city.radius_meters,
-                cached=True,
-                is_current=True,
-                kingdom=kingdoms.get(city.osm_id)
-            )
+            matching_cities.append((city, boundary))
+    
+    # Prefer highest admin_level (most specific: 8=city > 7=borough > 6=county)
+    if matching_cities:
+        matching_cities.sort(key=lambda x: x[0].admin_level, reverse=True)
+        city, boundary = matching_cities[0]
+        
+        print(f"   💾 Found in cache: {city.name} (level {city.admin_level})")
+        city.access_count += 1
+        city.last_accessed = datetime.utcnow()
+        db.commit()
+        
+        _ensure_kingdom_exists(db, city.osm_id, city.name)
+        kingdoms = _get_kingdom_data(db, [city.osm_id], current_user)
+        
+        return CityBoundaryResponse(
+            osm_id=city.osm_id,
+            name=city.name,
+            admin_level=city.admin_level,
+            center_lat=city.center_lat,
+            center_lon=city.center_lon,
+            boundary=boundary,
+            radius_meters=city.radius_meters,
+            cached=True,
+            is_current=True,
+            kingdom=kingdoms.get(city.osm_id)
+        )
     
     # Step 2: Not in cache - call OSM
     print(f"   🌐 Not in cache, calling OSM...")
@@ -355,7 +364,7 @@ async def get_neighbor_cities(
     """
     print(f"🏘️ Loading neighbors for ({lat:.4f}, {lon:.4f})")
     
-    # Step 1: Find the current city
+    # Step 1: Find the current city (prefer highest admin_level)
     current_city = None
     lat_delta = 0.5
     lon_delta = 0.5 / max(0.1, math.cos(math.radians(lat)))
@@ -365,38 +374,103 @@ async def get_neighbor_cities(
         CityBoundary.center_lon.between(lon - lon_delta, lon + lon_delta)
     ).all()
     
+    # Find all cities containing the point, then pick highest admin_level
+    matching_cities = []
     for city in cached_cities:
         boundary = city.boundary_geojson.get("coordinates", [])
         if boundary and _is_point_in_polygon(lat, lon, boundary):
-            current_city = city
-            break
+            matching_cities.append(city)
     
-    # Step 2: Check cached neighbors
-    neighbor_ids = []
+    if matching_cities:
+        matching_cities.sort(key=lambda c: c.admin_level, reverse=True)
+        current_city = matching_cities[0]
+    
+    # Step 2: Get candidates (from cache or OSM)
+    candidates = []
+    is_boundary_sharing = True  # Assume true (already precise)
+    
     if current_city and current_city.neighbor_ids is not None:
-        print(f"   💾 Cached neighbors for {current_city.name}")
-        osm_ids = current_city.neighbor_ids
-        neighbor_ids = [{"osm_id": osm_id, "name": f"City-{osm_id}"} for osm_id in osm_ids]
+        print(f"   💾 Cached candidates for {current_city.name}")
+        candidates = current_city.neighbor_ids  # Now stores full candidate dicts
+        # Check if these were from boundary sharing or radius search
+        is_boundary_sharing = candidates[0].get("is_boundary_sharing", True) if candidates else True
     
     # Step 3: Fetch from OSM if not cached
-    if not neighbor_ids:
-        print(f"   🌐 Fetching neighbors from OSM...")
-        neighbor_ids = await fetch_nearby_city_ids(lat, lon)
+    if not candidates:
+        print(f"   🌐 Fetching candidates from OSM...")
         
-        if not neighbor_ids:
+        candidates, is_boundary_sharing = await fetch_nearby_city_candidates(lat, lon)
+        
+        if not candidates:
             print(f"   ⚠️ No neighbors found")
             return []
         
-        print(f"   🌐 OSM returned {len(neighbor_ids)} neighbors")
+        print(f"   🌐 OSM returned {len(candidates)} candidates")
         
-        # Cache the neighbor list if we found the current city
+        # Cache candidates with metadata
         if current_city:
-            current_city.neighbor_ids = [n["osm_id"] for n in neighbor_ids]
+            for c in candidates:
+                c["is_boundary_sharing"] = is_boundary_sharing
+            current_city.neighbor_ids = candidates
             current_city.neighbors_updated_at = datetime.utcnow()
             db.commit()
-            print(f"   💾 Cached neighbor list for {current_city.name}")
+            print(f"   💾 Cached {len(candidates)} candidates for {current_city.name}")
     else:
-        print(f"   🌐 Using {len(neighbor_ids)} cached neighbors")
+        print(f"   🌐 Using {len(candidates)} cached candidates")
+    
+    # Step 4: Dynamic filtering based on source and cached boundaries
+    # Boundary-sharing candidates are already precise; radius candidates need filtering
+    current_boundary = None
+    if current_city and current_city.boundary_geojson:
+        coords = current_city.boundary_geojson.get("coordinates", [])
+        if coords:
+            current_boundary = [(c[0], c[1]) for c in coords]
+    
+    # Get cached boundaries for candidates
+    candidate_osm_ids = [c["osm_id"] for c in candidates]
+    cached_boundaries = {
+        c.osm_id: [(p[0], p[1]) for p in c.boundary_geojson.get("coordinates", [])]
+        for c in db.query(CityBoundary).filter(CityBoundary.osm_id.in_(candidate_osm_ids)).all()
+        if c.boundary_geojson and c.boundary_geojson.get("coordinates")
+    }
+    
+    neighbor_ids = []
+    boundary_count = 0
+    radius_count = 0
+    
+    for city in candidates:
+        osm_id = city["osm_id"]
+        source = city.get("source", "radius")
+        
+        if source == "boundary":
+            # Boundary-sharing = already a true neighbor
+            neighbor_ids.append(city)
+            boundary_count += 1
+        else:
+            # Radius search = needs filtering
+            if osm_id in cached_boundaries and current_boundary:
+                # BEST: boundary-to-boundary check (precise)
+                dist = _min_distance_between_polygons(current_boundary, cached_boundaries[osm_id])
+                if dist <= 5000:  # Within 5km = neighbor (accounts for water/gaps)
+                    city["edge_distance"] = dist
+                    neighbor_ids.append(city)
+                    radius_count += 1
+            elif current_boundary:
+                # FALLBACK: center-to-edge check (generous for cities across water/gaps)
+                dist = _distance_to_polygon_edge(city["center_lat"], city["center_lon"], current_boundary)
+                if dist <= 8000:  # Within 8km of edge - accounts for water/gaps
+                    city["edge_distance"] = dist
+                    neighbor_ids.append(city)
+                    radius_count += 1
+            else:
+                # No boundary at all - include if reasonably close
+                if city.get("distance", float('inf')) <= 15000:
+                    neighbor_ids.append(city)
+                    radius_count += 1
+    
+    neighbor_ids.sort(key=lambda c: c.get("edge_distance", c.get("distance", 0)))
+    neighbor_ids = neighbor_ids[:20]
+    print(f"   🎯 {len(neighbor_ids)} neighbors ({boundary_count} boundary, {radius_count} radius-filtered)")
     
     # Check which ones we have cached
     osm_ids = [n["osm_id"] for n in neighbor_ids]
