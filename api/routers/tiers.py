@@ -529,6 +529,17 @@ def get_skills_data_for_player(state, training_cost: int) -> list:
     return skills_data
 
 
+# ===== HELPER FUNCTIONS =====
+
+def _get_training_actions_dict() -> dict:
+    """Get training actions required - runtime import to avoid circular dependency"""
+    from .actions.training import calculate_training_actions_required
+    return {
+        str(level): calculate_training_actions_required(level, education_level=0)
+        for level in range(10)
+    }
+
+
 # ===== API ENDPOINTS =====
 
 @router.get("")
@@ -561,7 +572,8 @@ def get_all_tiers():
         },
         "training": {
             "max_tier": 10,
-            "tier_names": SKILL_TIER_NAMES
+            "tier_names": SKILL_TIER_NAMES,
+            "actions_required": _get_training_actions_dict()
         },
         "reputation": {
             "max_tier": 6,

@@ -48,12 +48,25 @@ def calculate_training_cost(total_skill_points: int) -> int:
 def calculate_training_actions_required(stat_level: int, education_level: int = 0) -> int:
     """Calculate how many actions required to complete training
     
-    Formula: (3 + (level // 3)) * (1 - (education_level * 0.05))
+    Formula: base_actions = 10 + (stat_level * 18) + (stat_level^2 * 3)
+    
+    This gives exponential growth:
+    - Tier 1 (level 0 -> 1): 10 actions
+    - Tier 2 (level 1 -> 2): 31 actions  
+    - Tier 3 (level 2 -> 3): 58 actions
+    - Tier 4 (level 3 -> 4): 91 actions
+    - Tier 5 (level 4 -> 5): 130 actions
+    - ...scales up to tier 10
+    
+    Education building can reduce this by up to 25% at max level.
     """
-    base_actions = 3 + (stat_level // 3)
-    education_reduction = 1.0 - (education_level * 0.05)
+    # Exponential scaling formula
+    base_actions = 10 + (stat_level * 18) + (stat_level ** 2 * 3)
+    
+    # Education building reduces training time (max 25% reduction at level 5)
+    education_reduction = 1.0 - min(education_level * 0.05, 0.25)
     reduced_actions = int(base_actions * education_reduction)
-    return max(1, reduced_actions)
+    return max(5, reduced_actions)
 
 
 @router.get("/train/costs")

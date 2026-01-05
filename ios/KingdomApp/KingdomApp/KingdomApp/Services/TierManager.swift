@@ -12,6 +12,7 @@ class TierManager {
     var equipment: EquipmentTiersData?
     var skillTierNames: [Int: String] = [:]
     var skillBenefits: [String: SkillBenefitsData] = [:]
+    var trainingActionsRequired: [Int: Int] = [:]  // current_level -> actions to train to next level
     var buildings: [String: BuildingTypeData] = [:]
     var buildingTypes: [String: BuildingTypeInfo] = [:]  // Full building type info
     var reputation: ReputationTiersData?
@@ -120,6 +121,18 @@ class TierManager {
                     self.skillBenefits = benefits
                     print("   - Loaded \(benefits.count) skill benefit definitions from backend")
                 }
+            }
+            
+            // Training action requirements from backend
+            if let trainingData = response.training, let actionsRequired = trainingData.actions_required {
+                var actionsDict: [Int: Int] = [:]
+                for (key, value) in actionsRequired {
+                    if let level = Int(key) {
+                        actionsDict[level] = value
+                    }
+                }
+                self.trainingActionsRequired = actionsDict
+                print("   - Loaded training actions: \(actionsDict)")
             }
             
             // Buildings - parse full building type info
@@ -239,6 +252,12 @@ class TierManager {
         return skillData.tierBonuses[tier] ?? []
     }
     
+    /// Get actions required to train from current level to next level
+    /// currentLevel 0 = training to tier 1, currentLevel 4 = training to tier 5
+    func trainingActionsFor(currentLevel: Int) -> Int {
+        return trainingActionsRequired[currentLevel] ?? 100  // Default fallback
+    }
+    
     // MARK: - Reputation Accessors
     
     func reputationTierName(_ tier: Int) -> String {
@@ -320,8 +339,15 @@ struct AllTiersResponse: Codable {
     let properties: PropertyTiersResponseData?
     let equipment: EquipmentTiersResponseData?
     let skills: SkillTiersResponseData?
+    let training: TrainingTiersResponseData?
     let buildings: BuildingTiersResponseData?
     let reputation: ReputationTiersResponseData?
+}
+
+struct TrainingTiersResponseData: Codable {
+    let max_tier: Int
+    let tier_names: [String: String]?
+    let actions_required: [String: Int]?
 }
 
 struct PropertyTiersResponseData: Codable {

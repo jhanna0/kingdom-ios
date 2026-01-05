@@ -60,7 +60,9 @@ struct SkillDetailView: View {
                                         .font(FontStyles.iconSmall)
                                         .foregroundColor(skillColor.opacity(0.5))
                                         .frame(width: 20)
-                                    Text("\(getActionsRequired(tier: tier)) actions")
+                                    // tier-1 because we're showing requirements TO REACH this tier
+                                    // e.g. tier 5 requires actions from level 4 -> 5
+                                    Text("\(tierManager.trainingActionsFor(currentLevel: tier - 1)) actions")
                                         .font(FontStyles.bodySmall)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     Spacer()
@@ -303,10 +305,6 @@ struct SkillDetailView: View {
         return player.trainingCost
     }
     
-    
-    private func getActionsRequired(tier: Int) -> Int {
-        return max(3, tier + 2)
-    }
     
     private var canAffordSelectedTier: Bool {
         return player.gold >= unifiedTrainingCost
