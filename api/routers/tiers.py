@@ -328,12 +328,17 @@ REPUTATION_TIERS = {
 }
 
 
-# ===== SKILL BENEFITS =====
+# ===== SKILL SYSTEM - SINGLE SOURCE OF TRUTH =====
+# Add new skills HERE and they'll work everywhere automatically!
 
-SKILL_BENEFITS = {
+SKILLS = {
     "attack": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Attack",
+        "stat_attribute": "attack_power",  # PlayerState model attribute
+        "icon": "bolt.fill",
+        "category": "combat",
+        "description": "Increases coup success chance and damage dealt",
+        "benefits": {
             1: ["+1 Attack Power in coups", "Increases coup success chance"],
             2: ["+2 Attack Power in coups", "Increases coup success chance"],
             3: ["+3 Attack Power in coups", "Increases coup success chance"],
@@ -342,8 +347,12 @@ SKILL_BENEFITS = {
         }
     },
     "defense": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Defense",
+        "stat_attribute": "defense_power",
+        "icon": "shield.fill",
+        "category": "combat",
+        "description": "Reduces coup damage taken",
+        "benefits": {
             1: ["+1 Defense Power in coups", "Reduces coup damage taken"],
             2: ["+2 Defense Power in coups", "Reduces coup damage taken"],
             3: ["+3 Defense Power in coups", "Reduces coup damage taken"],
@@ -352,8 +361,12 @@ SKILL_BENEFITS = {
         }
     },
     "leadership": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Leadership",
+        "stat_attribute": "leadership",
+        "icon": "crown.fill",
+        "category": "political",
+        "description": "Increases voting power and ruler rewards",
+        "benefits": {
             1: ["Vote weight: 1.0", "Can vote on coups (with rep)"],
             2: ["Vote weight: 1.2", "+50% rewards from ruler distributions"],
             3: ["Vote weight: 1.4", "Can propose coups (300+ rep)"],
@@ -362,8 +375,12 @@ SKILL_BENEFITS = {
         }
     },
     "building": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Building",
+        "stat_attribute": "building_skill",
+        "icon": "hammer.fill",
+        "category": "economy",
+        "description": "Improves construction and resource gathering",
+        "benefits": {
             1: ["-5% property upgrade costs", "Work on contracts & properties"],
             2: ["-10% property upgrade costs", "+10% gold from building contracts"],
             3: ["-15% property upgrade costs", "+20% gold from contracts", "+1 daily Assist action"],
@@ -372,8 +389,12 @@ SKILL_BENEFITS = {
         }
     },
     "intelligence": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Intelligence",
+        "stat_attribute": "intelligence",
+        "icon": "eye.fill",
+        "category": "espionage",
+        "description": "Improves sabotage and scouting",
+        "benefits": {
             1: ["-2% detection when sabotaging", "+2% catch chance when patrolling"],
             2: ["-4% detection when sabotaging", "+4% catch chance when patrolling"],
             3: ["-6% detection when sabotaging", "+6% catch chance when patrolling"],
@@ -382,8 +403,12 @@ SKILL_BENEFITS = {
         }
     },
     "science": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Science",
+        "stat_attribute": "science",
+        "icon": "flask.fill",
+        "category": "enhancement",
+        "description": "Enhances equipment effectiveness",
+        "benefits": {
             1: ["+1 to all equipped weapon/armor stats"],
             2: ["+2 to all equipped weapon/armor stats", "10% chance equipment doesn't break on death"],
             3: ["+3 to all equipped weapon/armor stats", "Your weapons deal +1 extra damage in battle"],
@@ -392,8 +417,12 @@ SKILL_BENEFITS = {
         }
     },
     "faith": {
-        "per_tier": "",
-        "tier_bonuses": {
+        "display_name": "Faith",
+        "stat_attribute": "faith",
+        "icon": "hands.sparkles.fill",
+        "category": "enhancement",
+        "description": "Provides random battle bonuses",
+        "benefits": {
             1: ["5% chance: random ally in battle gets +1 attack OR enemy gets -1 attack"],
             2: ["10% chance: random ally gets +2 attack OR enemy gets -2 defense"],
             3: ["15% chance: random ally gets +3 defense OR enemy gets -3 defense"],
@@ -402,6 +431,102 @@ SKILL_BENEFITS = {
         }
     }
 }
+
+# Helper: Get all skill type strings (for backward compatibility)
+SKILL_TYPES = list(SKILLS.keys())
+
+# Legacy format for backward compatibility
+SKILL_BENEFITS = {
+    skill_id: {
+        "per_tier": "",
+        "tier_bonuses": skill_data["benefits"]
+    }
+    for skill_id, skill_data in SKILLS.items()
+}
+
+
+# ===== SKILL HELPER FUNCTIONS =====
+
+def get_stat_value(state, skill_type: str) -> int:
+    """Get current stat value for a skill type from PlayerState"""
+    if skill_type not in SKILLS:
+        return 1  # Default
+    attr_name = SKILLS[skill_type]["stat_attribute"]
+    return getattr(state, attr_name, 1)
+
+
+def set_stat_value(state, skill_type: str, value: int) -> tuple[str, int]:
+    """Set stat value and return (display_name, new_value)"""
+    if skill_type not in SKILLS:
+        return "Unknown", value
+    
+    skill_data = SKILLS[skill_type]
+    attr_name = skill_data["stat_attribute"]
+    setattr(state, attr_name, value)
+    return skill_data["display_name"], value
+
+
+def increment_stat(state, skill_type: str) -> tuple[str, int]:
+    """Increment a stat and return (display_name, new_value)"""
+    if skill_type not in SKILLS:
+        return "Unknown", 0
+    
+    skill_data = SKILLS[skill_type]
+    attr_name = skill_data["stat_attribute"]
+    current_value = getattr(state, attr_name, 1)
+    new_value = current_value + 1
+    setattr(state, attr_name, new_value)
+    return skill_data["display_name"], new_value
+
+
+def get_total_skill_points(state) -> int:
+    """Get total skill points across ALL skills"""
+    total = 0
+    for skill_data in SKILLS.values():
+        attr_name = skill_data["stat_attribute"]
+        total += getattr(state, attr_name, 0)
+    return total
+
+
+def get_all_skill_values(state) -> dict:
+    """Get current values for all skills"""
+    return {
+        skill_type: get_stat_value(state, skill_type)
+        for skill_type in SKILLS.keys()
+    }
+
+
+def get_skills_data_for_player(state, training_cost: int) -> list:
+    """
+    Get complete skill data for player state response.
+    Returns a list of skill objects with all info needed for dynamic UI rendering.
+    Frontend can render skills without hardcoding any skill types!
+    """
+    skills_data = []
+    
+    for skill_type, skill_config in SKILLS.items():
+        current_value = get_stat_value(state, skill_type)
+        
+        # Get benefits for current tier (capped at 5 for display)
+        current_tier_benefits = skill_config["benefits"].get(
+            min(current_value, 5), 
+            skill_config["benefits"].get(5, [])
+        )
+        
+        skills_data.append({
+            "skill_type": skill_type,
+            "display_name": skill_config["display_name"],
+            "icon": skill_config["icon"],
+            "category": skill_config["category"],
+            "description": skill_config["description"],
+            "current_tier": current_value,
+            "max_tier": 5,
+            "training_cost": training_cost,  # Same cost for all skills
+            "current_benefits": current_tier_benefits,
+            "display_order": list(SKILLS.keys()).index(skill_type) * 10,  # 0, 10, 20, etc.
+        })
+    
+    return skills_data
 
 
 # ===== API ENDPOINTS =====
@@ -422,7 +547,9 @@ def get_all_tiers():
         "skills": {
             "max_tier": 10,
             "tier_names": SKILL_TIER_NAMES,
-            "skill_benefits": SKILL_BENEFITS
+            "skills": SKILLS,  # Full skill configuration
+            "skill_types": SKILL_TYPES,  # Just the keys
+            "skill_benefits": SKILL_BENEFITS  # Legacy format
         },
         "buildings": {
             "max_tier": 5,

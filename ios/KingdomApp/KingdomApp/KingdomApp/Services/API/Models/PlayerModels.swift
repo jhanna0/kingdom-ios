@@ -109,6 +109,24 @@ struct APIPlayerState: Codable {
         let expires_at: String?
     }
     
+    // DYNAMIC SKILLS DATA - Frontend can render skills without hardcoding!
+    let skills_data: [SkillData]?
+    
+    struct SkillData: Codable, Identifiable {
+        let skill_type: String
+        let display_name: String
+        let icon: String
+        let category: String
+        let description: String
+        let current_tier: Int
+        let max_tier: Int
+        let training_cost: Int
+        let current_benefits: [String]
+        let display_order: Int
+        
+        var id: String { skill_type }
+    }
+    
     // Resources
     let iron: Int
     let steel: Int

@@ -8,3 +8,4 @@ ADD COLUMN IF NOT EXISTS lumbermill_level INTEGER DEFAULT 0;
 UPDATE kingdoms SET lumbermill_level = 0 WHERE lumbermill_level IS NULL;
 
 
+

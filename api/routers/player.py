@@ -236,17 +236,19 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
 
 def player_state_to_response(user: User, state: DBPlayerState, db: Session, travel_event=None) -> PlayerState:
     """Convert PlayerState model to PlayerState schema"""
-    # Calculate training costs based on current stats and total purchases
-    total_trainings = state.total_training_purchases or 0
-    training_costs = {
-        "attack": calculate_training_cost(state.attack_power, total_trainings),
-        "defense": calculate_training_cost(state.defense_power, total_trainings),
-        "leadership": calculate_training_cost(state.leadership, total_trainings),
-        "building": calculate_training_cost(state.building_skill, total_trainings),
-        "intelligence": calculate_training_cost(state.intelligence, total_trainings),
-        "science": calculate_training_cost(state.science, total_trainings),
-        "faith": calculate_training_cost(state.faith, total_trainings)
-    }
+    # Calculate training costs based on TOTAL SKILL POINTS across ALL skills
+    # Import here to avoid circular dependency
+    from routers.tiers import get_total_skill_points, SKILL_TYPES, get_skills_data_for_player
+    
+    # All skills have the SAME cost - only total matters
+    total_skill_points = get_total_skill_points(state)
+    unified_cost = calculate_training_cost(total_skill_points)
+    
+    # Generate training costs dynamically for all skills
+    training_costs = {skill_type: unified_cost for skill_type in SKILL_TYPES}
+    
+    # Generate complete skills data for dynamic frontend rendering
+    skills_data = get_skills_data_for_player(state, unified_cost)
     
     # Calculate active perks
     active_perks = calculate_player_perks(user, state, db)
@@ -301,6 +303,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         leadership=state.leadership,
         building_skill=state.building_skill,
         intelligence=state.intelligence,
+        science=state.science,
+        faith=state.faith,
         
         # Debuffs
         attack_debuff=state.attack_debuff,
@@ -329,7 +333,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         # Contract & Work
         contracts_completed=0,  # TODO: compute from contract_contributions
         total_work_contributed=0,  # TODO: compute from contract_contributions
-        total_training_purchases=total_trainings,
+        total_training_purchases=state.total_training_purchases or 0,
         
         # Resources
         iron=state.iron,
@@ -376,6 +380,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         
         # Active perks (dynamically calculated)
         active_perks=active_perks,
+        
+        # DYNAMIC SKILLS DATA - Frontend can render without hardcoding skills!
+        skills_data=skills_data,
     )
 
 
@@ -793,7 +800,14 @@ def train_stat(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Train a combat stat (costs gold)"""
+    """Train a combat stat (costs gold) - LEGACY ENDPOINT
+    
+    NOTE: This is a legacy instant-training endpoint.
+    For the new training contract system, use /actions/train/purchase and /actions/train/{contract_id}
+    """
+    from routers.tiers import SKILLS, get_stat_value, set_stat_value
+    
+    # Only allow certain skills for instant training (legacy behavior)
     valid_stats = ["attack", "defense", "leadership", "building"]
     if stat not in valid_stats:
         raise HTTPException(
@@ -801,18 +815,14 @@ def train_stat(
             detail=f"Invalid stat. Choose: {', '.join(valid_stats)}"
         )
     
+    if stat not in SKILLS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown skill: {stat}"
+        )
+    
     state = get_or_create_player_state(db, current_user)
-    
-    # Map stat name to state attribute
-    stat_map = {
-        "attack": "attack_power",
-        "defense": "defense_power",
-        "leadership": "leadership",
-        "building": "building_skill"
-    }
-    
-    attr = stat_map[stat]
-    current_level = getattr(state, attr)
+    current_level = get_stat_value(state, stat)
     
     # Training cost: 100 * (level^1.5)
     cost = int(100 * (current_level ** 1.5))
@@ -824,14 +834,15 @@ def train_stat(
         )
     
     state.gold -= cost
-    setattr(state, attr, current_level + 1)
+    display_name, new_level = set_stat_value(state, stat, current_level + 1)
     state.updated_at = datetime.utcnow()
     db.commit()
     
     return {
         "success": True,
         "stat": stat,
-        "new_level": current_level + 1,
+        "stat_display_name": display_name,
+        "new_level": new_level,
         "cost": cost,
         "remaining_gold": state.gold
     }
@@ -843,12 +854,21 @@ def use_skill_point(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Use a skill point to increase a stat"""
+    """Use a skill point to increase a stat - LEGACY ENDPOINT"""
+    from routers.tiers import SKILLS, get_stat_value, set_stat_value
+    
+    # Only allow certain skills for instant training (legacy behavior)
     valid_stats = ["attack", "defense", "leadership", "building"]
     if stat not in valid_stats:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid stat. Choose: {', '.join(valid_stats)}"
+        )
+    
+    if stat not in SKILLS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown skill: {stat}"
         )
     
     state = get_or_create_player_state(db, current_user)
@@ -859,25 +879,18 @@ def use_skill_point(
             detail="No skill points available"
         )
     
-    stat_map = {
-        "attack": "attack_power",
-        "defense": "defense_power",
-        "leadership": "leadership",
-        "building": "building_skill"
-    }
-    
-    attr = stat_map[stat]
-    current_level = getattr(state, attr)
+    current_level = get_stat_value(state, stat)
     
     state.skill_points -= 1
-    setattr(state, attr, current_level + 1)
+    display_name, new_level = set_stat_value(state, stat, current_level + 1)
     state.updated_at = datetime.utcnow()
     db.commit()
     
     return {
         "success": True,
         "stat": stat,
-        "new_level": current_level + 1,
+        "stat_display_name": display_name,
+        "new_level": new_level,
         "remaining_skill_points": state.skill_points
     }
 

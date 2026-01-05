@@ -17,18 +17,32 @@ from .constants import WORK_BASE_COOLDOWN
 router = APIRouter()
 
 
-# Training types that map to player stats
-TRAINING_TYPES = ["attack", "defense", "leadership", "building", "intelligence", "science", "faith"]
+# Import centralized skill definitions
+from routers.tiers import SKILLS, SKILL_TYPES, get_stat_value, increment_stat, get_total_skill_points, get_all_skill_values
+
+# Training types = all skill types (for backward compatibility)
+TRAINING_TYPES = SKILL_TYPES
 
 
-def calculate_training_cost(stat_level: int, total_trainings: int = 0) -> int:
-    """Calculate gold cost to purchase training based on current stat level and total trainings
+def calculate_training_cost(total_skill_points: int) -> int:
+    """Calculate gold cost to purchase training based ONLY on TOTAL SKILL POINTS across ALL skills
     
-    Formula: 100 * (level^1.5) * (1.15^total_trainings)
+    ALL skills cost the same for their next tier based on the SUM of all skill levels.
+    This prevents min-maxing - every skill point makes ALL skills more expensive.
+    
+    Formula: 100 * (1.5^(total_skill_points + 1))
+    
+    We use (total + 1) because we're calculating the cost for the NEXT skill point.
+    
+    Examples:
+    - 0 total skill points: 100 * 1.5^1 = 150g for ANY skill's first tier
+    - 3 total skill points: 100 * 1.5^4 = 506g for ANY skill's next tier
+    - 10 total skill points: 100 * 1.5^11 = 8659g for ANY skill's next tier
     """
-    base_cost = 100.0 * pow(float(stat_level), 1.5)
-    global_multiplier = pow(1.5, float(total_trainings))
-    return int(base_cost * global_multiplier)
+    base_cost = 100.0
+    # Use total + 1 because we're buying the NEXT skill point
+    cost_multiplier = pow(1.5, float(total_skill_points + 1))
+    return int(base_cost * cost_multiplier)
 
 
 def calculate_training_actions_required(stat_level: int, education_level: int = 0) -> int:
@@ -40,46 +54,6 @@ def calculate_training_actions_required(stat_level: int, education_level: int = 
     education_reduction = 1.0 - (education_level * 0.05)
     reduced_actions = int(base_actions * education_reduction)
     return max(1, reduced_actions)
-
-
-def get_stat_value(state, training_type: str) -> int:
-    """Get current stat value for a training type"""
-    stat_map = {
-        "attack": state.attack_power,
-        "defense": state.defense_power,
-        "leadership": state.leadership,
-        "building": state.building_skill,
-        "intelligence": state.intelligence,
-        "science": state.science,
-        "faith": state.faith
-    }
-    return stat_map.get(training_type, 1)
-
-
-def increment_stat(state, training_type: str) -> tuple[str, int]:
-    """Increment the stat and return (stat_name, new_value)"""
-    if training_type == "attack":
-        state.attack_power += 1
-        return "Attack Power", state.attack_power
-    elif training_type == "defense":
-        state.defense_power += 1
-        return "Defense Power", state.defense_power
-    elif training_type == "leadership":
-        state.leadership += 1
-        return "Leadership", state.leadership
-    elif training_type == "building":
-        state.building_skill += 1
-        return "Building Skill", state.building_skill
-    elif training_type == "intelligence":
-        state.intelligence += 1
-        return "Intelligence", state.intelligence
-    elif training_type == "science":
-        state.science += 1
-        return "Science", state.science
-    elif training_type == "faith":
-        state.faith += 1
-        return "Faith", state.faith
-    return "Unknown", 0
 
 
 @router.get("/train/costs")
@@ -95,28 +69,21 @@ def get_training_costs(
             detail="Player state not found"
         )
     
-    total_trainings = state.total_training_purchases or 0
+    # ALL skills cost the SAME based on total skill points
+    total_skill_points = get_total_skill_points(state)
+    unified_cost = calculate_training_cost(total_skill_points)
+    
+    # Generate costs dynamically for all skills
+    costs = {skill_type: unified_cost for skill_type in SKILL_TYPES}
+    
+    # Get current stats dynamically for all skills
+    current_stats = get_all_skill_values(state)
     
     return {
-        "total_training_purchases": total_trainings,
-        "costs": {
-            "attack": calculate_training_cost(state.attack_power, total_trainings),
-            "defense": calculate_training_cost(state.defense_power, total_trainings),
-            "leadership": calculate_training_cost(state.leadership, total_trainings),
-            "building": calculate_training_cost(state.building_skill, total_trainings),
-            "intelligence": calculate_training_cost(state.intelligence, total_trainings),
-            "science": calculate_training_cost(state.science, total_trainings),
-            "faith": calculate_training_cost(state.faith, total_trainings)
-        },
-        "current_stats": {
-            "attack": state.attack_power,
-            "defense": state.defense_power,
-            "leadership": state.leadership,
-            "building": state.building_skill,
-            "intelligence": state.intelligence,
-            "science": state.science,
-            "faith": state.faith
-        },
+        "total_skill_points": total_skill_points,
+        "total_training_purchases": state.total_training_purchases or 0,
+        "costs": costs,
+        "current_stats": current_stats,
         "gold": state.gold
     }
 
@@ -206,9 +173,9 @@ def purchase_training(
         if kingdom:
             education_level = kingdom.education_level
     
-    # Calculate cost and actions required
-    total_trainings = state.total_training_purchases or 0
-    training_cost = calculate_training_cost(current_stat, total_trainings)
+    # Calculate cost based on TOTAL SKILL POINTS across ALL skills
+    total_skill_points = get_total_skill_points(state)
+    training_cost = calculate_training_cost(total_skill_points)
     actions_required = calculate_training_actions_required(current_stat, education_level)
     
     if state.gold < training_cost:
@@ -230,7 +197,7 @@ def purchase_training(
     
     # Spend gold and increment training counter
     state.gold -= training_cost
-    state.total_training_purchases = total_trainings + 1
+    state.total_training_purchases = (state.total_training_purchases or 0) + 1
     
     db.commit()
     db.refresh(contract)

@@ -74,17 +74,29 @@ struct SkillDetailView: View {
                             .fill(skillColor.opacity(0.3))
                             .frame(height: 2)
                         
-                        // Cost - ALWAYS SHOW
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+                        // Cost - Show only for next tier
+                        if tier == currentTier + 1 && currentTier < 5 {
+                            VStack(alignment: .leading, spacing: 12) {
+                                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+                                
+                                ResourceRow(
+                                    icon: "g.circle.fill",
+                                    iconColor: KingdomTheme.Colors.goldLight,
+                                    label: "Gold",
+                                    required: unifiedTrainingCost,
+                                    available: player.gold
+                                )
+                                
+                                // Show note about unified cost scaling
+                                Text("Cost scales with total skill points across all skills")
+                                    .font(FontStyles.labelTiny)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .padding(.top, 4)
+                            }
                             
-                            ResourceRow(
-                                icon: "g.circle.fill",
-                                iconColor: KingdomTheme.Colors.goldLight,
-                                label: "Gold",
-                                required: getCost(tier: tier),
-                                available: player.gold
-                            )
+                            Rectangle()
+                                .fill(skillColor.opacity(0.3))
+                                .frame(height: 2)
                         }
                         
                         // Action button or status - EXACT MapHUD style
@@ -285,32 +297,19 @@ struct SkillDetailView: View {
         }
     }
     
-    private var trainingCost: Int {
-        // FULLY DYNAMIC
-        switch skillType {
-        case "attack": return player.attackTrainingCost
-        case "defense": return player.defenseTrainingCost
-        case "leadership": return player.leadershipTrainingCost
-        case "building": return player.buildingTrainingCost
-        case "intelligence": return player.intelligenceTrainingCost
-        case "science": return player.scienceTrainingCost
-        case "faith": return player.faithTrainingCost
-        default: return 100
-        }
+    private var unifiedTrainingCost: Int {
+        // ALL skills cost the SAME - based on total skill points across ALL skills
+        print("🎯 SkillDetailView: \(skillType) costs \(player.trainingCost)g (unified cost for ALL skills)")
+        return player.trainingCost
     }
     
-    private func getCost(tier: Int) -> Int {
-        // This is a rough estimate since we don't have historical data
-        // The actual cost is based on total training purchases
-        return trainingCost
-    }
     
     private func getActionsRequired(tier: Int) -> Int {
         return max(3, tier + 2)
     }
     
     private var canAffordSelectedTier: Bool {
-        return player.gold >= getCost(tier: selectedTier)
+        return player.gold >= unifiedTrainingCost
     }
     
     private var hasActiveTraining: Bool {

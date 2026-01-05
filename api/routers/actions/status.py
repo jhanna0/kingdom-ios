@@ -12,6 +12,14 @@ from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling
 from .training import calculate_training_cost, TRAINING_TYPES
+from routers.tiers import get_total_skill_points, SKILL_TYPES
+
+
+def _get_training_costs_dict(state) -> dict:
+    """Helper to generate training costs dict for all skills"""
+    total = get_total_skill_points(state)
+    cost = calculate_training_cost(total)
+    return {skill_type: cost for skill_type in SKILL_TYPES}
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (
     WORK_BASE_COOLDOWN,
@@ -462,12 +470,7 @@ def get_action_status(
         "crafting": actions["crafting"],
         "vault_heist": actions.get("vault_heist"),
         "training_contracts": get_training_contracts_for_status(db, current_user.id),
-        "training_costs": {
-            "attack": calculate_training_cost(state.attack_power),
-            "defense": calculate_training_cost(state.defense_power),
-            "leadership": calculate_training_cost(state.leadership),
-            "building": calculate_training_cost(state.building_skill)
-        },
+        "training_costs": _get_training_costs_dict(state),
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,
         "property_upgrade_contracts": property_contracts,

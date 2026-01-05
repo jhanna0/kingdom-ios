@@ -84,7 +84,62 @@ struct CharacterSheetView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Skills grid - 3 rows for all skills + reputation
+            // DYNAMIC skills grid - renders skills from backend!
+            // When backend adds a new skill, it automatically appears here
+            dynamicSkillsGrid
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .task {
+            await loadTrainingContracts()
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func loadTrainingContracts() async {
+        print("🔍 CharacterSheetView: loadTrainingContracts() CALLED")
+        do {
+            let status = try await KingdomAPIService.shared.actions.getActionStatus()
+            print("✅ CharacterSheetView: Got action status response")
+            await MainActor.run {
+                trainingContracts = status.trainingContracts
+                craftingQueue = status.craftingQueue
+                craftingCosts = status.craftingCosts
+                isLoadingContracts = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingContracts = false
+            }
+        }
+    }
+    
+    private func loadMyActivities() async {
+        do {
+            let response = try await KingdomAPIService.shared.friends.getMyActivities(limit: 20, days: 7)
+            await MainActor.run {
+                myActivities = response.activities
+                isLoadingActivities = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingActivities = false
+            }
+        }
+    }
+    
+    // MARK: - Dynamic Skills Grid
+    
+    /// FULLY DYNAMIC skill grid - renders skills from backend data!
+    /// When backend adds a new skill, it automatically appears here without app update.
+    @ViewBuilder
+    private var dynamicSkillsGrid: some View {
+        if player.skillsData.isEmpty {
+            // Fallback to hardcoded skills if backend hasn't sent skills_data yet
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     skillGridButton(
@@ -142,52 +197,18 @@ struct CharacterSheetView: View {
                         skillType: "faith"
                     )
                     
-                    // Reputation button
                     reputationGridButton
                 }
             }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-        .task {
-            await loadTrainingContracts()
-        }
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-    
-    private func loadTrainingContracts() async {
-        print("🔍 CharacterSheetView: loadTrainingContracts() CALLED")
-        do {
-            let status = try await KingdomAPIService.shared.actions.getActionStatus()
-            print("✅ CharacterSheetView: Got action status response")
-            await MainActor.run {
-                trainingContracts = status.trainingContracts
-                craftingQueue = status.craftingQueue
-                craftingCosts = status.craftingCosts
-                isLoadingContracts = false
-            }
-        } catch {
-            await MainActor.run {
-                isLoadingContracts = false
-            }
-        }
-    }
-    
-    private func loadMyActivities() async {
-        do {
-            let response = try await KingdomAPIService.shared.friends.getMyActivities(limit: 20, days: 7)
-            await MainActor.run {
-                myActivities = response.activities
-                isLoadingActivities = false
-            }
-        } catch {
-            await MainActor.run {
-                isLoadingActivities = false
-            }
+        } else {
+            // DYNAMIC: Render skills from backend data in 2-column grid
+            DynamicSkillGridContent(
+                skills: player.skillsData,
+                trainingContracts: trainingContracts,
+                player: player,
+                reputationButton: reputationGridButton,
+                onPurchase: purchaseTraining
+            )
         }
     }
     
@@ -907,6 +928,113 @@ struct MyActivityRow: View {
         }
         .padding(12)
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+    }
+}
+
+// MARK: - Dynamic Skill Grid Content (extracted to fix compiler complexity)
+
+/// Separate struct to help Swift compiler with type checking
+private struct DynamicSkillGridContent: View {
+    let skills: [Player.SkillData]
+    let trainingContracts: [TrainingContract]
+    let player: Player
+    let reputationButton: AnyView
+    let onPurchase: (String) -> Void
+    
+    init(skills: [Player.SkillData], trainingContracts: [TrainingContract], player: Player, reputationButton: some View, onPurchase: @escaping (String) -> Void) {
+        self.skills = skills
+        self.trainingContracts = trainingContracts
+        self.player = player
+        self.reputationButton = AnyView(reputationButton)
+        self.onPurchase = onPurchase
+    }
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            ForEach(0..<rowCount, id: \.self) { rowIndex in
+                skillRow(at: rowIndex)
+            }
+            
+            // If even number of skills, add reputation in its own row
+            if skills.count % 2 == 0 {
+                HStack(spacing: 10) {
+                    reputationButton
+                    Spacer()
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+    
+    private var rowCount: Int {
+        (skills.count + 1) / 2
+    }
+    
+    @ViewBuilder
+    private func skillRow(at rowIndex: Int) -> some View {
+        let firstIndex = rowIndex * 2
+        let secondIndex = firstIndex + 1
+        
+        HStack(spacing: 10) {
+            skillButton(for: skills[firstIndex])
+            
+            if secondIndex < skills.count {
+                skillButton(for: skills[secondIndex])
+            } else {
+                // Last row with odd skills - add reputation button
+                reputationButton
+            }
+        }
+    }
+    
+    private func skillButton(for skill: Player.SkillData) -> some View {
+        NavigationLink(destination: SkillDetailView(
+            player: player,
+            skillType: skill.skillType,
+            trainingContracts: trainingContracts,
+            onPurchase: { onPurchase(skill.skillType) }
+        )) {
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: skill.icon)
+                        .font(FontStyles.iconLarge)
+                        .foregroundColor(.white)
+                        .frame(width: 52, height: 52)
+                        .brutalistBadge(
+                            backgroundColor: SkillConfig.get(skill.skillType).color,
+                            cornerRadius: 12,
+                            shadowOffset: 3,
+                            borderWidth: 2
+                        )
+                    
+                    Text("\(skill.currentTier)")
+                        .font(FontStyles.labelBadge)
+                        .foregroundColor(.white)
+                        .frame(width: 22, height: 22)
+                        .brutalistBadge(
+                            backgroundColor: .black,
+                            cornerRadius: 11,
+                            shadowOffset: 1,
+                            borderWidth: 1.5
+                        )
+                        .offset(x: 6, y: -6)
+                }
+                
+                VStack(spacing: 2) {
+                    Text(skill.displayName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Tier \(skill.currentTier)/\(skill.maxTier)")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+        }
+        .buttonStyle(.plain)
     }
 }
 

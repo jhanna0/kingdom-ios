@@ -42,8 +42,9 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
             expires_at=patrol_cooldown.expires_at
         )
     
-    # Training types
-    training_types = ["attack", "defense", "leadership", "building", "intelligence"]
+    # Import centralized skill types
+    from routers.tiers import SKILL_TYPES
+    training_types = SKILL_TYPES
     
     # Check training contracts from unified_contracts table (active = not completed)
     active_training = db.query(UnifiedContract).filter(

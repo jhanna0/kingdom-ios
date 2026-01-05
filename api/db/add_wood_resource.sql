@@ -9,3 +9,4 @@ ADD COLUMN IF NOT EXISTS wood INTEGER DEFAULT 0;
 UPDATE player_state SET wood = 0 WHERE wood IS NULL;
 
 
+

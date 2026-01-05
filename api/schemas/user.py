@@ -131,6 +131,11 @@ class PlayerState(BaseModel):
     # Active perks (calculated dynamically)
     active_perks: Optional[dict] = None
     
+    # DYNAMIC SKILLS DATA - Frontend can render skills without hardcoding!
+    # List of skill objects with: skill_type, display_name, icon, category, 
+    # description, current_tier, max_tier, training_cost, current_benefits, display_order
+    skills_data: Optional[list] = None
+    
     class Config:
         from_attributes = True
 

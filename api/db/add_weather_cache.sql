@@ -12,3 +12,4 @@ COMMENT ON COLUMN city_boundaries.weather_data IS 'Cached weather data from Open
 COMMENT ON COLUMN city_boundaries.weather_cached_at IS 'Timestamp when weather was last fetched';
 
 
+

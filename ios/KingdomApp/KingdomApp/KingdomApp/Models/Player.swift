@@ -34,17 +34,30 @@ class Player: ObservableObject {
     // Training contracts (active training)
     @Published var trainingContracts: [TrainingContractData] = []
     
-    // Training costs (from backend)
-    @Published var attackTrainingCost: Int = 100
-    @Published var defenseTrainingCost: Int = 100
-    @Published var leadershipTrainingCost: Int = 100
-    @Published var buildingTrainingCost: Int = 100
-    @Published var intelligenceTrainingCost: Int = 100
-    @Published var scienceTrainingCost: Int = 100
-    @Published var faithTrainingCost: Int = 100
+    // Training cost (from backend) - UNIFIED cost for ALL skills based on total skill points
+    @Published var trainingCost: Int = 100
     
     // Active perks (from backend)
     @Published var activePerks: PlayerPerks?
+    
+    // DYNAMIC SKILLS DATA from backend - renders skills without hardcoding!
+    @Published var skillsData: [SkillData] = []
+    
+    /// Skill data from backend for dynamic rendering
+    struct SkillData: Identifiable {
+        let skillType: String
+        let displayName: String
+        let icon: String
+        let category: String
+        let description: String
+        let currentTier: Int
+        let maxTier: Int
+        let trainingCost: Int
+        let currentBenefits: [String]
+        let displayOrder: Int
+        
+        var id: String { skillType }
+    }
     
     // Resources
     @Published var iron: Int = 0
@@ -716,16 +729,12 @@ class Player: ObservableObject {
         totalWorkContributed = apiState.total_work_contributed
         totalTrainingPurchases = apiState.total_training_purchases
         
-        // Training costs from backend
+        // Training cost from backend - ALL skills have the SAME cost based on total skill points
         if let costs = apiState.training_costs {
-            attackTrainingCost = costs.attack
-            defenseTrainingCost = costs.defense
-            leadershipTrainingCost = costs.leadership
-            buildingTrainingCost = costs.building
-            intelligenceTrainingCost = costs.intelligence
-            scienceTrainingCost = costs.science
-            faithTrainingCost = costs.faith
-            print("💰 Updated training costs: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building), science=\(costs.science), faith=\(costs.faith)")
+            // All costs should be identical - just use attack as the unified value
+            trainingCost = costs.attack
+            print("💰 Updated unified training cost: \(costs.attack)g for ALL skills")
+            print("   (Backend sent: attack=\(costs.attack), defense=\(costs.defense), leadership=\(costs.leadership), building=\(costs.building))")
         } else {
             print("⚠️ No training costs in API response")
         }
@@ -792,6 +801,27 @@ class Player: ObservableObject {
             
             activePerks = perks
             print("✨ Updated \(perks.totalPower) total power with perks")
+        }
+        
+        // DYNAMIC SKILLS DATA from backend - no more hardcoding skill lists!
+        if let apiSkillsData = apiState.skills_data {
+            skillsData = apiSkillsData
+                .sorted { $0.display_order < $1.display_order }
+                .map { apiSkill in
+                    SkillData(
+                        skillType: apiSkill.skill_type,
+                        displayName: apiSkill.display_name,
+                        icon: apiSkill.icon,
+                        category: apiSkill.category,
+                        description: apiSkill.description,
+                        currentTier: apiSkill.current_tier,
+                        maxTier: apiSkill.max_tier,
+                        trainingCost: apiSkill.training_cost,
+                        currentBenefits: apiSkill.current_benefits,
+                        displayOrder: apiSkill.display_order
+                    )
+                }
+            print("🎯 Loaded \(skillsData.count) skills from backend dynamically!")
         }
         
         // Backend is source of truth - no local caching

@@ -8,3 +8,4 @@ ADD COLUMN IF NOT EXISTS wood_paid INTEGER DEFAULT 0;
 UPDATE unified_contracts SET wood_paid = 0 WHERE wood_paid IS NULL;
 
 
+

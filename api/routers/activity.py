@@ -195,8 +195,9 @@ def _get_training_activities(db: Session, user_id: int, state: PlayerState, limi
     """Get training activities from unified_contracts table - show individual training actions"""
     activities = []
     
-    # Training types
-    training_types = ["attack", "defense", "leadership", "building", "intelligence"]
+    # Import centralized skill types
+    from routers.tiers import SKILL_TYPES
+    training_types = SKILL_TYPES
     
     # Query individual training contributions (each action performed)
     contributions = db.query(ContractContribution, UnifiedContract).join(
