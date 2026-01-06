@@ -266,10 +266,6 @@ def _handle_caught_saboteur(
     
     saboteur_state.game_data = game_data
     
-    # Set cooldown (tracked in action_cooldowns table)
-    from .utils import set_cooldown
-    set_cooldown(db, saboteur.id, "sabotage")
-    
     return {
         "success": False,
         "caught": True,
@@ -324,10 +320,6 @@ def _handle_successful_sabotage(
         'cost_paid': sabotage_cost
     })
     contract.action_contributions = contributions
-    
-    # Set cooldown (tracked in action_cooldowns table)
-    from .utils import set_cooldown
-    set_cooldown(db, saboteur.id, "sabotage")
     
     # Record sabotage in player's game_data
     game_data = saboteur_state.game_data or {}
@@ -449,6 +441,10 @@ def sabotage_contract(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
+    # Set cooldown IMMEDIATELY to prevent double-click exploits
+    cooldown_expires = datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)
+    set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
+    
     # Check if user has enough gold
     if state.gold < SABOTAGE_COST:
         raise HTTPException(
@@ -524,10 +520,6 @@ def sabotage_contract(
         kingdom=kingdom,
         sabotage_cost=SABOTAGE_COST
     )
-    
-    # Set cooldown in action_cooldowns table
-    cooldown_expires = datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)
-    set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
     
     # Commit all changes
     db.commit()

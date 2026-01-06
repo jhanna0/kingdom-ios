@@ -44,6 +44,10 @@ def perform_farming(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
+    # Set cooldown IMMEDIATELY to prevent double-click exploits
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
+    set_cooldown(db, current_user.id, "farm", cooldown_expires)
+    
     # Check if user is checked in
     if not state.current_kingdom_id:
         raise HTTPException(
@@ -68,10 +72,6 @@ def perform_farming(
     
     # Award gold to player
     state.gold += net_income
-    
-    # Update cooldown
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
-    set_cooldown(db, current_user.id, "farm", cooldown_expires)
     
     # Log activity
     log_activity(

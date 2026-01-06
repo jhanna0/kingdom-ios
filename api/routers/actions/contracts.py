@@ -53,6 +53,10 @@ def work_on_contract(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
+    # Set cooldown IMMEDIATELY to prevent double-click exploits
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    set_cooldown(db, current_user.id, "work", cooldown_expires)
+    
     # Get contract from unified_contracts (kingdom buildings only)
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
@@ -95,10 +99,6 @@ def work_on_contract(
         user_id=current_user.id
     )
     db.add(contribution)
-    
-    # Set cooldown in action_cooldowns table
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-    set_cooldown(db, current_user.id, "work", cooldown_expires)
     
     # Calculate reward - use the ruler-set action_reward
     # NOTE: This only applies to kingdom building contracts (filtered above by BUILDING_TYPES)
@@ -200,6 +200,10 @@ def work_on_property_upgrade(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
+    # Set cooldown IMMEDIATELY to prevent double-click exploits
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    set_cooldown(db, current_user.id, "work", cooldown_expires)
+    
     # Get contract from unified_contracts (property contracts)
     # Property contracts use type='property', tier=1 for construction, tier>1 for upgrades
     contract = db.query(UnifiedContract).filter(
@@ -238,10 +242,6 @@ def work_on_property_upgrade(
         user_id=current_user.id
     )
     db.add(contribution)
-    
-    # Set cooldown
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-    set_cooldown(db, current_user.id, "work", cooldown_expires)
     
     new_actions_completed = actions_completed + 1
     is_complete = new_actions_completed >= contract.actions_required

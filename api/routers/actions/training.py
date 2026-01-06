@@ -254,6 +254,10 @@ def work_on_training(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
+    # Set cooldown IMMEDIATELY to prevent double-click exploits
+    cooldown_expires = datetime.utcnow() + timedelta(hours=2)
+    set_cooldown(db, current_user.id, "training", cooldown_expires)
+    
     # Find the training contract
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
@@ -292,9 +296,6 @@ def work_on_training(
     )
     db.add(contribution)
     
-    # Update cooldown in action_cooldowns table
-    cooldown_expires = datetime.utcnow() + timedelta(hours=2)
-    set_cooldown(db, current_user.id, "training", cooldown_expires)
     state.experience += xp_earned
     
     # Check if training is now complete
