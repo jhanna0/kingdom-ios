@@ -62,6 +62,7 @@ class Player: ObservableObject {
     // Resources
     @Published var iron: Int = 0
     @Published var steel: Int = 0
+    @Published var wood: Int = 0
     
     // Crafting contracts (active crafting)
     @Published var craftingQueue: [CraftingContractData] = []
@@ -745,6 +746,7 @@ class Player: ObservableObject {
         // Resources
         iron = apiState.iron
         steel = apiState.steel
+        wood = apiState.wood
         
         // Equipment
         if let weaponData = apiState.equipped_weapon {

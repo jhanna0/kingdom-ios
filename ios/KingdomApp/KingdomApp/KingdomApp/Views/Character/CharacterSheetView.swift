@@ -28,13 +28,16 @@ struct CharacterSheetView: View {
                 // Combined combat stats and training
                 combatAndTrainingCard
                 
+                // Crafting section
+                craftingInfoCard
+                
+                // Inventory section
+                inventoryCard
+                
                 // Active Perks section
                 if player.activePerks != nil {
                     activePerksCard
                 }
-                
-                // Crafting section
-                craftingInfoCard
                 
                 // My Activity section
                 myActivitySection
@@ -601,45 +604,9 @@ struct CharacterSheetView: View {
                 Spacer()
             }
             
-            // Resources row with brutalist badges
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "cube.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(.gray)
-                    Text("\(player.iron)")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "cube.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(.blue)
-                    Text("\(player.steel)")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-                
-                HStack(spacing: 4) {
-                    Text("\(player.gold)")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    Image(systemName: "g.circle.fill")
-                        .font(FontStyles.iconMini)
-                        .foregroundColor(KingdomTheme.Colors.goldLight)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-            }
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             // Show active crafting contract if exists
             if let activeContract = craftingQueue.first(where: { $0.status != "completed" }) {
@@ -665,10 +632,6 @@ struct CharacterSheetView: View {
             Text("Tap equipment to view all tiers and start crafting")
                 .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
             
             // Equipment grid
             HStack(spacing: 10) {
@@ -760,6 +723,12 @@ struct CharacterSheetView: View {
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Inventory Card
+    
+    private var inventoryCard: some View {
+        InventoryCardView(player: player)
     }
     
     // MARK: - My Activity Section

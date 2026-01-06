@@ -130,6 +130,7 @@ struct APIPlayerState: Codable {
     // Resources
     let iron: Int
     let steel: Int
+    let wood: Int
     
     // Daily Actions
     let last_mining_action: String?
