@@ -254,13 +254,6 @@ def work_on_training(
                 detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
             )
     
-    # Check if user is checked in
-    if not state.current_kingdom_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must be checked into a kingdom to train"
-        )
-    
     # Find the training contract
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,

@@ -83,33 +83,67 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
             tier=active_crafting.tier
         )
     
-    # Check recent actions (within last 2 minutes)
+    # Check recent actions that are still on cooldown
+    # If someone did an action recently and it's still on cooldown, show that activity
     from db.models.action_cooldown import ActionCooldown
-    recent_threshold = now - timedelta(minutes=2)
+    from routers.actions.action_config import ACTION_TYPES
     
-    recent_cooldowns = db.query(ActionCooldown).filter(
-        ActionCooldown.user_id == state.user_id,
-        ActionCooldown.last_performed >= recent_threshold
+    # Get all cooldowns for this user
+    cooldowns = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == state.user_id
     ).all()
     
-    for cooldown in recent_cooldowns:
-        if cooldown.action_type == "work":
+    # Find the most recent action that's still on cooldown
+    most_recent_active = None
+    most_recent_time = None
+    
+    for cooldown in cooldowns:
+        if not cooldown.last_performed:
+            continue
+        
+        # Get the cooldown duration for this action type
+        action_config = ACTION_TYPES.get(cooldown.action_type)
+        if not action_config:
+            continue
+        
+        cooldown_minutes = action_config.get("cooldown_minutes", 120)
+        time_since_action = now - cooldown.last_performed
+        
+        # If the action is still on cooldown, it's a candidate
+        if time_since_action < timedelta(minutes=cooldown_minutes):
+            if most_recent_time is None or cooldown.last_performed > most_recent_time:
+                most_recent_time = cooldown.last_performed
+                most_recent_active = cooldown.action_type
+    
+    # Show the most recent action that's still on cooldown
+    if most_recent_active:
+        if most_recent_active == "work":
             return PlayerActivity(
                 type="working",
                 details="Working on construction"
             )
-        elif cooldown.action_type == "scout":
+        elif most_recent_active == "scout":
             return PlayerActivity(
                 type="scouting",
                 details="Gathering intelligence"
             )
-        elif cooldown.action_type == "sabotage":
+        elif most_recent_active == "sabotage":
             return PlayerActivity(
                 type="sabotage",
                 details="Sabotaging enemy"
             )
+        elif most_recent_active == "farm":
+            return PlayerActivity(
+                type="working",
+                details="Farming for gold"
+            )
+        elif most_recent_active == "chop_wood":
+            return PlayerActivity(
+                type="working",
+                details="Chopping wood"
+            )
     
-    # Default to idle
+    # Default to idle only if no actions are on cooldown
     return PlayerActivity(type="idle")
 
 

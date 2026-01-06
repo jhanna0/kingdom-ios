@@ -135,7 +135,7 @@ struct TrainingContractCard: View {
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
             } else if !isEnabled {
-                Text("Check in to a kingdom to train")
+                Text("Training not available")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)

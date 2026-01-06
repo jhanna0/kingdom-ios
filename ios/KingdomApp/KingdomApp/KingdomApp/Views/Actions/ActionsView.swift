@@ -208,7 +208,7 @@ struct ActionsView: View {
                     status: status.training,
                     fetchedAt: statusFetchedAt ?? Date(),
                     currentTime: currentTime,
-                    isEnabled: currentKingdom != nil,
+                    isEnabled: true,
                     globalCooldownActive: !status.globalCooldown.ready,
                     blockingAction: status.globalCooldown.blockingAction,
                     globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
