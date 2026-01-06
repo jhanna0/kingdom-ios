@@ -5,9 +5,39 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+import json
+import boto3
+from botocore.exceptions import ClientError
 
-# Database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@localhost:5432/kingdom")
+def get_database_url():
+    """Get database URL from Secrets Manager or environment variable"""
+    # Check if we're using Secrets Manager
+    secret_name = os.getenv("RDS_SECRET_NAME")
+    
+    if secret_name:
+        # Fetch credentials from Secrets Manager
+        try:
+            client = boto3.client('secretsmanager', region_name='us-east-1')
+            response = client.get_secret_value(SecretId=secret_name)
+            secret = json.loads(response['SecretString'])
+            
+            # Build DATABASE_URL from components
+            username = secret['username']
+            password = secret['password']
+            endpoint = os.getenv("RDS_ENDPOINT")
+            port = os.getenv("RDS_PORT", "5432")
+            database = os.getenv("RDS_DATABASE", "postgres")
+            
+            return f"postgresql://{username}:{password}@{endpoint}:{port}/{database}"
+        except ClientError as e:
+            print(f"❌ Error fetching secret: {e}")
+            raise
+    
+    # Fallback to DATABASE_URL environment variable (for local dev)
+    return os.getenv("DATABASE_URL", "postgresql://admin:admin@localhost:5432/kingdom")
+
+# Database URL from environment or Secrets Manager
+DATABASE_URL = get_database_url()
 
 # Create engine with Lambda-optimized settings
 engine = create_engine(

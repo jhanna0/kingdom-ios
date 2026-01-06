@@ -9,7 +9,10 @@ provider:
   timeout: 60
   stackName: kingdom-api-stack
   environment:
-    DATABASE_URL: postgresql://postgres:xlbAKC4!B*aK!J.W3tHZraA9#nVU@kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com:5432/postgres
+    RDS_SECRET_NAME: rds!db-5465f705-3666-44af-b197-39944abad239
+    RDS_ENDPOINT: kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com
+    RDS_PORT: '5432'
+    RDS_DATABASE: postgres
     JWT_SECRET_KEY: temp-secret-change-me
     DEV_MODE: 'True'
   vpc:
@@ -29,6 +32,10 @@ provider:
             - ec2:AssignPrivateIpAddresses
             - ec2:UnassignPrivateIpAddresses
           Resource: '*'
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource: 'arn:aws:secretsmanager:us-east-1:*:secret:rds!db-5465f705-3666-44af-b197-39944abad239-*'
 
 functions:
   api:
