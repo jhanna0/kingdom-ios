@@ -13,6 +13,7 @@ struct OnboardingView: View {
     @State private var isLoadingCity = false
     @State private var useCurrentLocation = false
     @State private var selectedCity: String?
+    @State private var selectedCityOsmId: String?  // OSM ID for hometown kingdom
     @State private var selectedCityCoordinate: CLLocationCoordinate2D?
     
     var body: some View {
@@ -29,6 +30,7 @@ struct OnboardingView: View {
                         isLoadingCity: $isLoadingCity,
                         useCurrentLocation: $useCurrentLocation,
                         selectedCity: $selectedCity,
+                        selectedCityOsmId: $selectedCityOsmId,
                         selectedCityCoordinate: $selectedCityCoordinate,
                         onContinue: { currentStep = 2 }
                     )
@@ -49,7 +51,7 @@ struct OnboardingView: View {
         Task {
             await authManager.completeOnboarding(
                 displayName: displayName,
-                hometownKingdomId: selectedCity // This will be the city name for now
+                hometownKingdomId: selectedCityOsmId // Now passing the OSM ID
             )
         }
     }
@@ -283,7 +285,7 @@ struct DisplayNameStep: View {
                     .padding(.top, 4)
                 }
                 
-                Text("Must be unique in \(selectedCity)")
+                Text("Must be unique across all kingdoms")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                     .padding(.top, 4)
@@ -341,6 +343,7 @@ struct HometownStep: View {
     @Binding var isLoadingCity: Bool
     @Binding var useCurrentLocation: Bool
     @Binding var selectedCity: String?
+    @Binding var selectedCityOsmId: String?
     @Binding var selectedCityCoordinate: CLLocationCoordinate2D?
     let onContinue: () -> Void
     
@@ -603,33 +606,29 @@ struct HometownStep: View {
         isLoadingCity = true
         
         Task {
-            // Use geocoder to get city name
-            let geocoder = CLGeocoder()
-            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            
+            // Call API to get city with OSM ID
             do {
-                let placemarks = try await geocoder.reverseGeocodeLocation(location)
+                let apiClient = APIClient.shared
+                let request = apiClient.request(
+                    endpoint: "/cities/current?lat=\(coordinate.latitude)&lon=\(coordinate.longitude)"
+                )
+                
+                let cityResponse: CityBoundaryResponse = try await apiClient.execute(request)
                 
                 await MainActor.run {
-                    if let placemark = placemarks.first {
-                        // Try to get city name from various fields
-                        let cityName = placemark.locality ?? 
-                                      placemark.subLocality ?? 
-                                      placemark.administrativeArea ?? 
-                                      "Unknown City"
-                        
-                        nearbyCity = cityName
-                        selectedCity = cityName
-                        selectedCityCoordinate = coordinate
-                        useCurrentLocation = true
-                    }
+                    nearbyCity = cityResponse.name
+                    selectedCity = cityResponse.name
+                    selectedCityOsmId = cityResponse.osm_id  // Store OSM ID!
+                    selectedCityCoordinate = coordinate
+                    useCurrentLocation = true
                     isLoadingCity = false
                 }
             } catch {
-                print("Geocoding error: \(error)")
+                print("City lookup error: \(error)")
                 await MainActor.run {
                     nearbyCity = "Unknown Location"
                     selectedCity = "Unknown Location"
+                    selectedCityOsmId = nil
                     selectedCityCoordinate = coordinate
                     isLoadingCity = false
                 }

@@ -10,3 +10,7 @@ UPDATE player_state SET wood = 0 WHERE wood IS NULL;
 
 
 
+
+
+
+

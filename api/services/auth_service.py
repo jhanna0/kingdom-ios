@@ -71,29 +71,51 @@ def decode_access_token(token: str) -> dict:
 def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     """Create or get user from Apple Sign In"""
     
+    print(f"🔐 [SIGNUP] Apple Sign In attempt:")
+    print(f"   - apple_user_id: {apple_data.apple_user_id}")
+    print(f"   - email: {apple_data.email}")
+    print(f"   - display_name: {apple_data.display_name}")
+    
     # Check if user already exists with this Apple ID
     existing_user = db.query(User).filter(User.apple_user_id == apple_data.apple_user_id).first()
     
     if existing_user:
+        print(f"✅ [SIGNUP] Existing user found: user_id={existing_user.id}, display_name={existing_user.display_name}")
         # Update last login
         existing_user.last_login = datetime.utcnow()
         db.commit()
         db.refresh(existing_user)
+        
+        # Log player state
+        if existing_user.player_state:
+            print(f"   - Player state: hometown_kingdom_id={existing_user.player_state.hometown_kingdom_id}")
+        else:
+            print(f"   - ⚠️ WARNING: User has no player_state!")
+        
         return existing_user
     
     # Sanitize and validate display name
     display_name = apple_data.display_name or "Player"
+    print(f"📝 [SIGNUP] Creating new user with display_name: {display_name}")
+    
     if display_name != "Player":  # Don't validate default name
         display_name = sanitize_username(display_name)
         is_valid, error_msg = validate_username(display_name)
         if not is_valid:
+            print(f"❌ [SIGNUP] Display name validation failed: {error_msg}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_msg
             )
     
-    # NOTE: Display name uniqueness validation removed - names can be reused across cities
-    # Uniqueness is now tracked via player_state.hometown_kingdom_id, not enforced at DB level
+    # Check if display name is already taken (globally unique)
+    existing_display_name = db.query(User).filter(User.display_name == display_name).first()
+    if existing_display_name:
+        print(f"❌ [SIGNUP] Display name already taken: {display_name}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Display name '{display_name}' is already taken"
+        )
     
     # Create new user - PostgreSQL will auto-generate the ID
     user = User(
@@ -104,6 +126,8 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     
     db.add(user)
     db.flush()  # Flush to get the auto-generated ID
+    
+    print(f"✅ [SIGNUP] User created: user_id={user.id}, display_name={user.display_name}")
     
     # Create player state with default values
     player_state = PlayerState(
@@ -118,6 +142,8 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     db.commit()
     db.refresh(user)
     
+    print(f"✅ [SIGNUP] PlayerState created: hometown_kingdom_id={player_state.hometown_kingdom_id} (should be None)")
+    
     return user
 
 
@@ -129,50 +155,94 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
 
 def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     """Update user profile"""
+    print(f"📝 [UPDATE_PROFILE] Updating user profile:")
+    print(f"   - user_id: {user_id}")
+    print(f"   - updates: {updates}")
+    
     user = get_user_by_id(db, user_id)
     
     if not user:
+        print(f"❌ [UPDATE_PROFILE] User not found: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+    
+    print(f"✅ [UPDATE_PROFILE] User found: display_name={user.display_name}")
     
     # Special handling for display_name updates
     if "display_name" in updates and updates["display_name"] is not None:
         display_name = sanitize_username(updates["display_name"])
         is_valid, error_msg = validate_username(display_name)
         if not is_valid:
+            print(f"❌ [UPDATE_PROFILE] Display name validation failed: {error_msg}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_msg
             )
         
-        # Check if new name is taken in this hometown
-        player_state = user.player_state
-        if player_state and player_state.hometown_kingdom_id:
-            # Check if name is taken by another user with the same hometown
-            name_taken = db.query(User).join(PlayerState).filter(
-                User.display_name == display_name,
-                PlayerState.hometown_kingdom_id == player_state.hometown_kingdom_id,
-                User.id != user_id  # Exclude current user
-            ).first()
-            
-            if name_taken:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Name '{display_name}' is already taken in this city"
-                )
+        # Check if new name is taken (globally unique)
+        name_taken = db.query(User).filter(
+            User.display_name == display_name,
+            User.id != user_id  # Exclude current user
+        ).first()
+        
+        if name_taken:
+            print(f"❌ [UPDATE_PROFILE] Display name already taken: {display_name}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Display name '{display_name}' is already taken"
+            )
         
         updates["display_name"] = display_name
+        print(f"✅ [UPDATE_PROFILE] Display name validated: {display_name}")
     
-    # Update allowed fields
+    # Fields that belong on player_state, not user
+    player_state_fields = {"hometown_kingdom_id", "current_kingdom_id"}
+    
+    # Update user fields
     for key, value in updates.items():
+        if key in player_state_fields:
+            continue  # Handle separately
         if value is not None and hasattr(user, key):
+            print(f"   - Setting user.{key} = {value}")
             setattr(user, key, value)
+    
+    # Update player_state fields
+    player_state = user.player_state
+    if not player_state:
+        print(f"⚠️ [UPDATE_PROFILE] No player_state found, creating new one")
+        player_state = PlayerState(user_id=user.id)
+        db.add(player_state)
+        db.flush()
+    else:
+        print(f"✅ [UPDATE_PROFILE] Player state found: current hometown_kingdom_id={player_state.hometown_kingdom_id}")
+    
+    for key, value in updates.items():
+        if key in player_state_fields and value is not None:
+            print(f"   - Setting player_state.{key} = {value}")
+            setattr(player_state, key, value)
     
     user.updated_at = datetime.utcnow()
     db.commit()
+    
+    print(f"💾 [UPDATE_PROFILE] Changes committed to database")
+    
     db.refresh(user)
+    db.refresh(player_state)  # Refresh player_state explicitly
+    
+    print(f"✅ [UPDATE_PROFILE] Final state (after refresh):")
+    print(f"   - user.display_name: {user.display_name}")
+    print(f"   - player_state.hometown_kingdom_id: {player_state.hometown_kingdom_id}")
+    
+    # Double-check by querying directly from DB
+    from db.models.player_state import PlayerState as DBPlayerState
+    db_check = db.query(DBPlayerState).filter(DBPlayerState.user_id == user.id).first()
+    if db_check:
+        print(f"🔍 [UPDATE_PROFILE] DB verification query:")
+        print(f"   - DB row hometown_kingdom_id: {db_check.hometown_kingdom_id}")
+    else:
+        print(f"⚠️ [UPDATE_PROFILE] WARNING: Could not find player_state in DB for verification!")
     
     return user
 
@@ -181,6 +251,22 @@ def user_to_private_response(user: User) -> dict:
     """Convert User model to UserPrivate response"""
     # Get player state if it exists
     player_state = user.player_state
+    
+    print(f"🔄 [user_to_private_response] Converting user to response:")
+    print(f"   - user.id: {user.id}")
+    print(f"   - user.display_name: {user.display_name}")
+    print(f"   - player_state exists: {player_state is not None}")
+    
+    if player_state:
+        print(f"   - player_state.id: {player_state.id}")
+        print(f"   - player_state.user_id: {player_state.user_id}")
+        print(f"   - player_state.hometown_kingdom_id: {player_state.hometown_kingdom_id}")
+        hometown_id = player_state.hometown_kingdom_id
+    else:
+        print(f"   - ⚠️ WARNING: No player_state found for user!")
+        hometown_id = None
+    
+    print(f"   - hometown_kingdom_id for response: {hometown_id}")
     
     # NOTE: After schema migration, the following fields are no longer on player_state:
     # - reputation: now per-kingdom in user_kingdoms table (using 0 for now)
@@ -194,7 +280,7 @@ def user_to_private_response(user: User) -> dict:
         "email": user.email,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
-        "hometown_kingdom_id": player_state.hometown_kingdom_id if player_state else None,
+        "hometown_kingdom_id": hometown_id,
         "gold": player_state.gold if player_state else 0,
         "level": player_state.level if player_state else 1,
         "experience": player_state.experience if player_state else 0,

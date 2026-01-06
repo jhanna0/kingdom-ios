@@ -94,6 +94,7 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
+    hometown_kingdom_id: Optional[str] = None  # For onboarding
     
     @field_validator('display_name')
     @classmethod

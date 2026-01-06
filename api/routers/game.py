@@ -264,9 +264,8 @@ def create_kingdom(
             user_kingdom = _get_or_create_user_kingdom(db, current_user.id, existing.id)
             user_kingdom.times_conquered = (user_kingdom.times_conquered or 0) + 1
             
-            # Update user stats
-            state.kingdoms_ruled += 1
-            state.total_conquests += 1
+            # Update user stats - mark as claimed starting city
+            state.has_claimed_starting_city = True
             
             db.commit()
             db.refresh(existing)
@@ -302,9 +301,8 @@ def create_kingdom(
     user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom.id)
     user_kingdom.times_conquered = 1
     
-    # Update user stats
-    state.kingdoms_ruled += 1
-    state.total_conquests += 1
+    # Update user stats - mark as claimed starting city
+    state.has_claimed_starting_city = True
     
     db.commit()
     

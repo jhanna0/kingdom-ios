@@ -92,6 +92,13 @@ def get_current_user(
             detail="Account is inactive"
         )
     
+    print(f"🔐 [get_current_user] User authenticated:")
+    print(f"   - user.id: {user.id}")
+    print(f"   - apple_user_id: {apple_user_id}")
+    print(f"   - player_state loaded: {user.player_state is not None}")
+    if user.player_state:
+        print(f"   - player_state.hometown_kingdom_id: {user.player_state.hometown_kingdom_id}")
+    
     return user
 
 
@@ -134,10 +141,17 @@ def apple_signin(apple_data: AppleSignIn, db: Session = Depends(get_db)):
     
     Creates a new account if this is the first time, or logs in existing user
     """
+    print(f"\n{'='*80}")
+    print(f"🍎 [POST /auth/apple-signin] Request received")
+    print(f"{'='*80}\n")
+    
     user = create_user_with_apple(db, apple_data)
     
     # Generate token with apple_user_id (stable identifier)
     access_token = create_access_token(data={"sub": user.apple_user_id})
+    
+    print(f"\n✅ [POST /auth/apple-signin] Token generated for user_id={user.id}")
+    print(f"{'='*80}\n")
     
     return TokenResponse(
         access_token=access_token,
@@ -155,7 +169,22 @@ def get_my_profile(current_user = Depends(get_current_user)):
     
     Includes sensitive information like email, gold, etc.
     """
-    return user_to_private_response(current_user)
+    print(f"\n{'='*80}")
+    print(f"🔍 [GET /auth/me] Request received:")
+    print(f"   - user_id: {current_user.id}")
+    print(f"   - display_name: {current_user.display_name}")
+    if current_user.player_state:
+        print(f"   - player_state.hometown_kingdom_id: {current_user.player_state.hometown_kingdom_id}")
+    else:
+        print(f"   - ⚠️ WARNING: No player_state found!")
+    print(f"{'='*80}\n")
+    
+    response = user_to_private_response(current_user)
+    
+    print(f"📤 [GET /auth/me] Response:")
+    print(f"   - hometown_kingdom_id in response: {response.get('hometown_kingdom_id')}")
+    
+    return response
 
 
 
@@ -183,11 +212,26 @@ def patch_my_profile(
 ):
     """Partially update current user's profile (PATCH)"""
     
+    print(f"\n{'='*80}")
+    print(f"🔄 [PATCH /auth/me] Request received:")
+    print(f"   - current_user.id: {current_user.id}")
+    print(f"   - current_user.display_name: {current_user.display_name}")
+    print(f"   - updates raw: {updates}")
+    print(f"{'='*80}\n")
+    
     # Convert to dict and filter out None values
     update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
     
+    print(f"📦 [PATCH /auth/me] Filtered update_data: {update_data}")
+    
     user = update_user_profile(db, current_user.id, update_data)
-    return user_to_private_response(user)
+    
+    response = user_to_private_response(user)
+    print(f"\n✅ [PATCH /auth/me] Response prepared:")
+    print(f"   - hometown_kingdom_id in response: {response.get('hometown_kingdom_id')}")
+    print(f"{'='*80}\n")
+    
+    return response
 
 
 

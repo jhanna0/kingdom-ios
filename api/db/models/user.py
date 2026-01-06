@@ -24,7 +24,7 @@ class User(Base):
     email = Column(String, nullable=True)
     
     # Profile
-    display_name = Column(String, nullable=False)
+    display_name = Column(String, nullable=False, unique=True, index=True)
     avatar_url = Column(String, nullable=True)
     
     # Account status

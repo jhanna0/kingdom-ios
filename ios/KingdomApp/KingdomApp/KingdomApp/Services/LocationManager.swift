@@ -45,11 +45,12 @@ class LocationManager: NSObject, ObservableObject {
         "somerville": CLLocationCoordinate2D(latitude: 42.3876, longitude: -71.0995),      // Somerville, MA (near Boston)
         "worcester": CLLocationCoordinate2D(latitude: 42.2626, longitude: -71.8023),       // Worcester, MA (central Mass)
         "newburyport": CLLocationCoordinate2D(latitude: 42.8126, longitude: -70.8773),     // Newburyport, MA (north shore)
-        "plymouth": CLLocationCoordinate2D(latitude: 41.9584, longitude: -70.6673)         // Plymouth, MA (historic coastal)
+        "plymouth": CLLocationCoordinate2D(latitude: 41.9584, longitude: -70.6673),        // Plymouth, MA (historic coastal)
+        "beirut": CLLocationCoordinate2D(latitude: 33.8938, longitude: 35.5018)             // Beirut, Lebanon
     ]
     
     /// Fake location for testing (defaults to SF)
-    static var fakeLocation = testCities["concord"]!
+    static var fakeLocation = testCities["sf"]!
     
     override init() {
         super.init()

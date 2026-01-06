@@ -46,3 +46,7 @@ COMMENT ON COLUMN player_activity_log.action_category IS 'Category: kingdom, com
 COMMENT ON COLUMN player_activity_log.visibility IS 'Who can see this: public, friends, private';
 
 
+
+
+
+

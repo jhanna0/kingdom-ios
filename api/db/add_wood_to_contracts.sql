@@ -9,3 +9,7 @@ UPDATE unified_contracts SET wood_paid = 0 WHERE wood_paid IS NULL;
 
 
 
+
+
+
+
