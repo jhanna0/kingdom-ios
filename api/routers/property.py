@@ -101,6 +101,17 @@ def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 
 
 def property_to_response(prop: Property) -> PropertyResponse:
     """Convert Property model to response"""
+    # Ensure timezone info for iOS ISO8601DateFormatter compatibility
+    purchased_str = prop.purchased_at.isoformat()
+    if not purchased_str.endswith('Z') and '+' not in purchased_str:
+        purchased_str += 'Z'
+    
+    last_upgraded_str = None
+    if prop.last_upgraded:
+        last_upgraded_str = prop.last_upgraded.isoformat()
+        if not last_upgraded_str.endswith('Z') and '+' not in last_upgraded_str:
+            last_upgraded_str += 'Z'
+    
     return PropertyResponse(
         id=prop.id,
         kingdom_id=prop.kingdom_id,
@@ -109,8 +120,8 @@ def property_to_response(prop: Property) -> PropertyResponse:
         owner_name=prop.owner_name,
         tier=prop.tier,
         location=prop.location,
-        purchased_at=prop.purchased_at.isoformat(),
-        last_upgraded=prop.last_upgraded.isoformat() if prop.last_upgraded else None
+        purchased_at=purchased_str,
+        last_upgraded=last_upgraded_str
     )
 
 
@@ -557,10 +568,17 @@ def get_property_upgrade_status(
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Ensure timezone info for started_at
+        started_at_str = None
+        if contract.created_at:
+            started_at_str = contract.created_at.isoformat()
+            if not started_at_str.endswith('Z') and '+' not in started_at_str:
+                started_at_str += 'Z'
+        
         active_contract_data = {
             "contract_id": str(contract.id),
             "property_id": property_id,
-            "to_tier": contract.tier,
+            "to_tier": contract.tier or 1,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "status": "completed" if contract.completed_at else "in_progress"

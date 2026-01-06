@@ -2,7 +2,7 @@
 Property model - Player-owned properties
 """
 from sqlalchemy import Column, String, DateTime, Integer, BigInteger, ForeignKey
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..base import Base
 
@@ -27,7 +27,7 @@ class Property(Base):
     
     tier = Column(Integer, default=1)  # 1-5
     location = Column(String, nullable=True)  # "north", "south", "east", "west"
-    purchased_at = Column(DateTime, default=datetime.utcnow)
+    purchased_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_upgraded = Column(DateTime, nullable=True)
     
     def __repr__(self):

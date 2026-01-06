@@ -21,6 +21,7 @@ class PropertyAPI {
         // Convert to Property model
         func toProperty() -> Property {
             let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             
             return Property(
                 id: id,
@@ -191,16 +192,10 @@ class PropertyAPI {
     struct ActiveUpgradeContract: Codable {
         let contract_id: String
         let property_id: String
-        let kingdom_id: String?  // Only for construction (from_tier=0)
-        let kingdom_name: String?  // Only for construction (from_tier=0)
-        let location: String?  // Only for construction (from_tier=0)
-        let from_tier: Int
         let to_tier: Int
         let actions_required: Int
         let actions_completed: Int
-        let cost: Int
         let status: String
-        let started_at: String
     }
     
     func getPropertyUpgradeStatus(propertyId: String) async throws -> PropertyUpgradeStatus {

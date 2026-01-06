@@ -23,7 +23,7 @@ struct PropertyCard: View {
             // Property info
             VStack(alignment: .leading, spacing: 4) {
                 Text(property.tierName)
-                    .font(FontStyles.bodyMediumBold)
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack(spacing: 6) {
