@@ -427,7 +427,7 @@ SKILLS = {
             2: ["10% chance: random ally gets +2 attack OR enemy gets -2 defense"],
             3: ["15% chance: random ally gets +3 defense OR enemy gets -3 defense"],
             4: ["20% chance: 2 random allies get +2 attack OR 2 enemies get -2 attack"],
-            5: ["25% chance: Revive 3s allies or smite 3 enemies during a battle"]
+            5: ["25% chance: Revive 3 allies or smite 3 enemies during a battle"]
         }
     }
 }

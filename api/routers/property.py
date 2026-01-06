@@ -81,18 +81,14 @@ def calculate_upgrade_cost(current_tier: int) -> int:
 
 
 def calculate_wood_required(current_tier: int) -> int:
-    """Calculate wood required for next tier (T1 land clearing doesn't need wood)"""
+    """Calculate wood required for next tier - exponential scaling
+    
+    Formula: 10 * (2 ** tier)
+    """
     next_tier = current_tier + 1
     if next_tier <= 1:
         return 0  # T1 land clearing doesn't need wood
-    # T2-T5 need increasing amounts of wood
-    wood_requirements = {
-        2: 20,   # House needs 20 wood
-        3: 50,   # Workshop needs 50 wood
-        4: 100,  # Beautiful Property needs 100 wood
-        5: 200   # Defensive Walls needs 200 wood
-    }
-    return wood_requirements.get(next_tier, 0)
+    return int(10 * (2 ** next_tier))
 
 
 def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 0) -> int:

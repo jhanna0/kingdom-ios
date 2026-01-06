@@ -44,10 +44,10 @@ struct PropertyCard: View {
             
             Spacer()
             
-            // Tier badge
-            Text("T\(property.tier)")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+            // Chevron to indicate clickable
+            Image(systemName: "chevron.right")
+                .font(FontStyles.iconSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)

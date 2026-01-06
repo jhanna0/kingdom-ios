@@ -235,6 +235,9 @@ struct AuthenticatedView: View {
             NotificationsSheet()
         }
         .task {
+            // Clear notification badge when app opens
+            NotificationManager.shared.clearDeliveredNotifications()
+            
             await appInit.initialize()
             await loadNotificationBadge()
             viewModel.loadInitialCooldown()

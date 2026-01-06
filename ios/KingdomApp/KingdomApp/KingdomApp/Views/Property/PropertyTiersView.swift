@@ -167,7 +167,7 @@ struct PropertyTiersView: View {
                             .fill(Color.black)
                             .offset(x: 2, y: 2)
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(KingdomTheme.Colors.inkMedium)
+                            .fill(KingdomTheme.Colors.buttonSuccess)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.black, lineWidth: 2)
@@ -227,7 +227,7 @@ struct PropertyTiersView: View {
                     Text("Available to Upgrade")
                         .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
@@ -236,7 +236,7 @@ struct PropertyTiersView: View {
                             .fill(Color.black)
                             .offset(x: 2, y: 2)
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(KingdomTheme.Colors.parchment)
+                            .fill(KingdomTheme.Colors.buttonSuccess)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.black, lineWidth: 2)

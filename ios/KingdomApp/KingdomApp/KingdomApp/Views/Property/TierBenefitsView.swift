@@ -129,7 +129,7 @@ struct TierBenefitsView: View {
                             Image(systemName: "g.circle.fill")
                                 .font(FontStyles.iconSmall)
                                 .foregroundColor(KingdomTheme.Colors.goldLight)
-                            Text("\(upgradeCost(from: tier - 1))")
+                            Text("\(tierManager.propertyTierCost(tier) ?? 0)")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
@@ -146,7 +146,7 @@ struct TierBenefitsView: View {
                             Image(systemName: "figure.walk")
                                 .font(FontStyles.iconSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(baseActionsRequired(for: tier - 1)) actions")
+                            Text("\(tierManager.propertyTierActions(tier) ?? 0) actions")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
@@ -209,15 +209,9 @@ struct TierBenefitsView: View {
         return tierManager.propertyTierBenefits(tier)
     }
     
-    private func upgradeCost(from tier: Int) -> Int {
-        let baseCost = 500
-        let nextTier = tier + 1
-        return baseCost * Int(pow(2.0, Double(nextTier - 2)))
-    }
-    
-    private func baseActionsRequired(for tier: Int) -> Int {
-        return 5 + (tier * 2)
-    }
+    // ❌ REMOVED: Hardcoded cost calculations
+    // Now using TierManager.shared which fetches from backend API
+    // Single source of truth: api/routers/tiers.py
     
     private func tierColor(for tier: Int) -> Color {
         // Consistent green for all property tiers
