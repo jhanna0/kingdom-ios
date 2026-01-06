@@ -16,6 +16,10 @@ from .models import (
     KingdomHistory,
     Alliance,
     PlayerActivityLog,
+    MarketOrder,
+    MarketTransaction,
+    OrderType,
+    OrderStatus,
     # New unified models
     UnifiedContract,
     ContractContribution,
@@ -42,6 +46,10 @@ __all__ = [
     "KingdomHistory",
     "Alliance",
     "PlayerActivityLog",
+    "MarketOrder",
+    "MarketTransaction",
+    "OrderType",
+    "OrderStatus",
     # New unified models
     "UnifiedContract",
     "ContractContribution",

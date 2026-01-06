@@ -15,6 +15,7 @@ from .kingdom_history import KingdomHistory
 from .alliance import Alliance
 from .friend import Friend
 from .activity_log import PlayerActivityLog
+from .market_order import MarketOrder, MarketTransaction, OrderType, OrderStatus
 
 # New unified models
 from .unified_contract import UnifiedContract, ContractContribution
@@ -37,6 +38,10 @@ __all__ = [
     "Alliance",
     "Friend",
     "PlayerActivityLog",
+    "MarketOrder",
+    "MarketTransaction",
+    "OrderType",
+    "OrderStatus",
     # New unified models
     "UnifiedContract",
     "ContractContribution",

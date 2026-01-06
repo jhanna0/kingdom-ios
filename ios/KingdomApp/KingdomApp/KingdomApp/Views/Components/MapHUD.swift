@@ -6,6 +6,7 @@ struct MapHUD: View {
     @Binding var showActions: Bool
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
+    @Binding var showMarket: Bool
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     let notificationBadgeCount: Int
@@ -138,6 +139,14 @@ struct MapHUD: View {
                         backgroundColor: KingdomTheme.Colors.buttonSuccess
                     ) {
                         showProperties = true
+                    }
+                    
+                    // Market (icon only)
+                    BrutalistIconButton(
+                        icon: "cart.fill",
+                        backgroundColor: KingdomTheme.Colors.imperialGold
+                    ) {
+                        showMarket = true
                     }
                     
                     // Friends (icon only)

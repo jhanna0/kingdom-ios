@@ -83,6 +83,7 @@ struct AuthenticatedView: View {
     @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
     @State private var showActivity = false
+    @State private var showMarket = false
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
     @State private var hasShownInitialKingdom = false
@@ -111,6 +112,7 @@ struct AuthenticatedView: View {
                     showActions: $showActions,
                     showProperties: $showProperties,
                     showActivity: $showActivity,
+                    showMarket: $showMarket,
                     notificationBadgeCount: notificationBadgeCount
                 )
                 
@@ -230,6 +232,11 @@ struct AuthenticatedView: View {
         }
         .sheet(isPresented: $showActivity) {
             FriendsView()
+        }
+        .sheet(isPresented: $showMarket) {
+            NavigationStack {
+                MarketView()
+            }
         }
         .sheet(isPresented: $showNotifications) {
             NotificationsSheet()
