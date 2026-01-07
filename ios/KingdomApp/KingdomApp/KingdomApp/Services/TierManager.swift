@@ -8,6 +8,7 @@ class TierManager {
     static let shared = TierManager()
     
     var isLoaded: Bool = false
+    var resources: [String: ResourceInfo] = [:]  // Resource configurations from backend
     var properties: PropertyTiersData?
     var equipment: EquipmentTiersData?
     var skillTierNames: [Int: String] = [:]
@@ -25,6 +26,9 @@ class TierManager {
     }
     
     private func loadDefaults() {
+        // Resources loaded from backend ONLY - no defaults!
+        resources = [:]
+        
         // Property defaults
         properties = PropertyTiersData(maxTier: 5, tiers: [
             1: PropertyTierInfo(name: "Land", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil),
@@ -70,6 +74,23 @@ class TierManager {
         print("✅ TierManager: Received response from /tiers")
         
         await MainActor.run {
+            // Resources - load from backend
+            if let resourceData = response.resources {
+                var resourcesDict: [String: ResourceInfo] = [:]
+                for (key, value) in resourceData.types {
+                    resourcesDict[key] = ResourceInfo(
+                        displayName: value.display_name,
+                        icon: value.icon,
+                        colorName: value.color,
+                        description: value.description,
+                        category: value.category,
+                        displayOrder: value.display_order
+                    )
+                }
+                self.resources = resourcesDict
+                print("   - Loaded \(resourcesDict.count) resource types from backend")
+            }
+            
             // Properties - convert string keys to int
             if let propertyData = response.properties {
                 var tiers: [Int: PropertyTierInfo] = [:]
@@ -189,6 +210,7 @@ class TierManager {
             
             self.isLoaded = true
             print("✅ TierManager: Loaded all tier data successfully")
+            print("   - Resources: \(self.resources.count) types")
             print("   - Properties: \(self.properties?.tiers.count ?? 0) tiers")
             print("   - Equipment: \(self.equipment?.tiers.count ?? 0) tiers")
             print("   - Skills: \(self.skillTierNames.count) tiers")
@@ -326,6 +348,18 @@ class TierManager {
         buildingTypes[buildingType]?.tiers[tier]?.description ?? ""
     }
     
+    // MARK: - Resource Accessors
+    
+    /// Get all resource types sorted by display order
+    func getAllResources() -> [(key: String, info: ResourceInfo)] {
+        return resources.sorted { $0.value.displayOrder < $1.value.displayOrder }
+            .map { (key: $0.key, info: $0.value) }
+    }
+    
+    func resourceInfo(_ resourceId: String) -> ResourceInfo? {
+        return resources[resourceId]
+    }
+    
     // MARK: - Constants
     
     func workshopRequiredForCrafting() -> Int {
@@ -336,12 +370,26 @@ class TierManager {
 // MARK: - Response Models
 
 struct AllTiersResponse: Codable {
+    let resources: ResourcesResponseData?
     let properties: PropertyTiersResponseData?
     let equipment: EquipmentTiersResponseData?
     let skills: SkillTiersResponseData?
     let training: TrainingTiersResponseData?
     let buildings: BuildingTiersResponseData?
     let reputation: ReputationTiersResponseData?
+}
+
+struct ResourcesResponseData: Codable {
+    let types: [String: ResourceInfoResponse]
+}
+
+struct ResourceInfoResponse: Codable {
+    let display_name: String
+    let icon: String
+    let color: String  // Color name (theme color or standard SwiftUI color)
+    let description: String
+    let category: String
+    let display_order: Int
 }
 
 struct TrainingTiersResponseData: Codable {
@@ -507,5 +555,15 @@ struct SkillBenefitsData: Codable {
         }
         tierBonuses = intKeyDict
     }
+}
+
+/// Resource info from backend - NO HARDCODING!
+struct ResourceInfo {
+    let displayName: String
+    let icon: String
+    let colorName: String  // Theme color name (e.g., "goldLight", "gray", "blue")
+    let description: String
+    let category: String
+    let displayOrder: Int
 }
 

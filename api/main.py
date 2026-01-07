@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
 
 from db import init_db
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -125,6 +125,7 @@ app.include_router(players.router)
 app.include_router(friends.router)
 app.include_router(activity.router)
 app.include_router(tiers.router)
+app.include_router(resources.router)
 app.include_router(weather.router)
 app.include_router(market.router)
 

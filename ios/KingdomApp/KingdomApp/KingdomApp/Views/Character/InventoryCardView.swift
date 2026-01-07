@@ -1,5 +1,33 @@
 import SwiftUI
 
+// MARK: - Resource Item Model (used for rendering)
+
+struct ResourceItem: Identifiable {
+    let id: String  // Resource key (gold, iron, etc.)
+    let displayName: String
+    let icon: String
+    let color: Color
+    let amount: Int
+}
+
+// MARK: - Color Mapping Helper
+
+private func mapColorName(_ colorName: String) -> Color {
+    switch colorName.lowercased() {
+    case "goldlight": return KingdomTheme.Colors.goldLight
+    case "gray": return .gray
+    case "blue": return .blue
+    case "brown": return .brown
+    case "green": return .green
+    case "red": return .red
+    case "purple": return .purple
+    case "orange": return .orange
+    case "cyan": return .cyan
+    case "yellow": return .yellow
+    default: return KingdomTheme.Colors.inkMedium
+    }
+}
+
 // MARK: - Number Formatting Helper
 
 extension Int {
@@ -42,6 +70,49 @@ extension Int {
 struct InventoryCardView: View {
     @ObservedObject var player: Player
     
+    /// FULLY DYNAMIC: Get resources from backend player state - NO HARDCODING!
+    /// Backend sends complete resource data with amounts - frontend just renders
+    /// Adding new resources only requires backend changes, NO iOS REDEPLOYMENT!
+    private var resources: [ResourceItem] {
+        // Use dynamic resources_data from backend (preferred)
+        if !player.resourcesData.isEmpty {
+            return player.resourcesData.map { resource in
+                ResourceItem(
+                    id: resource.key,
+                    displayName: resource.displayName,
+                    icon: resource.icon,
+                    color: mapColorName(resource.colorName),
+                    amount: resource.amount
+                )
+            }
+        }
+        
+        // Fallback to TierManager + KeyPath mapping (legacy, for old API responses)
+        return TierManager.shared.getAllResources().compactMap { item in
+            guard let amount = getPlayerAmountFallback(for: item.key) else { return nil }
+            return ResourceItem(
+                id: item.key,
+                displayName: item.info.displayName,
+                icon: item.info.icon,
+                color: mapColorName(item.info.colorName),
+                amount: amount
+            )
+        }
+    }
+    
+    /// FALLBACK ONLY: Get resource amount using KeyPath mapping
+    /// Used only when resources_data is not available (old API responses)
+    private func getPlayerAmountFallback(for resourceKey: String) -> Int? {
+        let resourceMap: [String: KeyPath<Player, Int>] = [
+            "gold": \.gold,
+            "iron": \.iron,
+            "steel": \.steel,
+            "wood": \.wood
+        ]
+        guard let keyPath = resourceMap[resourceKey] else { return nil }
+        return player[keyPath: keyPath]
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
@@ -60,36 +131,17 @@ struct InventoryCardView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Resource grid (5 columns)
+            // DYNAMIC: Render all resources from backend config
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
-                    InventoryGridItem(
-                        icon: "g.circle.fill",
-                        iconColor: KingdomTheme.Colors.goldLight,
-                        name: "Gold",
-                        amount: player.gold
-                    )
-                    
-                    InventoryGridItem(
-                        icon: "cube.fill",
-                        iconColor: .gray,
-                        name: "Iron",
-                        amount: player.iron
-                    )
-                    
-                    InventoryGridItem(
-                        icon: "cube.fill",
-                        iconColor: .blue,
-                        name: "Steel",
-                        amount: player.steel
-                    )
-                    
-                    InventoryGridItem(
-                        icon: "tree.fill",
-                        iconColor: .brown,
-                        name: "Wood",
-                        amount: player.wood
-                    )
+                    ForEach(resources) { resource in
+                        InventoryGridItem(
+                            icon: resource.icon,
+                            iconColor: resource.color,
+                            name: resource.displayName,
+                            amount: resource.amount
+                        )
+                    }
                     
                     Spacer()
                         .frame(maxWidth: .infinity)

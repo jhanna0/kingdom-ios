@@ -127,7 +127,23 @@ struct APIPlayerState: Codable {
         var id: String { skill_type }
     }
     
-    // Resources
+    // DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
+    // When present, use this instead of individual iron/steel/wood fields
+    let resources_data: [ResourceData]?
+    
+    struct ResourceData: Codable, Identifiable {
+        let key: String           // Resource key (gold, iron, steel, wood, etc.)
+        let amount: Int           // Current amount player has
+        let display_name: String  // "Gold", "Iron", etc.
+        let icon: String          // SF Symbol name
+        let color: String         // Theme color name
+        let category: String      // "currency", "material", etc.
+        let display_order: Int    // Sort order
+        
+        var id: String { key }
+    }
+    
+    // Resources (legacy - use resources_data for dynamic rendering)
     let iron: Int
     let steel: Int
     let wood: Int

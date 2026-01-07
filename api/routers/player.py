@@ -239,10 +239,36 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     # Calculate training costs based on TOTAL SKILL POINTS across ALL skills
     # Import here to avoid circular dependency
     from routers.tiers import get_total_skill_points, SKILL_TYPES, get_skills_data_for_player
+    from routers.resources import RESOURCES
     
     # All skills have the SAME cost - only total matters
     total_skill_points = get_total_skill_points(state)
     unified_cost = calculate_training_cost(total_skill_points)
+    
+    # Build DYNAMIC resources data - frontend renders without hardcoding!
+    # Maps resource keys to player state columns (gold is in state.gold, iron in state.iron, etc.)
+    resource_column_map = {
+        "gold": state.gold,
+        "iron": state.iron,
+        "steel": state.steel,
+        "wood": state.wood,
+    }
+    
+    resources_data = []
+    for resource_key, resource_config in RESOURCES.items():
+        amount = resource_column_map.get(resource_key, 0)
+        resources_data.append({
+            "key": resource_key,
+            "amount": amount,
+            "display_name": resource_config["display_name"],
+            "icon": resource_config["icon"],
+            "color": resource_config["color"],
+            "category": resource_config["category"],
+            "display_order": resource_config["display_order"],
+        })
+    
+    # Sort by display order
+    resources_data.sort(key=lambda x: x["display_order"])
     
     # Generate training costs dynamically for all skills
     training_costs = {skill_type: unified_cost for skill_type in SKILL_TYPES}
@@ -383,6 +409,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         
         # DYNAMIC SKILLS DATA - Frontend can render without hardcoding skills!
         skills_data=skills_data,
+        
+        # DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
+        resources_data=resources_data,
     )
 
 

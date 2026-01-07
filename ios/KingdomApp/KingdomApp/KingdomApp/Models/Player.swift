@@ -59,10 +59,27 @@ class Player: ObservableObject {
         var id: String { skillType }
     }
     
-    // Resources
+    // Resources (legacy individual properties - kept for backwards compatibility)
     @Published var iron: Int = 0
     @Published var steel: Int = 0
     @Published var wood: Int = 0
+    
+    // DYNAMIC RESOURCES DATA from backend - renders inventory without hardcoding!
+    // This is the source of truth - use this for dynamic inventory rendering
+    @Published var resourcesData: [ResourceData] = []
+    
+    /// Dynamic resource data from backend for rendering
+    struct ResourceData: Identifiable {
+        let key: String           // Resource key (gold, iron, steel, wood, etc.)
+        let amount: Int           // Current amount player has
+        let displayName: String   // "Gold", "Iron", etc.
+        let icon: String          // SF Symbol name
+        let colorName: String     // Theme color name
+        let category: String      // "currency", "material", etc.
+        let displayOrder: Int     // Sort order
+        
+        var id: String { key }
+    }
     
     // Crafting contracts (active crafting)
     @Published var craftingQueue: [CraftingContractData] = []
@@ -743,10 +760,28 @@ class Player: ObservableObject {
         // Training contracts from backend (Note: this comes from action status, not player state)
         // The trainingContracts will be updated when action status is fetched
         
-        // Resources
+        // Resources (legacy individual properties)
         iron = apiState.iron
         steel = apiState.steel
         wood = apiState.wood
+        
+        // DYNAMIC RESOURCES DATA from backend - no more hardcoding!
+        if let apiResourcesData = apiState.resources_data {
+            resourcesData = apiResourcesData
+                .sorted { $0.display_order < $1.display_order }
+                .map { apiResource in
+                    ResourceData(
+                        key: apiResource.key,
+                        amount: apiResource.amount,
+                        displayName: apiResource.display_name,
+                        icon: apiResource.icon,
+                        colorName: apiResource.color,
+                        category: apiResource.category,
+                        displayOrder: apiResource.display_order
+                    )
+                }
+            print("📦 Loaded \(resourcesData.count) resources from backend dynamically!")
+        }
         
         // Equipment
         if let weaponData = apiState.equipped_weapon {

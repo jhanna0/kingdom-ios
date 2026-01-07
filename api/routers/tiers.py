@@ -577,8 +577,12 @@ def get_all_tiers():
     Single source of truth - NO MORE HARDCODING IN FRONTEND!
     """
     from .actions.action_config import ACTION_TYPES
+    from .resources import RESOURCES
     
     return {
+        "resources": {
+            "types": RESOURCES  # Import from resources.py
+        },
         "properties": {
             "max_tier": 5,
             "tiers": {str(k): v for k, v in PROPERTY_TIERS.items()}
@@ -829,4 +833,3 @@ def get_action_config_endpoint(action_type: str):
         "action_type": action_type,
         **config
     }
-

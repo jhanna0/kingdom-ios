@@ -136,6 +136,11 @@ class PlayerState(BaseModel):
     # description, current_tier, max_tier, training_cost, current_benefits, display_order
     skills_data: Optional[list] = None
     
+    # DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
+    # List of resource objects with: key, amount, display_name, icon, color, category, display_order
+    # When this is present, frontend should use it instead of individual iron/steel/wood fields
+    resources_data: Optional[list] = None
+    
     class Config:
         from_attributes = True
 
