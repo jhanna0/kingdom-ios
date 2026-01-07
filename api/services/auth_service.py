@@ -218,10 +218,26 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     else:
         print(f"✅ [UPDATE_PROFILE] Player state found: current hometown_kingdom_id={player_state.hometown_kingdom_id}")
     
+    # Track if we're setting hometown_kingdom_id during onboarding
+    is_setting_hometown = False
+    hometown_value = None
+    
     for key, value in updates.items():
         if key in player_state_fields and value is not None:
             print(f"   - Setting player_state.{key} = {value}")
             setattr(player_state, key, value)
+            
+            # Track hometown updates
+            if key == "hometown_kingdom_id":
+                is_setting_hometown = True
+                hometown_value = value
+    
+    # FIX: When setting hometown during onboarding, also set current_kingdom_id
+    # This ensures the user can immediately claim their hometown kingdom without
+    # needing to close and reopen the app
+    if is_setting_hometown and hometown_value and not player_state.current_kingdom_id:
+        print(f"🏠 [UPDATE_PROFILE] Setting hometown - also setting current_kingdom_id to {hometown_value}")
+        player_state.current_kingdom_id = hometown_value
     
     user.updated_at = datetime.utcnow()
     db.commit()
