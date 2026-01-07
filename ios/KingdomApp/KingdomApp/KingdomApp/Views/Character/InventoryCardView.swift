@@ -60,9 +60,9 @@ struct InventoryCardView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Resource grid (3 columns)
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
+            // Resource grid (5 columns)
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
                     InventoryGridItem(
                         icon: "g.circle.fill",
                         iconColor: KingdomTheme.Colors.goldLight,
@@ -83,18 +83,13 @@ struct InventoryCardView: View {
                         name: "Steel",
                         amount: player.steel
                     )
-                }
-                
-                HStack(spacing: 10) {
+                    
                     InventoryGridItem(
                         icon: "tree.fill",
                         iconColor: .brown,
                         name: "Wood",
                         amount: player.wood
                     )
-                    
-                    Spacer()
-                        .frame(maxWidth: .infinity)
                     
                     Spacer()
                         .frame(maxWidth: .infinity)
@@ -119,38 +114,40 @@ struct InventoryGridItem: View {
             ZStack(alignment: .topTrailing) {
                 // Icon background
                 Image(systemName: icon)
-                    .font(FontStyles.iconLarge)
+                    .font(.system(size: 18))
                     .foregroundColor(.white)
-                    .frame(width: 52, height: 52)
+                    .frame(width: 36, height: 36)
                     .brutalistBadge(
                         backgroundColor: iconColor,
-                        cornerRadius: 12,
-                        shadowOffset: 3,
+                        cornerRadius: 8,
+                        shadowOffset: 2,
                         borderWidth: 2
                     )
                 
                 // Amount badge with Runescape-style colors
                 Text(amount.abbreviated())
-                    .font(FontStyles.labelBadge)
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundColor(amount.valueColor())
-                    .padding(.horizontal, 6)
-                    .frame(minWidth: 22, minHeight: 22)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 18, minHeight: 18)
                     .brutalistBadge(
                         backgroundColor: .black,
-                        cornerRadius: 11,
+                        cornerRadius: 9,
                         shadowOffset: 1,
                         borderWidth: 1.5
                     )
-                    .offset(x: 6, y: -6)
+                    .offset(x: 4, y: -4)
             }
             
             Text(name)
-                .font(FontStyles.bodyMediumBold)
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+        .padding(.vertical, 8)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
     }
 }
 
