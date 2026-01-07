@@ -13,6 +13,9 @@ struct CharacterSheetView: View {
     @State private var isLoadingContracts = true
     @State private var myActivities: [ActivityLogEntry] = []
     @State private var isLoadingActivities = true
+    @State private var showRelocationSheet = false
+    @State private var relocationStatus: RelocationStatusResponse?
+    @State private var isLoadingRelocationStatus = false
     
     var body: some View {
         ScrollView {
@@ -24,6 +27,11 @@ struct CharacterSheetView: View {
                     gold: player.gold,
                     rulerOf: player.isRuler ? player.currentKingdomName : nil
                 )
+                
+                // Hometown section (only show if not in hometown)
+                if player.currentKingdom != player.hometownKingdomId {
+                    hometownCard
+                }
                 
                 // Combined combat stats and training
                 combatAndTrainingCard
@@ -46,6 +54,16 @@ struct CharacterSheetView: View {
         }
         .task {
             await loadMyActivities()
+            await loadRelocationStatus()
+        }
+        .sheet(isPresented: $showRelocationSheet) {
+            RelocationSheetView(
+                player: player,
+                relocationStatus: relocationStatus,
+                onRelocate: {
+                    await relocateHometown()
+                }
+            )
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
         .navigationTitle("Character Sheet")
@@ -63,6 +81,72 @@ struct CharacterSheetView: View {
                 .foregroundColor(KingdomTheme.Colors.buttonPrimary)
             }
         }
+    }
+    
+    // MARK: - Hometown Card
+    
+    private var hometownCard: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack {
+                Image(systemName: "house.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.royalBlue)
+                
+                Text("Hometown")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                if isLoadingRelocationStatus {
+                    ProgressView()
+                        .tint(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Travel to a kingdom and tap below to set it as your hometown.")
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                // Relocation button
+                Button(action: {
+                    showRelocationSheet = true
+                }) {
+                    HStack {
+                        Image(systemName: "house.fill")
+                            .font(FontStyles.iconSmall)
+                        
+                        if let status = relocationStatus {
+                            if status.can_relocate {
+                                Text("Set \(player.currentKingdomName ?? "Current Kingdom") as Hometown")
+                            } else {
+                                Text("Available in \(status.days_until_available) days")
+                            }
+                        } else {
+                            Text("Set as Hometown")
+                        }
+                    }
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .brutalistBadge(
+                    backgroundColor: relocationStatus?.can_relocate == true ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkLight,
+                    cornerRadius: 8,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+                .disabled(relocationStatus?.can_relocate != true)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Combined Combat & Training Card
@@ -131,6 +215,60 @@ struct CharacterSheetView: View {
         } catch {
             await MainActor.run {
                 isLoadingActivities = false
+            }
+        }
+    }
+    
+    private func loadRelocationStatus() async {
+        isLoadingRelocationStatus = true
+        do {
+            let status = try await KingdomAPIService.shared.player.getRelocationStatus()
+            await MainActor.run {
+                relocationStatus = status
+                isLoadingRelocationStatus = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingRelocationStatus = false
+            }
+            print("❌ Failed to load relocation status: \(error)")
+        }
+    }
+    
+    private func relocateHometown() async {
+        do {
+            let response = try await KingdomAPIService.shared.player.relocateHometown()
+            
+            // Refresh player state
+            let playerState = try await KingdomAPIService.shared.player.loadState()
+            
+            await MainActor.run {
+                player.updateFromAPIState(playerState)
+                
+                // Show success message
+                if response.lost_ruler_status {
+                    errorMessage = "Relocated to \(response.new_hometown_name). You lost ruler status in \(response.old_hometown_name)."
+                } else {
+                    errorMessage = "Successfully relocated to \(response.new_hometown_name)!"
+                }
+                showError = true
+                
+                // Reload relocation status
+                Task {
+                    await loadRelocationStatus()
+                }
+                
+                // Haptic feedback
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showError = true
+                
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
             }
         }
     }
@@ -1004,6 +1142,102 @@ private struct DynamicSkillGridContent: View {
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Relocation Sheet View
+
+struct RelocationSheetView: View {
+    @ObservedObject var player: Player
+    let relocationStatus: RelocationStatusResponse?
+    let onRelocate: () async -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var isRelocating = false
+    @State private var showConfirmation = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                if let status = relocationStatus {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            if let currentKingdomName = player.currentKingdomName {
+                                Text("Set \(currentKingdomName) as your hometown?")
+                                    .font(FontStyles.headingLarge)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                
+                                Text("Your hometown appears in royal blue on the map. You can change this once every \(status.cooldown_days) days.")
+                                    .font(FontStyles.bodyMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                
+                                Button(action: {
+                                    showConfirmation = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "house.fill")
+                                            .font(FontStyles.iconSmall)
+                                        Text("Confirm")
+                                    }
+                                    .font(FontStyles.bodyLargeBold)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                }
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
+                            }
+                        }
+                        .padding()
+                    }
+                } else {
+                    ProgressView()
+                        .tint(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
+            .navigationTitle("Relocate Hometown")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .font(KingdomTheme.Typography.headline())
+                    .fontWeight(.semibold)
+                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                }
+            }
+            .alert("Confirm Relocation", isPresented: $showConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Relocate", role: .destructive) {
+                    Task {
+                        isRelocating = true
+                        await onRelocate()
+                        isRelocating = false
+                        dismiss()
+                    }
+                }
+            } message: {
+                if let kingdomName = player.currentKingdomName {
+                    Text("Set \(kingdomName) as your hometown? This will appear in royal blue on your map.")
+                }
+            }
+            .overlay {
+                if isRelocating {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                        
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.5)
+                    }
+                }
+            }
+        }
     }
 }
 

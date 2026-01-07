@@ -8,6 +8,7 @@ import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from fastapi import HTTPException, status
 
 from db import User, UserKingdom, PlayerState
@@ -108,8 +109,10 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
                 detail=error_msg
             )
     
-    # Check if display name is already taken (globally unique)
-    existing_display_name = db.query(User).filter(User.display_name == display_name).first()
+    # Check if display name is already taken (globally unique, case-insensitive)
+    existing_display_name = db.query(User).filter(
+        func.lower(User.display_name) == func.lower(display_name)
+    ).first()
     if existing_display_name:
         print(f"❌ [SIGNUP] Display name already taken: {display_name}")
         raise HTTPException(
@@ -181,9 +184,9 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
                 detail=error_msg
             )
         
-        # Check if new name is taken (globally unique)
+        # Check if new name is taken (globally unique, case-insensitive)
         name_taken = db.query(User).filter(
-            User.display_name == display_name,
+            func.lower(User.display_name) == func.lower(display_name),
             User.id != user_id  # Exclude current user
         ).first()
         

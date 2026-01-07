@@ -968,3 +968,124 @@ def dev_boost(
         "reputation_boosted": reputation_boosted
     }
 
+
+@router.post("/relocate-hometown")
+def relocate_hometown(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Relocate player's hometown to their current kingdom
+    - Can only be done once every 60 days (after first change)
+    - First change is free (no cooldown)
+    - If player rules current hometown in a different empire, they lose ruler status
+    """
+    state = get_or_create_player_state(db, current_user)
+    
+    # Use current kingdom as new hometown
+    if not state.current_kingdom_id:
+        raise HTTPException(status_code=400, detail="You must be in a kingdom to relocate")
+    
+    kingdom_id = state.current_kingdom_id
+    
+    # Validate new kingdom exists
+    new_kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+    if not new_kingdom:
+        raise HTTPException(status_code=404, detail="Current kingdom not found")
+    
+    # Check if already hometown
+    if state.hometown_kingdom_id == kingdom_id:
+        raise HTTPException(status_code=400, detail="This is already your hometown")
+    
+    # Check cooldown (60 days)
+    cooldown_days = 60
+    if state.last_hometown_change:
+        time_since_change = datetime.utcnow() - state.last_hometown_change
+        days_remaining = cooldown_days - time_since_change.days
+        if days_remaining > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"You can relocate again in {days_remaining} days"
+            )
+    
+    # Get current hometown info
+    old_hometown = None
+    old_empire_id = None
+    will_lose_ruler_status = False
+    
+    if state.hometown_kingdom_id:
+        old_hometown = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+        if old_hometown:
+            old_empire_id = old_hometown.empire_id or old_hometown.id
+            
+            # Check if player rules their current hometown
+            if old_hometown.ruler_id == current_user.id:
+                new_empire_id = new_kingdom.empire_id or new_kingdom.id
+                
+                # Only lose ruler status if moving to different empire
+                if old_empire_id != new_empire_id:
+                    will_lose_ruler_status = True
+                    old_hometown.ruler_id = None
+                    print(f"👑❌ {current_user.display_name} lost ruler status in {old_hometown.name} due to relocation")
+    
+    # Update hometown
+    old_hometown_name = old_hometown.name if old_hometown else "Unknown"
+    state.hometown_kingdom_id = kingdom_id
+    state.last_hometown_change = datetime.utcnow()
+    
+    # Log the relocation
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="relocate_hometown",
+        action_category="kingdom",
+        description=f"Relocated hometown from {old_hometown_name} to {new_kingdom.name}",
+        kingdom_id=kingdom_id,
+        details={
+            "from_kingdom": old_hometown_name,
+            "to_kingdom": new_kingdom.name,
+            "lost_ruler_status": will_lose_ruler_status
+        },
+        visibility="private"
+    )
+    
+    db.commit()
+    
+    print(f"🏠 {current_user.display_name} relocated hometown: {old_hometown_name} → {new_kingdom.name}")
+    
+    return {
+        "success": True,
+        "message": f"Hometown relocated to {new_kingdom.name}",
+        "new_hometown_id": kingdom_id,
+        "new_hometown_name": new_kingdom.name,
+        "old_hometown_name": old_hometown_name,
+        "lost_ruler_status": will_lose_ruler_status,
+        "next_relocation_available": (datetime.utcnow() + timedelta(days=cooldown_days)).isoformat()
+    }
+
+
+@router.get("/relocation-status")
+def get_relocation_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check if player can relocate hometown and when
+    """
+    state = get_or_create_player_state(db, current_user)
+    
+    cooldown_days = 60
+    can_relocate = True
+    days_until_available = 0
+    
+    if state.last_hometown_change:
+        time_since_change = datetime.utcnow() - state.last_hometown_change
+        days_until_available = max(0, cooldown_days - time_since_change.days)
+        can_relocate = days_until_available == 0
+    
+    return {
+        "can_relocate": can_relocate,
+        "days_until_available": days_until_available,
+        "cooldown_days": cooldown_days
+    }
+

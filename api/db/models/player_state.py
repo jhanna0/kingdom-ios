@@ -59,6 +59,9 @@ class PlayerState(Base):
     # One-time flags
     has_claimed_starting_city = Column(Boolean, default=False)
     
+    # Hometown relocation tracking
+    last_hometown_change = Column(DateTime, nullable=True)  # NULL = never changed (first change is free)
+    
     # Training cost scaling (can't compute this easily)
     total_training_purchases = Column(Integer, default=0)
     

@@ -198,5 +198,45 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Hometown Relocation
+    
+    /// Get hometown relocation status (cooldown, eligibility, warnings)
+    func getRelocationStatus() async throws -> RelocationStatusResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/player/relocation-status")
+        return try await client.execute(request)
+    }
+    
+    /// Relocate hometown to current kingdom
+    func relocateHometown() async throws -> RelocationResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/player/relocate-hometown", method: "POST")
+        return try await client.execute(request)
+    }
+    
+}
+
+// MARK: - Relocation Response Models
+
+struct RelocationStatusResponse: Codable {
+    let can_relocate: Bool
+    let days_until_available: Int
+    let cooldown_days: Int
+}
+
+struct RelocationResponse: Codable {
+    let success: Bool
+    let message: String
+    let new_hometown_id: String
+    let new_hometown_name: String
+    let old_hometown_name: String
+    let lost_ruler_status: Bool
+    let next_relocation_available: String
 }
 

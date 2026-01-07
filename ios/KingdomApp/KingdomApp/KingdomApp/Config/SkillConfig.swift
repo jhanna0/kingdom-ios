@@ -50,6 +50,18 @@ struct SkillConfig {
             displayName: "Faith",
             icon: "hands.sparkles.fill",
             color: Color(red: 0.65, green: 0.55, blue: 0.95)  // Deep lavender - holy vibes with better visibility
+        ),
+        "philosophy": SkillConfig(
+            type: "philosophy",
+            displayName: "Philosophy",
+            icon: "book.fill",
+            color: Color(red: 0.6, green: 0.5, blue: 0.35)  // Warm bronze - wisdom and ancient knowledge
+        ),
+        "merchant": SkillConfig(
+            type: "merchant",
+            displayName: "Merchant",
+            icon: "dollarsign.circle.fill",
+            color: Color(red: 0.85, green: 0.65, blue: 0.2)  // Rich amber gold - wealth and trade
         )
     ]
     
