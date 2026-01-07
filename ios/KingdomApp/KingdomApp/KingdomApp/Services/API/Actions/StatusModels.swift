@@ -1,16 +1,63 @@
 import Foundation
 
-// MARK: - Global Cooldown
+// MARK: - Global Cooldown (Legacy)
 
 struct GlobalCooldown: Codable {
     let ready: Bool
     let secondsRemaining: Int
     let blockingAction: String?
+    let blockingSlot: String?  // NEW: Which slot is blocking
     
     enum CodingKeys: String, CodingKey {
         case ready
         case secondsRemaining = "seconds_remaining"
         case blockingAction = "blocking_action"
+        case blockingSlot = "blocking_slot"
+    }
+}
+
+// MARK: - Slot Cooldown (NEW: Parallel Actions)
+
+/// Per-slot cooldown status - enables parallel actions!
+struct SlotCooldown: Codable {
+    let ready: Bool
+    let secondsRemaining: Int
+    let blockingAction: String?
+    let blockingSlot: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case ready
+        case secondsRemaining = "seconds_remaining"
+        case blockingAction = "blocking_action"
+        case blockingSlot = "blocking_slot"
+    }
+}
+
+// MARK: - Slot Info (NEW: Backend-driven slot rendering)
+
+/// Slot definition from backend - frontend renders these dynamically!
+/// NO hardcoding of slot names, icons, or colors allowed.
+struct SlotInfo: Codable, Identifiable {
+    let id: String
+    let displayName: String
+    let icon: String
+    let colorTheme: String
+    let displayOrder: Int
+    let description: String?
+    let location: String  // "home", "enemy", or "any"
+    let contentType: String  // "actions", "training_contracts", "building_contracts" - tells frontend which renderer to use
+    let actions: [String]  // Action keys that belong to this slot
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case icon
+        case colorTheme = "color_theme"
+        case displayOrder = "display_order"
+        case description
+        case location
+        case contentType = "content_type"
+        case actions
     }
 }
 
@@ -59,6 +106,7 @@ struct ActionStatus: Codable {
     let themeColor: String?  // Maps to KingdomTheme.Colors
     let displayOrder: Int?
     let endpoint: String?  // FULLY DYNAMIC: Backend provides complete endpoint with all params
+    let slot: String?  // NEW: Which slot this action belongs to (building, economy, security, etc)
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -78,12 +126,19 @@ struct ActionStatus: Codable {
         case themeColor = "theme_color"
         case displayOrder = "display_order"
         case endpoint
+        case slot  // NEW
     }
 }
 
 // MARK: - All Action Status (Combined Response)
 
 struct AllActionStatus: Codable {
+    // NEW: Parallel actions support
+    let parallelActionsEnabled: Bool?
+    let slotCooldowns: [String: SlotCooldown]?  // NEW: Per-slot cooldowns
+    let slots: [SlotInfo]?  // NEW: Slot definitions from backend (display names, icons, colors, order)
+    
+    // Legacy global cooldown (kept for backward compatibility)
     let globalCooldown: GlobalCooldown
     let actions: [String: ActionStatus]  // DYNAMIC - API decides what actions are available
     
@@ -104,7 +159,20 @@ struct AllActionStatus: Codable {
     let propertyUpgradeContracts: [PropertyUpgradeContract]?
     let contracts: [APIContract]
     
+    // Helper to check if parallel actions are enabled
+    var supportsParallelActions: Bool {
+        return parallelActionsEnabled == true && slotCooldowns != nil
+    }
+    
+    // Helper to get cooldown for a specific slot
+    func cooldown(for slot: String) -> SlotCooldown? {
+        return slotCooldowns?[slot]
+    }
+    
     enum CodingKeys: String, CodingKey {
+        case parallelActionsEnabled = "parallel_actions_enabled"
+        case slotCooldowns = "slot_cooldowns"
+        case slots  // NEW: Slot definitions from backend
         case globalCooldown = "global_cooldown"
         case actions
         case work, patrol, farm, sabotage, scout, training, crafting, contracts
@@ -114,6 +182,24 @@ struct AllActionStatus: Codable {
         case craftingQueue = "crafting_queue"
         case craftingCosts = "crafting_costs"
         case propertyUpgradeContracts = "property_upgrade_contracts"
+    }
+    
+    // Helper to get slots for a specific location
+    func slotsForLocation(_ location: String) -> [SlotInfo] {
+        guard let allSlots = slots else { return [] }
+        return allSlots
+            .filter { $0.location == "any" || $0.location == location }
+            .sorted { $0.displayOrder < $1.displayOrder }
+    }
+    
+    // Get home kingdom slots (beneficial actions)
+    var homeSlots: [SlotInfo] {
+        slotsForLocation("home")
+    }
+    
+    // Get enemy kingdom slots (hostile actions)
+    var enemySlots: [SlotInfo] {
+        slotsForLocation("enemy")
     }
 }
 

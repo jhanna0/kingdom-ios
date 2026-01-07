@@ -429,6 +429,34 @@ SKILLS = {
             4: ["20% chance: 2 random allies get +2 attack OR 2 enemies get -2 attack"],
             5: ["25% chance: Revive 3 allies or smite 3 enemies during a battle"]
         }
+    },
+    "philosophy": {
+        "display_name": "Philosophy",
+        "stat_attribute": "philosophy",
+        "icon": "book.fill",
+        "category": "civic",
+        "description": "Increases reputation gains and reduces penalties",
+        "benefits": {
+            1: ["+10% reputation from all actions", "-10% reputation loss from failed coups"],
+            2: ["+20% reputation from all actions", "-20% reputation loss from failed coups"],
+            3: ["+30% reputation from all actions", "Check-ins award 2x reputation", "-30% rep loss from fails"],
+            4: ["+40% reputation from all actions", "-40% reputation loss from failed actions"],
+            5: ["+50% reputation from all actions", "-50% reputation loss", "Unlock: Start coup votes in kingdoms where you have 100+ rep (instead of 150)"]
+        }
+    },
+    "merchant": {
+        "display_name": "Merchant",
+        "stat_attribute": "merchant",
+        "icon": "dollarsign.circle.fill",
+        "category": "economy",
+        "description": "Reduces taxes and improves trading capacity",
+        "benefits": {
+            1: ["-5% tax on all transactions", "+10% gold from building contracts"],
+            2: ["-10% tax on all transactions", "+20% gold from building contracts", "Can list 2 market orders at once"],
+            3: ["-15% tax on all transactions", "+30% gold from building contracts", "Can list 3 market orders at once"],
+            4: ["-20% tax on all transactions", "+40% gold from building contracts", "Can list 4 market orders at once"],
+            5: ["-25% tax on all transactions", "+50% gold from building contracts", "Can list 5 market orders at once", "No market listing fees"]
+        }
     }
 }
 

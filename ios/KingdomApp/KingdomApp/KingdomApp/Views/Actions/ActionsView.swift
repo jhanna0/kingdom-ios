@@ -154,17 +154,7 @@ struct ActionsView: View {
     
     @ViewBuilder
     private func actionStatusContent(status: AllActionStatus) -> some View {
-        // Training Contracts
-        if !status.trainingContracts.isEmpty {
-            trainingSection(status: status)
-        }
-        
-        // Property Upgrade Contracts
-        if let propertyContracts = status.propertyUpgradeContracts, !propertyContracts.isEmpty {
-            propertyUpgradeSection(contracts: propertyContracts, status: status)
-        }
-        
-        // Location-based actions
+        // ALL slots rendered dynamically from backend - no duplicates!
         if isInHomeKingdom {
             beneficialActionsSection(status: status)
         } else if isInEnemyKingdom {
@@ -179,214 +169,228 @@ struct ActionsView: View {
         }
     }
     
-    // MARK: - Training Section
+    private func formatTime(seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else if seconds < 3600 {
+            let mins = seconds / 60
+            return "\(mins)m"
+        } else {
+            let hours = seconds / 3600
+            let mins = (seconds % 3600) / 60
+            return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
+        }
+    }
     
-    private func trainingSection(status: AllActionStatus) -> some View {
+    // MARK: - Beneficial Actions (Home Kingdom) - DYNAMICALLY RENDERED FROM BACKEND
+    
+    private func beneficialActionsSection(status: AllActionStatus) -> some View {
         Group {
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-                .padding(.horizontal)
-            
-            Text("Character Training")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
-            
-            Text("Train your skills - complete actions to level up (2 hour cooldown)")
-                .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.bottom, KingdomTheme.Spacing.small)
-            
-            ForEach(status.trainingContracts.filter { $0.status != "completed" }) { contract in
-                TrainingContractCard(
-                    contract: contract,
-                    status: status.training,
-                    fetchedAt: statusFetchedAt ?? Date(),
-                    currentTime: currentTime,
-                    isEnabled: true,
-                    globalCooldownActive: !status.globalCooldown.ready,
-                    blockingAction: status.globalCooldown.blockingAction,
-                    globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                    onAction: { performTraining(contractId: contract.id) }
-                )
+            // DYNAMIC: Render all home slots from backend
+            ForEach(status.homeSlots) { slot in
+                dynamicSlotSection(slot: slot, status: status)
             }
         }
     }
     
-    // MARK: - Property Upgrade Section
+    // MARK: - Dynamic Slot Section Renderer
     
-    private func propertyUpgradeSection(contracts: [PropertyUpgradeContract], status: AllActionStatus) -> some View {
-        Group {
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-                .padding(.horizontal)
+    /// Renders a slot section with header and all its actions
+    /// Frontend is a "dumb renderer" - all organization comes from backend
+    @ViewBuilder
+    private func dynamicSlotSection(slot: SlotInfo, status: AllActionStatus) -> some View {
+        // Check if this slot has any content to show
+        let hasContent = slotHasContent(slot: slot, status: status)
+        
+        if hasContent {
+            // Section header with slot metadata from backend
+            dynamicSectionHeader(slot: slot, status: status)
             
-            Text("Property Upgrades")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
+            // Slot description from backend
+            if let description = slot.description, !description.isEmpty {
+                Text(description)
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, KingdomTheme.Spacing.small)
+            }
             
-            Text("Build and upgrade your properties - complete work actions to finish")
-                .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.bottom, KingdomTheme.Spacing.small)
+            // Render slot-specific content
+            renderSlotContent(slot: slot, status: status)
+        }
+    }
+    
+    /// Check if a slot has any content to display - uses contentType from backend!
+    private func slotHasContent(slot: SlotInfo, status: AllActionStatus) -> Bool {
+        switch slot.contentType {
+        case "training_contracts":
+            return !status.trainingContracts.filter { $0.status != "completed" }.isEmpty
+        case "building_contracts":
+            let hasKingdomContracts = !availableContractsInKingdom.isEmpty
+            let hasPropertyContracts = !(status.propertyUpgradeContracts?.filter { $0.status != "completed" }.isEmpty ?? true)
+            return hasKingdomContracts || hasPropertyContracts
+        case "actions":
+            let slotActions = slot.actions.compactMap { status.actions[$0] }
+            return !slotActions.isEmpty
+        default:
+            return false
+        }
+    }
+    
+    /// Render content for a specific slot - uses contentType from backend, NO hardcoded slot IDs!
+    @ViewBuilder
+    private func renderSlotContent(slot: SlotInfo, status: AllActionStatus) -> some View {
+        switch slot.contentType {
+        case "training_contracts":
+            renderTrainingContracts(slot: slot, status: status)
             
-            ForEach(contracts.filter { $0.status != "completed" }) { contract in
+        case "building_contracts":
+            renderBuildingContracts(slot: slot, status: status)
+            
+        case "actions":
+            renderSlotActions(slot: slot, status: status)
+            
+        default:
+            EmptyView()
+        }
+    }
+    
+    // MARK: - Content Type Renderers (driven by backend contentType)
+    
+    @ViewBuilder
+    private func renderTrainingContracts(slot: SlotInfo, status: AllActionStatus) -> some View {
+        let cooldown = status.cooldown(for: slot.id)
+        let isReady = cooldown?.ready ?? true
+        let remainingSeconds = cooldown?.secondsRemaining ?? 0
+        
+        ForEach(status.trainingContracts.filter { $0.status != "completed" }) { contract in
+            TrainingContractCard(
+                contract: contract,
+                status: status.training,
+                fetchedAt: statusFetchedAt ?? Date(),
+                currentTime: currentTime,
+                isEnabled: true,
+                globalCooldownActive: !isReady,
+                blockingAction: cooldown?.blockingAction,
+                globalCooldownSecondsRemaining: remainingSeconds,
+                onAction: { performTraining(contractId: contract.id) }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private func renderBuildingContracts(slot: SlotInfo, status: AllActionStatus) -> some View {
+        let cooldown = status.cooldown(for: slot.id)
+        let isReady = cooldown?.ready ?? true
+        let remainingSeconds = cooldown?.secondsRemaining ?? 0
+        
+        // Kingdom building contracts
+        ForEach(availableContractsInKingdom) { contract in
+            WorkContractCard(
+                contract: contract,
+                status: status.work,
+                fetchedAt: statusFetchedAt ?? Date(),
+                currentTime: currentTime,
+                globalCooldownActive: !isReady,
+                blockingAction: cooldown?.blockingAction,
+                globalCooldownSecondsRemaining: remainingSeconds,
+                onAction: { performWork(contractId: contract.id) }
+            )
+        }
+        
+        // Property upgrade contracts
+        if let propertyContracts = status.propertyUpgradeContracts {
+            ForEach(propertyContracts.filter { $0.status != "completed" }) { contract in
                 PropertyUpgradeContractCard(
                     contract: contract,
                     fetchedAt: statusFetchedAt ?? Date(),
                     currentTime: currentTime,
-                    globalCooldownActive: !status.globalCooldown.ready,
-                    blockingAction: status.globalCooldown.blockingAction,
-                    globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
+                    globalCooldownActive: !isReady,
+                    blockingAction: cooldown?.blockingAction,
+                    globalCooldownSecondsRemaining: remainingSeconds,
                     onAction: { performPropertyUpgrade(contractId: contract.id) }
                 )
             }
         }
     }
     
-    // MARK: - Beneficial Actions (Home Kingdom)
-    
-    private func beneficialActionsSection(status: AllActionStatus) -> some View {
-        Group {
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-                .padding(.horizontal)
-            
-            Text("Kingdom Project")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
-            
-            // Work on Contracts
-            if !availableContractsInKingdom.isEmpty {
-                ForEach(availableContractsInKingdom) { contract in
-                    WorkContractCard(
-                        contract: contract,
-                        status: status.work,
-                        fetchedAt: statusFetchedAt ?? Date(),
-                        currentTime: currentTime,
-                        globalCooldownActive: !status.globalCooldown.ready,
-                        blockingAction: status.globalCooldown.blockingAction,
-                        globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                        onAction: { performWork(contractId: contract.id) }
-                    )
-                }
-            } else {
-                InfoCard(
-                    title: "No Active Contracts",
-                    icon: "hammer.fill",
-                    description: "Ruler can create contracts for building upgrades",
-                    color: .gray
-                )
-            }
-            
-            // Divider
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
-            
-            Text("Beneficial Actions")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
-            
-            // Farm (Always available)
-            ActionCard(
-                title: "Farm",
-                icon: "leaf.fill",
-                description: "Work the fields to earn gold",
-                status: status.farm,
-                fetchedAt: statusFetchedAt ?? Date(),
-                currentTime: currentTime,
-                isEnabled: true,
-                activeCount: nil,
-                globalCooldownActive: !status.globalCooldown.ready,
-                blockingAction: status.globalCooldown.blockingAction,
-                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                onAction: { performFarming() }
-            )
-            
-            // Patrol
-            ActionCard(
-                title: "Patrol",
-                icon: "eye.fill",
-                description: "Guard against saboteurs for 10 minutes",
-                status: status.patrol,
-                fetchedAt: statusFetchedAt ?? Date(),
-                currentTime: currentTime,
-                isEnabled: true,
-                activeCount: status.patrol.activePatrollers,
-                globalCooldownActive: !status.globalCooldown.ready,
-                blockingAction: status.globalCooldown.blockingAction,
-                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
-                onAction: { performPatrol() }
-            )
+    @ViewBuilder
+    private func renderSlotActions(slot: SlotInfo, status: AllActionStatus) -> some View {
+        let slotActions = slot.actions.compactMap { key in
+            status.actions[key].map { (key: key, action: $0) }
+        }
+        ForEach(slotActions.sorted { ($0.action.displayOrder ?? 999) < ($1.action.displayOrder ?? 999) }, id: \.key) { item in
+            renderAction(key: item.key, action: item.action, status: status)
         }
     }
     
-    // MARK: - Hostile Actions (Enemy Kingdom)
+    // MARK: - Dynamic Section Header (Backend-driven)
     
-    private func hostileActionsSection(status: AllActionStatus) -> some View {
-        Group {
+    private func dynamicSectionHeader(slot: SlotInfo, status: AllActionStatus) -> some View {
+        let cooldown = status.cooldown(for: slot.id)
+        let isReady = cooldown?.ready ?? true
+        let remainingSeconds = cooldown?.secondsRemaining ?? 0
+        
+        return VStack(alignment: .leading, spacing: 4) {
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 2)
                 .padding(.horizontal)
             
-            Text("Hostile Actions")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, KingdomTheme.Spacing.medium)
-            
-            // DYNAMIC: Render all hostile actions from API
-            ForEach(Array(sortedActions(status.actions, category: "hostile").enumerated()), id: \.element.key) { index, item in
-                renderAction(key: item.key, action: item.value, status: status)
-                    .id(item.key)  // Use key as stable ID
+            HStack {
+                // Icon from backend
+                Image(systemName: slot.icon)
+                    .font(.headline)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                // Display name from backend
+                Text(slot.displayName)
+                    .font(FontStyles.headingLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                if !isReady {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                        Text(formatTime(seconds: remainingSeconds))
+                    }
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                        Text("Ready")
+                    }
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, KingdomTheme.Spacing.medium)
+        }
+    }
+    
+    // MARK: - Hostile Actions (Enemy Kingdom) - DYNAMICALLY RENDERED FROM BACKEND
+    
+    private func hostileActionsSection(status: AllActionStatus) -> some View {
+        Group {
+            // DYNAMIC: Render all enemy slots from backend
+            ForEach(status.enemySlots) { slot in
+                dynamicSlotSection(slot: slot, status: status)
             }
         }
     }
     
     // MARK: - Dynamic Action Rendering
     
-    private func sortedActions(_ actions: [String: ActionStatus], category: String) -> [(key: String, value: ActionStatus)] {
-        let sorted = actions
-            .filter { $0.value.category == category }
-            .sorted { 
-                // First sort by display order
-                let order1 = $0.value.displayOrder ?? 999
-                let order2 = $1.value.displayOrder ?? 999
-                if order1 != order2 {
-                    return order1 < order2
-                }
-                // Then by key name for stability
-                return $0.key < $1.key
-            }
-        return sorted
-    }
-    
     @ViewBuilder
     private func renderAction(key: String, action: ActionStatus, status: AllActionStatus) -> some View {
         if action.unlocked == true {
+            let actionCooldown = getSlotCooldown(for: action, status: status)
             ActionCard(
                 title: action.title ?? key.capitalized,
                 icon: action.icon ?? "circle.fill",
@@ -396,9 +400,9 @@ struct ActionsView: View {
                 currentTime: currentTime,
                 isEnabled: true,
                 activeCount: action.activePatrollers,
-                globalCooldownActive: !status.globalCooldown.ready,
-                blockingAction: status.globalCooldown.blockingAction,
-                globalCooldownSecondsRemaining: status.globalCooldown.secondsRemaining,
+                globalCooldownActive: actionCooldown.active,
+                blockingAction: actionCooldown.blockingAction,
+                globalCooldownSecondsRemaining: actionCooldown.seconds,
                 onAction: { performGenericAction(action: action) }
             )
         } else {
@@ -432,8 +436,8 @@ struct ActionsView: View {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: action.title ?? "Action")
+                // Schedule notification for cooldown completion (use action's slot)
+                await scheduleNotificationForCooldown(actionName: action.title ?? "Action", slot: action.slot)
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -551,8 +555,8 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: "Work")
+                // Schedule notification for cooldown completion (use slot from action status)
+                await scheduleNotificationForCooldown(actionName: "Work", slot: actionStatus?.work.slot)
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -576,101 +580,6 @@ extension ActionsView {
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performPatrol() {
-        Task {
-            do {
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.startPatrol()
-                
-                await loadActionStatus(force: true)
-                await viewModel.refreshPlayerFromBackend()
-                viewModel.refreshCooldown()
-                
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: "Patrol")
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: rewards.gold ?? 0,
-                            reputationReward: rewards.reputation ?? 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: previousGold,
-                            previousReputation: previousReputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-        }
-    }
-    
-    private func performFarming() {
-        Task {
-            do {
-                let previousGold = viewModel.player.gold
-                let previousReputation = viewModel.player.reputation
-                let previousExperience = viewModel.player.experience
-                
-                let response = try await KingdomAPIService.shared.actions.performFarming()
-                
-                await loadActionStatus(force: true)
-                await viewModel.refreshPlayerFromBackend()
-                viewModel.refreshCooldown()
-                
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: "Farming")
-                
-                await MainActor.run {
-                    if let rewards = response.rewards {
-                        currentReward = Reward(
-                            goldReward: rewards.gold ?? 0,
-                            reputationReward: rewards.reputation ?? 0,
-                            experienceReward: rewards.experience ?? 0,
-                            message: response.message,
-                            previousGold: previousGold,
-                            previousReputation: previousReputation,
-                            previousExperience: previousExperience,
-                            currentGold: viewModel.player.gold,
-                            currentReputation: viewModel.player.reputation,
-                            currentExperience: viewModel.player.experience
-                        )
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            showReward = true
-                        }
-                    }
-                }
-            } catch let error as APIError {
-                print("❌ Farm action error: \(error)")
-                await MainActor.run {
-                    errorMessage = "Farm Error: \(error.localizedDescription)"
-                    showError = true
-                }
-            } catch {
-                print("❌ Farm action error: \(error)")
-                await MainActor.run {
-                    errorMessage = "Farm Error: \(error.localizedDescription)"
                     showError = true
                 }
             }
@@ -688,8 +597,8 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: "Training")
+                // Schedule notification for cooldown completion (use slot from action status)
+                await scheduleNotificationForCooldown(actionName: "Training", slot: actionStatus?.training.slot)
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
@@ -728,8 +637,8 @@ extension ActionsView {
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
-                // Schedule notification for cooldown completion
-                await scheduleNotificationForCooldown(actionName: "Property Upgrade")
+                // Schedule notification for cooldown completion (use slot from action status)
+                await scheduleNotificationForCooldown(actionName: "Property Upgrade", slot: actionStatus?.work.slot)
                 
                 await MainActor.run {
                     currentReward = Reward(
@@ -760,25 +669,35 @@ extension ActionsView {
     // MARK: - Centralized Notification Helper
     
     /// Schedule notification for action cooldown completion
-    /// Reads the current global cooldown and schedules a local notification
-    private func scheduleNotificationForCooldown(actionName: String) async {
+    /// NEW: Supports parallel actions - schedules per-slot notifications
+    private func scheduleNotificationForCooldown(actionName: String, slot: String? = nil) async {
         guard let status = actionStatus else { return }
         
-        // Get cooldown seconds from global cooldown
-        let cooldownSeconds = status.globalCooldown.secondsRemaining ?? 0
+        var cooldownSeconds = 0
+        
+        // If parallel actions enabled and we have a slot, use slot-specific cooldown
+        if status.supportsParallelActions, let slot = slot, let slotCooldown = status.cooldown(for: slot) {
+            cooldownSeconds = slotCooldown.secondsRemaining
+            print("📱 Scheduling notification for \(actionName) (\(slot) slot) - \(cooldownSeconds)s")
+        } else {
+            // Fallback to global cooldown
+            cooldownSeconds = status.globalCooldown.secondsRemaining
+            print("📱 Scheduling notification for \(actionName) (global) - \(cooldownSeconds)s")
+        }
         
         // Schedule notification if there's a cooldown
         if cooldownSeconds > 0 {
             await NotificationManager.shared.scheduleActionCooldownNotification(
                 actionName: actionName,
-                cooldownSeconds: cooldownSeconds
+                cooldownSeconds: cooldownSeconds,
+                slot: slot
             )
         }
     }
     
 }
 
-// MARK: - Timer & Kingdom Status
+    // MARK: - Timer & Kingdom Status
 
 extension ActionsView {
     private func startUIUpdateTimer() {
@@ -806,6 +725,29 @@ extension ActionsView {
             isInEnemyKingdom = !isInHomeKingdom
             print("♻️ Updated kingdom status cache for \(kingdom.name)")
         }
+    }
+    
+    // MARK: - Slot Cooldown Helpers (NEW)
+    
+    /// Get cooldown info for a specific action's slot
+    private func getSlotCooldown(for action: ActionStatus, status: AllActionStatus) -> (active: Bool, seconds: Int, blockingAction: String?) {
+        // If parallel actions enabled, check slot-specific cooldown
+        if status.supportsParallelActions, let slot = action.slot {
+            if let slotCooldown = status.cooldown(for: slot) {
+                return (
+                    active: !slotCooldown.ready,
+                    seconds: slotCooldown.secondsRemaining,
+                    blockingAction: slotCooldown.blockingAction
+                )
+            }
+        }
+        
+        // Fallback to global cooldown (legacy)
+        return (
+            active: !status.globalCooldown.ready,
+            seconds: status.globalCooldown.secondsRemaining,
+            blockingAction: status.globalCooldown.blockingAction
+        )
     }
 }
 

@@ -90,3 +90,4 @@ class MarketTransaction(Base):
     def __repr__(self):
         return f"<MarketTransaction(id={self.id}, {self.quantity} {self.item_type} @ {self.price_per_unit}g, total={self.total_gold}g)>"
 
+

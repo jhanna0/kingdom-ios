@@ -46,6 +46,8 @@ class PlayerState(Base):
     intelligence = Column(Integer, default=0)
     science = Column(Integer, default=0)
     faith = Column(Integer, default=0)
+    philosophy = Column(Integer, default=0)
+    merchant = Column(Integer, default=0)
     
     # Combat debuff (temporary)
     attack_debuff = Column(Integer, default=0)

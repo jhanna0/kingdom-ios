@@ -186,17 +186,28 @@ def get_action_status(
         ).all()
         contracts = [contract_to_response(c, db) for c in contracts_query]
     
-    # Check global action cooldown (ONE ACTION AT A TIME!)
-    global_cooldown = check_global_action_cooldown_from_table(
-        db,
-        current_user.id,
-        work_cooldown, 
-        patrol_cooldown,
-        farm_cooldown,
-        sabotage_cooldown, 
-        scout_cooldown, 
-        training_cooldown
-    )
+    # Check slot-based cooldowns (PARALLEL ACTIONS!)
+    # Each slot can have one action running - different slots can run in parallel
+    from .action_config import get_action_slot, get_all_slot_definitions, get_slots_for_location, SLOT_DEFINITIONS, ACTION_SLOTS
+    
+    slot_cooldowns = {}
+    action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout", "sabotage", "chop_wood"]
+    
+    for action_type in action_types_to_check:
+        slot = get_action_slot(action_type)
+        if slot not in slot_cooldowns:
+            cooldown_info = check_global_action_cooldown_from_table(
+                db,
+                current_user.id,
+                current_action_type=action_type,
+                work_cooldown=work_cooldown, 
+                patrol_cooldown=patrol_cooldown,
+                farm_cooldown=farm_cooldown,
+                sabotage_cooldown=sabotage_cooldown, 
+                scout_cooldown=scout_cooldown, 
+                training_cooldown=training_cooldown
+            )
+            slot_cooldowns[slot] = cooldown_info
     
     # Get crafting costs for all tiers
     crafting_costs = {}
@@ -457,8 +468,37 @@ def get_action_status(
             "endpoint": None
         }
     
+    # Add slot information to each action
+    for action_key, action_data in actions.items():
+        action_data["slot"] = get_action_slot(action_key)
+    
+    # Build slots array with actions for each slot
+    # Frontend renders this dynamically - no hardcoding!
+    slots = []
+    for slot_def in get_all_slot_definitions():
+        slot_id = slot_def["id"]
+        # Get actions that belong to this slot
+        slot_actions = [
+            action_key for action_key, action_data in actions.items()
+            if action_data.get("slot") == slot_id
+        ]
+        slots.append({
+            "id": slot_id,
+            "display_name": slot_def["display_name"],
+            "icon": slot_def["icon"],
+            "color_theme": slot_def["color_theme"],
+            "display_order": slot_def["display_order"],
+            "description": slot_def["description"],
+            "location": slot_def["location"],
+            "content_type": slot_def["content_type"],  # Tells frontend which renderer to use
+            "actions": slot_actions,
+        })
+    
     return {
-        "global_cooldown": global_cooldown,
+        "parallel_actions_enabled": True,  # NEW: Signals to frontend that parallel actions are supported
+        "slot_cooldowns": slot_cooldowns,  # NEW: Per-slot cooldown status
+        "slots": slots,  # NEW: Full slot metadata for frontend rendering (no hardcoding!)
+        "global_cooldown": slot_cooldowns.get("building", {"ready": True, "seconds_remaining": 0}),  # For old clients
         "actions": actions,  # DYNAMIC ACTION LIST
         # Legacy structure for backward compatibility
         "work": actions["work"],

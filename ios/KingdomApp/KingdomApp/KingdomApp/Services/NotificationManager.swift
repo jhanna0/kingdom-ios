@@ -46,13 +46,12 @@ class NotificationManager {
     // MARK: - Schedule Action Cooldown Notification
     
     /// Schedule a notification for when an action cooldown completes
+    /// NEW: Supports parallel actions - multiple notifications can be scheduled at once
     /// - Parameters:
-    ///   - actionName: Name of the action (e.g. "Farming", "Training")
+    ///   - actionName: Name of the action (e.g. "Farming", "Training", "Work")
     ///   - cooldownSeconds: How many seconds until the cooldown completes
-    func scheduleActionCooldownNotification(actionName: String, cooldownSeconds: Int) async {
-        // Cancel any existing cooldown notifications
-        await cancelActionCooldownNotifications()
-        
+    ///   - slot: Optional slot identifier for parallel actions (e.g. "economy", "building")
+    func scheduleActionCooldownNotification(actionName: String, cooldownSeconds: Int, slot: String? = nil) async {
         // Don't schedule if cooldown is too short (< 5 seconds)
         guard cooldownSeconds > 5 else {
             print("⏭️ Skipping notification - cooldown too short (\(cooldownSeconds)s)")
@@ -73,32 +72,84 @@ class NotificationManager {
             print("⚠️ Warning: Sound is not enabled in notification settings!")
         }
         
-        // Create notification content
+        // Create unique identifier per slot (enables parallel notifications!)
+        let identifier = slot != nil ? "cooldown_\(slot!)" : "cooldown_global"
+        
+        // Create notification content with better messaging
         let content = UNMutableNotificationContent()
-        content.title = "You are Idle!"
-        content.body = ""
+        content.title = "Action Complete!"
+        content.body = formatCompletionMessage(for: actionName)
         content.sound = UNNotificationSound.default
         content.badge = 1
         content.categoryIdentifier = "ACTION_COOLDOWN"
         
+        // Add slot info to userInfo for future use
+        if let slot = slot {
+            content.userInfo = ["slot": slot, "action": actionName]
+        }
+        
+        // Cancel existing notification for this specific slot
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
         // Schedule for cooldown completion
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(cooldownSeconds), repeats: false)
-        let request = UNNotificationRequest(identifier: "action_cooldown", content: content, trigger: trigger)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
         
         do {
             try await UNUserNotificationCenter.current().add(request)
-            print("✅ Scheduled notification for \(actionName) in \(cooldownSeconds)s")
+            let slotInfo = slot != nil ? " [\(slot!) slot]" : ""
+            print("✅ Scheduled notification for \(actionName)\(slotInfo) in \(cooldownSeconds)s (ID: \(identifier))")
         } catch {
             print("❌ Error scheduling notification: \(error)")
         }
+    }
+    
+    /// Format a completion message for the action
+    /// Examples: "You are no longer farming", "You are no longer training"
+    private func formatCompletionMessage(for actionName: String) -> String {
+        let lowercased = actionName.lowercased()
+        
+        // Handle gerunds (actions ending in -ing)
+        if lowercased.hasSuffix("ing") {
+            // "Farming" -> "You are no longer farming"
+            // "Training" -> "You are no longer training"
+            return "You are no longer \(lowercased)"
+        }
+        
+        // Handle "Work" specially
+        if lowercased == "work" {
+            return "You are no longer working"
+        }
+        
+        // Handle "Patrol" specially
+        if lowercased == "patrol" {
+            return "You are no longer on patrol"
+        }
+        
+        // Default: "You can [action] again"
+        return "You can \(lowercased) again"
     }
     
     // MARK: - Cancel Notifications
     
     /// Cancel all action cooldown notifications
     func cancelActionCooldownNotifications() async {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["action_cooldown"])
-        print("🗑️ Cancelled existing action cooldown notifications")
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [
+            "cooldown_global",
+            "cooldown_building",
+            "cooldown_economy",
+            "cooldown_security",
+            "cooldown_personal",
+            "cooldown_intelligence"
+        ])
+        print("🗑️ Cancelled all action cooldown notifications")
+    }
+    
+    /// Cancel notification for a specific slot
+    func cancelSlotNotification(slot: String) {
+        let identifier = "cooldown_\(slot)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        print("🗑️ Cancelled \(slot) slot notification")
     }
     
     /// Clear all delivered notifications (badge count)

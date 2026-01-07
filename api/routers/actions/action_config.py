@@ -177,6 +177,132 @@ ACTION_TYPES = {
 }
 
 
+# ===== ACTION SLOT SYSTEM (Parallel Actions) =====
+# Maps action_type to slot category - actions in different slots can run in parallel!
+# Actions in the SAME slot block each other (only 1 at a time per slot)
+
+ACTION_SLOTS = {
+    # BUILDING SLOT - Kingdom/property construction work
+    "work": "building",
+    "property_upgrade": "building",
+    
+    # ECONOMY SLOT - Resource gathering
+    "farm": "economy",
+    "chop_wood": "economy",
+    
+    # SECURITY SLOT - Defense and reconnaissance
+    "patrol": "security",
+    
+    # INTELLIGENCE SLOT - Hostile operations
+    "scout": "intelligence",
+    "sabotage": "intelligence",
+    "vault_heist": "intelligence",
+    
+    # PERSONAL SLOT - Self-improvement
+    "training": "personal",
+    "crafting": "personal",
+}
+
+
+# ===== SLOT DEFINITIONS - Frontend Rendering Metadata =====
+# Defines display name, icon, color, and order for each slot
+# Frontend renders these dynamically - NO hardcoding allowed!
+
+SLOT_DEFINITIONS = {
+    "personal": {
+        "id": "personal",
+        "display_name": "Personal Development",
+        "icon": "figure.strengthtraining.traditional",
+        "color_theme": "buttonPrimary",
+        "display_order": 1,
+        "description": "Train your skills - complete actions to level up",
+        "location": "any",  # Can be done anywhere
+        "content_type": "training_contracts",  # Frontend uses this to pick renderer
+    },
+    "building": {
+        "id": "building",
+        "display_name": "Building",
+        "icon": "hammer.fill",
+        "color_theme": "inkMedium",
+        "display_order": 2,
+        "description": "Construct and upgrade infrastructure",
+        "location": "home",  # Home kingdom only
+        "content_type": "building_contracts",  # Kingdom + property contracts
+    },
+    "economy": {
+        "id": "economy",
+        "display_name": "Economy",
+        "icon": "leaf.fill",
+        "color_theme": "buttonSuccess",
+        "display_order": 3,
+        "description": "Gather resources and earn gold",
+        "location": "home",  # Home kingdom only
+        "content_type": "actions",  # Generic action cards
+    },
+    "security": {
+        "id": "security",
+        "display_name": "Security",
+        "icon": "eye.fill",
+        "color_theme": "buttonPrimary",
+        "display_order": 4,
+        "description": "Protect your kingdom from threats",
+        "location": "home",  # Home kingdom only
+        "content_type": "actions",
+    },
+    "intelligence": {
+        "id": "intelligence",
+        "display_name": "Intelligence",
+        "icon": "magnifyingglass",
+        "color_theme": "buttonWarning",
+        "display_order": 5,
+        "description": "Covert operations in enemy territory",
+        "location": "enemy",  # Enemy kingdom only
+        "content_type": "actions",
+    },
+}
+
+
+def get_slot_definition(slot_id: str) -> dict:
+    """Get the full definition for a slot"""
+    return SLOT_DEFINITIONS.get(slot_id, {
+        "id": slot_id,
+        "display_name": slot_id.replace("_", " ").title(),
+        "icon": "circle.fill",
+        "color_theme": "inkMedium",
+        "display_order": 99,
+        "description": "",
+        "location": "any",
+    })
+
+
+def get_all_slot_definitions() -> list:
+    """Get all slot definitions sorted by display order"""
+    return sorted(
+        SLOT_DEFINITIONS.values(),
+        key=lambda s: s.get("display_order", 99)
+    )
+
+
+def get_slots_for_location(location: str) -> list:
+    """Get slots available for a specific location (home, enemy, any)"""
+    result = []
+    for slot in get_all_slot_definitions():
+        slot_location = slot.get("location", "any")
+        if slot_location == "any" or slot_location == location:
+            result.append(slot)
+    return result
+
+
+def get_action_slot(action_type: str) -> str:
+    """Get the slot category for an action type"""
+    return ACTION_SLOTS.get(action_type, "default")
+
+
+def actions_conflict(action1: str, action2: str) -> bool:
+    """Check if two actions would conflict (same slot)"""
+    return get_action_slot(action1) == get_action_slot(action2)
+
+
 # ===== HELPER FUNCTIONS =====
 
 def get_action_config(action_type: str) -> dict:

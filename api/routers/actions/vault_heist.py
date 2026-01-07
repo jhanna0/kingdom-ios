@@ -96,10 +96,14 @@ def attempt_vault_heist(
             detail=f"Intelligence level {MIN_INTELLIGENCE_REQUIRED} required for vault heists"
         )
     
-    # GLOBAL ACTION LOCK: Check if ANY action is on cooldown
+    # ACTION SLOT CHECK: Check if any action in the INTELLIGENCE slot is on cooldown
     if not DEV_MODE:
         work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=work_cooldown)
+        global_cooldown = check_global_action_cooldown_from_table(
+            db, current_user.id,
+            current_action_type="vault_heist",
+            work_cooldown=work_cooldown
+        )
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -108,7 +112,7 @@ def attempt_vault_heist(
             blocking_action = global_cooldown["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
+                detail=f"Intelligence action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
     
     # Check vault heist specific cooldown (using action_cooldowns table)

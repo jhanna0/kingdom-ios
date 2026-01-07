@@ -91,6 +91,7 @@ def check_cooldown(last_action: datetime, cooldown_minutes: float) -> Dict:
 def check_global_action_cooldown_from_table(
     db: Session, 
     user_id: int,
+    current_action_type: str = None,
     work_cooldown: float = WORK_BASE_COOLDOWN,
     patrol_cooldown: float = PATROL_COOLDOWN,
     farm_cooldown: float = FARM_COOLDOWN,
@@ -98,7 +99,22 @@ def check_global_action_cooldown_from_table(
     scout_cooldown: float = SCOUT_COOLDOWN,
     training_cooldown: float = TRAINING_COOLDOWN
 ) -> Dict:
-    """Check if ANY action is on cooldown using action_cooldowns table"""
+    """
+    Check if any action in the SAME SLOT is on cooldown.
+    
+    NEW: Parallel action system - actions in different slots can run simultaneously!
+    - building slot: work, property_upgrade
+    - economy slot: farm, chop_wood
+    - security slot: patrol
+    - intelligence slot: scout, sabotage, vault_heist
+    - personal slot: training, crafting
+    
+    Args:
+        current_action_type: The action being attempted (to check its slot)
+    """
+    # Import here to avoid circular dependency
+    from .action_config import get_action_slot
+    
     now = datetime.utcnow()
     
     action_cooldowns = {
@@ -110,7 +126,13 @@ def check_global_action_cooldown_from_table(
         "training": training_cooldown,
         "crafting": work_cooldown,
         "intelligence": SCOUT_COOLDOWN,
+        "chop_wood": farm_cooldown,
+        "property_upgrade": work_cooldown,
+        "vault_heist": SCOUT_COOLDOWN,
     }
+    
+    # Get the slot for the action being attempted
+    current_slot = get_action_slot(current_action_type) if current_action_type else None
     
     # Get all cooldowns for this user
     cooldowns = db.query(ActionCooldown).filter(
@@ -122,6 +144,13 @@ def check_global_action_cooldown_from_table(
     
     for cooldown in cooldowns:
         if cooldown.action_type in action_cooldowns and cooldown.last_performed:
+            # PARALLEL ACTION SYSTEM: Only check actions in the SAME slot
+            action_slot = get_action_slot(cooldown.action_type)
+            
+            # Skip actions in different slots (they can run in parallel!)
+            if current_slot and action_slot != current_slot:
+                continue
+            
             cooldown_minutes = action_cooldowns[cooldown.action_type]
             elapsed = (now - cooldown.last_performed).total_seconds()
             required = cooldown_minutes * 60
@@ -135,10 +164,11 @@ def check_global_action_cooldown_from_table(
         return {
             "ready": False,
             "seconds_remaining": int(max_remaining),
-            "blocking_action": blocking_action
+            "blocking_action": blocking_action,
+            "blocking_slot": get_action_slot(blocking_action) if blocking_action else None
         }
     
-    return {"ready": True, "seconds_remaining": 0, "blocking_action": None}
+    return {"ready": True, "seconds_remaining": 0, "blocking_action": None, "blocking_slot": None}
 
 
 def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN,

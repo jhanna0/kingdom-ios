@@ -41,7 +41,11 @@ def work_on_contract(
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=cooldown_minutes)
+        global_cooldown = check_global_action_cooldown_from_table(
+            db, current_user.id,
+            current_action_type="work",
+            work_cooldown=cooldown_minutes
+        )
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -50,7 +54,7 @@ def work_on_contract(
             blocking_action = global_cooldown["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
+                detail=f"Building action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
     
     # Set cooldown IMMEDIATELY to prevent double-click exploits
@@ -188,7 +192,11 @@ def work_on_property_upgrade(
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown_from_table(db, current_user.id, work_cooldown=cooldown_minutes)
+        global_cooldown = check_global_action_cooldown_from_table(
+            db, current_user.id,
+            current_action_type="work",
+            work_cooldown=cooldown_minutes
+        )
         
         if not global_cooldown["ready"]:
             remaining = global_cooldown["seconds_remaining"]
@@ -197,7 +205,7 @@ def work_on_property_upgrade(
             blocking_action = global_cooldown["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Another action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s. Only ONE action at a time!"
+                detail=f"Building action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
     
     # Set cooldown IMMEDIATELY to prevent double-click exploits
