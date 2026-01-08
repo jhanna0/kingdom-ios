@@ -42,13 +42,6 @@ class ActionsAPI {
         return try await client.execute(request)
     }
     
-    // MARK: - Scouting
-    
-    func scoutKingdom(kingdomId: String) async throws -> ScoutActionResponse {
-        let request = client.request(endpoint: "/actions/scout/\(kingdomId)", method: "POST")
-        return try await client.execute(request)
-    }
-    
     // MARK: - Training
     
     func getTrainingCosts() async throws -> TrainingCostsResponse {

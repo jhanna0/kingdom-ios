@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -102,6 +102,7 @@ async def startup_event():
         print("💰 Market: /market (Grand Exchange - dynamic items)")
         print("📦 Resources: /resources (item definitions)")
         print("🏹 Hunts: /hunts (Group hunting)")
+        print("🕵️ Incidents: /incidents (Covert operations)")
         print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
@@ -144,6 +145,7 @@ app.include_router(resources.router)
 app.include_router(weather.router)
 app.include_router(market.router)
 app.include_router(hunts.router)
+app.include_router(incidents.router)
 
 
 # ===== WebSocket Endpoint (Local Development) =====

@@ -1,448 +1,172 @@
-# Intelligence & Military Strength System
+# Intelligence System: Covert Incidents + Probability Bar
 
-## Overview
-
-The intelligence system transforms the map view from a static display into a strategic information warfare layer. Players can now:
-
-1. **View military strength as rulers** (rulers see their kingdom's full strength)
-2. **Scout enemy kingdoms** to gather intelligence
-3. **Make informed decisions** about attacks and defenses
+A **multi-player espionage system** using hunt-style probability bar mechanics.
 
 ---
 
-## 🎯 Key Features
+## How It Works (Two-Phase System)
 
-### 1. Military Strength Display
+### Phase 1: Initial Success Roll
 
-Every kingdom shows:
-- **Walls** - Always visible (can be seen from outside)
-- **Attack Power** - Total combat strength (if ruler or scouted)
-- **Defense Power** - Total defensive strength (if ruler or scouted)
-- **Active Citizens** - Players checked in within 24h (if ruler or scouted)
-- **Population** - Total citizens (if ruler or scouted)
+When a player attempts an infiltration operation:
 
-### 2. Intelligence Levels
+1. **Calculate success chance** based on:
+   - Attacker's **Intelligence Tier** (higher = better base chance)
+   - Enemy **Patrol Count** (more patrols = penalty to success)
 
-Intelligence skill determines what info you can gather:
+2. **Roll for success**:
+   - If **FAIL**: Operation fails entirely. Attacker loses gold + cooldown but gets nothing.
+   - If **SUCCESS**: Proceed to Phase 2 (incident triggers).
 
-| Level | Info Revealed |
-|-------|---------------|
-| **T3** | Population estimate, active citizens |
-| **T4** | + Patrol strength indicator |
-| **T5** | + Total attack/defense power |
-| **T6** | + Top 5 strongest players |
-| **T7+** | + All building levels |
+#### Initial Success Formula
 
-### 3. Intelligence Gathering
-
-**Requirements:**
-- Intelligence level 3+
-- 500 gold (always paid upfront)
-- Must be checked into target kingdom
-- 24-hour cooldown
-- Cannot target own kingdom
-
-**Success Chance:**
 ```
-Base: 40%
-+ Intelligence bonus: +8% per level
-- Patrol penalty: -5% per active patrol
-- Vault penalty: -3% per vault level
-
-Range: 10% - 90%
+success_chance = BASE_SUCCESS[intelligence_tier] - (active_patrols × PATROL_PENALTY)
 ```
 
-**On Success:**
-- Reveal military stats (based on your intelligence level)
-- Intel shared with your home kingdom (all citizens see it)
-- Intel expires after 7 days
-- +50 reputation in home kingdom
+Clamped to `[5%, 70%]` (always some chance, never trivial).
 
-**On Failure (Caught):**
-- Lose 500g
-- Lose 200 reputation in target kingdom
-- Temporarily banned (future: 48 hours)
-- No intel gained
+**Base Success by Tier:**
+| Tier | Base Chance |
+|------|-------------|
+| T1   | 20%         |
+| T2   | 28%         |
+| T3   | 36%         |
+| T4   | 44%         |
+| T5   | 52%         |
+| T6   | 58%         |
+| T7   | 64%         |
+
+**Patrol Penalty:** -6% per active patrol
+
+**Examples:**
+- T1 vs 0 patrols: 20% success
+- T1 vs 3 patrols: 20% - 18% = 5% (floor)
+- T3 vs 2 patrols: 36% - 12% = 24% success
+- T5 vs 3 patrols: 52% - 18% = 34% success
+- T5 vs 0 patrols: 52% success
+
+### Phase 2: Tug-of-War Incident (If Phase 1 Succeeds)
+
+Once the initial roll succeeds, a **Covert Incident** is created:
+
+1. Both sides are notified
+2. Players can **join** and **roll** to shift the probability bar
+3. When resolved, a **master roll** picks the final outcome
 
 ---
 
-## 🎮 Gameplay Flow
+## Core Concepts
 
-### As an Attacker
+### Covert Incident (Event)
 
-1. **Scout the target** - Check neighboring kingdoms
-2. **Gather intelligence** - Send scouts to get military stats
-3. **Analyze strength** - Compare your attack vs their defense
-4. **Plan the attack** - "We need 75 more attack to guarantee victory"
-5. **Recruit allies** - Share intel with your kingdom
-6. **Launch assault** - Once you have enough power
+An incident is keyed by:
+- **attacker_kingdom_id**
+- **defender_kingdom_id**
 
-### As a Defender (Ruler)
+Rules:
+- **At most 1 active incident** per (attacker → defender) pair
+- A defender kingdom can have **multiple simultaneous incidents**, one per attacking kingdom
 
-1. **Monitor your strength** - Check your military stats regularly (ruler privilege)
-2. **Run patrols** - Increase detection chance for enemy scouts
-3. **Build walls** - Visible deterrent + actual defense
-4. **Upgrade vault** - Makes it harder for spies to succeed
-5. **Stay active** - More active citizens = more defense
+### The Probability Bar (Same Pattern as Hunting)
+
+Each incident has a **slot table** ("bar"). Available outcomes depend on attacker's intelligence tier:
+
+**T1 (base):**
+```
+prevent: 60          # Defender wins
+intel: 40            # Attacker gets intelligence
+```
+
+**T3 (adds disruption):**
+```
+prevent: 50
+intel: 30
+disruption: 20       # Attacker causes temp debuff
+```
+
+**T5 (adds sabotage & heist):**
+```
+prevent: 40
+intel: 22
+disruption: 18
+contract_sabotage: 12  # Attacker delays contract
+vault_heist: 8         # Attacker steals gold
+```
+
+### Shifting the Bar
+
+Participants roll during the incident window:
+
+- **Attacker success**: shift slots *toward attacker outcomes* (pulls from `prevent`)
+- **Defender success**: shift slots *toward `prevent`* (pulls from attacker outcomes)
+- **Critical success**: apply 2x shift
+
+This creates the tug-of-war:
+- Defenders grow the "prevent" section
+- Attackers grow the outcome sections
+
+### Resolution: Master Roll
+
+When the incident ends (timer or manually resolved):
+1. One master roll across the bar
+2. The roll "lands" on an outcome based on current probabilities
+3. Apply the result
 
 ---
 
-## 📊 Database Schema
+## Outcomes
 
-### `kingdom_intelligence` Table
+### `prevent` (Defender Win)
+- Operation fails at the last moment
+- Defenders receive reputation/gold rewards for participation
+- Attacker already paid cost + cooldown (risk for attempting)
 
-```sql
-CREATE TABLE kingdom_intelligence (
-    id SERIAL PRIMARY KEY,
-    kingdom_id VARCHAR NOT NULL,           -- Target kingdom
-    gatherer_id INTEGER NOT NULL,          -- Who gathered this intel
-    gatherer_kingdom_id VARCHAR NOT NULL,  -- Gatherer's home kingdom
-    gatherer_name VARCHAR NOT NULL,
-    
-    -- Intelligence data (snapshot)
-    wall_level INTEGER NOT NULL,
-    total_attack_power INTEGER NOT NULL,
-    total_defense_power INTEGER NOT NULL,
-    active_citizen_count INTEGER NOT NULL,
-    population_estimate INTEGER NOT NULL,
-    treasury_estimate INTEGER,
-    building_levels JSONB,
-    top_players JSONB,
-    
-    -- Metadata
-    intelligence_level INTEGER NOT NULL,
-    gathered_at TIMESTAMP NOT NULL,
-    expires_at TIMESTAMP NOT NULL,         -- Intel expires after 7 days
-    
-    UNIQUE(kingdom_id, gatherer_kingdom_id)  -- One intel per kingdom pair
-);
-```
+### `intel` (Attacker Win, T1+)
+- Create/update `KingdomIntelligence` snapshot for defender kingdom
+- Snapshot is shared with attacker kingdom, expires after 48 hours
 
-### `player_state` Table Update
+### `disruption` (Attacker Win, T3+)
+- Temporary debuff on defender kingdom (e.g., +10% cooldowns)
+- Duration: 30 minutes
 
-```sql
-ALTER TABLE player_state 
-ADD COLUMN last_intelligence_action TIMESTAMP;
-```
+### `contract_sabotage` (Attacker Win, T5+)
+- Add 5% more actions required to defender's active contract
+- Cooldown: Can only sabotage same kingdom once per 6 hours
+
+### `vault_heist` (Attacker Win, T5+)
+- Steal 10% of defender kingdom's vault (min 500g if available)
+- High risk, high reward
 
 ---
 
-## 🔌 API Endpoints
+## What Patrol Does
 
-### GET `/intelligence/military-strength/{kingdom_id}`
+Patrol has **one job**: make the initial success roll harder.
 
-Get military strength information for a kingdom.
+- Each active patrol reduces attacker's success chance by 6%
+- Patrols do NOT affect the tug-of-war phase or outcome probabilities
+- This keeps the system simple and patrol meaningful
 
-**Response (As Ruler):**
-```json
-{
-  "kingdom_id": "ashford",
-  "kingdom_name": "Ashford",
-  "wall_level": 3,
-  "total_attack": 150,
-  "total_defense": 120,
-  "total_defense_with_walls": 135,
-  "active_citizens": 25,
-  "population": 30,
-  "is_own_kingdom": false,
-  "is_ruler": true,
-  "has_intel": false
-}
-```
-
-**Response (Enemy Kingdom with Intel):**
-```json
-{
-  "kingdom_id": "bordertown",
-  "kingdom_name": "Bordertown",
-  "wall_level": 2,
-  "total_attack": 80,
-  "total_defense": 60,
-  "total_defense_with_walls": 70,
-  "active_citizens": 15,
-  "population": 20,
-  "is_own_kingdom": false,
-  "has_intel": true,
-  "intel_level": 5,
-  "intel_age_days": 2,
-  "gathered_by": "Alice"
-}
-```
-
-**Response (Enemy Kingdom, No Intel):**
-```json
-{
-  "kingdom_id": "stronghold",
-  "kingdom_name": "Stronghold",
-  "wall_level": 4,
-  "is_own_kingdom": false,
-  "has_intel": false
-}
-```
-
-### POST `/intelligence/gather/{kingdom_id}`
-
-Gather intelligence on an enemy kingdom.
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "caught": false,
-  "message": "Successfully gathered intelligence on Bordertown!",
-  "cost_paid": 500,
-  "reputation_gained": 50,
-  "detection_chance": 35.0,
-  "intel_expires_in_days": 7,
-  "intel_level": 5,
-  "intel_data": {
-    "wall_level": 2,
-    "total_attack": 80,
-    "total_defense": 60,
-    "active_citizens": 15,
-    "population": 20
-  }
-}
-```
-
-**Caught Response:**
-```json
-{
-  "success": false,
-  "caught": true,
-  "message": "Caught gathering intelligence! Lost 500g and 200 reputation.",
-  "cost_paid": 500,
-  "reputation_lost": 200,
-  "detection_chance": 45.0
-}
-```
+**No patrols = easier to infiltrate initially**
+**Many patrols = hard to even start the operation**
 
 ---
 
-## 📱 iOS Implementation
+## What Intelligence Tier Does
 
-### New Models
+Intelligence tier affects **two things**:
 
-**`Intelligence.swift`:**
-- `MilitaryStrengthResponse` - API response
-- `MilitaryStrength` - UI display model
-- `GatherIntelligenceResponse` - Scout action result
-
-### New API Methods
-
-**`IntelligenceAPI.swift`:**
-- `getMilitaryStrength(kingdomId:)` - Fetch military info
-- `gatherIntelligence(kingdomId:)` - Scout enemy kingdom
-
-### New UI Components
-
-**`MilitaryStrengthCard.swift`:**
-- Shows military strength for kingdoms you rule
-- Shows scouted intelligence for enemy kingdoms
-- Shows "gather intelligence" button for unscouted enemies
-- Displays intel age and warning when expiring
-- Shows combat assessment ("We could win!")
-
-### Updated Views
-
-**`KingdomDetailView.swift`:**
-- Now shows `MilitaryStrengthCard` for every kingdom
-- Automatically loads military strength when opened
-- Handles intelligence gathering action
-
-**`MapViewModel.swift`:**
-- Caches military strength data: `militaryStrengthCache`
-- `fetchMilitaryStrength(kingdomId:)` - Load strength info
-- `gatherIntelligence(kingdomId:)` - Scout action
+1. **Initial Success Chance**: Higher tier = better base chance to succeed at Phase 1
+2. **Available Outcomes**: Higher tier unlocks more powerful outcomes (disruption, sabotage, heist)
 
 ---
 
-## 🎨 UI/UX Features
+## API Endpoints
 
-### Ruler View (Your Kingdom)
-
-```
-┌─────────────────────────────────────┐
-│ 🛡️ Military Strength (Ruler View)  │
-├─────────────────────────────────────┤
-│ 🏛️ Walls       Level 3 (+15 defense)│
-│ ⚡ Total Attack           150       │
-│ 🛡️ Total Defense          135       │
-│ 👥 Active Citizens         25       │
-└─────────────────────────────────────┘
-```
-
-### Enemy Kingdom (No Intel)
-
-```
-┌─────────────────────────────────────┐
-│ 👁️ Intelligence Report              │
-├─────────────────────────────────────┤
-│ 🏛️ Walls              Level 2       │
-│                                     │
-│        🚫 Intelligence Unknown       │
-│                                     │
-│   Send a scout to gather info       │
-│                                     │
-│  [🔭 Gather Intelligence (500g)]    │
-│                                     │
-│ Requirements:                       │
-│ ✓ Intelligence level 3+             │
-│ ✓ 500 gold                         │
-│ ✗ Must check into Bordertown       │
-└─────────────────────────────────────┘
-```
-
-### Enemy Kingdom (With Intel)
-
-```
-┌─────────────────────────────────────┐
-│ 👁️ Intelligence Report   2 days ago │
-├─────────────────────────────────────┤
-│ 🔎 Intel by Alice                   │
-│                                     │
-│ 🏛️ Walls              Level 2       │
-│ 👥 Population             ~20       │
-│ 👤 Active Citizens         15       │
-│ ⚡ Attack Power            80       │
-│ 🛡️ Total Defense          70       │
-│                                     │
-│ ✅ We could win an attack!          │
-│                                     │
-│  [🔄 Update Intel (500g)]           │
-└─────────────────────────────────────┘
-```
-
----
-
-## 🎲 Strategic Implications
-
-### Information Asymmetry
-
-- **Fog of War**: You don't know enemy strength by default
-- **Scouting Value**: Intelligence gathering becomes essential
-- **Counter-Intelligence**: Patrols catch enemy scouts
-- **Intel Decay**: Must re-scout every 7 days
-
-### Risk vs Reward
-
-**Scouting:**
-- Low risk (10-90% detection based on situation)
-- High reward (crucial battle info)
-- Cheap (500g per attempt)
-- Team benefit (entire kingdom sees intel)
-
-**Being Scouted:**
-- Patrols increase detection
-- Vaults provide security bonus
-- Catching scouts grants reputation
-- Walls always visible (deterrent)
-
-### Attack Planning
-
-Before: *"Let's just attack!"*  
-After: *"Their defense is 70, we have 150 attack. We need 88 to win (70 × 1.25). We have 62 more than needed. High chance of success!"*
-
----
-
-## 🚀 Setup Instructions
-
-### 1. Run Database Migration
-
-```bash
-cd api
-psql -U your_username -d kingdom_db -f db/add_kingdom_intelligence.sql
-```
-
-### 2. Restart Backend
-
-```bash
-cd api
-uvicorn main:app --reload
-```
-
-### 3. Test API
-
-```bash
-# Get military strength (own kingdom)
-curl http://localhost:8000/intelligence/military-strength/YOUR_KINGDOM_ID \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# Gather intelligence (enemy kingdom)
-curl -X POST http://localhost:8000/intelligence/gather/ENEMY_KINGDOM_ID \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-### 4. Build iOS App
-
-The new files should be automatically detected by Xcode:
-- `Models/Intelligence.swift`
-- `Services/API/IntelligenceAPI.swift`
-- `Views/Kingdom/MilitaryStrengthCard.swift`
-
-If not, add them manually to your Xcode project.
-
----
-
-## 🔮 Future Enhancements
-
-### Phase 1 (Current)
-- ✅ Military strength display
-- ✅ Intelligence gathering
-- ✅ Intel sharing with kingdom
-- ✅ Patrol-based detection
-
-### Phase 2 (Next)
-- [ ] Temporary ban system (48h after being caught)
-- [ ] Push notifications when caught scouting
-- [ ] Intel feed (see all recent intel in kingdom)
-- [ ] Spy counter (track how many times you've scouted)
-
-### Phase 3 (Advanced)
-- [ ] Counter-intelligence actions
-- [ ] Fake intelligence (plant false info)
-- [ ] Assassination attempts (remove ruler temporarily)
-- [ ] Spy networks (coordinate with other spies)
-- [ ] Information marketplace (sell intel to other kingdoms)
-
----
-
-## 📈 Balance Considerations
-
-### Detection Rates
-
-Current formula provides:
-- **High-level spy + no patrols + weak vault**: ~10-20% detection
-- **Medium spy + some patrols + medium vault**: ~40-50% detection
-- **Low-level spy + many patrols + strong vault**: ~70-80% detection
-
-### Cost vs Benefit
-
-- **500g cost** - Affordable but not trivial
-- **24h cooldown** - Prevents spam but allows planning
-- **7-day expiry** - Forces periodic re-scouting
-- **+50 rep reward** - Encourages scouting for your kingdom
-
-### Patrol Effectiveness
-
-- Each patrol: -5% detection chance for enemy scouts
-- 10 patrols = -50% detection (very effective)
-- Encourages active defense
-- Patrol duration: 10 minutes
-
----
-
-## 🎉 Result
-
-The map view is now **strategically useful**! Players can:
-
-1. **Know their strength** - Rulers see their kingdom's military power (privileged information)
-2. **Scout enemies** - Gather intel on potential targets
-3. **Make decisions** - "Can we win this fight?"
-4. **Coordinate attacks** - Share intel with kingdom
-5. **Defend intelligently** - Run patrols to catch scouts
-
-This creates the **information warfare layer** needed before implementing coups and invasions, while adding strategic importance to the ruler role!
-
-
-
+- `POST /incidents/trigger` - Attempt infiltration (pays gold, rolls initial success)
+- `POST /incidents/{id}/join` - Join an existing incident
+- `POST /incidents/{id}/roll` - Execute a roll to shift the bar
+- `POST /incidents/{id}/resolve` - Resolve with master roll
+- `GET /incidents/{id}` - Get incident status
+- `GET /incidents/config` - Get tunable config values

@@ -27,12 +27,9 @@ from .constants import (
     FARM_COOLDOWN,
     FARM_GOLD_REWARD,
     SABOTAGE_COOLDOWN,
-    SCOUT_COOLDOWN,
-    SCOUT_GOLD_REWARD,
     TRAINING_COOLDOWN,
     PATROL_REPUTATION_REWARD,
-    MIN_INTELLIGENCE_REQUIRED,
-    VAULT_HEIST_COOLDOWN_HOURS
+    SCOUT_COOLDOWN,
 )
 
 
@@ -155,7 +152,6 @@ def get_action_status(
     patrol_cooldown = PATROL_COOLDOWN
     farm_cooldown = FARM_COOLDOWN
     sabotage_cooldown = SABOTAGE_COOLDOWN
-    scout_cooldown = SCOUT_COOLDOWN
     training_cooldown = TRAINING_COOLDOWN
     
     # Count active patrollers in current kingdom
@@ -191,7 +187,7 @@ def get_action_status(
     from .action_config import get_action_slot, get_all_slot_definitions, get_slots_for_location, SLOT_DEFINITIONS, ACTION_SLOTS
     
     slot_cooldowns = {}
-    action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout", "sabotage", "chop_wood"]
+    action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout", "chop_wood"]
     
     for action_type in action_types_to_check:
         slot = get_action_slot(action_type)
@@ -203,8 +199,7 @@ def get_action_status(
                 work_cooldown=work_cooldown, 
                 patrol_cooldown=patrol_cooldown,
                 farm_cooldown=farm_cooldown,
-                sabotage_cooldown=sabotage_cooldown, 
-                scout_cooldown=scout_cooldown, 
+                sabotage_cooldown=sabotage_cooldown,
                 training_cooldown=training_cooldown
             )
             slot_cooldowns[slot] = cooldown_info
@@ -228,9 +223,6 @@ def get_action_status(
     farm_base = FARM_GOLD_REWARD
     farm_bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
     farm_gross = int(farm_base * farm_bonus_multiplier)
-    
-    # Scout reward (no tax or bonus for scouts in enemy territory)
-    scout_reward = SCOUT_GOLD_REWARD
     
     # Patrol reward (reputation only)
     patrol_rep_reward = PATROL_REPUTATION_REWARD
@@ -335,40 +327,6 @@ def get_action_status(
             "display_order": 35
         }
     
-    # Scout - Requires Tier 1 Intelligence
-    if state.intelligence >= 1:
-        actions["scout"] = {
-            **check_cooldown_from_table(db, current_user.id, "scout", scout_cooldown),
-            "cooldown_minutes": scout_cooldown,
-            "expected_reward": {
-                "gold": scout_reward
-            },
-            "unlocked": True,
-            "action_type": "scout",
-            "title": "Scout Kingdom",
-            "icon": "magnifyingglass",
-            "description": "Gather intelligence on enemy kingdom",
-            "category": "hostile",
-            "theme_color": "buttonWarning",
-            "display_order": 10,
-            "endpoint": f"/actions/scout/{state.current_kingdom_id}" if state.current_kingdom_id else None
-        }
-    else:
-        actions["scout"] = {
-            "ready": False,
-            "seconds_remaining": 0,
-            "unlocked": False,
-            "action_type": "scout",
-            "requirements_met": False,
-            "requirement_description": f"Requires T1 Intelligence (you: T{state.intelligence})",
-            "title": "Scout Kingdom",
-            "icon": "magnifyingglass",
-            "description": "Gather intelligence on enemy kingdom",
-            "category": "hostile",
-            "theme_color": "buttonWarning",
-            "endpoint": None
-        }
-    
     actions["training"] = {
         **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
         "cooldown_minutes": training_cooldown,
@@ -395,77 +353,71 @@ def get_action_status(
         "display_order": 20
     }
     
-    # INTELLIGENCE-GATED ACTIONS - dynamically add based on requirements
-    # For sabotage, get the active contract in current kingdom (if any)
-    sabotage_endpoint = None
-    if state.current_kingdom_id:
-        # UnifiedContract already imported at top of file
-        active_contract = db.query(UnifiedContract).filter(
-            UnifiedContract.kingdom_id == state.current_kingdom_id,
-            UnifiedContract.category == 'kingdom_building',
-            UnifiedContract.completed_at.is_(None)  # Active contracts only
-        ).first()
-        if active_contract:
-            sabotage_endpoint = f"/actions/sabotage/{active_contract.id}"
+    # COVERT OPERATION - ONE action, outcomes scale with tier!
+    # T1: intel only
+    # T3: + disruption
+    # T5: + contract_sabotage, vault_heist
+    # Patrol count determines if the incident triggers
+    intel_tier = state.intelligence
     
-    if state.intelligence >= 4:
-        actions["sabotage"] = {
-            **check_cooldown_from_table(db, current_user.id, "sabotage", sabotage_cooldown),
-            "cooldown_minutes": sabotage_cooldown,
+    # Build outcome list with tier requirements shown
+    current_outcomes = []
+    locked_outcomes = []
+    
+    if intel_tier >= 1:
+        current_outcomes.append("Intel")
+    else:
+        locked_outcomes.append("Intel (T1)")
+    
+    if intel_tier >= 3:
+        current_outcomes.append("Disruption")
+    else:
+        locked_outcomes.append("Disruption (T3)")
+    
+    if intel_tier >= 5:
+        current_outcomes.append("Sabotage")
+        current_outcomes.append("Vault Heist")
+    else:
+        locked_outcomes.append("Sabotage (T5)")
+        locked_outcomes.append("Vault Heist (T5)")
+    
+    if state.intelligence >= 1:
+        # ONLY show what they CAN do - no locked outcomes
+        description = f"Outcomes: {', '.join(current_outcomes)}"
+        
+        actions["scout"] = {
+            **check_cooldown_from_table(db, current_user.id, "scout", SCOUT_COOLDOWN),
+            "cooldown_minutes": SCOUT_COOLDOWN,
             "unlocked": True,
-            "action_type": "sabotage",
+            "action_type": "scout",
             "requirements_met": True,
-            "title": "Sabotage Contract",
-            "icon": "flame.fill",
-            "description": "Delay enemy construction projects (300g cost)",
+            "title": "Infiltrate",
+            "icon": "eye.fill",
+            "description": description,
             "category": "hostile",
-            "theme_color": "buttonDanger",
-            "endpoint": sabotage_endpoint
+            "theme_color": "royalEmerald",
+            "display_order": 5,
+            "endpoint": "/incidents/trigger",
+            "cost": 100,
+            "intelligence_tier": intel_tier,
+            "current_outcomes": current_outcomes,
+            "locked_outcomes": locked_outcomes,
         }
     else:
-        actions["sabotage"] = {
+        actions["scout"] = {
             "ready": False,
             "seconds_remaining": 0,
             "unlocked": False,
-            "action_type": "sabotage",
+            "action_type": "scout",
             "requirements_met": False,
-            "requirement_description": f"Requires T4 Intelligence (you: T{state.intelligence})",
-            "title": "Sabotage Contract",
-            "icon": "flame.fill",
-            "description": "Delay enemy construction projects",
+            "requirement_description": f"Requires Intelligence T1+ (you: T{state.intelligence})",
+            "title": "Infiltrate",
+            "icon": "eye.fill",
+            "description": "Hostile operations in enemy territory",
             "category": "hostile",
-            "theme_color": "buttonDanger",
-            "endpoint": None
-        }
-    
-    if state.intelligence >= MIN_INTELLIGENCE_REQUIRED:
-        actions["vault_heist"] = {
-            **check_cooldown_from_table(db, current_user.id, "vault_heist", VAULT_HEIST_COOLDOWN_HOURS * 60),
-            "cooldown_minutes": VAULT_HEIST_COOLDOWN_HOURS * 60,
-            "unlocked": True,
-            "action_type": "vault_heist",
-            "requirements_met": True,
-            "title": "Vault Heist",
-            "icon": "banknote.fill",
-            "description": "Steal 10% of kingdom vault (1000g cost, 7 day cooldown)",
-            "category": "hostile",
-            "theme_color": "buttonSpecial",
-            "endpoint": f"/actions/vault-heist/{state.current_kingdom_id}" if state.current_kingdom_id else None
-        }
-    else:
-        actions["vault_heist"] = {
-            "ready": False,
-            "seconds_remaining": 0,
-            "unlocked": False,
-            "action_type": "vault_heist",
-            "requirements_met": False,
-            "requirement_description": f"Requires Intelligence Tier {MIN_INTELLIGENCE_REQUIRED} (current: Tier {state.intelligence})",
-            "title": "Vault Heist",
-            "icon": "banknote.fill",
-            "description": "Steal from enemy kingdom vault",
-            "category": "hostile",
-            "theme_color": "buttonSpecial",
-            "endpoint": None
+            "theme_color": "royalEmerald",
+            "display_order": 5,
+            "endpoint": None,
         }
     
     # Add slot information to each action
@@ -504,11 +456,11 @@ def get_action_status(
         "work": actions["work"],
         "patrol": actions["patrol"],
         "farm": actions["farm"],
-        "sabotage": actions["sabotage"],
-        "scout": actions["scout"],
+        "sabotage": actions["scout"],  # Legacy - now "Covert Operation" with tier-based outcomes
         "training": actions["training"],
         "crafting": actions["crafting"],
-        "vault_heist": actions.get("vault_heist"),
+        "vault_heist": actions["scout"],  # Legacy - now "Covert Operation" (T5 unlocks heist outcome)
+        "scout": actions["scout"],
         "training_contracts": get_training_contracts_for_status(db, current_user.id),
         "training_costs": _get_training_costs_dict(state),
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),

@@ -10,7 +10,6 @@ from .constants import (
     PATROL_COOLDOWN,
     FARM_COOLDOWN,
     SABOTAGE_COOLDOWN,
-    SCOUT_COOLDOWN,
     TRAINING_COOLDOWN,
     WORK_BASE_COOLDOWN
 )
@@ -96,7 +95,6 @@ def check_global_action_cooldown_from_table(
     patrol_cooldown: float = PATROL_COOLDOWN,
     farm_cooldown: float = FARM_COOLDOWN,
     sabotage_cooldown: float = SABOTAGE_COOLDOWN,
-    scout_cooldown: float = SCOUT_COOLDOWN,
     training_cooldown: float = TRAINING_COOLDOWN
 ) -> Dict:
     """
@@ -122,13 +120,12 @@ def check_global_action_cooldown_from_table(
         "patrol": patrol_cooldown,
         "farm": farm_cooldown,
         "sabotage": sabotage_cooldown,
-        "scout": scout_cooldown,
         "training": training_cooldown,
         "crafting": work_cooldown,
-        "intelligence": SCOUT_COOLDOWN,
+        "intelligence": 24 * 60,  # 24 hours for intelligence gathering
         "chop_wood": farm_cooldown,
         "property_upgrade": work_cooldown,
-        "vault_heist": SCOUT_COOLDOWN,
+        "vault_heist": 168 * 60,  # 7 days for vault heist
     }
     
     # Get the slot for the action being attempted
@@ -174,7 +171,7 @@ def check_global_action_cooldown_from_table(
 def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN,
                                   farm_cooldown: float = FARM_COOLDOWN,
                                   sabotage_cooldown: float = SABOTAGE_COOLDOWN,
-                                  scout_cooldown: float = SCOUT_COOLDOWN, training_cooldown: float = TRAINING_COOLDOWN) -> Dict:
+                                  training_cooldown: float = TRAINING_COOLDOWN) -> Dict:
     """Check if ANY action is on cooldown (legacy - uses player_state columns)"""
     now = datetime.utcnow()
     actions = [
@@ -182,7 +179,6 @@ def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: f
         ("patrol", state.last_patrol_action, patrol_cooldown),
         ("farm", state.last_farm_action, farm_cooldown),
         ("sabotage", state.last_sabotage_action, sabotage_cooldown),
-        ("scout", state.last_scout_action, scout_cooldown),
         ("training", state.last_training_action, training_cooldown),
     ]
     

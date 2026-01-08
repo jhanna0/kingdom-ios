@@ -69,61 +69,26 @@ ACTION_TYPES = {
             "wood": "varies_by_lumbermill_level"
         }
     },
-    "sabotage": {
-        "display_name": "Sabotage",
-        "icon": "bolt.fill",
-        "description": "Damage enemy kingdom infrastructure",
-        "category": "hostile",
-        "cooldown_minutes": 120,  # 2 hours
-        "theme_color": "buttonDanger",
-        "display_order": 10,
-        "endpoint": "/actions/sabotage",
-        "always_unlocked": True,
-        "requirements": {
-            "location": "enemy_kingdom",
-            "requirement_text": "Must be in an enemy kingdom"
-        }
-    },
     "scout": {
-        "display_name": "Scout",
-        "icon": "eye.circle.fill",
-        "description": "Gather intelligence on enemy defenses",
+        "display_name": "Infiltrate",
+        "icon": "eye.fill",
+        "description": "Hostile operation in enemy territory. Higher tiers unlock better outcomes!",
         "category": "hostile",
-        "cooldown_minutes": 120,  # 2 hours
-        "theme_color": "buttonDanger",
-        "display_order": 20,
-        "endpoint": "/actions/scout",
-        "always_unlocked": True,
-        "requirements": {
-            "location": "enemy_kingdom",
-            "requirement_text": "Must be in an enemy kingdom"
-        },
-        "rewards": {
-            "gold": 10
-        }
-    },
-    "vault_heist": {
-        "display_name": "Vault Heist",
-        "icon": "banknote.fill",
-        "description": "Steal 10% of enemy vault (high risk!)",
-        "category": "hostile",
-        "cooldown_minutes": 10080,  # 7 days (168 hours)
-        "cooldown_hours": 168,
-        "theme_color": "buttonDanger",
-        "display_order": 30,
-        "endpoint": "/actions/intelligence/vault-heist",
+        "cooldown_minutes": 30,
+        "theme_color": "royalEmerald",
+        "display_order": 5,
+        "endpoint": "/incidents/trigger",
         "always_unlocked": False,
         "requirements": {
             "skill": "intelligence",
-            "skill_level": 5,
+            "skill_level": 1,
             "location": "enemy_kingdom",
-            "requirement_text": "Intelligence Tier 5+ required",
-            "cost": 1000  # Gold cost
-        },
-        "rewards": {
-            "gold": "10%_of_enemy_vault"
+            "cost": 100,
+            "requirement_text": "Intelligence T1+ (100g). T3: disruption, T5: sabotage/heist"
         }
     },
+    # NOTE: sabotage and vault_heist are now OUTCOMES of the incident probability bar
+    # T1: intel only, T3: +disruption, T5: +contract_sabotage, +vault_heist
     "training": {
         "display_name": "Training",
         "icon": "figure.run",
@@ -193,10 +158,8 @@ ACTION_SLOTS = {
     # SECURITY SLOT - Defense and reconnaissance
     "patrol": "security",
     
-    # INTELLIGENCE SLOT - Hostile operations
-    "scout": "intelligence",
-    "sabotage": "intelligence",
-    "vault_heist": "intelligence",
+    # INTELLIGENCE SLOT - Hostile operations (ONE action, outcomes scale with tier)
+    "scout": "intelligence",          # Triggers incidents - outcomes: intel, disruption, sabotage, heist
     
     # PERSONAL SLOT - Self-improvement
     "training": "personal",
@@ -252,10 +215,10 @@ SLOT_DEFINITIONS = {
     "intelligence": {
         "id": "intelligence",
         "display_name": "Intelligence",
-        "icon": "magnifyingglass",
-        "color_theme": "buttonWarning",
+        "icon": "eye.fill",
+        "color_theme": "royalEmerald",
         "display_order": 5,
-        "description": "Covert operations in enemy territory",
+        "description": "Infiltrate enemy territory",
         "location": "enemy",  # Enemy kingdom only
         "content_type": "actions",
     },
@@ -338,28 +301,21 @@ def get_all_action_types() -> list:
 WORK_BASE_COOLDOWN = ACTION_TYPES["work"]["cooldown_minutes"]
 PATROL_COOLDOWN = ACTION_TYPES["patrol"]["cooldown_minutes"]
 FARM_COOLDOWN = ACTION_TYPES["farm"]["cooldown_minutes"]
-SABOTAGE_COOLDOWN = ACTION_TYPES["sabotage"]["cooldown_minutes"]
-SCOUT_COOLDOWN = ACTION_TYPES["scout"]["cooldown_minutes"]
+SABOTAGE_COOLDOWN = 120  # Legacy - sabotage is now an incident outcome
 TRAINING_COOLDOWN = ACTION_TYPES["training"]["cooldown_minutes"]
 CRAFTING_BASE_COOLDOWN = ACTION_TYPES["crafting"]["cooldown_minutes"]
 
-# Vault heist configuration
-VAULT_HEIST_COOLDOWN = ACTION_TYPES["vault_heist"]["cooldown_minutes"]
-VAULT_HEIST_COOLDOWN_HOURS = ACTION_TYPES["vault_heist"]["cooldown_hours"]
-MIN_INTELLIGENCE_REQUIRED = 5
-HEIST_COST = ACTION_TYPES["vault_heist"]["requirements"]["cost"]
+# Covert operation (scout) - ONE action, outcomes scale with intelligence tier
+# T1: intel, T3: +disruption, T5: +contract_sabotage, +vault_heist
+SCOUT_COOLDOWN = ACTION_TYPES["scout"]["cooldown_minutes"]
+SCOUT_COST = 100  # Gold cost to trigger
+
+# Vault heist outcome config (when rolled on probability bar at T5)
 HEIST_PERCENT = 0.10
 MIN_HEIST_AMOUNT = 500
-BASE_HEIST_DETECTION = 0.3
-VAULT_LEVEL_BONUS = 0.05
-INTELLIGENCE_REDUCTION = 0.04
-PATROL_BONUS = 0.02
-HEIST_REP_LOSS = 500
-HEIST_BAN = True
 
 # Action rewards (use .get() for safety - rewards structure may vary)
 FARM_GOLD_REWARD = ACTION_TYPES["farm"]["rewards"].get("gold", 0)
-SCOUT_GOLD_REWARD = ACTION_TYPES["scout"]["rewards"].get("gold", 0)
 PATROL_GOLD_REWARD = ACTION_TYPES["patrol"]["rewards"].get("gold", 0)
 PATROL_REPUTATION_REWARD = ACTION_TYPES["patrol"]["rewards"].get("reputation", 0)
 

@@ -103,11 +103,11 @@ struct ActionCard: View {
             } else if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
-                        Image(systemName: "play.fill")
-                        Text("Start")
+                        Image(systemName: actionButtonIcon)
+                        Text(actionButtonText)
                     }
                 }
-                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+                .buttonStyle(.brutalist(backgroundColor: actionButtonColor, fullWidth: true))
             } else if !isEnabled {
                 Text("Check in to a kingdom first")
                     .font(FontStyles.labelLarge)
@@ -117,10 +117,31 @@ struct ActionCard: View {
                     .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else {
-                CooldownTimer(
-                    secondsRemaining: calculatedSecondsRemaining,
-                    totalSeconds: Int((status.cooldownMinutes ?? 120) * 60)
-                )
+                // Show simple cooldown for instant actions (scout/infiltrate)
+                // Show progress bar for ongoing actions (farm, patrol, etc.)
+                if status.actionType == "scout" {
+                    let minutes = calculatedSecondsRemaining / 60
+                    let seconds = calculatedSecondsRemaining % 60
+                    
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("Ready in \(minutes)m \(seconds)s")
+                            .font(FontStyles.labelLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                } else {
+                    CooldownTimer(
+                        secondsRemaining: calculatedSecondsRemaining,
+                        totalSeconds: Int((status.cooldownMinutes ?? 120) * 60)
+                    )
+                }
             }
         }
         .padding(KingdomTheme.Spacing.medium)
@@ -137,6 +158,28 @@ struct ActionCard: View {
         } else {
             return KingdomTheme.Colors.inkMedium
         }
+    }
+    
+    private var actionButtonColor: Color {
+        // Hostile actions (scout/infiltrate) use emerald/teal, beneficial actions use green
+        if status.category == "hostile" || status.actionType == "scout" {
+            return KingdomTheme.Colors.royalEmerald
+        }
+        return KingdomTheme.Colors.buttonSuccess
+    }
+    
+    private var actionButtonIcon: String {
+        if status.category == "hostile" || status.actionType == "scout" {
+            return "eye.fill"
+        }
+        return "play.fill"
+    }
+    
+    private var actionButtonText: String {
+        if status.actionType == "scout" {
+            return "Infiltrate"
+        }
+        return "Start"
     }
     
     @ViewBuilder

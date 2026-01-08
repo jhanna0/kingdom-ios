@@ -94,7 +94,7 @@ def _get_top_players(db: Session, kingdom_id: str, intelligence_level: int) -> O
     
     return [
         {
-            "name": db.query(User).filter(User.id == p.user_id).first().username,
+            "name": db.query(User).filter(User.id == p.user_id).first().display_name,
             "attack": p.attack_power,
             "defense": p.defense_power
         }
@@ -399,7 +399,7 @@ def gather_intelligence(
         if existing_intel:
             # Update existing intel
             existing_intel.gatherer_id = current_user.id
-            existing_intel.gatherer_name = current_user.username
+            existing_intel.gatherer_name = current_user.display_name
             existing_intel.wall_level = kingdom.wall_level
             existing_intel.total_attack_power = total_attack
             existing_intel.total_defense_power = total_defense
@@ -416,7 +416,7 @@ def gather_intelligence(
                 kingdom_id=kingdom_id,
                 gatherer_id=current_user.id,
                 gatherer_kingdom_id=state.hometown_kingdom_id,
-                gatherer_name=current_user.username,
+                gatherer_name=current_user.display_name,
                 wall_level=kingdom.wall_level,
                 total_attack_power=total_attack,
                 total_defense_power=total_defense,

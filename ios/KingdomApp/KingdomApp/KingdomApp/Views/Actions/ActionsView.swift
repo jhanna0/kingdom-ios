@@ -9,6 +9,10 @@ struct ActionsView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showActionResult = false
+    @State private var actionResultSuccess = true
+    @State private var actionResultTitle = ""
+    @State private var actionResultMessage = ""
     @State private var showReward = false
     @State private var currentReward: Reward?
     @State private var currentTime = Date()
@@ -76,6 +80,15 @@ struct ActionsView: View {
             if showReward, let reward = currentReward {
                 RewardDisplayView(reward: reward, isShowing: $showReward)
                     .transition(.opacity)
+            }
+            if showActionResult {
+                ActionResultPopup(
+                    success: actionResultSuccess,
+                    title: actionResultTitle,
+                    message: actionResultMessage,
+                    isShowing: $showActionResult
+                )
+                .transition(.opacity)
             }
         }
     }
@@ -492,6 +505,7 @@ struct ActionsView: View {
                 
                 await MainActor.run {
                     if let rewards = response.rewards {
+                        // Show reward popup for actions with rewards
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,
                             reputationReward: rewards.reputation ?? 0,
@@ -506,6 +520,14 @@ struct ActionsView: View {
                         )
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
+                        }
+                    } else if !response.message.isEmpty {
+                        // Show themed popup for actions without rewards
+                        actionResultSuccess = response.success
+                        actionResultTitle = response.success ? "Success!" : "Failed"
+                        actionResultMessage = response.message
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showActionResult = true
                         }
                     }
                 }

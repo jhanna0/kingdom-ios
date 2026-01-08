@@ -230,6 +230,14 @@ struct GenericActionResponse: Codable {
     let nextTrainAvailableAt: Date?
     let expiresAt: Date?
     
+    // Incident-specific fields (for infiltration actions)
+    let triggered: Bool?           // Was an incident triggered?
+    let successChance: Double?     // What was the calculated success chance?
+    let roll: Double?              // What did they roll?
+    let intelligenceTier: Int?     // Attacker's intelligence tier
+    let activePatrols: Int?        // How many enemy patrols were active
+    let incident: IncidentInfo?    // Incident data if triggered
+    
     enum CodingKeys: String, CodingKey {
         case success, message, rewards
         case nextActionAvailableAt = "next_action_available_at"
@@ -239,6 +247,41 @@ struct GenericActionResponse: Codable {
         case nextSabotageAvailableAt = "next_sabotage_available_at"
         case nextTrainAvailableAt = "next_train_available_at"
         case expiresAt = "expires_at"
+        case triggered
+        case successChance = "success_chance"
+        case roll
+        case intelligenceTier = "intelligence_tier"
+        case activePatrols = "active_patrols"
+        case incident
+    }
+    
+    /// Check if this is an infiltration response
+    var isInfiltrationResponse: Bool {
+        return triggered != nil || successChance != nil
+    }
+}
+
+// MARK: - Incident Info (for infiltration responses)
+
+struct IncidentInfo: Codable {
+    let incidentId: String
+    let attackerKingdomId: String
+    let defenderKingdomId: String
+    let status: String
+    let attackerTier: Int
+    let slots: [String: Int]?
+    let probabilities: [String: Double]?
+    let timeRemainingSeconds: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case incidentId = "incident_id"
+        case attackerKingdomId = "attacker_kingdom_id"
+        case defenderKingdomId = "defender_kingdom_id"
+        case status
+        case attackerTier = "attacker_tier"
+        case slots
+        case probabilities
+        case timeRemainingSeconds = "time_remaining_seconds"
     }
 }
 
