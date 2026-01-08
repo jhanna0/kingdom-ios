@@ -12,6 +12,12 @@ class MarketAPI {
         return try await client.execute(request)
     }
     
+    /// Get available items for trading with full config (icons, colors, etc.)
+    func getAvailableItems() async throws -> AvailableItemsResponse {
+        let request = client.request(endpoint: "/market/available-items")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Orders
     
     /// Create a new buy or sell order
@@ -66,7 +72,7 @@ class MarketAPI {
     
     /// Get order book for an item (buy/sell orders at each price)
     func getOrderBook(itemType: ItemType) async throws -> OrderBook {
-        let request = client.request(endpoint: "/market/orderbook/\(itemType.rawValue)")
+        let request = client.request(endpoint: "/market/orderbook/\(itemType)")
         return try await client.execute(request)
     }
     
@@ -74,7 +80,7 @@ class MarketAPI {
     
     /// Get price history for an item
     func getPriceHistory(itemType: ItemType, hours: Int = 24) async throws -> PriceHistory {
-        let request = client.request(endpoint: "/market/history/\(itemType.rawValue)?hours=\(hours)")
+        let request = client.request(endpoint: "/market/history/\(itemType)?hours=\(hours)")
         return try await client.execute(request)
     }
     
@@ -84,7 +90,7 @@ class MarketAPI {
     func getRecentTrades(itemType: ItemType? = nil, limit: Int = 50) async throws -> [MarketTransaction] {
         var endpoint = "/market/recent-trades?limit=\(limit)"
         if let itemType = itemType {
-            endpoint += "&item_type=\(itemType.rawValue)"
+            endpoint += "&item_type=\(itemType)"
         }
         
         let request = client.request(endpoint: endpoint)

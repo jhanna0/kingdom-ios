@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 
-from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property, UserKingdom
+from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property, UserKingdom, ActionCooldown
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
@@ -254,9 +254,20 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         "wood": state.wood,
     }
     
+    # Query PlayerInventory for items like meat, sinew, etc.
+    from db.models.inventory import PlayerInventory
+    inventory_items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user.id
+    ).all()
+    
+    # Build a map of inventory items by item_id
+    inventory_map = {item.item_id: item.quantity for item in inventory_items}
+    
     resources_data = []
     for resource_key, resource_config in RESOURCES.items():
-        amount = resource_column_map.get(resource_key, 0)
+        # First check if it's a column resource (gold, iron, steel, wood)
+        # Then check if it's in the inventory table (meat, sinew, etc.)
+        amount = resource_column_map.get(resource_key, inventory_map.get(resource_key, 0))
         resources_data.append({
             "key": resource_key,
             "amount": amount,
@@ -994,10 +1005,15 @@ def relocate_hometown(
     if state.hometown_kingdom_id == kingdom_id:
         raise HTTPException(status_code=400, detail="This is already your hometown")
     
-    # Check cooldown (60 days)
+    # Check cooldown (60 days) from action_cooldowns table
     cooldown_days = 60
-    if state.last_hometown_change:
-        time_since_change = datetime.utcnow() - state.last_hometown_change
+    hometown_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type == "hometown_change"
+    ).first()
+    
+    if hometown_cooldown:
+        time_since_change = datetime.utcnow() - hometown_cooldown.last_performed
         days_remaining = cooldown_days - time_since_change.days
         if days_remaining > 0:
             raise HTTPException(
@@ -1028,7 +1044,22 @@ def relocate_hometown(
     # Update hometown
     old_hometown_name = old_hometown.name if old_hometown else "Unknown"
     state.hometown_kingdom_id = kingdom_id
-    state.last_hometown_change = datetime.utcnow()
+    
+    # Update action_cooldowns table
+    hometown_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type == "hometown_change"
+    ).first()
+    
+    if hometown_cooldown:
+        hometown_cooldown.last_performed = datetime.utcnow()
+    else:
+        hometown_cooldown = ActionCooldown(
+            user_id=current_user.id,
+            action_type="hometown_change",
+            last_performed=datetime.utcnow()
+        )
+        db.add(hometown_cooldown)
     
     # Log the relocation
     log_activity(
@@ -1075,8 +1106,14 @@ def get_relocation_status(
     can_relocate = True
     days_until_available = 0
     
-    if state.last_hometown_change:
-        time_since_change = datetime.utcnow() - state.last_hometown_change
+    # Check action_cooldowns table
+    hometown_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type == "hometown_change"
+    ).first()
+    
+    if hometown_cooldown:
+        time_since_change = datetime.utcnow() - hometown_cooldown.last_performed
         days_until_available = max(0, cooldown_days - time_since_change.days)
         can_relocate = days_until_available == 0
     

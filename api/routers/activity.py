@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 
 from db.base import get_db
-from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, CheckInHistory, UnifiedContract, ContractContribution
+from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Property, Kingdom, UnifiedContract, ContractContribution
 from db.models.activity_log import PlayerActivityLog
 from sqlalchemy import func
 from routers.auth import get_current_user
@@ -244,33 +244,38 @@ def _get_training_activities(db: Session, user_id: int, state: PlayerState, limi
     return activities
 
 
-def _get_checkin_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
-    """Get check-in activities"""
+def _get_kingdom_visit_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+    """Get kingdom visit statistics from user_kingdoms table"""
     activities = []
     
-    checkins = db.query(CheckInHistory).filter(
-        CheckInHistory.user_id == user_id
-    ).order_by(desc(CheckInHistory.checked_in_at)).limit(limit).all()
+    from db.models.kingdom import UserKingdom
     
-    for checkin in checkins:
+    # Get all kingdoms user has visited, ordered by most recent visit
+    user_kingdoms = db.query(UserKingdom).filter(
+        UserKingdom.user_id == user_id,
+        UserKingdom.checkins_count > 0
+    ).order_by(desc(UserKingdom.last_checkin)).limit(limit).all()
+    
+    for uk in user_kingdoms:
         # Get kingdom info
-        kingdom = db.query(Kingdom).filter(Kingdom.id == checkin.kingdom_id).first()
-        kingdom_name = kingdom.name if kingdom else checkin.kingdom_id
+        kingdom = db.query(Kingdom).filter(Kingdom.id == uk.kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else uk.kingdom_id
         
         activities.append(ActivityLogEntry(
-            id=checkin.id + 6000000,  # Offset to avoid ID collision
+            id=hash(f"{user_id}-{uk.kingdom_id}") % 1000000 + 7000000,  # Offset to avoid ID collision
             user_id=user_id,
-            action_type="checkin",
+            action_type="kingdom_visits",
             action_category="kingdom",
-            description=f"Checked in to {kingdom_name}",
-            kingdom_id=checkin.kingdom_id,
+            description=f"Visited {kingdom_name}",
+            kingdom_id=uk.kingdom_id,
             kingdom_name=kingdom_name,
-            amount=checkin.gold_earned if checkin.gold_earned > 0 else None,
+            amount=uk.checkins_count,
             details={
-                "gold_earned": checkin.gold_earned,
-                "experience_earned": checkin.experience_earned
+                "total_visits": uk.checkins_count,
+                "gold_earned": uk.gold_earned,
+                "reputation": uk.local_reputation
             },
-            created_at=checkin.checked_in_at
+            created_at=uk.last_checkin or uk.first_visited
         ))
     
     return activities
@@ -340,7 +345,7 @@ def get_my_activities(
     all_activities.extend(_get_invasion_activities(db, user_id, limit))
     all_activities.extend(_get_property_activities(db, user_id, limit))
     all_activities.extend(_get_training_activities(db, user_id, state, limit))
-    all_activities.extend(_get_checkin_activities(db, user_id, limit))
+    all_activities.extend(_get_kingdom_visit_activities(db, user_id, limit))
     all_activities.extend(_get_action_log_activities(db, user_id, limit))
     
     # Filter by date if specified
@@ -423,7 +428,7 @@ def get_friend_activities(
         friend_activities.extend(_get_invasion_activities(db, friend_id, 20))
         friend_activities.extend(_get_property_activities(db, friend_id, 20))
         friend_activities.extend(_get_training_activities(db, friend_id, friend_state, 10))
-        friend_activities.extend(_get_checkin_activities(db, friend_id, 20))
+        friend_activities.extend(_get_kingdom_visit_activities(db, friend_id, 20))
         friend_activities.extend(_get_action_log_activities(db, friend_id, 20))
         
         # Add user info to activities

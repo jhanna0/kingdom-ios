@@ -23,22 +23,33 @@ enum OrderStatus: String, Codable {
     }
 }
 
-enum ItemType: String, Codable, CaseIterable {
-    case iron = "iron"
-    case steel = "steel"
-    case wood = "wood"
+// ItemType is now dynamic - fetched from /market/available-items
+// No more hardcoded enum! Use MarketItem for display properties.
+typealias ItemType = String
+
+// MARK: - Dynamic Item Config (from /market/available-items)
+
+struct MarketItem: Codable, Identifiable, Hashable {
+    var id: String { itemId }
+    let itemId: String
+    let displayName: String
+    let icon: String        // SF Symbol name
+    let color: String       // SwiftUI color name
+    let description: String
+    let category: String
     
-    var displayName: String {
-        rawValue.capitalized
+    enum CodingKeys: String, CodingKey {
+        case itemId = "id"
+        case displayName = "display_name"
+        case icon
+        case color
+        case description
+        case category
     }
-    
-    var icon: String {
-        switch self {
-        case .iron: return "⚙️"
-        case .steel: return "🔩"
-        case .wood: return "🪵"
-        }
-    }
+}
+
+struct AvailableItemsResponse: Codable {
+    let items: [MarketItem]
 }
 
 // MARK: - Models

@@ -25,6 +25,8 @@ from .models import (
     ContractContribution,
     PlayerItem,
     ActionCooldown,
+    PlayerInventory,
+    Item,
 )
 
 __all__ = [
@@ -55,5 +57,7 @@ __all__ = [
     "ContractContribution",
     "PlayerItem",
     "ActionCooldown",
+    "PlayerInventory",
+    "Item",
 ]
 

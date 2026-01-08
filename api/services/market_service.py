@@ -7,8 +7,8 @@ from sqlalchemy import and_, or_
 from typing import List, Optional, Tuple
 from datetime import datetime
 
-from db.models import MarketOrder, MarketTransaction, OrderType, OrderStatus, PlayerState, User
-from schemas.market import ItemType
+from db.models import MarketOrder, MarketTransaction, OrderType, OrderStatus, PlayerState, User, PlayerInventory
+from routers.resources import RESOURCES
 
 
 class MarketMatchingEngine:
@@ -305,24 +305,49 @@ class MarketMatchingEngine:
         return transaction
     
     def _get_player_resource(self, state: PlayerState, item_type: str) -> int:
-        """Get player's current amount of a resource"""
-        if item_type == "iron":
-            return state.iron
-        elif item_type == "steel":
-            return state.steel
-        elif item_type == "wood":
-            return state.wood
-        else:
+        """Get player's current amount of a resource (supports both column and inventory storage)"""
+        config = RESOURCES.get(item_type)
+        if not config:
             raise ValueError(f"Unknown item type: {item_type}")
+        
+        if config.get("storage_type") == "column":
+            # Legacy column storage (iron, steel, wood)
+            return getattr(state, item_type, 0)
+        else:
+            # Inventory table storage (meat, sinew, etc.)
+            inv = self.db.query(PlayerInventory).filter(
+                PlayerInventory.user_id == state.user_id,
+                PlayerInventory.item_id == item_type
+            ).first()
+            return inv.quantity if inv else 0
     
     def _modify_player_resource(self, state: PlayerState, item_type: str, delta: int):
-        """Modify player's resource amount"""
-        if item_type == "iron":
-            state.iron += delta
-        elif item_type == "steel":
-            state.steel += delta
-        elif item_type == "wood":
-            state.wood += delta
-        else:
+        """Modify player's resource amount (supports both column and inventory storage)"""
+        config = RESOURCES.get(item_type)
+        if not config:
             raise ValueError(f"Unknown item type: {item_type}")
+        
+        if config.get("storage_type") == "column":
+            # Legacy column storage (iron, steel, wood)
+            current = getattr(state, item_type, 0)
+            setattr(state, item_type, current + delta)
+        else:
+            # Inventory table storage (meat, sinew, etc.)
+            inv = self.db.query(PlayerInventory).filter(
+                PlayerInventory.user_id == state.user_id,
+                PlayerInventory.item_id == item_type
+            ).first()
+            
+            if inv:
+                inv.quantity += delta
+                if inv.quantity <= 0:
+                    self.db.delete(inv)
+            elif delta > 0:
+                # Create new inventory row
+                inv = PlayerInventory(
+                    user_id=state.user_id,
+                    item_id=item_type,
+                    quantity=delta
+                )
+                self.db.add(inv)
 

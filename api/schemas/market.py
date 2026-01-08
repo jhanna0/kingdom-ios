@@ -21,12 +21,9 @@ class OrderStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ItemType(str, Enum):
-    """Tradeable items"""
-    IRON = "iron"
-    STEEL = "steel"
-    WOOD = "wood"
-    # Future: stone, titanium, food, etc.
+# ItemType is now a simple string validated against RESOURCES config
+# No more hardcoded enum! Frontend fetches available items from /market/available-items
+ItemType = str  # Validated against routers.resources.RESOURCES at runtime
 
 
 class CreateOrderRequest(BaseModel):
@@ -157,7 +154,7 @@ class MarketInfoResponse(BaseModel):
     market_level: int
     
     # Available items (based on kingdom buildings)
-    available_items: List[ItemType]
+    available_items: List[str]  # List of item_ids from resources.RESOURCES
     message: Optional[str] = None  # Message to display when no items available
     
     # Player resources
@@ -167,4 +164,9 @@ class MarketInfoResponse(BaseModel):
     # Market activity
     total_active_orders: int
     total_transactions_24h: int
+
+
+class AvailableItemsResponse(BaseModel):
+    """List of items available for trading with full config"""
+    items: List[dict]  # Each item has: id, display_name, icon, color, description, category
 

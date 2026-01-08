@@ -34,6 +34,8 @@ struct ActionIconHelper {
             return "figure.walk"
         case "checkin":
             return "location.circle.fill"
+        case "kingdom_visits":
+            return "map.fill"
         default:
             return "circle.fill"
         }
@@ -70,6 +72,8 @@ struct ActionIconHelper {
             return "Travel"
         case "checkin":
             return "Check In"
+        case "kingdom_visits":
+            return "Kingdom Visits"
         default:
             return actionType.capitalized
         }
@@ -106,6 +110,8 @@ struct ActionIconHelper {
             return "Traveled"
         case "checkin":
             return "Checked in"
+        case "kingdom_visits":
+            return "Visited kingdom"
         default:
             return actionType.capitalized
         }
@@ -158,6 +164,8 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "checkin":
             return KingdomTheme.Colors.buttonSuccess // Green
+        case "kingdom_visits":
+            return KingdomTheme.Colors.royalPurple // Purple for travel
         default:
             return KingdomTheme.Colors.inkMedium
         }

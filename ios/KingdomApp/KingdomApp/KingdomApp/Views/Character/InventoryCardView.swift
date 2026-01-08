@@ -131,20 +131,17 @@ struct InventoryCardView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // DYNAMIC: Render all resources from backend config
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(resources) { resource in
-                        InventoryGridItem(
-                            icon: resource.icon,
-                            iconColor: resource.color,
-                            name: resource.displayName,
-                            amount: resource.amount
-                        )
-                    }
-                    
-                    Spacer()
-                        .frame(maxWidth: .infinity)
+            // DYNAMIC: Render all resources from backend config in 5-column grid
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+            
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(resources) { resource in
+                    InventoryGridItem(
+                        icon: resource.icon,
+                        iconColor: resource.color,
+                        name: resource.displayName,
+                        amount: resource.amount
+                    )
                 }
             }
         }

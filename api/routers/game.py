@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List
 import uuid
 
-from db import get_db, User, PlayerState, Kingdom, UserKingdom, CheckInHistory, CityBoundary
+from db import get_db, User, PlayerState, Kingdom, UserKingdom, CityBoundary
 from schemas import CheckInRequest, CheckInResponse, CheckInRewards
 from routers.auth import get_current_user
 from config import DEV_MODE
@@ -309,134 +309,7 @@ def create_kingdom(
     return kingdom
 
 
-# ===== Check-in System =====
-
-@router.post("/checkin", response_model=CheckInResponse)
-def check_in(
-    request: CheckInRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Check in to a kingdom
-    
-    Validates location and rewards player with gold and XP
-    Enforces cooldown to prevent spam
-    """
-    
-    # Get kingdom - should already exist from /cities call
-    kingdom = db.query(Kingdom).filter(Kingdom.id == request.city_boundary_osm_id).first()
-    
-    if not kingdom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kingdom not found"
-        )
-    
-    # Verify user is actually inside kingdom boundaries
-    if not _is_user_in_kingdom(db, request.latitude, request.longitude, kingdom):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You are not within the kingdom boundaries"
-        )
-    
-    # Get or create user-kingdom relationship
-    user_kingdom = _get_or_create_user_kingdom(db, current_user.id, kingdom.id)
-    
-    # Check cooldown (1 hour in production, 5 minutes in dev mode)
-    if user_kingdom.last_checkin:
-        time_since_last = datetime.utcnow() - user_kingdom.last_checkin
-        cooldown = timedelta(minutes=5) if DEV_MODE else timedelta(hours=1)
-        
-        if time_since_last < cooldown:
-            remaining = cooldown - time_since_last
-            minutes = int(remaining.total_seconds() / 60)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Check-in cooldown active. Try again in {minutes} minutes."
-            )
-    
-    # Calculate rewards
-    base_gold = 10
-    base_xp = 5
-    
-    # DEV MODE: 10x rewards
-    if DEV_MODE:
-        base_gold *= 10
-        base_xp *= 10
-    
-    # Check if user is the ruler
-    is_ruler = (kingdom.ruler_id == current_user.id)
-    
-    # Bonus if you're the ruler
-    if is_ruler:
-        base_gold *= 2
-        base_xp *= 2
-    
-    # Bonus based on kingdom level
-    gold_reward_before_tax = base_gold * kingdom.level
-    xp_reward = base_xp * kingdom.level
-    
-    # Apply tax (rulers are exempt in their own kingdom)
-    if is_ruler:
-        # Rulers don't pay tax in their own kingdom
-        gold_reward = gold_reward_before_tax
-        tax_amount = 0
-        tax_rate = 0
-    else:
-        # Apply kingdom tax rate
-        tax_rate = kingdom.tax_rate
-        tax_amount = int(gold_reward_before_tax * tax_rate / 100)
-        gold_reward = gold_reward_before_tax - tax_amount
-        
-        # Add tax to kingdom treasury
-        kingdom.treasury_gold += tax_amount
-    
-    # Update user state
-    state = _get_or_create_player_state(db, current_user)
-    state.gold += gold_reward
-    state.experience += xp_reward
-    # NOTE: total_checkins is now tracked in user_kingdoms.checkins_count
-    
-    # Level up check
-    required_exp = state.level * 100
-    if state.experience >= required_exp:
-        state.level += 1
-        state.experience -= required_exp
-        # Level-up bonus is NOT taxed
-        state.gold += 50 * state.level
-    
-    # Update user-kingdom
-    user_kingdom.checkins_count += 1
-    user_kingdom.last_checkin = datetime.utcnow()
-    user_kingdom.gold_earned += gold_reward
-    user_kingdom.local_reputation += 1
-    
-    # Update kingdom activity (tax already added above)
-    kingdom.last_activity = datetime.utcnow()
-    
-    # Record check-in history
-    checkin_record = CheckInHistory(
-        user_id=current_user.id,
-        kingdom_id=kingdom.id,
-        latitude=request.latitude,
-        longitude=request.longitude,
-        gold_earned=gold_reward,
-        experience_earned=xp_reward,
-        checked_in_at=datetime.utcnow()
-    )
-    db.add(checkin_record)
-    
-    db.commit()
-    
-    return CheckInResponse(
-        success=True,
-        message=f"Checked in to {kingdom.name}!",
-        rewards=CheckInRewards(
-            gold=gold_reward,
-            experience=xp_reward
-        )
-    )
+# REMOVED: Manual check-in endpoint - Kingdom entry is automatic via /state endpoint
 
 
 # ===== Conquest System =====

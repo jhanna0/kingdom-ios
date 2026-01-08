@@ -1,8 +1,11 @@
 """
 RESOURCES SYSTEM - Single Source of Truth for inventory/resource definitions
 Frontend renders ALL resources dynamically from this config - NO HARDCODING!
+
+This file is AUTHORITATIVE. The `items` DB table is synced from this on startup.
 """
 from fastapi import APIRouter
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 
@@ -11,39 +14,52 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 # These define how items look in the UI (icon, color, name, etc.)
 # Storage: gold/iron/steel/wood are legacy columns in PlayerState
 #          meat/sinew/etc use the player_inventory table (proper design!)
+#
+# is_tradeable: Can be sold on the market (default True)
+# storage_type: "column" = PlayerState column, "inventory" = player_inventory table
+
+# I DO NOT LIKE HOW WE HAVE THIS WEIRD HAVE RESOURCE HALF IN TABLE WITHOUT FK DESIGN!
 
 RESOURCES = {
     "gold": {
         "display_name": "Gold",
         "icon": "g.circle.fill",
-        "color": "goldLight",  # Use theme color name - frontend maps to Color(red: 0.7, green: 0.5, blue: 0.2)
+        "color": "goldLight",
         "description": "Primary currency used for purchasing and trading",
         "category": "currency",
-        "display_order": 0
+        "display_order": 0,
+        "is_tradeable": False,  # Gold is currency, not a tradeable item
+        "storage_type": "column",
     },
     "iron": {
         "display_name": "Iron",
         "icon": "cube.fill",
-        "color": "gray",  # Standard SwiftUI .gray
+        "color": "gray",
         "description": "Basic crafting material for weapons and armor",
         "category": "material",
-        "display_order": 1
+        "display_order": 1,
+        "is_tradeable": True,
+        "storage_type": "column",
     },
     "steel": {
         "display_name": "Steel",
         "icon": "cube.fill",
-        "color": "blue",  # Standard SwiftUI .blue
+        "color": "blue",
         "description": "Advanced crafting material for superior equipment",
         "category": "material",
-        "display_order": 2
+        "display_order": 2,
+        "is_tradeable": True,
+        "storage_type": "column",
     },
     "wood": {
         "display_name": "Wood",
         "icon": "tree.fill",
-        "color": "brown",  # Standard SwiftUI .brown
+        "color": "brown",
         "description": "Building material used for construction",
         "category": "material",
-        "display_order": 3
+        "display_order": 3,
+        "is_tradeable": True,
+        "storage_type": "column",
     },
     "meat": {
         "display_name": "Meat",
@@ -51,7 +67,9 @@ RESOURCES = {
         "color": "red",
         "description": "Fresh game meat from hunting. Sell at market or use for food.",
         "category": "consumable",
-        "display_order": 4
+        "display_order": 4,
+        "is_tradeable": True,
+        "storage_type": "inventory",
     },
     "sinew": {
         "display_name": "Sinew",
@@ -59,9 +77,48 @@ RESOURCES = {
         "color": "brown",
         "description": "Animal sinew. Rare drop from hunting - used to craft a hunting bow.",
         "category": "crafting",
-        "display_order": 5
+        "display_order": 5,
+        "is_tradeable": True,
+        "storage_type": "inventory",
     },
 }
+
+
+def sync_items_to_db(db: Session):
+    """
+    Sync RESOURCES dict to the items table on startup.
+    Code is authoritative - this just provides DB queryability and FK constraints.
+    """
+    from db.models import Item
+    
+    for item_id, config in RESOURCES.items():
+        existing = db.query(Item).filter(Item.id == item_id).first()
+        
+        if existing:
+            # Update existing item
+            existing.display_name = config["display_name"]
+            existing.icon = config["icon"]
+            existing.color = config["color"]
+            existing.description = config.get("description", "")
+            existing.category = config["category"]
+            existing.display_order = config.get("display_order", 0)
+            existing.is_tradeable = config.get("is_tradeable", True)
+        else:
+            # Create new item
+            item = Item(
+                id=item_id,
+                display_name=config["display_name"],
+                icon=config["icon"],
+                color=config["color"],
+                description=config.get("description", ""),
+                category=config["category"],
+                display_order=config.get("display_order", 0),
+                is_tradeable=config.get("is_tradeable", True),
+            )
+            db.add(item)
+    
+    db.commit()
+    print(f"✅ Synced {len(RESOURCES)} items to database")
 
 # ===== HUNTING BOW - Craftable with sinew + wood =====
 

@@ -819,18 +819,31 @@ class HuntManager:
         if not session.animal_escaped and session.animal_data:
             self._calculate_loot(session, bonus_amount)
         
+        # Get base sinew chance for this tier to show in message
+        tier = session.animal_data.get("tier", 0) if session.animal_data else 0
+        base_sinew_chance = DROP_TABLES.get(tier, {}).get("sinew", 0)
+        final_sinew_chance = min(1.0, base_sinew_chance + bonus_amount)
+        
         tier_messages = {
-            "none": "The gods are silent... but you still claim your prize.",
-            "small": f"✨ Minor blessing: +{int(bonus_amount * 100)}% loot!",
-            "medium": f"🌟 Divine favor: +{int(bonus_amount * 100)}% loot!",
-            "large": f"⚡ LEGENDARY BLESSING: +{int(bonus_amount * 100)}% loot!",
+            "none": f"The gods are silent... (Sinew chance: {int(final_sinew_chance * 100)}%)",
+            "small": f"✨ Minor blessing: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
+            "medium": f"🌟 Divine favor: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
+            "large": f"⚡ LEGENDARY BLESSING: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
         }
         
+        # Build detailed message showing what dropped
+        message = tier_messages.get(bonus_tier, tier_messages["none"])
+        if session.items_dropped:
+            items_str = ", ".join(session.items_dropped)
+            message += f" → Received: {items_str}!"
+        
         return {
-            "message": tier_messages.get(bonus_tier, tier_messages["none"]),
+            "message": message,
             "effects": {
                 "bonus_tier": bonus_tier,
                 "blessing_bonus": bonus_amount,
+                "base_sinew_chance": base_sinew_chance,
+                "final_sinew_chance": final_sinew_chance,
                 "items_dropped": session.items_dropped,
                 "meat": session.total_meat,
                 "bonus_meat": session.bonus_meat,

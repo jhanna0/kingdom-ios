@@ -22,6 +22,7 @@ from .unified_contract import UnifiedContract, ContractContribution
 from .player_item import PlayerItem
 from .action_cooldown import ActionCooldown
 from .inventory import PlayerInventory
+from .item import Item
 
 __all__ = [
     "User",
@@ -49,5 +50,6 @@ __all__ = [
     "PlayerItem",
     "ActionCooldown",
     "PlayerInventory",
+    "Item",
 ]
 

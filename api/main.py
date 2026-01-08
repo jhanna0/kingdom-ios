@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
 
-from db import init_db
+from db import init_db, SessionLocal
 from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts
 from routers import property as property_router
 import config  # Import to trigger dev mode message
@@ -75,6 +75,15 @@ async def extract_user_from_token(request: Request, call_next):
 async def startup_event():
     try:
         init_db()
+        
+        # Sync items from RESOURCES to database (code is authoritative)
+        from routers.resources import sync_items_to_db
+        db = SessionLocal()
+        try:
+            sync_items_to_db(db)
+        finally:
+            db.close()
+        
         print("🚀 Kingdom API started")
         print("📱 App Config: /app-config (version checking)")
         print("🔐 Authentication: /auth/apple-signin")
@@ -90,7 +99,8 @@ async def startup_event():
         print("👫 Friends: /friends")
         print("📊 Activity: /activity")
         print("🎯 Tiers: /tiers (SINGLE SOURCE OF TRUTH)")
-        print("💰 Market: /market (Grand Exchange)")
+        print("💰 Market: /market (Grand Exchange - dynamic items)")
+        print("📦 Resources: /resources (item definitions)")
         print("🏹 Hunts: /hunts (Group hunting)")
         print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:

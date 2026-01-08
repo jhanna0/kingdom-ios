@@ -8,36 +8,53 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from db import get_db, User, Kingdom, MarketOrder, MarketTransaction, OrderType, OrderStatus
+from db import get_db, User, Kingdom, MarketOrder, MarketTransaction, OrderType, OrderStatus, PlayerInventory
 from routers.auth import get_current_user
 from schemas.market import (
     CreateOrderRequest, CreateOrderResult, MarketOrderResponse, MarketTransactionResponse,
     OrderBook, OrderBookEntry, PriceHistory, PriceHistoryEntry, PlayerOrdersResponse,
-    CancelOrderResult, MarketInfoResponse, ItemType
+    CancelOrderResult, MarketInfoResponse, AvailableItemsResponse
 )
+from routers.resources import RESOURCES
 from services.market_service import MarketMatchingEngine
 
 
 router = APIRouter(prefix="/market", tags=["market"])
 
 
-def get_available_items(kingdom: Kingdom) -> List[ItemType]:
-    """Get list of tradeable items based on kingdom buildings"""
+def get_market_commodities(kingdom: Kingdom) -> List[str]:
+    """
+    Get building-gated market commodities (iron, steel, wood).
+    These are the main items shown as tabs on the market page.
+    """
     items = []
     
-    # Iron available if mine level >= 1
     if kingdom.mine_level >= 2:
-        items.append(ItemType.IRON)
-    
-    # Steel available if mine level >= 3
+        items.append("iron")
     if kingdom.mine_level >= 3:
-        items.append(ItemType.STEEL)
+        items.append("steel")
     
-    # Wood available if lumbermill exists (you may need to add this check)
-    if hasattr(kingdom, 'lumbermill_level') and kingdom.lumbermill_level >= 1:
-        items.append(ItemType.WOOD)
-    elif kingdom.farm_level >= 1:  # Or if farm produces wood
-        items.append(ItemType.WOOD)
+    has_lumbermill = hasattr(kingdom, 'lumbermill_level') and kingdom.lumbermill_level >= 1
+    has_farm = kingdom.farm_level >= 1
+    if has_lumbermill or has_farm:
+        items.append("wood")
+    
+    return items
+
+
+def get_all_tradeable_items(kingdom: Kingdom) -> List[str]:
+    """
+    Get ALL items that can be traded (for Create Order page).
+    Includes market commodities + inventory items like meat/sinew.
+    """
+    items = get_market_commodities(kingdom)
+    
+    # Add inventory items (consumables, crafting materials)
+    for item_id, config in RESOURCES.items():
+        if not config.get("is_tradeable", True):
+            continue
+        if config.get("storage_type") == "inventory" and item_id not in items:
+            items.append(item_id)
     
     return items
 
@@ -85,12 +102,19 @@ def create_order(
             detail="This kingdom has no market. The ruler must build a market first."
         )
     
-    # Check if item is available for trading
-    available_items = get_available_items(kingdom)
-    if request.item_type not in available_items:
+    # Validate item exists in RESOURCES config
+    if request.item_type not in RESOURCES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Item '{request.item_type.value}' not available for trading in this kingdom"
+            detail=f"Unknown item type: '{request.item_type}'"
+        )
+    
+    # Check if item is available for trading (includes meat, sinew, etc.)
+    tradeable_items = get_all_tradeable_items(kingdom)
+    if request.item_type not in tradeable_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Item '{request.item_type}' not available for trading in this kingdom"
         )
     
     # Check buy order limit (20 per item type)
@@ -98,7 +122,7 @@ def create_order(
         active_buy_orders_count = db.query(func.count(MarketOrder.id)).filter(
             and_(
                 MarketOrder.player_id == current_user.id,
-                MarketOrder.item_type == request.item_type.value,
+                MarketOrder.item_type == request.item_type,
                 MarketOrder.order_type == OrderType.BUY,
                 MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
             )
@@ -107,7 +131,7 @@ def create_order(
         if active_buy_orders_count >= 20:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"You have reached the maximum of 20 active buy orders for {request.item_type.value}. Cancel some orders first."
+                detail=f"You have reached the maximum of 20 active buy orders for {request.item_type}. Cancel some orders first."
             )
     
     # TODO: Check merchant skill for cross-kingdom trading
@@ -121,7 +145,7 @@ def create_order(
             player_id=current_user.id,
             kingdom_id=state.current_kingdom_id,
             order_type=request.order_type,
-            item_type=request.item_type.value,
+            item_type=request.item_type,
             price_per_unit=request.price_per_unit,
             quantity=request.quantity
         )
@@ -213,7 +237,7 @@ def cancel_order(
 
 @router.get("/orderbook/{item_type}", response_model=OrderBook)
 def get_order_book(
-    item_type: ItemType,
+    item_type: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -239,7 +263,7 @@ def get_order_book(
     ).filter(
         and_(
             MarketOrder.kingdom_id == kingdom_id,
-            MarketOrder.item_type == item_type.value,
+            MarketOrder.item_type == item_type,
             MarketOrder.order_type == OrderType.BUY,
             MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
         )
@@ -253,7 +277,7 @@ def get_order_book(
     ).filter(
         and_(
             MarketOrder.kingdom_id == kingdom_id,
-            MarketOrder.item_type == item_type.value,
+            MarketOrder.item_type == item_type,
             MarketOrder.order_type == OrderType.SELL,
             MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
         )
@@ -294,7 +318,7 @@ def get_order_book(
 
 @router.get("/history/{item_type}", response_model=PriceHistory)
 def get_price_history(
-    item_type: ItemType,
+    item_type: str,
     hours: int = Query(default=24, ge=1, le=168),  # 1 hour to 1 week
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -318,7 +342,7 @@ def get_price_history(
     transactions = db.query(MarketTransaction).filter(
         and_(
             MarketTransaction.kingdom_id == kingdom_id,
-            MarketTransaction.item_type == item_type.value,
+            MarketTransaction.item_type == item_type,
             MarketTransaction.created_at >= cutoff_time
         )
     ).order_by(MarketTransaction.created_at.desc()).limit(500).all()
@@ -447,10 +471,10 @@ def get_market_info(
             detail="Kingdom not found"
         )
     
-    # Get available items
-    available_items = get_available_items(kingdom)
+    # Get market commodities (iron, steel, wood) - main page tabs
+    available_items = get_market_commodities(kingdom)
     
-    # Generate message if no items available
+    # Generate message if no commodities available
     message = None
     if not available_items:
         requirements = []
@@ -482,6 +506,18 @@ def get_market_info(
         )
     ).scalar()
     
+    # Build player resources from both column storage and inventory
+    player_resources = {}
+    for item_id, config in RESOURCES.items():
+        if config.get("storage_type") == "column":
+            player_resources[item_id] = getattr(state, item_id, 0)
+        else:
+            inv = db.query(PlayerInventory).filter(
+                PlayerInventory.user_id == current_user.id,
+                PlayerInventory.item_id == item_id
+            ).first()
+            player_resources[item_id] = inv.quantity if inv else 0
+    
     return MarketInfoResponse(
         kingdom_id=kingdom.id,
         kingdom_name=kingdom.name,
@@ -489,11 +525,7 @@ def get_market_info(
         available_items=available_items,
         message=message,
         player_gold=state.gold,
-        player_resources={
-            "iron": state.iron,
-            "steel": state.steel,
-            "wood": state.wood
-        },
+        player_resources=player_resources,
         total_active_orders=total_active_orders or 0,
         total_transactions_24h=total_transactions_24h or 0
     )
@@ -501,7 +533,7 @@ def get_market_info(
 
 @router.get("/recent-trades", response_model=List[MarketTransactionResponse])
 def get_recent_trades(
-    item_type: Optional[ItemType] = None,
+    item_type: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -523,10 +555,51 @@ def get_recent_trades(
     )
     
     if item_type:
-        query = query.filter(MarketTransaction.item_type == item_type.value)
+        query = query.filter(MarketTransaction.item_type == item_type)
     
     transactions = query.order_by(
         MarketTransaction.created_at.desc()
     ).limit(limit).all()
     
     return [MarketTransactionResponse.from_orm(t) for t in transactions]
+
+
+@router.get("/available-items", response_model=AvailableItemsResponse)
+def get_available_items_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all items available for trading with full config.
+    Frontend should use this to render market UI dynamically - NO HARDCODING!
+    """
+    state = current_user.player_state
+    if not state or not state.current_kingdom_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must be checked into a kingdom"
+        )
+    
+    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+    if not kingdom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kingdom not found"
+        )
+    
+    # Get ALL tradeable items (commodities + inventory items like meat/sinew)
+    tradeable_item_ids = get_all_tradeable_items(kingdom)
+    
+    items = []
+    for item_id in tradeable_item_ids:
+        config = RESOURCES.get(item_id, {})
+        items.append({
+            "id": item_id,
+            "display_name": config.get("display_name", item_id),
+            "icon": config.get("icon", "questionmark"),
+            "color": config.get("color", "gray"),
+            "description": config.get("description", ""),
+            "category": config.get("category", "unknown"),
+        })
+    
+    return AvailableItemsResponse(items=items)

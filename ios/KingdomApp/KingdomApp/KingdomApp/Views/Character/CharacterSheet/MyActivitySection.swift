@@ -118,19 +118,29 @@ struct MyActivityRow: View {
             
             if let amount = activity.amount {
                 HStack(spacing: 2) {
-                    let prefix = activity.actionType == "travel_fee" ? "-" : "+"
-                    Text("\(prefix)\(amount)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    if activity.actionType == "patrol" {
-                        Image(systemName: "r.circle.fill")
+                    // Special formatting for different action types
+                    if activity.actionType == "kingdom_visits" {
+                        Text("\(amount)×")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Image(systemName: "map.fill")
                             .font(.system(size: 12))
                             .foregroundColor(KingdomTheme.Colors.royalPurple)
                     } else {
-                        Image(systemName: "g.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                        let prefix = activity.actionType == "travel_fee" ? "-" : "+"
+                        Text("\(prefix)\(amount)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        if activity.actionType == "patrol" {
+                            Image(systemName: "r.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(KingdomTheme.Colors.royalPurple)
+                        } else {
+                            Image(systemName: "g.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                        }
                     }
                 }
             }

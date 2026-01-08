@@ -3,7 +3,6 @@ import Combine
 
 struct MarketView: View {
     @StateObject private var viewModel = MarketViewModel()
-    @State private var selectedItemType: ItemType = .iron
     
     var body: some View {
         ZStack {
@@ -17,8 +16,8 @@ struct MarketView: View {
                         kingdomHeader(info)
                     }
                     
-                    // Create Order Button - ALWAYS ENABLED
-                    NavigationLink(destination: CreateOrderView(viewModel: viewModel, itemType: selectedItemType)) {
+                    // Create Order Button
+                    NavigationLink(destination: CreateOrderView(viewModel: viewModel)) {
                         HStack(spacing: 12) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title2)
@@ -44,13 +43,10 @@ struct MarketView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Item Tabs
-                    itemTabs
-                    
-                    // My Active Orders (always show the section)
+                    // My Active Orders
                     myOrdersSection
                     
-                    // Recent Trades
+                    // Recent Trades (all items)
                     if !viewModel.recentTrades.isEmpty {
                         recentTradesSection
                     }
@@ -64,12 +60,7 @@ struct MarketView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .task {
-            await viewModel.loadMarket(itemType: selectedItemType)
-        }
-        .onChange(of: selectedItemType) { newItem in
-            Task {
-                await viewModel.loadRecentTrades(itemType: newItem)
-            }
+            await viewModel.loadMarket()
         }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") { }
@@ -131,55 +122,6 @@ struct MarketView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
         .padding(.top, KingdomTheme.Spacing.small)
-    }
-    
-    // MARK: - Item Tabs
-    
-    private var itemTabs: some View {
-        Group {
-            if let availableItems = viewModel.marketInfo?.availableItems, !availableItems.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(availableItems, id: \.self) { item in
-                        Button(action: { selectedItemType = item }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: itemIcon(for: item))
-                                    .font(.system(size: 14, weight: .bold))
-                                Text(item.displayName)
-                                    .font(FontStyles.labelLarge)
-                            }
-                            .foregroundColor(selectedItemType == item ? .white : KingdomTheme.Colors.inkDark)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                ZStack {
-                                    if selectedItemType == item {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.black)
-                                            .offset(x: 2, y: 2)
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(itemColor(for: item))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(Color.black, lineWidth: 2)
-                                            )
-                                    } else {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(KingdomTheme.Colors.parchment)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(Color.black, lineWidth: 2)
-                                            )
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-                .padding(KingdomTheme.Spacing.medium)
-                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
-                .padding(.horizontal)
-            }
-        }
     }
     
     // MARK: - My Orders
@@ -295,23 +237,6 @@ struct MarketView: View {
         .padding(.horizontal)
     }
     
-    // MARK: - Helpers
-    
-    private func itemIcon(for item: ItemType) -> String {
-        switch item {
-        case .iron: return "gearshape.fill"
-        case .steel: return "wrench.and.screwdriver.fill"
-        case .wood: return "tree.fill"
-        }
-    }
-    
-    private func itemColor(for item: ItemType) -> Color {
-        switch item {
-        case .iron: return .gray
-        case .steel: return .blue
-        case .wood: return .brown
-        }
-    }
 }
 
 // MARK: - Resource Badge
@@ -391,16 +316,15 @@ struct CreateOrderView: View {
     @ObservedObject var viewModel: MarketViewModel
     @Environment(\.dismiss) var dismiss
     
-    @State private var selectedItemType: ItemType
+    @State private var selectedItemType: ItemType = ""
     @State private var orderType: OrderType = .buy
     @State private var pricePerUnit: Int = 10
     @State private var quantity: Int = 1
     @State private var orderPlaced = false
     @State private var showCancelAlert = false
     
-    init(viewModel: MarketViewModel, itemType: ItemType) {
+    init(viewModel: MarketViewModel) {
         self.viewModel = viewModel
-        _selectedItemType = State(initialValue: itemType)
     }
     
     var totalCost: Int {
@@ -417,7 +341,7 @@ struct CreateOrderView: View {
     var hasEnoughItems: Bool {
         guard orderType == .sell,
               let info = viewModel.marketInfo,
-              let available = info.playerResources[selectedItemType.rawValue] else {
+              let available = info.playerResources[selectedItemType] else {
             return true
         }
         return available >= quantity
@@ -430,56 +354,54 @@ struct CreateOrderView: View {
             
             ScrollView {
                 VStack(spacing: KingdomTheme.Spacing.medium) {
-                    // Item Selector (only available items from backend)
-                    if let availableItems = viewModel.marketInfo?.availableItems, !availableItems.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Item")
-                                    .font(FontStyles.headingMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                                
+                    // Item Selector (all tradeable items from backend)
+                    if !viewModel.availableItems.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Item")
+                                .font(FontStyles.headingMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            // Use a scrollable row if many items
+                            ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(availableItems, id: \.self) { item in
-                                        Button(action: { selectedItemType = item }) {
+                                    ForEach(viewModel.availableItems) { item in
+                                        Button(action: { selectedItemType = item.itemId }) {
                                             HStack(spacing: 6) {
-                                                Image(systemName: itemIcon(for: item))
+                                                Image(systemName: item.icon)
                                                     .font(.system(size: 14, weight: .bold))
                                                 Text(item.displayName)
                                                     .font(FontStyles.labelLarge)
                                             }
-                                            .foregroundColor(selectedItemType == item ? .white : KingdomTheme.Colors.inkDark)
-                                            .frame(maxWidth: .infinity)
+                                            .foregroundColor(selectedItemType == item.itemId ? .white : KingdomTheme.Colors.inkDark)
+                                            .padding(.horizontal, 12)
                                             .padding(.vertical, 10)
                                             .background(
-                                                selectedItemType == item
-                                                    ? itemColor(for: item)
+                                                selectedItemType == item.itemId
+                                                    ? viewModel.color(for: item.itemId)
                                                     : KingdomTheme.Colors.parchmentLight
                                             )
-                                            .cornerRadius(8)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(Color.black, lineWidth: 2)
+                                                    .strokeBorder(Color.black, lineWidth: 2)
                                             )
                                         }
                                     }
                                 }
                             }
-                            .padding()
-                            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
-                        } else {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("No items available")
-                                    .font(FontStyles.headingMedium)
-                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                                if let message = viewModel.marketInfo?.message {
-                                    Text(message)
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                         }
+                        .padding()
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Loading items...")
+                                .font(FontStyles.headingMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                    }
                         
                         // Order Type Picker
                         VStack(alignment: .leading, spacing: 8) {
@@ -632,7 +554,7 @@ struct CreateOrderView: View {
                         }
                         
                         if orderType == .sell && !hasEnoughItems {
-                            Text("Not enough \(selectedItemType.displayName)")
+                            Text("Not enough \(itemDisplayName(for: selectedItemType))")
                                 .font(FontStyles.labelLarge)
                                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -711,6 +633,16 @@ struct CreateOrderView: View {
         } message: {
             Text(viewModel.successMessage)
         }
+        .task {
+            // Load available items if not already loaded
+            if viewModel.availableItems.isEmpty {
+                await viewModel.loadAvailableItems()
+            }
+            // Set initial selection to first item
+            if selectedItemType.isEmpty, let first = viewModel.availableItems.first {
+                selectedItemType = first.itemId
+            }
+        }
     }
     
     private func incrementButton(_ label: String, action: @escaping () -> Void) -> some View {
@@ -756,20 +688,17 @@ struct CreateOrderView: View {
         }
     }
     
+    // Use ViewModel's dynamic item config
     private func itemIcon(for item: ItemType) -> String {
-        switch item {
-        case .iron: return "gearshape.fill"
-        case .steel: return "wrench.and.screwdriver.fill"
-        case .wood: return "tree.fill"
-        }
+        viewModel.icon(for: item)
     }
     
     private func itemColor(for item: ItemType) -> Color {
-        switch item {
-        case .iron: return .gray
-        case .steel: return .blue
-        case .wood: return .brown
-        }
+        viewModel.color(for: item)
+    }
+    
+    private func itemDisplayName(for item: ItemType) -> String {
+        viewModel.displayName(for: item)
     }
 }
 
@@ -778,6 +707,7 @@ struct CreateOrderView: View {
 @MainActor
 class MarketViewModel: ObservableObject {
     @Published var marketInfo: MarketInfo?
+    @Published var availableItems: [MarketItem] = []  // Dynamic item configs from API
     @Published var myActiveOrders: [MarketOrder] = []
     @Published var recentTrades: [MarketTransaction] = []
     
@@ -788,11 +718,49 @@ class MarketViewModel: ObservableObject {
     
     private let api = MarketAPI()
     
-    func loadMarket(itemType: ItemType) async {
+    /// Get MarketItem config for a given item_id
+    func itemConfig(for itemId: String) -> MarketItem? {
+        availableItems.first { $0.itemId == itemId }
+    }
+    
+    /// Get display name for an item (falls back to capitalized id)
+    func displayName(for itemId: String) -> String {
+        itemConfig(for: itemId)?.displayName ?? itemId.capitalized
+    }
+    
+    /// Get SF Symbol icon for an item
+    func icon(for itemId: String) -> String {
+        itemConfig(for: itemId)?.icon ?? "questionmark.circle"
+    }
+    
+    /// Get color for an item
+    func color(for itemId: String) -> Color {
+        guard let colorName = itemConfig(for: itemId)?.color else { return .gray }
+        return colorFromName(colorName)
+    }
+    
+    private func colorFromName(_ name: String) -> Color {
+        switch name.lowercased() {
+        case "red": return .red
+        case "blue": return .blue
+        case "green": return .green
+        case "gray", "grey": return .gray
+        case "brown": return .brown
+        case "orange": return .orange
+        case "yellow": return .yellow
+        case "purple": return .purple
+        case "pink": return .pink
+        case "goldlight": return Color(red: 0.7, green: 0.5, blue: 0.2)
+        default: return .gray
+        }
+    }
+    
+    /// Load market page data (info, orders, recent trades)
+    func loadMarket() async {
         do {
             async let info = api.getMarketInfo()
             async let orders = api.getMyOrders()
-            async let trades = api.getRecentTrades(itemType: itemType, limit: 20)
+            async let trades = api.getRecentTrades(itemType: nil, limit: 20)  // All items
             
             let (infoResult, ordersResult, tradesResult) = try await (info, orders, trades)
             
@@ -804,11 +772,13 @@ class MarketViewModel: ObservableObject {
         }
     }
     
-    func loadRecentTrades(itemType: ItemType) async {
+    /// Load available items for Create Order page
+    func loadAvailableItems() async {
         do {
-            self.recentTrades = try await api.getRecentTrades(itemType: itemType, limit: 20)
+            let response = try await api.getAvailableItems()
+            self.availableItems = response.items
         } catch {
-            print("Failed to load recent trades: \(error)")
+            showError(message: error.localizedDescription)
         }
     }
     
@@ -822,11 +792,12 @@ class MarketViewModel: ObservableObject {
             )
             
             // Refresh data
-            await loadMarket(itemType: itemType)
+            await loadMarket()
             
             // Show success message
+            let itemName = displayName(for: itemType)
             if result.fullyFilled {
-                showSuccess(message: "Order filled instantly! Traded \(result.totalQuantityFilled) \(itemType.displayName) for \(result.totalGoldExchanged)g")
+                showSuccess(message: "Order filled instantly! Traded \(result.totalQuantityFilled) \(itemName) for \(result.totalGoldExchanged)g")
             } else if result.partiallyFilled {
                 showSuccess(message: "Order partially filled. \(result.totalQuantityFilled) traded, \(result.quantityRemaining) remaining")
             } else {
