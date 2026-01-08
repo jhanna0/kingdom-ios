@@ -18,4 +18,3 @@ mangum==0.17.0
 
 # AWS SDK (included in Lambda runtime, but specified for local dev)
 boto3==1.34.34
-

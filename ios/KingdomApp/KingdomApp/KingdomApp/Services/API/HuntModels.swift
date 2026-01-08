@@ -163,6 +163,7 @@ struct HuntAnimal: Codable {
     let icon: String?
     let tier: Int?
     let hp: Int?
+    let meat: Int?
 }
 
 // MARK: - Phase State (Multi-Roll System)
@@ -453,6 +454,22 @@ enum AnyCodableValue: Codable {
     
     var intValue: Int? {
         if case .int(let v) = self { return v }
+        return nil
+    }
+    
+    var doubleValue: Double? {
+        if case .double(let v) = self { return v }
+        if case .int(let v) = self { return Double(v) }
+        return nil
+    }
+    
+    var stringValue: String? {
+        if case .string(let v) = self { return v }
+        return nil
+    }
+    
+    var arrayValue: [AnyCodableValue]? {
+        if case .array(let v) = self { return v }
         return nil
     }
 }

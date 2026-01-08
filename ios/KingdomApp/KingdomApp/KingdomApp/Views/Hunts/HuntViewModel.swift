@@ -211,7 +211,17 @@ class HuntViewModel: ObservableObject {
     }
     
     /// User taps "Master Roll" / "Resolve" button
+    /// This now shows a waiting screen where user must tap to actually roll
     func userTappedResolve() async {
+        guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
+        
+        // Transition to resolving state - shows the "tap to roll" screen
+        uiState = .resolving(currentPhase)
+    }
+    
+    /// User taps the actual roll button on the master roll screen
+    /// This triggers the API call and animation
+    func executeMasterRoll() async {
         await resolveCurrentPhase()
     }
     
@@ -277,13 +287,8 @@ class HuntViewModel: ObservableObject {
                     }
                 }
                 
-                // Check if we've run out of rolls - must resolve
-                if !(hunt?.canRoll ?? false) && (hunt?.canResolve ?? false) {
-                    await resolveCurrentPhase()
-                    return
-                }
-                
-                // Back to active phase state
+                // Stay in active phase state - user must manually tap resolve
+                // DO NOT auto-trigger master roll - let user see their results first!
                 uiState = .phaseActive(currentPhase)
                 
             } else {
@@ -298,12 +303,10 @@ class HuntViewModel: ObservableObject {
         }
     }
     
-    /// Resolve/finalize the current phase
+    /// Resolve/finalize the current phase (called after user taps roll button)
     private func resolveCurrentPhase() async {
         guard let huntId = hunt?.hunt_id,
               let currentPhase = hunt?.phase_state?.huntPhase else { return }
-        
-        uiState = .resolving(currentPhase)
         
         do {
             let response = try await KingdomAPIService.shared.hunts.resolvePhase(huntId: huntId)
@@ -312,13 +315,17 @@ class HuntViewModel: ObservableObject {
                 currentPhaseResult = response.phase_result
                 hunt = response.hunt
                 
-                // ALL phases get master roll animation!
+                // ALL phases get master roll animation - user already tapped, now animate!
                 if let effects = response.phase_result?.effects,
                    let rollValue = effects["master_roll"]?.intValue {
                     await showMasterRollAnimation(value: rollValue, phase: currentPhase)
                 }
                 
-                // Special handling for Track phase - show creature reveal after animation
+                // After animation completes, show appropriate next screen
+                // Small delay to let animation settle
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                
+                // Special handling for Track phase - show creature reveal
                 if currentPhase == .track,
                    let effects = response.phase_result?.effects,
                    effects["animal_found"]?.boolValue == true {

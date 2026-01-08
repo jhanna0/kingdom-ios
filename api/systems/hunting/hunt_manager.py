@@ -996,16 +996,33 @@ class HuntManager:
             )
             effects["loot_bonus"] = bonus_multiplier
             
-            if group_roll.critical_count > 0:
+            # Apply loot bonus and calculate drops BEFORE setting message
+            if not session.animal_escaped and session.animal_data:
+                self._calculate_loot(session, bonus_multiplier)
+            
+            # Include items in effects so frontend can show them
+            effects["items_dropped"] = session.items_dropped.copy()
+            effects["total_meat"] = session.total_meat + session.bonus_meat
+            effects["bonus_meat"] = session.bonus_meat
+            
+            # Set outcome message based on ACTUAL results, not just prayer rolls!
+            if session.items_dropped:
+                # Got rare items - this is a success!
+                item_names = [item.replace("_", " ").title() for item in session.items_dropped]
+                if group_roll.critical_count > 0:
+                    outcome_message = f"✨ Divine favor! You found: {', '.join(item_names)}!"
+                else:
+                    outcome_message = f"🎁 Fortune smiles! You found: {', '.join(item_names)}!"
+                effects["loot_success"] = True
+            elif group_roll.critical_count > 0:
                 outcome_message = "✨ The gods bestow their blessing!"
             elif group_roll.success_count > 0:
                 outcome_message = "Your prayers are heard."
+            elif session.bonus_meat > 0:
+                # Got bonus meat from previous successes
+                outcome_message = "A modest blessing upon your hunt."
             else:
-                outcome_message = "Silence from the heavens..."
-            
-            # Apply loot bonus and calculate drops
-            if not session.animal_escaped and session.animal_data:
-                self._calculate_loot(session, bonus_multiplier)
+                outcome_message = "The gods are silent... but you still have your catch!"
         
         # Create phase result
         result = PhaseResult(

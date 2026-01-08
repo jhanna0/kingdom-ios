@@ -566,4 +566,3 @@ struct ResourceInfo {
     let category: String
     let displayOrder: Int
 }
-
