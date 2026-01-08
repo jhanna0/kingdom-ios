@@ -5,7 +5,7 @@ struct HometownCard: View {
     @ObservedObject var player: Player
     let relocationStatus: RelocationStatusResponse?
     let isLoadingRelocationStatus: Bool
-    let onShowRelocationSheet: () -> Void
+    let onRelocate: () async -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -35,8 +35,12 @@ struct HometownCard: View {
                     .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
-                // Relocation button
-                Button(action: onShowRelocationSheet) {
+                // Relocation navigation link
+                NavigationLink(destination: RelocationView(
+                    player: player,
+                    relocationStatus: relocationStatus,
+                    onRelocate: onRelocate
+                )) {
                     HStack {
                         Image(systemName: "house.fill")
                             .font(FontStyles.iconSmall)

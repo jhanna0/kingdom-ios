@@ -12,7 +12,6 @@ struct CharacterSheetView: View {
     @State private var isLoadingContracts = true
     @State private var myActivities: [ActivityLogEntry] = []
     @State private var isLoadingActivities = true
-    @State private var showRelocationSheet = false
     @State private var relocationStatus: RelocationStatusResponse?
     @State private var isLoadingRelocationStatus = false
     
@@ -63,7 +62,7 @@ struct CharacterSheetView: View {
                         player: player,
                         relocationStatus: relocationStatus,
                         isLoadingRelocationStatus: isLoadingRelocationStatus,
-                        onShowRelocationSheet: { showRelocationSheet = true }
+                        onRelocate: relocateHometown
                     )
                 }
             }
@@ -73,15 +72,6 @@ struct CharacterSheetView: View {
             await loadTrainingContracts()
             await loadMyActivities()
             await loadRelocationStatus()
-        }
-        .sheet(isPresented: $showRelocationSheet) {
-            RelocationSheetView(
-                player: player,
-                relocationStatus: relocationStatus,
-                onRelocate: {
-                    await relocateHometown()
-                }
-            )
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
         .navigationTitle("Character Sheet")
