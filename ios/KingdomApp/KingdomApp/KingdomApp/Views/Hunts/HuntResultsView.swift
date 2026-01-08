@@ -10,7 +10,7 @@ struct HuntResultsView: View {
     @State private var showRewards = false
     @State private var showPlayers = false
     @State private var showButtons = false
-    @State private var goldCountUp: Int = 0
+    @State private var meatCountUp: Int = 0
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -72,9 +72,9 @@ struct HuntResultsView: View {
                 showRewards = true
             }
             
-            // Count up gold animation
-            if let totalGold = viewModel.hunt?.rewards?.total_gold {
-                animateGoldCountUp(to: totalGold)
+            // Count up meat animation
+            if let totalMeat = viewModel.hunt?.rewards?.total_meat {
+                animateMeatCountUp(to: totalMeat)
             }
         }
         
@@ -203,19 +203,28 @@ struct HuntResultsView: View {
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             if let rewards = viewModel.hunt?.rewards {
-                // Gold
+                // Meat (Primary Reward)
                 HStack {
-                    Image(systemName: "dollarsign.circle.fill")
+                    Text("🥩")
                         .font(.title)
-                        .foregroundColor(KingdomTheme.Colors.gold)
                     
                     VStack(alignment: .leading) {
-                        Text("Gold Earned")
+                        Text("Meat Collected")
                             .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        Text("\(goldCountUp)g")
+                        Text("\(meatCountUp) meat")
                             .font(.system(size: 28, weight: .bold, design: .serif))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        if rewards.bonus_meat > 0 {
+                            Text("(+\(rewards.bonus_meat) from blessing)")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        
+                        Text("Market Value: \(rewards.meat_market_value)g")
+                            .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     }
                     
@@ -224,33 +233,8 @@ struct HuntResultsView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(KingdomTheme.Colors.gold.opacity(0.1))
+                        .fill(KingdomTheme.Colors.parchment)
                 )
-                
-                // Meat
-                if rewards.meat > 0 {
-                    HStack {
-                        Text("🥩")
-                            .font(.title)
-                        
-                        VStack(alignment: .leading) {
-                            Text("Meat Collected")
-                                .font(FontStyles.labelMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            Text("\(rewards.meat) units (+\(rewards.meat_value)g value)")
-                                .font(KingdomTheme.Typography.headline())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(KingdomTheme.Colors.parchment)
-                    )
-                }
                 
                 // Items
                 if !rewards.items.isEmpty {
@@ -335,7 +319,7 @@ struct HuntResultsView: View {
     
     // MARK: - Helpers
     
-    private func animateGoldCountUp(to target: Int) {
+    private func animateMeatCountUp(to target: Int) {
         let duration: Double = 1.5
         let steps = 30
         let stepDuration = duration / Double(steps)
@@ -344,9 +328,9 @@ struct HuntResultsView: View {
         for i in 0...steps {
             DispatchQueue.main.asyncAfter(deadline: .now() + stepDuration * Double(i)) {
                 if i == steps {
-                    goldCountUp = target
+                    meatCountUp = target
                 } else {
-                    goldCountUp = increment * i
+                    meatCountUp = increment * i
                 }
             }
         }
@@ -399,11 +383,11 @@ struct PlayerContributionRow: View {
             
             Spacer()
             
-            // Gold earned
+            // Meat earned
             VStack(alignment: .trailing) {
-                Text("+\(participant.gold_earned)g")
+                Text("🥩 \(participant.meat_earned)")
                     .font(KingdomTheme.Typography.headline())
-                    .foregroundColor(KingdomTheme.Colors.gold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("Contribution: \(String(format: "%.1f", participant.total_contribution))")
                     .font(FontStyles.labelSmall)

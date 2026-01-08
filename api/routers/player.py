@@ -310,20 +310,18 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         email=user.email,
         avatar_url=user.avatar_url,
         
-        # Kingdom & Territory
+        # Territory
         hometown_kingdom_id=state.hometown_kingdom_id,
-        origin_kingdom_id=None,  # Removed from schema (was for first 300+ rep kingdom)
-        home_kingdom_id=None,  # Removed from schema (was for most check-ins)
         current_kingdom_id=state.current_kingdom_id,
         current_kingdom_name=current_kingdom_name,
         
-        # Core Stats
+        # Progression
         gold=state.gold,
         level=state.level,
         experience=state.experience,
         skill_points=state.skill_points,
         
-        # Combat Stats
+        # Stats
         attack_power=state.attack_power,
         defense_power=state.defense_power,
         leadership=state.leadership,
@@ -332,86 +330,56 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         science=state.science,
         faith=state.faith,
         
-        # Debuffs
+        # Combat
         attack_debuff=state.attack_debuff,
         debuff_expires_at=state.debuff_expires_at,
         
-        # Reputation (from user_kingdoms table for current kingdom)
-        reputation=reputation,
-        honor=100,  # Removed from schema
-        kingdom_reputation={},  # Removed from schema
+        # Reputation & Honor
+        reputation=reputation,  # From user_kingdoms for current kingdom
+        honor=state.honor or 100,
         
-        # Check-in tracking (NOTE: moved to user_kingdoms table)
-        check_in_history={},  # Removed from schema
-        last_check_in=None,  # TODO: fetch from user_kingdoms
-        last_daily_check_in=None,  # TODO: implement if needed
-        
-        # Activity tracking (NOTE: computed from other tables)
-        total_checkins=0,  # TODO: compute from user_kingdoms
-        total_conquests=0,  # TODO: compute from kingdom_history
+        # Activity (TODO: should be computed from other tables)
+        total_checkins=state.total_checkins or 0,
+        total_conquests=state.total_conquests or 0,
         kingdoms_ruled=kingdoms_ruled_count,
-        coups_won=0,  # TODO: compute from coup_events
-        coups_failed=0,  # TODO: compute from coup_events
-        times_executed=0,  # TODO: compute from coup_events
-        executions_ordered=0,  # TODO: compute from coup_events
-        last_coup_attempt=None,  # TODO: fetch from coup_events
-        
-        # Contract & Work
-        contracts_completed=0,  # TODO: compute from contract_contributions
-        total_work_contributed=0,  # TODO: compute from contract_contributions
+        coups_won=state.coups_won or 0,
+        coups_failed=state.coups_failed or 0,
+        times_executed=state.times_executed or 0,
+        executions_ordered=state.executions_ordered or 0,
+        contracts_completed=state.contracts_completed or 0,
+        total_work_contributed=state.total_work_contributed or 0,
         total_training_purchases=state.total_training_purchases or 0,
         
-        # Resources
-        iron=state.iron,
-        steel=state.steel,
-        wood=state.wood,
+        # Flags
+        has_claimed_starting_city=state.has_claimed_starting_city or False,
+        is_alive=state.is_alive,
+        is_ruler=is_ruler,
+        is_verified=user.is_verified,
         
-        # Daily Actions (NOTE: moved to action_cooldowns table)
-        last_mining_action=None,  # Removed from schema
-        last_crafting_action=None,  # Removed from schema
-        last_building_action=None,  # Removed from schema
-        last_spy_action=None,  # Removed from schema
+        # Legacy resources
+        iron=state.iron or 0,
+        steel=state.steel or 0,
+        wood=state.wood or 0,
         
         # Equipment (from player_items table)
         equipped_weapon=equipped["equipped_weapon"],
         equipped_armor=equipped["equipped_armor"],
-        equipped_shield=equipped["equipped_shield"],
-        inventory=inventory,
-        crafting_queue=[],  # TODO: fetch from unified_contracts
-        crafting_progress={},  # Removed (tracked in unified_contracts)
         
-        # Properties (from properties table - TODO: query from properties table)
-        properties=[],
-        
-        # Rewards (removed - dead code)
-        total_rewards_received=0,
-        last_reward_received=None,
-        last_reward_amount=0,
-        
-        # Status
-        is_alive=state.is_alive,
-        is_ruler=is_ruler,
-        is_verified=user.is_verified,
+        # Properties
+        properties=[],  # TODO: query from properties table
         
         # Timestamps
         created_at=state.created_at,
         updated_at=state.updated_at,
         last_login=user.last_login,
         
-        # Training costs (dynamically calculated)
+        # Dynamic data
         training_costs=training_costs,
-        
-        # Travel event (if provided)
         travel_event=travel_event,
-        
-        # Active perks (dynamically calculated)
         active_perks=active_perks,
-        
-        # DYNAMIC SKILLS DATA - Frontend can render without hardcoding skills!
         skills_data=skills_data,
-        
-        # DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
         resources_data=resources_data,
+        inventory=inventory,
     )
 
 

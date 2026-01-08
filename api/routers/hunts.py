@@ -21,7 +21,7 @@ from typing import Optional, List, Dict
 from datetime import datetime
 
 from db import get_db
-from db.models import User, PlayerState
+from db.models import User, PlayerState, PlayerInventory
 from routers.auth import get_current_user
 from systems.hunting import HuntManager, HuntConfig, HuntPhase
 from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
@@ -78,15 +78,40 @@ def get_player_stats(db: Session, user_id: int) -> Dict[str, int]:
     }
 
 
+def add_to_inventory(db: Session, user_id: int, item_id: str, quantity: int) -> None:
+    """Add items to player inventory (upsert)."""
+    if quantity <= 0:
+        return
+    
+    existing = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id == item_id
+    ).first()
+    
+    if existing:
+        existing.quantity += quantity
+    else:
+        db.add(PlayerInventory(user_id=user_id, item_id=item_id, quantity=quantity))
+
+
 def apply_hunt_rewards(db: Session, hunt: dict) -> None:
-    """Apply hunt rewards to participants."""
+    """Apply hunt rewards to participants.
+    
+    Hunts award MEAT (not gold!) and sinew (rare) for bow crafting.
+    Uses proper inventory table, not columns per item type!
+    """
     for player_id_str, participant in hunt.get("participants", {}).items():
         player_id = int(player_id_str)
-        gold_earned = participant.get("gold_earned", 0)
+        meat_earned = participant.get("meat_earned", 0)
+        items_earned = participant.get("items_earned", [])
         
-        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
-        if state and gold_earned > 0:
-            state.gold = (state.gold or 0) + gold_earned
+        # Add meat to inventory
+        if meat_earned > 0:
+            add_to_inventory(db, player_id, "meat", meat_earned)
+        
+        # Add rare drops (sinew, etc)
+        for item_id in items_earned:
+            add_to_inventory(db, player_id, item_id, 1)
     
     db.commit()
 
@@ -119,9 +144,12 @@ def get_hunt_preview(
 def get_hunt_config():
     """
     Get hunt configuration for the UI.
-    Includes timing, party limits, animals, and phases.
+    Includes timing, party limits, animals, phases, and drop tables.
+    
+    NOTE: Hunts drop MEAT (not gold!) + sinew (rare) for bow crafting.
     """
-    from systems.hunting.config import PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS
+    from systems.hunting.config import PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS, DROP_TABLES, MEAT_MARKET_VALUE
+    from routers.resources import HUNTING_BOW
     
     return {
         "timing": {
@@ -150,14 +178,22 @@ def get_hunt_config():
                 "name": data["name"],
                 "icon": data["icon"],
                 "tier": data["tier"],
-                "base_gold": data["base_gold"],
                 "meat": data["meat"],
+                "hp": data["hp"],
+                "sinew_chance": DROP_TABLES.get(data["tier"], {}).get("sinew", 0),
                 "description": data["description"],
                 "track_requirement": TRACK_TIER_THRESHOLDS.get(data["tier"], 0),
             }
             for animal_id, data in ANIMALS.items()
         ],
         "tier_thresholds": TRACK_TIER_THRESHOLDS,
+        "hunting_bow": HUNTING_BOW,
+        "meat_market_value": MEAT_MARKET_VALUE,
+        "notes": {
+            "rewards": "Hunts drop MEAT + sinew (rare). NO GOLD!",
+            "sinew": "Rarer from small game, more common from big game",
+            "bow": "Craft hunting bow with 10 wood + 3 sinew for +2 attack in hunts",
+        },
     }
 
 

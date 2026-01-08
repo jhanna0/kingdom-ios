@@ -237,9 +237,9 @@ struct AnimalsPreviewCard: View {
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                             .lineLimit(1)
                         
-                        Text("\(animal.base_gold)g")
+                        Text("🥩 \(animal.meat)")
                             .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     .padding(8)
                     .frame(maxWidth: .infinity)

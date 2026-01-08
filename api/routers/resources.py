@@ -8,7 +8,9 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 
 
 # ===== RESOURCE DEFINITIONS - SINGLE SOURCE OF TRUTH =====
-# Keys MUST match PlayerState database columns exactly (gold, iron, steel, wood, etc.)
+# These define how items look in the UI (icon, color, name, etc.)
+# Storage: gold/iron/steel/wood are legacy columns in PlayerState
+#          meat/sinew/etc use the player_inventory table (proper design!)
 
 RESOURCES = {
     "gold": {
@@ -42,7 +44,35 @@ RESOURCES = {
         "description": "Building material used for construction",
         "category": "material",
         "display_order": 3
-    }
+    },
+    "meat": {
+        "display_name": "Meat",
+        "icon": "flame.fill",
+        "color": "red",
+        "description": "Fresh game meat from hunting. Sell at market or use for food.",
+        "category": "consumable",
+        "display_order": 4
+    },
+    "sinew": {
+        "display_name": "Sinew",
+        "icon": "line.diagonal",
+        "color": "brown",
+        "description": "Animal sinew. Rare drop from hunting - used to craft a hunting bow.",
+        "category": "crafting",
+        "display_order": 5
+    },
+}
+
+# ===== HUNTING BOW - Craftable with sinew + wood =====
+
+HUNTING_BOW = {
+    "id": "hunting_bow",
+    "display_name": "Hunting Bow",
+    "icon": "arrow.up.right",
+    "color": "green",
+    "description": "A sturdy bow for hunting. Gives +2 attack during hunts.",
+    "attack_bonus": 2,
+    "recipe": {"wood": 10, "sinew": 3},
 }
 
 
@@ -54,11 +84,12 @@ def get_all_resources():
     """
     return {
         "resources": RESOURCES,
-        "categories": ["currency", "material"],
+        "hunting_bow": HUNTING_BOW,
+        "categories": ["currency", "material", "consumable", "crafting"],
         "notes": {
             "dynamic_rendering": "Frontend should render all resources from this config",
-            "database_sync": "Resource keys match PlayerState database columns exactly",
-            "adding_resources": "Add new resources to RESOURCES dict - they'll appear everywhere automatically"
+            "storage": "gold/iron/steel/wood are PlayerState columns. meat/sinew use player_inventory table.",
+            "hunting": "Hunts drop meat (always) + sinew (rare). Craft hunting bow with 10 wood + 3 sinew."
         }
     }
 

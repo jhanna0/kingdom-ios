@@ -149,7 +149,7 @@ struct HuntParticipant: Codable, Identifiable {
     let total_contribution: Double
     let successful_rolls: Int
     let critical_rolls: Int
-    let gold_earned: Int
+    let meat_earned: Int
     let items_earned: [String]?
     
     var id: Int { player_id }
@@ -222,11 +222,10 @@ struct PhaseState: Codable {
 // MARK: - Rewards
 
 struct HuntRewards: Codable {
-    let base_gold: Int
-    let bonus_gold: Int
-    let total_gold: Int
     let meat: Int
-    let meat_value: Int
+    let bonus_meat: Int
+    let total_meat: Int
+    let meat_market_value: Int
     let items: [String]
 }
 
@@ -353,7 +352,8 @@ struct HuntAnimalPreview: Codable, Identifiable {
     let name: String
     let icon: String
     let tier: Int
-    let base_gold: Int
+    let meat: Int
+    let hp: Int
     let required_tracking: Int
 }
 
@@ -390,8 +390,8 @@ struct HuntAnimalConfig: Codable, Identifiable {
     let name: String
     let icon: String
     let tier: Int
-    let base_gold: Int
     let meat: Int
+    let hp: Int
     let description: String
     let track_requirement: Int
 }

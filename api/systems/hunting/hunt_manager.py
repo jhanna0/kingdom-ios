@@ -22,9 +22,9 @@ from .config import (
     PHASE_CONFIG,
     TRACK_TIER_THRESHOLDS,
     FAITH_DROP_BONUS_PER_POINT,
-    MEAT_TO_GOLD_RATIO,
-    NO_TRAIL_GOLD,
-    ESCAPED_GOLD_PERCENT,
+    MEAT_MARKET_VALUE,
+    NO_TRAIL_MEAT,
+    ESCAPED_MEAT_PERCENT,
     # Drop tables for all phases
     TRACK_DROP_TABLE,
     TRACK_SHIFT_PER_SUCCESS,
@@ -52,7 +52,7 @@ class HuntParticipant:
     total_contribution: float = 0.0
     successful_rolls: int = 0
     critical_rolls: int = 0
-    gold_earned: int = 0
+    meat_earned: int = 0
     items_earned: List[str] = field(default_factory=list)
     
     def to_dict(self) -> dict:
@@ -65,7 +65,7 @@ class HuntParticipant:
             "total_contribution": round(self.total_contribution, 2),
             "successful_rolls": self.successful_rolls,
             "critical_rolls": self.critical_rolls,
-            "gold_earned": self.gold_earned,
+            "meat_earned": self.meat_earned,
             "items_earned": self.items_earned,
         }
 
@@ -225,10 +225,9 @@ class HuntSession:
     # Phase results
     phase_results: List[PhaseResult] = field(default_factory=list)
     
-    # Rewards
-    base_gold: int = 0
-    bonus_gold: int = 0
+    # Rewards (Meat + Rare Items - NO GOLD from hunts!)
     total_meat: int = 0
+    bonus_meat: int = 0  # From blessing bonus
     items_dropped: List[str] = field(default_factory=list)
     
     # Timing
@@ -306,11 +305,10 @@ class HuntSession:
             "phase_state": self.current_phase_state.to_dict() if self.current_phase_state else None,
             "phase_results": [pr.to_dict() for pr in self.phase_results],
             "rewards": {
-                "base_gold": self.base_gold,
-                "bonus_gold": self.bonus_gold,
-                "total_gold": self.base_gold + self.bonus_gold,
                 "meat": self.total_meat,
-                "meat_value": self.total_meat * MEAT_TO_GOLD_RATIO,
+                "bonus_meat": self.bonus_meat,
+                "total_meat": self.total_meat + self.bonus_meat,
+                "meat_market_value": (self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE,
                 "items": self.items_dropped,
             },
             "party_size": len(self.participants),
@@ -783,9 +781,10 @@ class HuntManager:
                 },
             }
         else:
-            # Not enough damage - animal escapes
+            # Not enough damage - animal escapes (get partial meat from wounds)
             session.animal_escaped = True
-            session.bonus_gold = int(session.animal_data.get("base_gold", 0) * ESCAPED_GOLD_PERCENT)
+            escaped_meat = int(session.animal_data.get("meat", 0) * ESCAPED_MEAT_PERCENT)
+            session.total_meat = escaped_meat
             
             return {
                 "message": f"The {session.animal_data['name']} took {total_damage} damage but escaped!",
@@ -793,7 +792,7 @@ class HuntManager:
                     "escaped": True,
                     "damage_dealt": total_damage,
                     "remaining_hp": state.animal_remaining_hp,
-                    "consolation_gold": session.bonus_gold,
+                    "consolation_meat": escaped_meat,
                     "master_roll": master_roll,
                     "damage_breakdown": damage_breakdown,
                     "drop_table_slots": state.drop_table_slots.copy(),
@@ -833,7 +832,8 @@ class HuntManager:
                 "bonus_tier": bonus_tier,
                 "blessing_bonus": bonus_amount,
                 "items_dropped": session.items_dropped,
-                "gold": session.base_gold,
+                "meat": session.total_meat,
+                "bonus_meat": session.bonus_meat,
                 "master_roll": master_roll,
                 "drop_table_slots": state.drop_table_slots.copy(),
             },
@@ -961,11 +961,12 @@ class HuntManager:
                     outcome_message = f"The {session.animal_data['name']} escaped!"
                     effects["escaped"] = True
                 else:
-                    # Partial success - wounded but escaped
+                    # Partial success - wounded but escaped (get some meat)
                     session.animal_escaped = True
-                    session.bonus_gold = int(session.animal_data["base_gold"] * ESCAPED_GOLD_PERCENT)
+                    session.total_meat = int(session.animal_data["meat"] * ESCAPED_MEAT_PERCENT)
                     outcome_message = f"The wounded {session.animal_data['name']} got away..."
                     effects["wounded_escape"] = True
+                    effects["consolation_meat"] = session.total_meat
                 
                 # Counterattack check
                 if self.rng.random() < config["counterattack_chance"]:
@@ -1027,37 +1028,43 @@ class HuntManager:
                 break
     
     def _calculate_loot(self, session: HuntSession, blessing_bonus: float) -> None:
-        """Calculate and assign loot based on hunt results."""
+        """Calculate and assign loot based on hunt results.
+        
+        Hunts drop MEAT (main reward) + RARE ITEMS (for bow crafting).
+        NO GOLD DROPS - players can sell meat at market for gold.
+        """
         if not session.animal_data:
             return
         
         animal = session.animal_data
         tier = animal["tier"]
         
-        # Base rewards
-        session.base_gold = animal["base_gold"]
+        # Base meat reward
         session.total_meat = animal["meat"]
         
-        # Get drop table and apply blessing bonus
+        # Blessing bonus adds extra meat!
+        session.bonus_meat = int(session.total_meat * blessing_bonus)
+        
+        # Get drop table and apply blessing bonus to rare item chances
         drop_table = DROP_TABLES.get(tier, {})
         for item, base_chance in drop_table.items():
             modified_chance = min(1.0, base_chance + blessing_bonus)
             if self.rng.random() < modified_chance:
                 session.items_dropped.append(item)
         
-        # Distribute rewards among participants
+        # Distribute meat among participants
         party_size = len(session.participants)
-        gold_per_player = session.base_gold // party_size
-        meat_per_player = session.total_meat // party_size
+        total_meat_reward = session.total_meat + session.bonus_meat
+        meat_per_player = total_meat_reward // party_size
         
         for p in session.participants.values():
-            # Contribution bonus (top contributors get slightly more)
+            # Contribution bonus (top contributors get slightly more meat)
             contribution_ratio = p.total_contribution / max(1, sum(
                 pp.total_contribution for pp in session.participants.values()
             ))
-            bonus = int(gold_per_player * contribution_ratio * 0.2)  # Up to 20% bonus
+            bonus = int(meat_per_player * contribution_ratio * 0.2)  # Up to 20% bonus
             
-            p.gold_earned = gold_per_player + bonus
+            p.meat_earned = meat_per_player + bonus
             p.items_earned = session.items_dropped.copy()  # Everyone gets all drops (for now)
     
     def finalize_hunt(self, session: HuntSession) -> dict:
@@ -1077,11 +1084,11 @@ class HuntManager:
         else:
             session.status = HuntStatus.COMPLETED
         
-        # If no trail was found, give consolation gold
+        # If no trail was found, no rewards (you found nothing!)
         if session.track_score <= 0:
             for p in session.participants.values():
-                p.gold_earned = NO_TRAIL_GOLD
-            session.base_gold = NO_TRAIL_GOLD * len(session.participants)
+                p.meat_earned = NO_TRAIL_MEAT
+            session.total_meat = NO_TRAIL_MEAT
         
         session.current_phase = HuntPhase.RESULTS
         
@@ -1137,7 +1144,8 @@ def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
                 "name": data["name"],
                 "icon": data["icon"],
                 "tier": data["tier"],
-                "base_gold": data["base_gold"],
+                "meat": data["meat"],
+                "hp": data["hp"],
                 "required_tracking": TRACK_TIER_THRESHOLDS.get(data["tier"], 0),
             }
             for animal_id, data in ANIMALS.items()

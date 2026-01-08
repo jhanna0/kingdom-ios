@@ -16,27 +16,24 @@ struct TravelEvent: Codable, Equatable {
 /// Complete player state from API
 struct APIPlayerState: Codable {
     // Identity
-    let id: Int  // User ID from database (auto-increment integer)
+    let id: Int
     let display_name: String
     let email: String?
     let avatar_url: String?
     
-    // Kingdom & Territory
-    let hometown_kingdom_id: String?  // Player's hometown (used for royal blue territory color)
-    let origin_kingdom_id: String?    // DEPRECATED - no longer returned by API
-    let home_kingdom_id: String?      // DEPRECATED - no longer returned by API (use hometown_kingdom_id)
-    let current_kingdom_id: String?   // Where the player currently is (ID)
-    let current_kingdom_name: String? // Where the player currently is (name)
-    let fiefs_ruled: [String]?
+    // Territory
+    let hometown_kingdom_id: String?
+    let current_kingdom_id: String?
+    let current_kingdom_name: String?
     let travel_event: TravelEvent?
     
-    // Core Stats
+    // Progression
     let gold: Int
     let level: Int
     let experience: Int
     let skill_points: Int
     
-    // Combat Stats
+    // Stats
     let attack_power: Int
     let defense_power: Int
     let leadership: Int
@@ -45,21 +42,15 @@ struct APIPlayerState: Codable {
     let science: Int
     let faith: Int
     
-    // Debuffs
+    // Combat
     let attack_debuff: Int
     let debuff_expires_at: String?
     
-    // Reputation
+    // Reputation & Honor
     let reputation: Int
     let honor: Int
-    let kingdom_reputation: [String: Int]?
     
-    // Check-in tracking
-    let check_in_history: [String: Int]?
-    let last_check_in: String?
-    let last_daily_check_in: String?
-    
-    // Activity tracking
+    // Activity
     let total_checkins: Int
     let total_conquests: Int
     let kingdoms_ruled: Int
@@ -67,15 +58,39 @@ struct APIPlayerState: Codable {
     let coups_failed: Int
     let times_executed: Int
     let executions_ordered: Int
-    let last_coup_attempt: String?
-    
-    // Contract & Work
     let contracts_completed: Int
     let total_work_contributed: Int
     let total_training_purchases: Int
     
-    // Training costs (calculated by backend)
+    // Flags
+    let has_claimed_starting_city: Bool
+    let is_alive: Bool
+    let is_ruler: Bool
+    let is_verified: Bool
+    
+    // Legacy resources
+    let iron: Int
+    let steel: Int
+    let wood: Int
+    
+    // Equipment
+    let equipped_weapon: APIEquipmentItem?
+    let equipped_armor: APIEquipmentItem?
+    
+    // Properties
+    let properties: [APIPropertyItem]?
+    
+    // Timestamps
+    let created_at: String?
+    let updated_at: String?
+    let last_login: String?
+    
+    // Dynamic data
     let training_costs: TrainingCostsFromAPI?
+    let active_perks: ActivePerks?
+    let skills_data: [SkillData]?
+    let resources_data: [ResourceData]?
+    let inventory: [InventoryItem]?
     
     struct TrainingCostsFromAPI: Codable {
         let attack: Int
@@ -85,10 +100,9 @@ struct APIPlayerState: Codable {
         let intelligence: Int
         let science: Int
         let faith: Int
+        let philosophy: Int?
+        let merchant: Int?
     }
-    
-    // Active perks (calculated by backend)
-    let active_perks: ActivePerks?
     
     struct ActivePerks: Codable {
         let combat: [PerkEntry]
@@ -109,9 +123,6 @@ struct APIPlayerState: Codable {
         let expires_at: String?
     }
     
-    // DYNAMIC SKILLS DATA - Frontend can render skills without hardcoding!
-    let skills_data: [SkillData]?
-    
     struct SkillData: Codable, Identifiable {
         let skill_type: String
         let display_name: String
@@ -127,58 +138,24 @@ struct APIPlayerState: Codable {
         var id: String { skill_type }
     }
     
-    // DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
-    // When present, use this instead of individual iron/steel/wood fields
-    let resources_data: [ResourceData]?
-    
     struct ResourceData: Codable, Identifiable {
-        let key: String           // Resource key (gold, iron, steel, wood, etc.)
-        let amount: Int           // Current amount player has
-        let display_name: String  // "Gold", "Iron", etc.
-        let icon: String          // SF Symbol name
-        let color: String         // Theme color name
-        let category: String      // "currency", "material", etc.
-        let display_order: Int    // Sort order
+        let key: String
+        let amount: Int
+        let display_name: String
+        let icon: String
+        let color: String
+        let category: String
+        let display_order: Int
         
         var id: String { key }
     }
     
-    // Resources (legacy - use resources_data for dynamic rendering)
-    let iron: Int
-    let steel: Int
-    let wood: Int
-    
-    // Daily Actions
-    let last_mining_action: String?
-    let last_crafting_action: String?
-    let last_building_action: String?
-    let last_spy_action: String?
-    
-    // Equipment
-    let equipped_weapon: APIEquipmentItem?
-    let equipped_armor: APIEquipmentItem?
-    let equipped_shield: APIEquipmentItem?
-    let inventory: [APIEquipmentItem]?
-    let crafting_queue: [APIEquipmentItem]?
-    let crafting_progress: [String: Int]?
-    
-    // Properties
-    let properties: [APIPropertyItem]?
-    
-    // Rewards
-    let total_rewards_received: Int
-    let last_reward_received: String?
-    let last_reward_amount: Int
-    
-    // Status
-    let is_alive: Bool
-    let is_ruler: Bool
-    let is_verified: Bool
-    
-    // Timestamps
-    let created_at: String?
-    let updated_at: String?
-    let last_login: String?
+    struct InventoryItem: Codable, Identifiable {
+        let item_id: String
+        let quantity: Int
+        
+        var id: String { item_id }
+    }
 }
 
 struct APIEquipmentItem: Codable {

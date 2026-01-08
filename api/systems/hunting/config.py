@@ -40,8 +40,7 @@ MAX_PARTY_SIZE = 5                     # Maximum hunters
 # - track_threshold: Minimum tracking score to encounter
 # - hp: How much "progress" needed to kill
 # - danger: How much danger it poses (affects injury)
-# - base_gold: Base gold reward
-# - meat: Amount of meat (converts to gold at 2g per meat)
+# - meat: Amount of meat dropped (main hunting reward!)
 
 ANIMALS = {
     "squirrel": {
@@ -51,7 +50,6 @@ ANIMALS = {
         "track_threshold": 0,     # Always findable
         "hp": 1,
         "danger": 0,
-        "base_gold": 5,
         "meat": 1,
         "description": "A quick little critter. Easy prey.",
     },
@@ -62,7 +60,6 @@ ANIMALS = {
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "base_gold": 8,
         "meat": 2,
         "description": "Fast but fragile. Common in meadows.",
     },
@@ -73,7 +70,6 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "base_gold": 25,
         "meat": 8,
         "description": "Graceful and alert. A worthy hunt.",
     },
@@ -84,7 +80,6 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "base_gold": 50,
         "meat": 15,
         "description": "Aggressive when cornered. Dangerous tusks.",
     },
@@ -95,7 +90,6 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "base_gold": 100,
         "meat": 25,
         "description": "The king of the forest. Approach with caution.",
     },
@@ -106,7 +100,6 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "base_gold": 150,
         "meat": 35,
         "description": "Massive and unpredictable. Legendary game.",
     },
@@ -199,43 +192,36 @@ ANIMAL_WEIGHTS_BY_TIER = {
 
 
 # ============================================================
-# DROP TABLE CONFIGURATION
+# DROP TABLE CONFIGURATION - RARE HUNTING LOOT
 # ============================================================
-# Loot chances are modified by faith_score from the Blessing phase
+# Loot chances are modified by blessing phase success
 # Format: {"item": base_chance} where chance is 0-1
+# 
+# IMPORTANT: Hunts drop MEAT (always) + SINEW (rare chance)
+# NO GOLD DROPS! Meat can be sold at market for gold if needed.
+#
+# Sinew is used to craft hunting bow (10 wood + 3 sinew)
 
 DROP_TABLES = {
-    # Tier 0 - Small game
+    # Tier 0 - Small game (Squirrel, Rabbit) - sinew is rare
     0: {
-        "small_pelt": 0.8,       # 80% base chance
-        "lucky_rabbit_foot": 0.05,
+        "sinew": 0.05,  # 5% chance
     },
-    # Tier 1 - Medium game
+    # Tier 1 - Medium game (Deer)
     1: {
-        "quality_pelt": 0.6,
-        "antler_fragment": 0.3,
-        "venison_steak": 0.9,
+        "sinew": 0.15,  # 15% chance
     },
-    # Tier 2 - Dangerous game
+    # Tier 2 - Dangerous game (Boar)
     2: {
-        "boar_tusk": 0.5,
-        "thick_hide": 0.7,
-        "boar_meat": 1.0,
+        "sinew": 0.25,  # 25% chance
     },
-    # Tier 3 - Big game
+    # Tier 3 - Big game (Bear)
     3: {
-        "bear_claw": 0.6,
-        "bear_pelt": 0.5,
-        "bear_meat": 1.0,
-        "trophy_head": 0.1,    # Rare!
+        "sinew": 0.40,  # 40% chance
     },
-    # Tier 4 - Legendary game
+    # Tier 4 - Legendary game (Moose)
     4: {
-        "moose_antlers": 0.5,
-        "legendary_pelt": 0.4,
-        "moose_meat": 1.0,
-        "trophy_head": 0.2,
-        "hunters_glory": 0.05,  # Very rare collectible
+        "sinew": 0.60,  # 60% chance
     },
 }
 
@@ -352,14 +338,14 @@ def get_max_tier_from_track_score(track_score: float) -> int:
 
 
 # Consolation rewards for failed hunts
-NO_TRAIL_GOLD = 2          # Gold if tracking fails completely
-ESCAPED_GOLD_PERCENT = 0.3  # 30% of normal gold if animal escapes
+NO_TRAIL_MEAT = 0           # No meat if tracking fails completely
+ESCAPED_MEAT_PERCENT = 0.3  # 30% of normal meat if animal escapes (wounded it at least)
 
 
 # ============================================================
-# MEAT TO GOLD CONVERSION
+# MEAT VALUE (for market selling)
 # ============================================================
-MEAT_TO_GOLD_RATIO = 2  # 1 meat = 2 gold
+MEAT_MARKET_VALUE = 2  # 1 meat sells for 2 gold at market
 
 
 # ============================================================

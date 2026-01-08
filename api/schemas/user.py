@@ -19,27 +19,25 @@ class TravelEvent(BaseModel):
     
     
 class PlayerState(BaseModel):
-    """Complete player state for sync"""
+    """Complete player state for API responses"""
     # Identity
-    id: int  # User ID from database (auto-increment)
+    id: int
     display_name: str
     email: Optional[str] = None
     avatar_url: Optional[str] = None
     
-    # Kingdom & Territory
+    # Territory
     hometown_kingdom_id: Optional[str] = None
-    origin_kingdom_id: Optional[str] = None
-    home_kingdom_id: Optional[str] = None
     current_kingdom_id: Optional[str] = None
-    current_kingdom_name: Optional[str] = None
+    current_kingdom_name: Optional[str] = None  # Computed on read
     
-    # Core Stats
+    # Progression
     gold: int = 100
     level: int = 1
     experience: int = 0
     skill_points: int = 0
     
-    # Combat Stats
+    # Stats (T0-T5)
     attack_power: int = 0
     defense_power: int = 0
     leadership: int = 0
@@ -48,123 +46,77 @@ class PlayerState(BaseModel):
     science: int = 0
     faith: int = 0
     
-    # Debuffs
+    # Combat debuff
     attack_debuff: int = 0
     debuff_expires_at: Optional[datetime] = None
     
-    # Reputation
-    reputation: int = 0
+    # Reputation & Honor
+    reputation: int = 0  # Per-kingdom rep is in user_kingdoms, this is for API compatibility
     honor: int = 100
-    kingdom_reputation: Dict[str, int] = {}
     
-    # Check-in tracking
-    check_in_history: Dict[str, int] = {}
-    last_check_in: Optional[datetime] = None
-    last_daily_check_in: Optional[datetime] = None
-    
-    # Activity tracking
+    # Activity (TODO: should be computed from other tables)
     total_checkins: int = 0
     total_conquests: int = 0
     kingdoms_ruled: int = 0
-    has_claimed_starting_city: bool = False
     coups_won: int = 0
     coups_failed: int = 0
     times_executed: int = 0
     executions_ordered: int = 0
-    last_coup_attempt: Optional[datetime] = None
-    
-    # Contract & Work
     contracts_completed: int = 0
     total_work_contributed: int = 0
-    total_training_purchases: int = 0  # Total training sessions purchased (for cost scaling)
+    total_training_purchases: int = 0
     
-    # Resources
+    # Flags
+    has_claimed_starting_city: bool = False
+    is_alive: bool = True
+    is_ruler: bool = False  # Computed on read
+    is_verified: bool = False
+    
+    # Legacy resources (new items use player_inventory table)
     iron: int = 0
     steel: int = 0
     wood: int = 0
     
-    # Daily Actions
-    last_mining_action: Optional[datetime] = None
-    last_crafting_action: Optional[datetime] = None
-    last_building_action: Optional[datetime] = None
-    last_spy_action: Optional[datetime] = None
-    
-    # Action System (cooldown-based)
-    last_work_action: Optional[datetime] = None
-    last_patrol_action: Optional[datetime] = None
-    last_sabotage_action: Optional[datetime] = None
-    last_scout_action: Optional[datetime] = None
-    patrol_expires_at: Optional[datetime] = None
-    
-    # Equipment
+    # Equipment (from player_items table)
     equipped_weapon: Optional[EquipmentItem] = None
     equipped_armor: Optional[EquipmentItem] = None
-    equipped_shield: Optional[EquipmentItem] = None
-    inventory: List[EquipmentItem] = []
-    crafting_queue: List[EquipmentItem] = []
-    crafting_progress: Dict[str, int] = {}
     
-    # Properties
+    # Properties (from properties table)
     properties: List[PropertyItem] = []
-    
-    # Rewards
-    total_rewards_received: int = 0
-    last_reward_received: Optional[datetime] = None
-    last_reward_amount: int = 0
-    
-    # Status
-    is_alive: bool = True
-    is_ruler: bool = False
-    is_verified: bool = False
     
     # Timestamps
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
     
-    # Training costs (calculated dynamically)
+    # Dynamic data computed on read
     training_costs: Optional[dict] = None
-    
-    # Travel event (only present when kingdom_id is provided to /player/state)
     travel_event: Optional[TravelEvent] = None
-    
-    # Active perks (calculated dynamically)
     active_perks: Optional[dict] = None
-    
-    # DYNAMIC SKILLS DATA - Frontend can render skills without hardcoding!
-    # List of skill objects with: skill_type, display_name, icon, category, 
-    # description, current_tier, max_tier, training_cost, current_benefits, display_order
     skills_data: Optional[list] = None
-    
-    # DYNAMIC RESOURCES DATA - Frontend renders inventory without hardcoding!
-    # List of resource objects with: key, amount, display_name, icon, color, category, display_order
-    # When this is present, frontend should use it instead of individual iron/steel/wood fields
-    resources_data: Optional[list] = None
+    resources_data: Optional[list] = None  # Includes inventory items
+    inventory: Optional[list] = None  # From player_inventory table
     
     class Config:
         from_attributes = True
 
 
 class PlayerStateUpdate(BaseModel):
-    """Partial update for player state"""
-    # All fields optional for partial updates
+    """Partial update for player state - only fields that can actually be updated"""
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     
-    # Kingdom & Territory
+    # Territory
     hometown_kingdom_id: Optional[str] = None
-    origin_kingdom_id: Optional[str] = None
-    home_kingdom_id: Optional[str] = None
     current_kingdom_id: Optional[str] = None
-    fiefs_ruled: Optional[List[str]] = None
     
-    # Core Stats
+    # Progression
     gold: Optional[int] = None
     level: Optional[int] = None
     experience: Optional[int] = None
     skill_points: Optional[int] = None
     
-    # Combat Stats
+    # Stats
     attack_power: Optional[int] = None
     defense_power: Optional[int] = None
     leadership: Optional[int] = None
@@ -173,72 +125,21 @@ class PlayerStateUpdate(BaseModel):
     science: Optional[int] = None
     faith: Optional[int] = None
     
-    # Debuffs
+    # Combat
     attack_debuff: Optional[int] = None
     debuff_expires_at: Optional[datetime] = None
     
-    # Reputation
-    reputation: Optional[int] = None
+    # Honor
     honor: Optional[int] = None
-    kingdom_reputation: Optional[Dict[str, int]] = None
     
-    # Check-in tracking
-    check_in_history: Optional[Dict[str, int]] = None
-    last_check_in: Optional[datetime] = None
-    last_daily_check_in: Optional[datetime] = None
-    
-    # Activity tracking
-    total_checkins: Optional[int] = None
-    total_conquests: Optional[int] = None
-    kingdoms_ruled: Optional[int] = None
-    has_claimed_starting_city: Optional[bool] = None
-    coups_won: Optional[int] = None
-    coups_failed: Optional[int] = None
-    times_executed: Optional[int] = None
-    executions_ordered: Optional[int] = None
-    last_coup_attempt: Optional[datetime] = None
-    
-    # Contract & Work
-    contracts_completed: Optional[int] = None
-    total_work_contributed: Optional[int] = None
-    total_training_purchases: Optional[int] = None
-    
-    # Resources
+    # Legacy resources
     iron: Optional[int] = None
     steel: Optional[int] = None
-    
-    # Daily Actions
-    last_mining_action: Optional[datetime] = None
-    last_crafting_action: Optional[datetime] = None
-    last_building_action: Optional[datetime] = None
-    last_spy_action: Optional[datetime] = None
-    
-    # Action System (cooldown-based)
-    last_work_action: Optional[datetime] = None
-    last_patrol_action: Optional[datetime] = None
-    last_sabotage_action: Optional[datetime] = None
-    last_scout_action: Optional[datetime] = None
-    patrol_expires_at: Optional[datetime] = None
-    
-    # Equipment
-    equipped_weapon: Optional[EquipmentItem] = None
-    equipped_armor: Optional[EquipmentItem] = None
-    equipped_shield: Optional[EquipmentItem] = None
-    inventory: Optional[List[EquipmentItem]] = None
-    crafting_queue: Optional[List[EquipmentItem]] = None
-    crafting_progress: Optional[Dict[str, int]] = None
-    
-    # Properties
-    properties: Optional[List[PropertyItem]] = None
-    
-    # Rewards
-    total_rewards_received: Optional[int] = None
-    last_reward_received: Optional[datetime] = None
-    last_reward_amount: Optional[int] = None
+    wood: Optional[int] = None
     
     # Status
     is_alive: Optional[bool] = None
-    is_ruler: Optional[bool] = None
+    has_claimed_starting_city: Optional[bool] = None
 
 
 class SyncRequest(BaseModel):

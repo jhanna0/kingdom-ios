@@ -21,6 +21,7 @@ from .market_order import MarketOrder, MarketTransaction, OrderType, OrderStatus
 from .unified_contract import UnifiedContract, ContractContribution
 from .player_item import PlayerItem
 from .action_cooldown import ActionCooldown
+from .inventory import PlayerInventory
 
 __all__ = [
     "User",
@@ -47,5 +48,6 @@ __all__ = [
     "ContractContribution",
     "PlayerItem",
     "ActionCooldown",
+    "PlayerInventory",
 ]
 

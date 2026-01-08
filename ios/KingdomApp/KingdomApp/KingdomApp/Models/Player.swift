@@ -646,33 +646,22 @@ class Player: ObservableObject {
         
         // Reputation
         state["reputation"] = reputation
-        state["kingdom_reputation"] = kingdomReputation
+        // Note: kingdom_reputation is now in user_kingdoms table (backend)
         
         // Territory
         state["current_kingdom_id"] = currentKingdom
         state["hometown_kingdom_id"] = hometownKingdomId
-        state["fiefs_ruled"] = Array(fiefsRuled)
-        state["is_ruler"] = isRuler
+        // Note: fiefs_ruled and is_ruler are computed by backend
         
-        // Check-in
-        state["check_in_history"] = checkInHistory
-        if let lastCheckIn = lastCheckIn {
-            state["last_check_in"] = ISO8601DateFormatter().string(from: lastCheckIn)
-        }
-        if let location = lastCheckInLocation {
-        }
-        if let lastDaily = lastDailyCheckIn {
-            state["last_daily_check_in"] = ISO8601DateFormatter().string(from: lastDaily)
-        }
+        // Check-in data is now in user_kingdoms and action_cooldowns tables
+        // These fields no longer accepted by backend API
         
         // Activity
         state["coups_won"] = coupsWon
         state["coups_failed"] = coupsFailed
         state["times_executed"] = timesExecuted
         state["executions_ordered"] = executionsOrdered
-        if let lastCoup = lastCoupAttempt {
-            state["last_coup_attempt"] = ISO8601DateFormatter().string(from: lastCoup)
-        }
+        // Note: last_coup_attempt is now in action_cooldowns table (backend)
         
         // Contract & Work
         state["contracts_completed"] = contractsCompleted
@@ -710,13 +699,14 @@ class Player: ObservableObject {
         
         // Reputation
         reputation = apiState.reputation
-        kingdomReputation = apiState.kingdom_reputation ?? [:]
+        // Note: kingdom_reputation has been moved to user_kingdoms table in backend
+        // TODO: Fetch from separate endpoint if needed
         
         // Territory
         currentKingdom = apiState.current_kingdom_id
         currentKingdomName = apiState.current_kingdom_name
         hometownKingdomId = apiState.hometown_kingdom_id
-        fiefsRuled = Set(apiState.fiefs_ruled ?? [])
+        // Note: fiefs_ruled is now computed in backend from kingdoms table
         isRuler = apiState.is_ruler
         
         print("🌍 Player territory synced from API:")
@@ -724,23 +714,18 @@ class Player: ObservableObject {
         print("   - Hometown Kingdom: \(hometownKingdomId ?? "nil") [ROYAL BLUE]")
         print("   - Is Ruler: \(isRuler)")
         
-        // Check-in
-        checkInHistory = apiState.check_in_history ?? [:]
-        if let lastCheckInStr = apiState.last_check_in {
-            lastCheckIn = ISO8601DateFormatter().date(from: lastCheckInStr)
-        }
-        if let lastDailyStr = apiState.last_daily_check_in {
-            lastDailyCheckIn = ISO8601DateFormatter().date(from: lastDailyStr)
-        }
+        // Check-in data moved to user_kingdoms table and action_cooldowns
+        // Note: These fields were removed from backend in cleanup_player_state.sql
+        // TODO: Fetch check_in_history from user_kingdoms endpoint if needed
+        // TODO: Fetch last_check_in and last_daily_check_in from action_cooldowns if needed
         
         // Activity
         coupsWon = apiState.coups_won
         coupsFailed = apiState.coups_failed
         timesExecuted = apiState.times_executed
         executionsOrdered = apiState.executions_ordered
-        if let lastCoupStr = apiState.last_coup_attempt {
-            lastCoupAttempt = ISO8601DateFormatter().date(from: lastCoupStr)
-        }
+        // Note: last_coup_attempt moved to action_cooldowns table
+        // TODO: Fetch from action_cooldowns endpoint if needed
         
         // Contract & Work
         contractsCompleted = apiState.contracts_completed
