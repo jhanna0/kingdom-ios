@@ -44,8 +44,8 @@ class AuthManager: ObservableObject {
             saveToken(token.access_token)
             await fetchUserProfile()
             
-            // Check if needs onboarding (no hometown selected yet)
-            if currentUser != nil && currentUser!.hometown_kingdom_id == nil {
+            // Check if needs onboarding (no hometown OR no proper display name)
+            if let user = currentUser, user.needsOnboarding {
                 needsOnboarding = true
             } else {
                 isAuthenticated = true
@@ -134,9 +134,9 @@ class AuthManager: ObservableObject {
         criticalErrorMessage = nil
         await fetchUserProfile()
         
-        if currentUser != nil && !hasCriticalError {
+        if let user = currentUser, !hasCriticalError {
             // Success - check onboarding status
-            if currentUser!.hometown_kingdom_id == nil {
+            if user.needsOnboarding {
                 needsOnboarding = true
             } else {
                 isAuthenticated = true
@@ -259,9 +259,9 @@ class AuthManager: ObservableObject {
             // Centralized: Set token in APIClient for all API calls
             apiClient.setAuthToken(token)
             await fetchUserProfile()
-            if currentUser != nil {
-                // Check if user needs onboarding
-                if currentUser!.hometown_kingdom_id == nil {
+            if let user = currentUser {
+                // Check if user needs onboarding (no hometown OR no proper display name)
+                if user.needsOnboarding {
                     needsOnboarding = true
                 } else {
                     isAuthenticated = true
@@ -293,6 +293,23 @@ struct UserData: Codable {
     let total_checkins: Int
     let total_conquests: Int
     let kingdoms_ruled: Int
+    
+    /// Returns true if the user needs to complete onboarding
+    /// (missing hometown kingdom OR has a placeholder/empty display name)
+    var needsOnboarding: Bool {
+        // No hometown kingdom selected
+        if hometown_kingdom_id == nil || hometown_kingdom_id?.isEmpty == true {
+            return true
+        }
+        
+        // Placeholder or empty display name
+        let trimmedName = display_name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty || trimmedName == "User" {
+            return true
+        }
+        
+        return false
+    }
 }
 
 // MARK: - Keychain Helper

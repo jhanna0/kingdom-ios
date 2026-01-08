@@ -3,6 +3,7 @@ import SwiftUI
 /// Character progression and training view
 struct CharacterSheetView: View {
     @ObservedObject var player: Player
+    @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) var dismiss
     @State private var showError = false
     @State private var errorMessage = ""
@@ -14,6 +15,7 @@ struct CharacterSheetView: View {
     @State private var isLoadingActivities = true
     @State private var relocationStatus: RelocationStatusResponse?
     @State private var isLoadingRelocationStatus = false
+    @State private var showLogoutConfirmation = false
     
     var body: some View {
         ScrollView {
@@ -65,6 +67,27 @@ struct CharacterSheetView: View {
                         onRelocate: relocateHometown
                     )
                 }
+                
+                // Logout button
+                Button {
+                    showLogoutConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .font(FontStyles.iconSmall)
+                        Text("Logout")
+                    }
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonDanger,
+                    cornerRadius: 8,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
             }
             .padding()
         }
@@ -93,6 +116,15 @@ struct CharacterSheetView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Logout", isPresented: $showLogoutConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Logout", role: .destructive) {
+                authManager.logout()
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to logout?")
         }
     }
     

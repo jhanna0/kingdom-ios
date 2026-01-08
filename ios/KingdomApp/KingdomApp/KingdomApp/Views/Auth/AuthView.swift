@@ -72,40 +72,6 @@ struct AuthView: View {
                             }
                         )
                     }
-                    
-                    // Developer Sign In
-                    Button(action: {
-                        Task {
-                            await authManager.signInWithApple(
-                                userID: "appletest",
-                                email: "appletest@example.com",
-                                name: "Apple Reviewer"
-                            )
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "person.badge.key.fill")
-                                .font(FontStyles.iconSmall)
-                            Text("Developer Sign In")
-                                .font(FontStyles.bodyMediumBold)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.black)
-                                    .offset(x: 3, y: 3)
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.blue)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.black, lineWidth: 3)
-                                    )
-                            }
-                        )
-                    }
                 }
                 .padding(KingdomTheme.Spacing.xxLarge)
                 .brutalistCard(

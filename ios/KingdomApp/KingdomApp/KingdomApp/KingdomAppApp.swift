@@ -12,13 +12,19 @@ struct KingdomAppApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var appInit = AppInitService()
     @StateObject private var musicService = MusicService.shared
+    @StateObject private var globalLocationManager = LocationManager()
     
     var body: some Scene {
         WindowGroup {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                if authManager.isAuthenticated {
+                // PRIORITY 1: Location check - app cannot function without location
+                if !globalLocationManager.isLocationAuthorized {
+                    LocationRequiredView(locationManager: globalLocationManager)
+                }
+                // PRIORITY 2: Authentication and onboarding flow
+                else if authManager.isAuthenticated {
                     AuthenticatedView()
                         .environmentObject(authManager)
                         .environmentObject(appInit)
@@ -34,7 +40,7 @@ struct KingdomAppApp: App {
                 }
                 
                 // BLOCKING error overlay for critical auth failures
-                if authManager.hasCriticalError {
+                if authManager.hasCriticalError && globalLocationManager.isLocationAuthorized {
                     ZStack {
                         Color.black.opacity(0.85).ignoresSafeArea()
                         BlockingErrorView(
@@ -71,6 +77,132 @@ struct KingdomAppApp: App {
             }
             // API errors use BlockingErrorWindow which is a UIKit window overlay
             // that appears above ALL content including sheets - handled by APIClient directly
+        }
+    }
+}
+
+// MARK: - Location Required View (Blocking)
+
+struct LocationRequiredView: View {
+    @ObservedObject var locationManager: LocationManager
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment.ignoresSafeArea()
+            
+            VStack(spacing: KingdomTheme.Spacing.xxLarge) {
+                Spacer()
+                
+                // Icon
+                Image(systemName: locationManager.isLocationDenied ? "location.slash.fill" : "location.fill")
+                    .font(.system(size: 64))
+                    .foregroundColor(.white)
+                    .frame(width: 120, height: 120)
+                    .brutalistBadge(
+                        backgroundColor: locationManager.isLocationDenied ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonWarning,
+                        cornerRadius: 24,
+                        shadowOffset: 6,
+                        borderWidth: 4
+                    )
+                
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    Text("Location Required")
+                        .font(FontStyles.displayLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("This is critical for gameplay")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                // Explanation Card
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.large) {
+                    HStack(spacing: KingdomTheme.Spacing.medium) {
+                        Image(systemName: "map.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(.white)
+                            .frame(width: 42, height: 42)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.inkMedium,
+                                cornerRadius: 8
+                            )
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Why Location?")
+                                .font(FontStyles.headingSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text("This is a location-based game. You must be physically present in a city to rule it!")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                    }
+                    
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 2)
+                    
+                    if locationManager.isLocationDenied {
+                        Text("Location access was denied. Please enable it in Settings to continue.")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    } else {
+                        Text("Grant location access to begin your journey.")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    
+                    // Privacy notice
+                    HStack(spacing: KingdomTheme.Spacing.small) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        Text("Your precise location is NEVER stored. We only use it to determine which city you're in.")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                    }
+                }
+                .padding(KingdomTheme.Spacing.large)
+                .brutalistCard(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 20
+                )
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                
+                Spacer()
+                
+                // Action Button
+                Button(action: {
+                    locationManager.requestPermissions()
+                }) {
+                    HStack {
+                        Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
+                            .font(FontStyles.bodyLargeBold)
+                        Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
+                            .font(FontStyles.iconSmall)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KingdomTheme.Spacing.large)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .fill(Color.black)
+                                .offset(x: 4, y: 4)
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .fill(KingdomTheme.Colors.inkMedium)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                        .stroke(Color.black, lineWidth: 3)
+                                )
+                        }
+                    )
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.bottom, KingdomTheme.Spacing.xxLarge)
+            }
         }
     }
 }

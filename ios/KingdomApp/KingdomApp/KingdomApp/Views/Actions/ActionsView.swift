@@ -1,5 +1,15 @@
 import SwiftUI
 
+// MARK: - Slot Action Item (Named struct to avoid anonymous tuple crashes)
+/// SwiftUI can crash with anonymous tuples in ForEach due to type metadata lookup issues.
+/// This named struct provides stable Identifiable conformance.
+private struct SlotActionItem: Identifiable {
+    let key: String
+    let action: ActionStatus
+    
+    var id: String { key }
+}
+
 // MARK: - Actions View
 
 struct ActionsView: View {
@@ -163,21 +173,12 @@ struct ActionsView: View {
         }
     }
     
-    // State for hunt navigation
-    @State private var showHuntView = false
-    
     // MARK: - Action Status Content
     
     @ViewBuilder
     private func actionStatusContent(status: AllActionStatus) -> some View {
         // ALL slots rendered dynamically from backend - no duplicates!
         if isInHomeKingdom {
-            // Group Hunt entry point (before other actions)
-            if let kingdom = currentKingdom {
-                groupHuntCard(kingdom: kingdom)
-                    .padding(.horizontal)
-            }
-            
             beneficialActionsSection(status: status)
         } else if isInEnemyKingdom {
             hostileActionsSection(status: status)
@@ -189,48 +190,6 @@ struct ActionsView: View {
                 color: .orange
             )
         }
-    }
-    
-    // MARK: - Group Hunt Card
-    
-    @ViewBuilder
-    private func groupHuntCard(kingdom: Kingdom) -> some View {
-        NavigationLink {
-            HuntView(kingdomId: kingdom.id, kingdomName: kingdom.name, playerId: viewModel.player.playerId)
-        } label: {
-            HStack(spacing: KingdomTheme.Spacing.medium) {
-                // Icon
-                Image(systemName: "hare.fill")
-                    .font(.title)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
-                        cornerRadius: 14,
-                        shadowOffset: 3,
-                        borderWidth: 2
-                    )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Group Hunt")
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Hunt together for gold and glory")
-                        .font(FontStyles.labelMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.headline)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-            .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
-        }
-        .buttonStyle(.plain)
     }
     
     private func formatTime(seconds: Int) -> String {
@@ -381,10 +340,16 @@ struct ActionsView: View {
     
     @ViewBuilder
     private func renderSlotActions(slot: SlotInfo, status: AllActionStatus) -> some View {
-        let slotActions = slot.actions.compactMap { key in
-            status.actions[key].map { (key: key, action: $0) }
-        }
-        ForEach(slotActions.sorted { ($0.action.displayOrder ?? 999) < ($1.action.displayOrder ?? 999) }, id: \.key) { item in
+        // Use named struct instead of anonymous tuple to avoid SwiftUI type metadata crashes
+        // Filter out empty keys and sort once before iteration
+        let slotActions: [SlotActionItem] = slot.actions
+            .filter { !$0.isEmpty }  // Guard against empty keys
+            .compactMap { key in
+                status.actions[key].map { SlotActionItem(key: key, action: $0) }
+            }
+            .sorted { ($0.action.displayOrder ?? 999) < ($1.action.displayOrder ?? 999) }
+        
+        ForEach(slotActions) { item in
             renderAction(key: item.key, action: item.action, status: status)
         }
     }

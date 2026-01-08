@@ -15,6 +15,7 @@ struct OnboardingView: View {
     @State private var selectedCity: String?
     @State private var selectedCityOsmId: String?  // OSM ID for hometown kingdom
     @State private var selectedCityCoordinate: CLLocationCoordinate2D?
+    @State private var hasInitializedStep = false
     
     var body: some View {
         ZStack {
@@ -45,13 +46,41 @@ struct OnboardingView: View {
                 }
             }
         }
+        .onAppear {
+            // Only initialize once - resume at the correct step based on what's missing
+            guard !hasInitializedStep else { return }
+            hasInitializedStep = true
+            
+            if let user = authManager.currentUser {
+                // Check what's missing and resume at appropriate step
+                let hasHometown = user.hometown_kingdom_id != nil && !(user.hometown_kingdom_id?.isEmpty ?? true)
+                let trimmedName = user.display_name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let hasValidName = !trimmedName.isEmpty && trimmedName != "User"
+                
+                if hasHometown && !hasValidName {
+                    // Has hometown but needs display name - skip to step 2
+                    // Pre-fill with current display name if it's not "User"
+                    if trimmedName != "User" {
+                        displayName = user.display_name
+                    }
+                    selectedCityOsmId = user.hometown_kingdom_id
+                    currentStep = 2
+                } else if !hasHometown {
+                    // Needs hometown - start at step 1 (skip welcome for returning users)
+                    currentStep = 1
+                }
+                // If both are missing, stay at step 0 (welcome)
+            }
+        }
     }
     
     private func finishOnboarding() {
         Task {
+            // Use existing hometown if user already has one
+            let hometownId = selectedCityOsmId ?? authManager.currentUser?.hometown_kingdom_id
             await authManager.completeOnboarding(
                 displayName: displayName,
-                hometownKingdomId: selectedCityOsmId // Now passing the OSM ID
+                hometownKingdomId: hometownId
             )
         }
     }
@@ -421,12 +450,12 @@ struct HometownStep: View {
             } else {
                 // No location permission - show prompt
                 VStack(spacing: KingdomTheme.Spacing.xxLarge) {
-                    Image(systemName: "location.slash.fill")
+                    Image(systemName: locationManager.isLocationDenied ? "location.slash.fill" : "location.fill")
                         .font(.system(size: 48))
                         .foregroundColor(.white)
                         .frame(width: 100, height: 100)
                         .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.buttonWarning,
+                            backgroundColor: locationManager.isLocationDenied ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonWarning,
                             cornerRadius: 20,
                             shadowOffset: 4,
                             borderWidth: 3
@@ -437,10 +466,27 @@ struct HometownStep: View {
                             .font(FontStyles.displayMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        Text("We need your location to find nearby cities and kingdoms")
-                            .font(FontStyles.bodyMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            .multilineTextAlignment(.center)
+                        if locationManager.isLocationDenied {
+                            Text("Location access was denied. We need your location to find nearby cities and kingdoms. Please enable it in Settings.")
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .multilineTextAlignment(.center)
+                        } else {
+                            Text("We need your location to find nearby cities and kingdoms")
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .multilineTextAlignment(.center)
+                        }
+                        
+                        // Privacy notice
+                        HStack(spacing: KingdomTheme.Spacing.small) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            Text("Your precise location is NEVER stored—only the city you're in.")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                        }
                     }
                     .padding(.horizontal, KingdomTheme.Spacing.large)
                     
@@ -448,9 +494,9 @@ struct HometownStep: View {
                         locationManager.requestPermissions()
                     }) {
                         HStack {
-                            Text("Enable Location")
+                            Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
                                 .font(FontStyles.bodyLargeBold)
-                            Image(systemName: "location.fill")
+                            Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
                                 .font(FontStyles.iconSmall)
                         }
                         .foregroundColor(.white)
@@ -557,6 +603,17 @@ struct HometownStep: View {
                                 InfoBullet(text: "Must be present to perform actions")
                                 InfoBullet(text: "Choose where you'll be most often")
                             }
+                            
+                            // Privacy notice
+                            HStack(spacing: KingdomTheme.Spacing.small) {
+                                Image(systemName: "lock.shield.fill")
+                                    .font(FontStyles.iconMini)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                Text("Your precise location is NEVER stored—only the city you're in.")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                            }
+                            .padding(.top, KingdomTheme.Spacing.small)
                         }
                         .padding(KingdomTheme.Spacing.large)
                     }

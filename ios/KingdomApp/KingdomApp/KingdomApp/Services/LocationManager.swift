@@ -1,12 +1,28 @@
 import Foundation
 import CoreLocation
 import Combine
+import UIKit
 
 class LocationManager: NSObject, ObservableObject {
     private let locationManager = CLLocationManager()
     
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var currentLocation: CLLocationCoordinate2D?
+    
+    /// Returns true if location services are completely disabled or denied
+    var isLocationDenied: Bool {
+        authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+    
+    /// Returns true if we can request permission (not yet determined)
+    var canRequestPermission: Bool {
+        authorizationStatus == .notDetermined
+    }
+    
+    /// Returns true if location is authorized
+    var isLocationAuthorized: Bool {
+        authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+    }
     
     // MARK: - Debug/Testing Features
     /// Set to true to use fake location instead of real GPS
@@ -80,7 +96,21 @@ class LocationManager: NSObject, ObservableObject {
     }
     
     func requestPermissions() {
-        locationManager.requestWhenInUseAuthorization()
+        if authorizationStatus == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+        } else if authorizationStatus == .denied || authorizationStatus == .restricted {
+            // Permission was denied - need to open Settings
+            openSettings()
+        }
+    }
+    
+    /// Opens the app's Settings page where user can enable location
+    func openSettings() {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            DispatchQueue.main.async {
+                UIApplication.shared.open(settingsURL)
+            }
+        }
     }
 }
 
