@@ -23,6 +23,13 @@ class APIClient: ObservableObject {
     @Published var lastError: String?
     @Published var lastSyncTime: Date?
     
+    // MARK: - Critical Error State (blocks UI until resolved)
+    private var isShowingBlockingError: Bool = false
+    
+    // All continuations waiting for retry (multiple requests can be blocked)
+    private var retryContinuations: [CheckedContinuation<Void, Never>] = []
+    private let retryLock = NSLock()
+    
     // MARK: - Initialization
     
     private init() {
@@ -35,6 +42,101 @@ class APIClient: ObservableObject {
         
         // Auth token will be set by AuthManager - this is the single source of truth
         self.authToken = nil
+    }
+    
+    // MARK: - Critical Error Handling
+    
+    /// Called when user taps retry - resumes ALL suspended requests
+    @MainActor
+    private func retryCriticalError() {
+        isShowingBlockingError = false
+        BlockingErrorWindow.shared.hide()
+        
+        // Resume ALL waiting requests so they retry
+        retryLock.lock()
+        let continuations = retryContinuations
+        retryContinuations = []
+        retryLock.unlock()
+        
+        for continuation in continuations {
+            continuation.resume()
+        }
+    }
+    
+    /// Show blocking error and suspend until user taps retry
+    private func waitForRetry(message: String) async {
+        // Show the blocking error window (only first caller shows it)
+        await MainActor.run {
+            if !isShowingBlockingError {
+                isShowingBlockingError = true
+                BlockingErrorWindow.shared.show(
+                    title: "Connection Error",
+                    message: message,
+                    retryAction: { [weak self] in
+                        Task { @MainActor in
+                            self?.retryCriticalError()
+                        }
+                    }
+                )
+            }
+        }
+        
+        // Suspend here until retryCriticalError() is called
+        await withCheckedContinuation { continuation in
+            retryLock.lock()
+            retryContinuations.append(continuation)
+            retryLock.unlock()
+        }
+    }
+    
+    /// Determine if an error should trigger blocking UI
+    /// Only network failures and server errors (5xx) should block
+    private func isCriticalError(_ error: Error, statusCode: Int? = nil) -> Bool {
+        // Server errors (500+) are critical
+        if let code = statusCode, code >= 500 {
+            return true
+        }
+        
+        // Network connectivity errors are critical
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet,
+                 .networkConnectionLost,
+                 .timedOut,
+                 .cannotConnectToHost,
+                 .cannotFindHost,
+                 .dnsLookupFailed:
+                return true
+            default:
+                return false
+            }
+        }
+        
+        return false
+    }
+    
+    /// Generate user-friendly error message
+    private func userFriendlyMessage(for error: Error, statusCode: Int? = nil) -> String {
+        if let code = statusCode, code >= 500 {
+            return "Server error (\(code)). The kingdom servers may be experiencing issues. Please try again in a moment."
+        }
+        
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                return "No internet connection. Please check your network and try again."
+            case .networkConnectionLost:
+                return "Connection lost. Please check your network and try again."
+            case .timedOut:
+                return "Request timed out. The server may be busy. Please try again."
+            case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+                return "Cannot reach the server. Please check your connection and try again."
+            default:
+                return "Network error: \(urlError.localizedDescription)"
+            }
+        }
+        
+        return "An unexpected error occurred: \(error.localizedDescription)"
     }
     
     // MARK: - Request Building
@@ -71,107 +173,170 @@ class APIClient: ObservableObject {
     // MARK: - Request Execution
     
     func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.serverError("Invalid response")
+        // If there's already a critical error showing, wait for it to clear first
+        if await MainActor.run(body: { isShowingBlockingError }) {
+            await withCheckedContinuation { continuation in
+                retryLock.lock()
+                retryContinuations.append(continuation)
+                retryLock.unlock()
+            }
         }
         
-        guard (200...299).contains(httpResponse.statusCode) else {
-            // Try to parse error message
-            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let detail = errorJson["detail"] as? String {
-                // Handle specific status codes
+        // Retry loop - on critical errors, suspend and wait for user to tap retry
+        while true {
+            let data: Data
+            let response: URLResponse
+            
+            do {
+                (data, response) = try await session.data(for: request)
+            } catch {
+                // Network-level error (no response received)
+                if isCriticalError(error) {
+                    let message = userFriendlyMessage(for: error)
+                    await waitForRetry(message: message)
+                    continue // Retry the request
+                }
+                throw APIError.networkError(error)
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.serverError("Invalid response")
+            }
+            
+            // Check for critical server errors (5xx) - wait for retry
+            if httpResponse.statusCode >= 500 {
+                let message = userFriendlyMessage(for: NSError(domain: "", code: 0), statusCode: httpResponse.statusCode)
+                await waitForRetry(message: message)
+                continue // Retry the request
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                // Non-critical HTTP errors - throw normally
+                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let detail = errorJson["detail"] as? String {
+                    if httpResponse.statusCode == 403 {
+                        throw APIError.forbidden(detail)
+                    } else if httpResponse.statusCode == 404 {
+                        throw APIError.notFound(detail)
+                    } else if httpResponse.statusCode == 401 {
+                        throw APIError.unauthorized
+                    }
+                    throw APIError.serverError(detail)
+                }
+                
                 if httpResponse.statusCode == 403 {
-                    throw APIError.forbidden(detail)
+                    throw APIError.forbidden("Access denied")
                 } else if httpResponse.statusCode == 404 {
-                    throw APIError.notFound(detail)
+                    throw APIError.notFound("Resource not found")
                 } else if httpResponse.statusCode == 401 {
                     throw APIError.unauthorized
                 }
-                throw APIError.serverError(detail)
+                throw APIError.serverError("HTTP \(httpResponse.statusCode)")
             }
             
-            // No detail message, use status code
-            if httpResponse.statusCode == 403 {
-                throw APIError.forbidden("Access denied")
-            } else if httpResponse.statusCode == 404 {
-                throw APIError.notFound("Resource not found")
-            } else if httpResponse.statusCode == 401 {
-                throw APIError.unauthorized
-            }
-            throw APIError.serverError("HTTP \(httpResponse.statusCode)")
-        }
-        
-        // Debug: Print raw response (skip cities endpoint due to large boundary data)
-        let path = request.url?.path ?? "unknown"
-        if !path.contains("/cities") {
-            if let jsonString = String(data: data, encoding: .utf8) {
-                print("📥 API Response (\(path)):")
-                print(jsonString)
-            }
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            print("❌ Decoding error for \(T.self):")
-            print("Error: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, let context):
-                    print("Key '\(key.stringValue)' not found: \(context.debugDescription)")
-                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                case .typeMismatch(let type, let context):
-                    print("Type mismatch for type \(type): \(context.debugDescription)")
-                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                case .valueNotFound(let type, let context):
-                    print("Value not found for type \(type): \(context.debugDescription)")
-                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                case .dataCorrupted(let context):
-                    print("Data corrupted: \(context.debugDescription)")
-                    print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                @unknown default:
-                    print("Unknown decoding error")
+            // Debug: Print raw response (skip cities endpoint due to large boundary data)
+            let path = request.url?.path ?? "unknown"
+            if !path.contains("/cities") {
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📥 API Response (\(path)):")
+                    print(jsonString)
                 }
             }
-            throw APIError.decodingError(error)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            do {
+                return try decoder.decode(T.self, from: data)
+            } catch {
+                print("❌ Decoding error for \(T.self):")
+                print("Error: \(error)")
+                if let decodingError = error as? DecodingError {
+                    switch decodingError {
+                    case .keyNotFound(let key, let context):
+                        print("Key '\(key.stringValue)' not found: \(context.debugDescription)")
+                        print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .typeMismatch(let type, let context):
+                        print("Type mismatch for type \(type): \(context.debugDescription)")
+                        print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .valueNotFound(let type, let context):
+                        print("Value not found for type \(type): \(context.debugDescription)")
+                        print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .dataCorrupted(let context):
+                        print("Data corrupted: \(context.debugDescription)")
+                        print("Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    @unknown default:
+                        print("Unknown decoding error")
+                    }
+                }
+                throw APIError.decodingError(error)
+            }
         }
     }
     
     func executeVoid(_ request: URLRequest) async throws {
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.serverError("Invalid response")
+        // If there's already a critical error showing, wait for it to clear first
+        if await MainActor.run(body: { isShowingBlockingError }) {
+            await withCheckedContinuation { continuation in
+                retryLock.lock()
+                retryContinuations.append(continuation)
+                retryLock.unlock()
+            }
         }
         
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let detail = errorJson["detail"] as? String {
-                // Handle specific status codes
+        // Retry loop - on critical errors, suspend and wait for user to tap retry
+        while true {
+            let data: Data
+            let response: URLResponse
+            
+            do {
+                (data, response) = try await session.data(for: request)
+            } catch {
+                // Network-level error (no response received)
+                if isCriticalError(error) {
+                    let message = userFriendlyMessage(for: error)
+                    await waitForRetry(message: message)
+                    continue // Retry the request
+                }
+                throw APIError.networkError(error)
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.serverError("Invalid response")
+            }
+            
+            // Check for critical server errors (5xx) - wait for retry
+            if httpResponse.statusCode >= 500 {
+                let message = userFriendlyMessage(for: NSError(domain: "", code: 0), statusCode: httpResponse.statusCode)
+                await waitForRetry(message: message)
+                continue // Retry the request
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                // Non-critical HTTP errors - throw normally
+                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let detail = errorJson["detail"] as? String {
+                    if httpResponse.statusCode == 403 {
+                        throw APIError.forbidden(detail)
+                    } else if httpResponse.statusCode == 404 {
+                        throw APIError.notFound(detail)
+                    } else if httpResponse.statusCode == 401 {
+                        throw APIError.unauthorized
+                    }
+                    throw APIError.serverError(detail)
+                }
+                
                 if httpResponse.statusCode == 403 {
-                    throw APIError.forbidden(detail)
+                    throw APIError.forbidden("Access denied")
                 } else if httpResponse.statusCode == 404 {
-                    throw APIError.notFound(detail)
+                    throw APIError.notFound("Resource not found")
                 } else if httpResponse.statusCode == 401 {
                     throw APIError.unauthorized
                 }
-                throw APIError.serverError(detail)
+                throw APIError.serverError("HTTP \(httpResponse.statusCode)")
             }
             
-            // No detail message, use status code
-            if httpResponse.statusCode == 403 {
-                throw APIError.forbidden("Access denied")
-            } else if httpResponse.statusCode == 404 {
-                throw APIError.notFound("Resource not found")
-            } else if httpResponse.statusCode == 401 {
-                throw APIError.unauthorized
-            }
-            throw APIError.serverError("HTTP \(httpResponse.statusCode)")
+            return // Success
         }
     }
     

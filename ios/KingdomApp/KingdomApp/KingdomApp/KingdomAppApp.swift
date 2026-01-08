@@ -35,27 +35,29 @@ struct KingdomAppApp: App {
                 
                 // BLOCKING error overlay for critical auth failures
                 if authManager.hasCriticalError {
-                    BlockingErrorView(
-                        title: "Authentication Failed",
-                        message: authManager.criticalErrorMessage ?? "Unknown error",
-                        primaryAction: .init(
-                            label: "Retry",
-                            icon: "arrow.triangle.2.circlepath",
-                            color: KingdomTheme.Colors.buttonPrimary,
-                            action: {
-                                Task {
-                                    await authManager.retryAuth()
+                    ZStack {
+                        Color.black.opacity(0.85).ignoresSafeArea()
+                        BlockingErrorView(
+                            title: "Authentication Failed",
+                            message: authManager.criticalErrorMessage ?? "Unknown error",
+                            primaryAction: .init(
+                                label: "Retry",
+                                icon: "arrow.triangle.2.circlepath",
+                                color: KingdomTheme.Colors.buttonPrimary,
+                                action: {
+                                    Task {
+                                        await authManager.retryAuth()
+                                    }
                                 }
-                            }
-                        ),
-                        secondaryAction: .init(
-                            label: "Sign Out",
-                            icon: "rectangle.portrait.and.arrow.right",
-                            color: KingdomTheme.Colors.buttonDanger,
-                            action: { authManager.logout() }
+                            ),
+                            secondaryAction: .init(
+                                label: "Sign Out",
+                                icon: "rectangle.portrait.and.arrow.right",
+                                color: KingdomTheme.Colors.buttonDanger,
+                                action: { authManager.logout() }
+                            )
                         )
-                    )
-                    .background(Color.black.opacity(0.8).ignoresSafeArea())
+                    }
                 }
             }
             .onAppear {
@@ -67,6 +69,8 @@ struct KingdomAppApp: App {
                     _ = await NotificationManager.shared.requestPermission()
                 }
             }
+            // API errors use BlockingErrorWindow which is a UIKit window overlay
+            // that appears above ALL content including sheets - handled by APIClient directly
         }
     }
 }
