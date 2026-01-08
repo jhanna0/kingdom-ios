@@ -17,28 +17,47 @@ Example usage in a router:
             event_type="coup_started",
             data={"attacker": user.display_name, "coup_id": coup.id}
         )
+
+Local Development:
+    When WEBSOCKET_API_ENDPOINT is not set, automatically uses the local
+    in-memory WebSocket manager for real-time updates.
 """
 import os
 import time
+import asyncio
 import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
+def is_local_mode() -> bool:
+    """Check if we're running in local development mode."""
+    return os.environ.get('WEBSOCKET_API_ENDPOINT') is None
+
+
 def get_websocket_endpoint() -> Optional[str]:
     """
     Get the WebSocket API endpoint URL from environment.
     
-    Returns None if not configured (local dev without WebSocket).
+    Returns None if not configured (local dev mode).
     """
-    endpoint = os.environ.get('WEBSOCKET_API_ENDPOINT')
+    return os.environ.get('WEBSOCKET_API_ENDPOINT')
+
+
+def _run_async(coro):
+    """
+    Run an async coroutine from sync code.
     
-    if not endpoint:
-        logger.debug("WEBSOCKET_API_ENDPOINT not set, skipping real-time notifications")
-        return None
-    
-    return endpoint
+    Handles the case where we're called from FastAPI's event loop.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # We're in an async context, schedule it
+        return asyncio.ensure_future(coro)
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(coro)
 
 
 def notify_kingdom(
@@ -70,13 +89,6 @@ def notify_kingdom(
             }
         )
     """
-    endpoint = get_websocket_endpoint()
-    if not endpoint:
-        return 0
-    
-    # Import here to avoid circular imports and cold start overhead
-    from .connection_manager import broadcast_to_kingdom
-    
     message = {
         "type": "event",
         "event_type": event_type,
@@ -84,6 +96,20 @@ def notify_kingdom(
         "data": data,
         "timestamp": int(time.time() * 1000)
     }
+    
+    if is_local_mode():
+        # Use local in-memory WebSocket manager
+        from .local_manager import local_manager
+        _run_async(local_manager.broadcast_to_kingdom(kingdom_id, message))
+        logger.debug(f"[Local WS] Broadcast to kingdom {kingdom_id}: {event_type}")
+        return 1  # Approximate - actual count is async
+    
+    endpoint = get_websocket_endpoint()
+    if not endpoint:
+        return 0
+    
+    # Import here to avoid circular imports and cold start overhead
+    from .connection_manager import broadcast_to_kingdom
     
     return broadcast_to_kingdom(
         endpoint_url=endpoint,
@@ -116,18 +142,24 @@ def notify_user(
             data={"amount": 100, "from": "contract_reward"}
         )
     """
-    endpoint = get_websocket_endpoint()
-    if not endpoint:
-        return 0
-    
-    from .connection_manager import broadcast_to_user
-    
     message = {
         "type": "notification",
         "event_type": event_type,
         "data": data,
         "timestamp": int(time.time() * 1000)
     }
+    
+    if is_local_mode():
+        from .local_manager import local_manager
+        _run_async(local_manager.broadcast_to_user(str(user_id), message))
+        logger.debug(f"[Local WS] Notify user {user_id}: {event_type}")
+        return 1
+    
+    endpoint = get_websocket_endpoint()
+    if not endpoint:
+        return 0
+    
+    from .connection_manager import broadcast_to_user
     
     return broadcast_to_user(
         endpoint_url=endpoint,
@@ -157,18 +189,24 @@ def notify_users(
     Returns:
         Total number of connections notified
     """
-    endpoint = get_websocket_endpoint()
-    if not endpoint:
-        return 0
-    
-    from .connection_manager import broadcast_to_multiple_users
-    
     message = {
         "type": "notification",
         "event_type": event_type,
         "data": data,
         "timestamp": int(time.time() * 1000)
     }
+    
+    if is_local_mode():
+        from .local_manager import local_manager
+        _run_async(local_manager.broadcast_to_users([str(uid) for uid in user_ids], message))
+        logger.debug(f"[Local WS] Notify {len(user_ids)} users: {event_type}")
+        return len(user_ids)
+    
+    endpoint = get_websocket_endpoint()
+    if not endpoint:
+        return 0
+    
+    from .connection_manager import broadcast_to_multiple_users
     
     return broadcast_to_multiple_users(
         endpoint_url=endpoint,
@@ -213,8 +251,62 @@ class PartyEvents:
     HUNT_LOBBY_CREATED = "hunt_lobby_created"
     HUNT_PLAYER_JOINED = "hunt_player_joined"
     HUNT_PLAYER_LEFT = "hunt_player_left"
+    HUNT_PLAYER_READY = "hunt_player_ready"
     HUNT_STARTED = "hunt_started"
-    HUNT_PHASE_CHANGED = "hunt_phase_changed"
+    HUNT_PHASE_COMPLETE = "hunt_phase_complete"
     HUNT_ROLL_RESULT = "hunt_roll_result"
     HUNT_ENDED = "hunt_ended"
+
+
+def notify_hunt_participants(
+    hunt_session: dict,
+    event_type: str,
+    data: dict
+) -> int:
+    """
+    Send a real-time notification to all participants in a hunt.
+    
+    Args:
+        hunt_session: Hunt session dict (must have 'participants' key)
+        event_type: Type of event (use PartyEvents constants)
+        data: Event-specific data
+    
+    Returns:
+        Total number of connections notified
+    """
+    # Extract participant user IDs
+    participants = hunt_session.get("participants", {})
+    if isinstance(participants, dict):
+        user_ids = [str(pid) for pid in participants.keys()]
+    else:
+        user_ids = []
+    
+    if not user_ids:
+        return 0
+    
+    message = {
+        "type": "hunt_event",
+        "event_type": event_type,
+        "hunt_id": hunt_session.get("hunt_id"),
+        "data": data,
+        "timestamp": int(time.time() * 1000)
+    }
+    
+    if is_local_mode():
+        from .local_manager import local_manager
+        _run_async(local_manager.broadcast_to_users(user_ids, message))
+        logger.info(f"[Local WS] Hunt {hunt_session.get('hunt_id')}: {event_type} -> {len(user_ids)} participants")
+        return len(user_ids)
+    
+    endpoint = get_websocket_endpoint()
+    if not endpoint:
+        return 0
+    
+    from .connection_manager import broadcast_to_multiple_users
+    
+    return broadcast_to_multiple_users(
+        endpoint_url=endpoint,
+        user_ids=user_ids,
+        message=message
+    )
 

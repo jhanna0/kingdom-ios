@@ -2,15 +2,18 @@
 Kingdom Game API - Main application setup
 """
 import logging
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
 
 from db import init_db
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts
 from routers import property as property_router
 import config  # Import to trigger dev mode message
+
+# Local WebSocket support
+from websocket.local_manager import local_manager
 
 # Setup logging
 logger = logging.getLogger("kingdom_api")
@@ -88,6 +91,8 @@ async def startup_event():
         print("📊 Activity: /activity")
         print("🎯 Tiers: /tiers (SINGLE SOURCE OF TRUTH)")
         print("💰 Market: /market (Grand Exchange)")
+        print("🏹 Hunts: /hunts (Group hunting)")
+        print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
         # Don't fail startup, tables might already exist
@@ -128,6 +133,38 @@ app.include_router(tiers.router)
 app.include_router(resources.router)
 app.include_router(weather.router)
 app.include_router(market.router)
+app.include_router(hunts.router)
+
+
+# ===== WebSocket Endpoint (Local Development) =====
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str = Query(default=None),
+    kingdom_id: str = Query(default="none"),
+):
+    """
+    WebSocket endpoint for real-time features (local dev only).
+    
+    Connect with:
+        ws://192.168.1.13:8000/ws?token=<jwt>&kingdom_id=<id>
+    
+    Actions:
+        - {"action": "subscribe", "kingdom_id": "123"}
+        - {"action": "unsubscribe"}
+        - {"action": "ping"}
+        - {"action": "sendMessage", "message": "Hello!"}
+    """
+    await local_manager.handle_connection(websocket, token, kingdom_id)
+
+
+@app.get("/ws/stats")
+def websocket_stats():
+    """Get WebSocket connection statistics (local dev debugging)."""
+    return {
+        "mode": "local",
+        **local_manager.stats,
+    }
 
 
 # Health check

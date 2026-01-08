@@ -1,0 +1,745 @@
+"""
+HUNTING API ROUTER
+==================
+Endpoints for the group hunting activity.
+
+Endpoints:
+- POST /hunts/create - Create a new hunt in current kingdom
+- POST /hunts/{hunt_id}/join - Join an existing hunt
+- POST /hunts/{hunt_id}/ready - Mark yourself as ready
+- POST /hunts/{hunt_id}/start - Start the hunt (creator only)
+- POST /hunts/{hunt_id}/phase/{phase} - Execute a phase (auto-progresses)
+- GET /hunts/{hunt_id} - Get hunt status
+- GET /hunts/kingdom/{kingdom_id} - Get active hunt in a kingdom
+- GET /hunts/preview - Get probability preview for current player
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional, List, Dict
+from datetime import datetime
+
+from db import get_db
+from db.models import User, PlayerState
+from routers.auth import get_current_user
+from systems.hunting import HuntManager, HuntConfig, HuntPhase
+from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
+from websocket.broadcast import notify_hunt_participants, PartyEvents
+
+router = APIRouter(prefix="/hunts", tags=["hunts"])
+
+# Global hunt manager (in production, this would be Redis-backed)
+_hunt_manager = HuntManager()
+
+
+def get_hunt_manager() -> HuntManager:
+    """Get the global hunt manager instance."""
+    return _hunt_manager
+
+
+# ============================================================
+# REQUEST/RESPONSE MODELS
+# ============================================================
+
+class CreateHuntRequest(BaseModel):
+    kingdom_id: str
+
+
+class HuntResponse(BaseModel):
+    success: bool
+    message: str
+    hunt: Optional[dict] = None
+
+
+class PhaseResultResponse(BaseModel):
+    success: bool
+    message: str
+    phase_result: Optional[dict] = None
+    hunt: Optional[dict] = None
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def get_player_stats(db: Session, user_id: int) -> Dict[str, int]:
+    """Get player's stats for hunting."""
+    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+    if not state:
+        return {}
+    
+    return {
+        "intelligence": state.intelligence or 0,
+        "attack_power": state.attack_power or 0,
+        "defense": state.defense_power or 0,
+        "faith": state.faith or 0,
+        "leadership": state.leadership or 0,
+    }
+
+
+def apply_hunt_rewards(db: Session, hunt: dict) -> None:
+    """Apply hunt rewards to participants."""
+    for player_id_str, participant in hunt.get("participants", {}).items():
+        player_id = int(player_id_str)
+        gold_earned = participant.get("gold_earned", 0)
+        
+        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        if state and gold_earned > 0:
+            state.gold = (state.gold or 0) + gold_earned
+    
+    db.commit()
+
+
+# ============================================================
+# ENDPOINTS - Static routes MUST come before dynamic routes!
+# ============================================================
+
+# --- Static GET routes (must be before /{hunt_id}) ---
+
+@router.get("/preview")
+def get_hunt_preview(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get hunt probability preview based on player's stats.
+    Shows chances for each phase and potential animals.
+    """
+    stats = get_player_stats(db, user.id)
+    preview = get_hunt_probability_preview(stats)
+    
+    return {
+        "player_stats": stats,
+        **preview,
+    }
+
+
+@router.get("/config")
+def get_hunt_config():
+    """
+    Get hunt configuration for the UI.
+    Includes timing, party limits, animals, and phases.
+    """
+    from systems.hunting.config import PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS
+    
+    return {
+        "timing": {
+            "lobby_timeout_seconds": HuntConfig.LOBBY_TIMEOUT,
+            "phase_duration_seconds": HuntConfig.PHASE_DURATION,
+            "results_duration_seconds": HuntConfig.RESULTS_DURATION,
+            "cooldown_minutes": HuntConfig.COOLDOWN,
+        },
+        "party": {
+            "min_size": HuntConfig.MIN_PARTY,
+            "max_size": HuntConfig.MAX_PARTY,
+        },
+        "phases": {
+            phase.value: {
+                "name": config["name"],
+                "display_name": config["display_name"],
+                "stat": config["stat"],
+                "icon": config["icon"],
+                "description": config["description"],
+            }
+            for phase, config in PHASE_CONFIG.items()
+        },
+        "animals": [
+            {
+                "id": animal_id,
+                "name": data["name"],
+                "icon": data["icon"],
+                "tier": data["tier"],
+                "base_gold": data["base_gold"],
+                "meat": data["meat"],
+                "description": data["description"],
+                "track_requirement": TRACK_TIER_THRESHOLDS.get(data["tier"], 0),
+            }
+            for animal_id, data in ANIMALS.items()
+        ],
+        "tier_thresholds": TRACK_TIER_THRESHOLDS,
+    }
+
+
+@router.get("/kingdom/{kingdom_id}")
+def get_kingdom_hunt(
+    kingdom_id: str,
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Get active hunt in a kingdom, if any."""
+    session = manager.get_active_hunt_for_kingdom(kingdom_id)
+    
+    if not session:
+        return {"active_hunt": None}
+    
+    return {"active_hunt": session.to_dict()}
+
+
+# --- Dynamic routes (after static routes) ---
+
+@router.post("/create", response_model=HuntResponse)
+def create_hunt(
+    request: CreateHuntRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """
+    Create a new group hunt in a kingdom.
+    Only one active hunt per kingdom allowed.
+    """
+    # Check for existing active hunt
+    existing = manager.get_active_hunt_for_kingdom(request.kingdom_id)
+    if existing:
+        return HuntResponse(
+            success=False,
+            message="A hunt is already active in this kingdom",
+            hunt=existing.to_dict(),
+        )
+    
+    # Get player stats
+    stats = get_player_stats(db, user.id)
+    
+    # Create the hunt
+    session = manager.create_hunt(
+        kingdom_id=request.kingdom_id,
+        creator_id=user.id,
+        creator_name=user.display_name or f"Player {user.id}",
+        creator_stats=stats,
+    )
+    
+    hunt_dict = session.to_dict()
+    
+    # Broadcast to kingdom that a hunt is available
+    notify_hunt_participants(
+        hunt_session=hunt_dict,
+        event_type=PartyEvents.HUNT_LOBBY_CREATED,
+        data={"message": f"{user.display_name} started a hunt!"}
+    )
+    
+    return HuntResponse(
+        success=True,
+        message="Hunt created! Waiting for party members...",
+        hunt=hunt_dict,
+    )
+
+
+@router.post("/{hunt_id}/join", response_model=HuntResponse)
+def join_hunt(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Join an existing hunt lobby."""
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.LOBBY:
+        return HuntResponse(
+            success=False,
+            message="Hunt has already started",
+            hunt=session.to_dict(),
+        )
+    
+    if user.id in session.participants:
+        return HuntResponse(
+            success=False,
+            message="You're already in this hunt",
+            hunt=session.to_dict(),
+        )
+    
+    stats = get_player_stats(db, user.id)
+    
+    if not session.add_participant(
+        player_id=user.id,
+        player_name=user.display_name or f"Player {user.id}",
+        stats=stats,
+    ):
+        return HuntResponse(
+            success=False,
+            message="Hunt is full",
+            hunt=session.to_dict(),
+        )
+    
+    hunt_dict = session.to_dict()
+    
+    # Notify other participants
+    notify_hunt_participants(
+        hunt_session=hunt_dict,
+        event_type=PartyEvents.HUNT_PLAYER_JOINED,
+        data={
+            "player_id": user.id,
+            "player_name": user.display_name or f"Player {user.id}",
+        }
+    )
+    
+    return HuntResponse(
+        success=True,
+        message=f"Joined the hunt! ({len(session.participants)}/{HuntConfig.MAX_PARTY})",
+        hunt=hunt_dict,
+    )
+
+
+@router.post("/{hunt_id}/leave", response_model=HuntResponse)
+def leave_hunt(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Leave a hunt lobby."""
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.LOBBY:
+        return HuntResponse(
+            success=False,
+            message="Cannot leave - hunt in progress",
+            hunt=session.to_dict(),
+        )
+    
+    if not session.remove_participant(user.id):
+        return HuntResponse(
+            success=False,
+            message="You're not in this hunt",
+            hunt=session.to_dict(),
+        )
+    
+    # If creator leaves, cancel the hunt
+    if session.created_by == user.id:
+        session.status = HuntStatus.CANCELLED
+        return HuntResponse(
+            success=True,
+            message="Hunt cancelled (leader left)",
+            hunt=session.to_dict(),
+        )
+    
+    return HuntResponse(
+        success=True,
+        message="Left the hunt",
+        hunt=session.to_dict(),
+    )
+
+
+@router.post("/{hunt_id}/ready", response_model=HuntResponse)
+def toggle_ready(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Toggle ready status in hunt lobby."""
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if user.id not in session.participants:
+        return HuntResponse(
+            success=False,
+            message="You're not in this hunt",
+        )
+    
+    current = session.participants[user.id].is_ready
+    session.set_ready(user.id, not current)
+    
+    hunt_dict = session.to_dict()
+    
+    # Notify others of ready status change
+    notify_hunt_participants(
+        hunt_session=hunt_dict,
+        event_type=PartyEvents.HUNT_PLAYER_READY,
+        data={
+            "player_id": user.id,
+            "ready": not current,
+        }
+    )
+    
+    return HuntResponse(
+        success=True,
+        message="Ready!" if not current else "Not ready",
+        hunt=hunt_dict,
+    )
+
+
+@router.post("/{hunt_id}/start", response_model=HuntResponse)
+def start_hunt(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Start the hunt (creator only, all must be ready)."""
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.created_by != user.id:
+        return HuntResponse(
+            success=False,
+            message="Only the hunt leader can start",
+            hunt=session.to_dict(),
+        )
+    
+    if not session.all_ready():
+        return HuntResponse(
+            success=False,
+            message="Not all party members are ready",
+            hunt=session.to_dict(),
+        )
+    
+    if not manager.start_hunt(session):
+        return HuntResponse(
+            success=False,
+            message="Cannot start hunt",
+            hunt=session.to_dict(),
+        )
+    
+    hunt_dict = session.to_dict()
+    
+    # Notify all participants that hunt started
+    notify_hunt_participants(
+        hunt_session=hunt_dict,
+        event_type=PartyEvents.HUNT_STARTED,
+        data={"message": "The hunt begins!"}
+    )
+    
+    return HuntResponse(
+        success=True,
+        message="The hunt begins!",
+        hunt=hunt_dict,
+    )
+
+
+# ============================================================
+# MULTI-ROLL ENDPOINTS
+# ============================================================
+
+class RollResponse(BaseModel):
+    """Response for individual roll within a phase"""
+    success: bool
+    message: str
+    roll_result: Optional[dict] = None
+    phase_state: Optional[dict] = None
+    phase_update: Optional[dict] = None
+    hunt: Optional[dict] = None
+
+
+@router.post("/{hunt_id}/roll", response_model=RollResponse)
+def execute_roll(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """
+    Execute a single roll within the current phase.
+    
+    TRACK phase: Each roll shifts creature probabilities
+    STRIKE phase: Each roll deals damage or risks escape
+    BLESSING phase: Each roll adds to loot bonus
+    """
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.IN_PROGRESS:
+        return RollResponse(
+            success=False,
+            message="Hunt is not active",
+            hunt=session.to_dict(),
+        )
+    
+    if user.id not in session.participants:
+        return RollResponse(
+            success=False,
+            message="You're not in this hunt",
+        )
+    
+    if not session.current_phase_state:
+        return RollResponse(
+            success=False,
+            message="No active phase",
+            hunt=session.to_dict(),
+        )
+    
+    # Execute the roll
+    result = manager.execute_roll(session, user.id)
+    
+    if not result.get("success"):
+        return RollResponse(
+            success=False,
+            message=result.get("message", "Cannot roll"),
+            hunt=session.to_dict(),
+        )
+    
+    # Broadcast roll to other participants
+    notify_hunt_participants(
+        hunt_session=session.to_dict(),
+        event_type="hunt_roll",
+        data={
+            "player_id": user.id,
+            "roll_result": result.get("roll_result"),
+            "phase_update": result.get("phase_update"),
+        }
+    )
+    
+    return RollResponse(
+        success=True,
+        message=result["roll_result"]["message"],
+        roll_result=result.get("roll_result"),
+        phase_state=result.get("phase_state"),
+        phase_update=result.get("phase_update"),
+        hunt=result.get("hunt"),
+    )
+
+
+@router.post("/{hunt_id}/resolve", response_model=PhaseResultResponse)
+def resolve_phase(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """
+    Resolve/finalize the current phase.
+    
+    TRACK phase: Performs the "Master Roll" that slides along the probability bar
+    STRIKE phase: Finalizes the combat (kill or escape)
+    BLESSING phase: Calculates final loot with accumulated bonus
+    """
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.IN_PROGRESS:
+        return PhaseResultResponse(
+            success=False,
+            message="Hunt is not active",
+            hunt=session.to_dict(),
+        )
+    
+    if user.id not in session.participants:
+        return PhaseResultResponse(
+            success=False,
+            message="You're not in this hunt",
+        )
+    
+    # Resolve the phase
+    result = manager.resolve_phase(session)
+    
+    if not result.get("success"):
+        return PhaseResultResponse(
+            success=False,
+            message=result.get("message", "Cannot resolve phase"),
+            hunt=session.to_dict(),
+        )
+    
+    # Broadcast phase completion
+    notify_hunt_participants(
+        hunt_session=session.to_dict(),
+        event_type=PartyEvents.HUNT_PHASE_COMPLETE,
+        data={
+            "phase": result.get("phase"),
+            "result": result.get("phase_result"),
+        }
+    )
+    
+    return PhaseResultResponse(
+        success=True,
+        message=result.get("message", "Phase resolved"),
+        phase_result=result.get("phase_result"),
+        hunt=result.get("hunt"),
+    )
+
+
+@router.post("/{hunt_id}/next-phase", response_model=HuntResponse)
+def advance_phase(
+    hunt_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """
+    Advance to the next phase after resolving current one.
+    If no more phases, finalizes the hunt.
+    """
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.IN_PROGRESS:
+        return HuntResponse(
+            success=False,
+            message="Hunt is not active",
+            hunt=session.to_dict(),
+        )
+    
+    if user.id not in session.participants:
+        return HuntResponse(
+            success=False,
+            message="You're not in this hunt",
+        )
+    
+    # Check current phase is resolved
+    if session.current_phase_state and not session.current_phase_state.is_resolved:
+        return HuntResponse(
+            success=False,
+            message="Must resolve current phase first",
+            hunt=session.to_dict(),
+        )
+    
+    # Advance to next phase
+    next_phase = manager.advance_to_next_phase(session)
+    
+    if next_phase:
+        notify_hunt_participants(
+            hunt_session=session.to_dict(),
+            event_type="hunt_phase_start",
+            data={"phase": next_phase.value}
+        )
+        
+        return HuntResponse(
+            success=True,
+            message=f"Starting {next_phase.value} phase",
+            hunt=session.to_dict(),
+        )
+    else:
+        # Hunt is complete
+        final_result = manager.finalize_hunt(session)
+        apply_hunt_rewards(db, final_result)
+        
+        notify_hunt_participants(
+            hunt_session=final_result,
+            event_type=PartyEvents.HUNT_ENDED,
+            data={"message": "Hunt complete!"}
+        )
+        
+        return HuntResponse(
+            success=True,
+            message="Hunt complete!",
+            hunt=final_result,
+        )
+
+
+# ============================================================
+# LEGACY PHASE ENDPOINT (for backwards compatibility)
+# ============================================================
+
+@router.post("/{hunt_id}/phase/{phase_name}", response_model=PhaseResultResponse)
+def execute_phase(
+    hunt_id: str,
+    phase_name: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """
+    Execute a hunt phase (LEGACY - uses old single-roll system).
+    For new clients, use /roll and /resolve endpoints instead.
+    
+    Phases must be executed in order: track -> strike -> blessing
+    """
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    if session.status != HuntStatus.IN_PROGRESS:
+        return PhaseResultResponse(
+            success=False,
+            message="Hunt is not active",
+            hunt=session.to_dict(),
+        )
+    
+    if user.id not in session.participants:
+        return PhaseResultResponse(
+            success=False,
+            message="You're not in this hunt",
+        )
+    
+    # Parse phase
+    try:
+        phase = HuntPhase(phase_name)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid phase: {phase_name}")
+    
+    # Validate phase order (Approach removed - was boring)
+    phase_order = [HuntPhase.TRACK, HuntPhase.STRIKE, HuntPhase.BLESSING]
+    
+    if phase not in phase_order:
+        return PhaseResultResponse(
+            success=False,
+            message=f"Invalid phase: {phase_name}",
+        )
+    
+    # Check if this phase was already executed
+    executed_phases = [pr.phase for pr in session.phase_results]
+    if phase in executed_phases:
+        return PhaseResultResponse(
+            success=False,
+            message=f"Phase {phase.value} already completed",
+            hunt=session.to_dict(),
+        )
+    
+    # Check phase order
+    phase_index = phase_order.index(phase)
+    for i in range(phase_index):
+        if phase_order[i] not in executed_phases:
+            return PhaseResultResponse(
+                success=False,
+                message=f"Must complete {phase_order[i].value} phase first",
+            )
+    
+    # Execute the phase
+    result = manager.execute_phase(session, phase)
+    
+    # Check for early termination conditions
+    hunt_ended = False
+    final_result = None
+    
+    if phase == HuntPhase.TRACK and session.track_score <= 0:
+        # No trail found - hunt ends
+        final_result = manager.finalize_hunt(session)
+        hunt_ended = True
+    elif phase == HuntPhase.STRIKE and session.animal_escaped:
+        # Animal escaped - hunt ends
+        final_result = manager.finalize_hunt(session)
+        hunt_ended = True
+    elif phase == HuntPhase.BLESSING:
+        # Hunt complete!
+        final_result = manager.finalize_hunt(session)
+        hunt_ended = True
+        
+        # Apply rewards to database
+        apply_hunt_rewards(db, final_result)
+    
+    # Broadcast phase completion
+    hunt_dict = final_result if hunt_ended else session.to_dict()
+    notify_hunt_participants(
+        hunt_session=hunt_dict,
+        event_type=PartyEvents.HUNT_PHASE_COMPLETE if not hunt_ended else PartyEvents.HUNT_ENDED,
+        data={
+            "phase": phase.value,
+            "result": result.to_dict(),
+        }
+    )
+    
+    return PhaseResultResponse(
+        success=True,
+        message=result.outcome_message,
+        phase_result=result.to_dict(),
+        hunt=hunt_dict,
+    )
+
+
+@router.get("/{hunt_id}")
+def get_hunt_status(
+    hunt_id: str,
+    manager: HuntManager = Depends(get_hunt_manager),
+):
+    """Get current hunt status."""
+    session = manager.get_hunt(hunt_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    return session.to_dict()
+
+

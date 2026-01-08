@@ -150,12 +150,21 @@ struct ActionsView: View {
         }
     }
     
+    // State for hunt navigation
+    @State private var showHuntView = false
+    
     // MARK: - Action Status Content
     
     @ViewBuilder
     private func actionStatusContent(status: AllActionStatus) -> some View {
         // ALL slots rendered dynamically from backend - no duplicates!
         if isInHomeKingdom {
+            // Group Hunt entry point (before other actions)
+            if let kingdom = currentKingdom {
+                groupHuntCard(kingdom: kingdom)
+                    .padding(.horizontal)
+            }
+            
             beneficialActionsSection(status: status)
         } else if isInEnemyKingdom {
             hostileActionsSection(status: status)
@@ -167,6 +176,48 @@ struct ActionsView: View {
                 color: .orange
             )
         }
+    }
+    
+    // MARK: - Group Hunt Card
+    
+    @ViewBuilder
+    private func groupHuntCard(kingdom: Kingdom) -> some View {
+        NavigationLink {
+            HuntView(kingdomId: kingdom.id, kingdomName: kingdom.name, playerId: viewModel.player.playerId)
+        } label: {
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                // Icon
+                Image(systemName: "hare.fill")
+                    .font(.title)
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        cornerRadius: 14,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Group Hunt")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Hunt together for gold and glory")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.headline)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .padding()
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
+        }
+        .buttonStyle(.plain)
     }
     
     private func formatTime(seconds: Int) -> String {
