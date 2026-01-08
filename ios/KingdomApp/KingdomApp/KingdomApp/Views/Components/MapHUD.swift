@@ -60,7 +60,11 @@ struct MapHUD: View {
                     Spacer()
                     
                     // Action Status Indicator - inline
-                    if let cooldown = viewModel.globalCooldown {
+                    // With parallel actions, show the busiest slot (longest remaining time)
+                    if let slotCooldowns = viewModel.slotCooldowns, !slotCooldowns.isEmpty {
+                        actionStatusBadgeFromSlots(slotCooldowns: slotCooldowns)
+                    } else if let cooldown = viewModel.globalCooldown {
+                        // Fallback to legacy global cooldown if slots not available
                         actionStatusBadge(cooldown: cooldown)
                     }
                 }
@@ -210,7 +214,58 @@ struct MapHUD: View {
         updateTimer = nil
     }
     
-    // MARK: - Action Status Badge (Compact)
+    // MARK: - Action Status Badge (Slot-based for Parallel Actions)
+    
+    @ViewBuilder
+    private func actionStatusBadgeFromSlots(slotCooldowns: [String: SlotCooldown]) -> some View {
+        let elapsed = viewModel.cooldownFetchedAt.map { Date().timeIntervalSince($0) } ?? 0
+        
+        // Find the busiest slot (longest remaining time)
+        let busiestSlot = slotCooldowns
+            .map { (key: $0.key, value: $0.value) }
+            .filter { !$0.value.ready }
+            .max { 
+                let remaining1 = max(0, Double($0.value.secondsRemaining) - elapsed)
+                let remaining2 = max(0, Double($1.value.secondsRemaining) - elapsed)
+                return remaining1 < remaining2
+            }
+        
+        HStack(spacing: 4) {
+            if let slot = busiestSlot,
+               let action = slot.value.blockingAction {
+                let calculatedRemaining = max(0, Double(slot.value.secondsRemaining) - elapsed)
+                
+                Image(systemName: actionIcon(for: action))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(actionBackgroundColor(for: action))
+                let minutes = Int(calculatedRemaining) / 60
+                Text("\(minutes)m")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            } else {
+                // All slots are idle
+                Text("💤")
+                    .font(.system(size: 12))
+            }
+        }
+        .frame(height: 32)
+        .padding(.horizontal, 8)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
+    // MARK: - Action Status Badge (Legacy - for backward compatibility)
     
     @ViewBuilder
     private func actionStatusBadge(cooldown: GlobalCooldown) -> some View {

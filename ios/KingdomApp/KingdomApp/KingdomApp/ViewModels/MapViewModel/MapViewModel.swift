@@ -28,6 +28,7 @@ class MapViewModel: ObservableObject {
     
     // Action Cooldown
     @Published var globalCooldown: GlobalCooldown?
+    @Published var slotCooldowns: [String: SlotCooldown]? // Per-slot cooldowns for parallel actions
     @Published var cooldownFetchedAt: Date?
     
     // MARK: - Services

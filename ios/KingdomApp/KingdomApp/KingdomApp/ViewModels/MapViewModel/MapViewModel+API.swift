@@ -48,6 +48,7 @@ extension MapViewModel {
             let status = try await actionsAPI.getActionStatus()
             await MainActor.run {
                 self.globalCooldown = status.globalCooldown
+                self.slotCooldowns = status.slotCooldowns // Store slot cooldowns for parallel actions
                 self.cooldownFetchedAt = Date()
             }
         } catch {
