@@ -1,3 +1,6 @@
+# Deploy command:
+# bash -c "source ~/.nvm/nvm.sh && nvm use 18 && cd /Users/jad/Desktop/kingdom/api && AWS_PROFILE=dev sls deploy"
+
 service: kingdom-api
 
 provider:
@@ -15,6 +18,10 @@ provider:
     RDS_DATABASE: postgres
     JWT_SECRET_KEY: temp-secret-change-me
     DEV_MODE: 'True'
+    # WebSocket config
+    CONNECTIONS_TABLE: ${self:service}-connections-${sls:stage}
+    WEBSOCKET_API_ENDPOINT:
+      Fn::Sub: "https://${WebsocketsApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}"
   vpc:
     securityGroupIds:
       - sg-62aae569  # Existing default security group (allows RDS access)
@@ -36,12 +43,79 @@ provider:
           Action:
             - secretsmanager:GetSecretValue
           Resource: 'arn:aws:secretsmanager:us-east-1:*:secret:rds!db-5465f705-3666-44af-b197-39944abad239-*'
+        # DynamoDB permissions for WebSocket connections
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+          Resource:
+            - !GetAtt ConnectionsTable.Arn
+            - !Sub "${ConnectionsTable.Arn}/index/*"
+        # API Gateway Management API (for sending messages to WebSocket clients)
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource:
+            - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketsApi}/*"
 
 functions:
+  # ===== REST API (existing) =====
   api:
     handler: main.handler
     events:
       - httpApi: '*'
+
+  # ===== WebSocket Handlers =====
+  wsConnect:
+    handler: websocket.handlers.connect_handler
+    events:
+      - websocket:
+          route: $connect
+    # WebSocket handlers don't need VPC - they only touch DynamoDB
+    vpc: ~
+
+  wsDisconnect:
+    handler: websocket.handlers.disconnect_handler
+    events:
+      - websocket:
+          route: $disconnect
+    vpc: ~
+
+  wsDefault:
+    handler: websocket.handlers.default_handler
+    events:
+      - websocket:
+          route: $default
+    vpc: ~
+
+  # Named routes for specific actions
+  wsSubscribe:
+    handler: websocket.handlers.subscribe_handler
+    events:
+      - websocket:
+          route: subscribe
+    vpc: ~
+
+  wsUnsubscribe:
+    handler: websocket.handlers.unsubscribe_handler
+    events:
+      - websocket:
+          route: unsubscribe
+    vpc: ~
+
+  wsSendMessage:
+    handler: websocket.handlers.send_message_handler
+    events:
+      - websocket:
+          route: sendMessage
+    # Needs VPC access to validate user is in kingdom + get display name
+
+plugins:
+  - serverless-python-requirements
 
 custom:
   pythonRequirements:
@@ -55,3 +129,48 @@ package:
     - '!__pycache__/**'
     - '!*.pyc'
 
+resources:
+  Resources:
+    # ===== DynamoDB Table for WebSocket Connections =====
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-connections-${sls:stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: connection_id
+            AttributeType: S
+          - AttributeName: kingdom_id
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connection_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          # Query all connections in a kingdom (for broadcasts)
+          - IndexName: kingdom-index
+            KeySchema:
+              - AttributeName: kingdom_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          # Query all connections for a user (for direct messages)
+          - IndexName: user-index
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+  Outputs:
+    WebSocketApiEndpoint:
+      Description: "WebSocket API endpoint URL"
+      Value:
+        Fn::Sub: "wss://${WebsocketsApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}"
+    ConnectionsTableName:
+      Description: "DynamoDB table for WebSocket connections"
+      Value: !Ref ConnectionsTable

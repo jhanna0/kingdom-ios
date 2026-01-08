@@ -11,7 +11,7 @@ enum AppConfig {
     }
     
     /// Set this to switch between local and Lambda API
-    static let apiEnvironment: APIEnvironment = .local
+    static let apiEnvironment: APIEnvironment = .lambda
     
     /// Backend API base URL
     static var apiBaseURL: String {
@@ -20,6 +20,16 @@ enum AppConfig {
             return "http://192.168.1.13:8000"
         case .lambda:
             return "https://eu0qm86e1m.execute-api.us-east-1.amazonaws.com"
+        }
+    }
+    
+    /// WebSocket URL for real-time features (Town Pub chat, etc.)
+    static var webSocketURL: String {
+        switch apiEnvironment {
+        case .local:
+            return "ws://192.168.1.13:8000/ws"  // Local dev WebSocket
+        case .lambda:
+            return "wss://02oas6q503.execute-api.us-east-1.amazonaws.com/dev"
         }
     }
     

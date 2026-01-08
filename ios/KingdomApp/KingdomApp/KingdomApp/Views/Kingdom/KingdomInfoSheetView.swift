@@ -14,6 +14,7 @@ struct KingdomInfoSheetView: View {
     @State private var claimErrorMessage = ""
     @State private var isClaiming = false
     @State private var weather: WeatherData?
+    @State private var showTownPub = false
     
     var body: some View {
         ScrollView {
@@ -252,6 +253,39 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
+                // TOWN PUB - Kingdom Chat (only if player is inside)
+                if isPlayerInside {
+                    Button {
+                        showTownPub = true
+                    } label: {
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Town Pub")
+                                    .font(FontStyles.bodyLargeBold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                Text("Chat with citizens")
+                                    .font(FontStyles.labelMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        .padding(KingdomTheme.Spacing.medium)
+                    }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    .padding(.horizontal)
+                }
+                
                 // Kingdom Laws - Tax & Fees (visible to all citizens)
                 if !kingdom.isUnclaimed {
                     kingdomLawsCard
@@ -450,6 +484,19 @@ struct KingdomInfoSheetView: View {
             .padding(.top)
         }
         .background(KingdomTheme.Colors.parchment)
+        .sheet(isPresented: $showTownPub) {
+            NavigationStack {
+                TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Close") {
+                                showTownPub = false
+                            }
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                    }
+            }
+        }
         .task {
             // Load weather
             do {
