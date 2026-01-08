@@ -117,8 +117,8 @@ def get_crafting_contracts(
             "gold_paid": contract.gold_paid,
             "iron_paid": contract.iron_paid,
             "steel_paid": contract.steel_paid,
-            "created_at": contract.created_at.isoformat() if contract.created_at else None,
-            "completed_at": contract.completed_at.isoformat() if contract.completed_at else None
+            "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
+            "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None
         })
     
     return {"contracts": result}
@@ -400,7 +400,7 @@ def get_inventory(
                 "attack_bonus": item.attack_bonus,
                 "defense_bonus": item.defense_bonus,
                 "is_equipped": item.is_equipped,
-                "crafted_at": item.crafted_at.isoformat() if item.crafted_at else None
+                "crafted_at": format_datetime_iso(item.crafted_at) if item.crafted_at else None
             }
             for item in items
         ]

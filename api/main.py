@@ -2,10 +2,43 @@
 Kingdom Game API - Main application setup
 """
 import logging
+import json
+from datetime import datetime, date
 from fastapi import FastAPI, Request, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from services.auth_service import decode_access_token
+
+
+class ISO8601JSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that formats datetimes with 'Z' suffix for iOS compatibility"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            # Strip microseconds - Swift's .iso8601 decoder can't parse them
+            obj_no_micro = obj.replace(microsecond=0)
+            iso_str = obj_no_micro.isoformat()
+            if iso_str.endswith('+00:00'):
+                return iso_str.replace('+00:00', 'Z')
+            elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+                # Naive datetime - assume UTC and add Z
+                return iso_str + 'Z'
+            return iso_str
+        elif isinstance(obj, date):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class ISO8601JSONResponse(JSONResponse):
+    """JSONResponse that uses our custom encoder for proper datetime formatting"""
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            cls=ISO8601JSONEncoder,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
 
 from db import init_db, SessionLocal
 from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents
@@ -19,11 +52,12 @@ from websocket.local_manager import local_manager
 logger = logging.getLogger("kingdom_api")
 logging.basicConfig(level=logging.ERROR)
 
-# Create FastAPI app
+# Create FastAPI app with custom JSON encoder for iOS-compatible datetime formatting
 app = FastAPI(
     title="Kingdom Game API",
     description="Backend API for Kingdom iOS app",
-    version="1.0.0"
+    version="1.0.0",
+    default_response_class=ISO8601JSONResponse
 )
 
 # Before request - extract username from JWT

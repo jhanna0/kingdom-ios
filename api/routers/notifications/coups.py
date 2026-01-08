@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from db import User, PlayerState, Kingdom, CoupEvent, UserKingdom
+from routers.actions.utils import format_datetime_iso
 
 
 def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[Dict[str, Any]]:
@@ -67,7 +68,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                 "message": f"{coup.initiator_name} is attempting to overthrow the ruler. Choose your side!",
                 "action": "vote_coup",
                 "action_id": coup.id,
-                "created_at": coup.start_time.isoformat(),
+                "created_at": format_datetime_iso(coup.start_time),
                 "coup_data": {
                     "id": coup.id,
                     "kingdom_id": coup.kingdom_id,
@@ -90,7 +91,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                 "message": f"You joined the {user_side}. {coup.time_remaining_seconds // 60} minutes remaining.",
                 "action": "view_coup",
                 "action_id": coup.id,
-                "created_at": coup.start_time.isoformat(),
+                "created_at": format_datetime_iso(coup.start_time),
                 "coup_data": {
                     "id": coup.id,
                     "kingdom_id": coup.kingdom_id,
@@ -113,7 +114,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                 "message": f"{coup.initiator_name} is trying to overthrow you in {kingdom.name}!",
                 "action": "view_coup",
                 "action_id": coup.id,
-                "created_at": coup.start_time.isoformat(),
+                "created_at": format_datetime_iso(coup.start_time),
                 "coup_data": {
                     "id": coup.id,
                     "kingdom_id": coup.kingdom_id,
@@ -150,7 +151,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                 "message": "You won!" if user_won else "You lost.",
                 "action": "view_coup_results",
                 "action_id": coup.id,
-                "created_at": coup.resolved_at.isoformat(),
+                "created_at": format_datetime_iso(coup.resolved_at),
                 "coup_data": {
                     "id": coup.id,
                     "kingdom_id": coup.kingdom_id,

@@ -1,11 +1,26 @@
 """
 User/Player state schemas
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional, List, Dict
 from datetime import datetime
 
 from .equipment import EquipmentItem, PropertyItem
+
+
+def serialize_datetime_with_z(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize datetime to ISO8601 string with Z suffix for iOS compatibility"""
+    if dt is None:
+        return None
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        # Naive datetime - assume UTC and add Z
+        return iso_str + 'Z'
+    return iso_str
 
 
 class TravelEvent(BaseModel):
@@ -97,6 +112,10 @@ class PlayerState(BaseModel):
     resources_data: Optional[list] = None  # Includes inventory items
     inventory: Optional[list] = None  # From player_inventory table
     
+    @field_serializer('debuff_expires_at', 'created_at', 'updated_at', 'last_login')
+    def serialize_timestamps(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
+    
     class Config:
         from_attributes = True
 
@@ -154,6 +173,10 @@ class SyncResponse(BaseModel):
     message: str
     player_state: PlayerState
     server_time: datetime
+    
+    @field_serializer('server_time')
+    def serialize_server_time(self, dt: datetime) -> str:
+        return serialize_datetime_with_z(dt)
 
 
 # Legacy schemas for backwards compatibility
@@ -163,6 +186,10 @@ class Player(BaseModel):
     gold: int = 0
     level: int = 1
     created_at: Optional[datetime] = None
+    
+    @field_serializer('created_at')
+    def serialize_created_at(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class PlayerCreate(BaseModel):

@@ -38,6 +38,20 @@ from .config import (
 )
 
 
+def _format_datetime_iso(dt: datetime) -> str:
+    """Format datetime as ISO8601 with Z suffix for iOS compatibility"""
+    if dt is None:
+        return None
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        return iso_str + 'Z'
+    return iso_str
+
+
 @dataclass
 class HuntParticipant:
     """A player participating in a hunt"""
@@ -312,9 +326,9 @@ class HuntSession:
                 "items": self.items_dropped,
             },
             "party_size": len(self.participants),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "created_at": _format_datetime_iso(self.created_at) if self.created_at else None,
+            "started_at": _format_datetime_iso(self.started_at) if self.started_at else None,
+            "completed_at": _format_datetime_iso(self.completed_at) if self.completed_at else None,
         }
 
 

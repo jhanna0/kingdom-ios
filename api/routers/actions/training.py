@@ -134,8 +134,8 @@ def get_training_contracts(
             "actions_completed": actions_completed,
             "status": "completed" if contract.completed_at else "in_progress",
             "gold_paid": contract.gold_paid,
-            "created_at": contract.created_at.isoformat() if contract.created_at else None,
-            "completed_at": contract.completed_at.isoformat() if contract.completed_at else None,
+            "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
+            "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None,
             "progress_percent": min(100, int((actions_completed / contract.actions_required) * 100)) if contract.actions_required > 0 else 100
         })
     

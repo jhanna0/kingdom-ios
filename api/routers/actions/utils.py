@@ -18,10 +18,24 @@ from db import Kingdom, ActionCooldown, PlayerItem
 
 
 def format_datetime_iso(dt: datetime) -> str:
-    """Format datetime as ISO8601 with Z suffix for UTC"""
+    """Format datetime as ISO8601 with Z suffix for iOS compatibility.
+    
+    - Strips microseconds (Swift's default ISO8601 parser can't handle them)
+    - Always appends 'Z' for UTC datetimes
+    - Handles both naive datetimes (assumes UTC) and timezone-aware datetimes
+    """
     if dt is None:
         return None
-    return dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    # Handle timezone-aware datetimes with +00:00
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    # Handle naive datetimes - assume UTC and add Z
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        return iso_str + 'Z'
+    return iso_str
 
 
 def calculate_cooldown(base_minutes: float, skill_level: int) -> float:

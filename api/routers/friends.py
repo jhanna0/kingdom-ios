@@ -16,6 +16,7 @@ from schemas.friend import (
 )
 from routers.auth import get_current_user
 from routers.players import _get_player_activity
+from routers.actions.utils import format_datetime_iso
 
 
 router = APIRouter(prefix="/friends", tags=["friends"])
@@ -127,7 +128,7 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
             last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
         time_since_action = datetime.utcnow() - last_action
         is_online = time_since_action < timedelta(minutes=10)
-        last_seen = last_action.isoformat()
+        last_seen = format_datetime_iso(last_action)
     elif friend_state and friend_state.updated_at:
         # Fallback to player_state updated_at if no actions recorded
         last_action = friend_state.updated_at
@@ -135,7 +136,7 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
             last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
         time_since_action = datetime.utcnow() - last_action
         is_online = time_since_action < timedelta(minutes=10)
-        last_seen = last_action.isoformat()
+        last_seen = format_datetime_iso(last_action)
     
     # Get activity data
     activity_dict = None
@@ -157,8 +158,8 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
         friend_username=friend_user.display_name,
         friend_display_name=friend_user.display_name,
         status=friendship.status,
-        created_at=friendship.created_at.isoformat(),
-        updated_at=friendship.updated_at.isoformat(),
+        created_at=format_datetime_iso(friendship.created_at),
+        updated_at=format_datetime_iso(friendship.updated_at),
         is_online=is_online if friendship.status == 'accepted' else None,
         level=friend_state.level if friend_state and friendship.status == 'accepted' else None,
         current_kingdom_id=friend_state.current_kingdom_id if friend_state and friendship.status == 'accepted' else None,

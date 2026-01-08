@@ -10,7 +10,7 @@ import json
 from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
-from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling
+from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso
 from .training import calculate_training_cost, TRAINING_TYPES
 from routers.tiers import get_total_skill_points, SKILL_TYPES
 
@@ -57,7 +57,7 @@ def get_training_contracts_for_status(db: Session, user_id: int) -> list:
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "cost_paid": contract.gold_paid,
-            "created_at": contract.created_at.isoformat() if contract.created_at else None,
+            "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "status": "completed" if contract.completed_at else "in_progress"
         })
     
@@ -87,7 +87,7 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
             "gold_paid": contract.gold_paid,
             "iron_paid": contract.iron_paid,
             "steel_paid": contract.steel_paid,
-            "created_at": contract.created_at.isoformat() if contract.created_at else None,
+            "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "status": "completed" if contract.completed_at else "in_progress"
         })
     
@@ -124,7 +124,7 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,
             "status": "completed" if contract.completed_at else "in_progress",
-            "started_at": contract.created_at.isoformat() if contract.created_at else None
+            "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None
         })
     
     return result

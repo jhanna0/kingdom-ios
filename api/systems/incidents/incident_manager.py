@@ -18,6 +18,20 @@ from ..rolls import RollEngine, RollResult
 from .config import IncidentConfig
 
 
+def _format_datetime_iso(dt: datetime) -> str:
+    """Format datetime as ISO8601 with Z suffix for iOS compatibility"""
+    if dt is None:
+        return None
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        return iso_str + 'Z'
+    return iso_str
+
+
 class IncidentStatus(Enum):
     """Current status of an incident"""
     ACTIVE = "active"           # Incident is live, accepting rolls
@@ -75,7 +89,7 @@ class RollRecord:
             "is_success": self.is_success,
             "is_critical": self.is_critical,
             "shift_applied": self.shift_applied,
-            "timestamp": self.timestamp.isoformat(),
+            "timestamp": _format_datetime_iso(self.timestamp),
         }
 
 
@@ -184,8 +198,8 @@ class IncidentSession:
             "triggered_by": self.triggered_by,
             "attacker_tier": self.attacker_tier,
             "status": self.status.value,
-            "created_at": self.created_at.isoformat(),
-            "expires_at": self.expires_at.isoformat(),
+            "created_at": _format_datetime_iso(self.created_at),
+            "expires_at": _format_datetime_iso(self.expires_at),
             "time_remaining_seconds": max(0, int((self.expires_at - datetime.utcnow()).total_seconds())),
             "participants": {
                 str(pid): p.to_dict() for pid, p in self.participants.items()
@@ -199,7 +213,7 @@ class IncidentSession:
             "can_resolve": self.can_resolve()[0],
             "outcome": self.outcome,
             "resolution_roll": self.resolution_roll,
-            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+            "resolved_at": _format_datetime_iso(self.resolved_at) if self.resolved_at else None,
         }
 
 

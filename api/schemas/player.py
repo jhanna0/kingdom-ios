@@ -1,9 +1,24 @@
 """
 Player schemas for public profiles and player lists
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional, Dict
 from datetime import datetime
+
+
+def serialize_datetime_with_z(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize datetime to ISO8601 string with Z suffix for iOS compatibility"""
+    if dt is None:
+        return None
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        # Naive datetime - assume UTC and add Z
+        return iso_str + 'Z'
+    return iso_str
 
 
 class PlayerActivity(BaseModel):
@@ -16,6 +31,10 @@ class PlayerActivity(BaseModel):
     training_type: Optional[str] = None  # "attack", "defense", "leadership", "building", "intelligence", "science", "faith"
     equipment_type: Optional[str] = None  # "weapon", "armor"
     tier: Optional[int] = None  # For crafting/training tiers
+    
+    @field_serializer('expires_at')
+    def serialize_expires_at(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class PlayerEquipment(BaseModel):
@@ -68,6 +87,10 @@ class PlayerPublicProfile(BaseModel):
     # Timestamps
     last_login: Optional[datetime] = None
     created_at: datetime
+    
+    @field_serializer('last_login', 'created_at')
+    def serialize_timestamps(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class PlayerInKingdom(BaseModel):

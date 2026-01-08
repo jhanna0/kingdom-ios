@@ -12,7 +12,7 @@ from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
 from routers.actions.training import calculate_training_cost
-from routers.actions.utils import get_equipped_items, get_inventory, log_activity
+from routers.actions.utils import get_equipped_items, get_inventory, log_activity, format_datetime_iso
 
 router = APIRouter(prefix="/player", tags=["player"])
 
@@ -80,7 +80,7 @@ def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dic
                 "bonus": -state.attack_debuff,
                 "source": "Combat Debuff",
                 "source_type": "debuff",
-                "expires_at": state.debuff_expires_at.isoformat()
+                "expires_at": format_datetime_iso(state.debuff_expires_at)
             })
     
     # Kingdom bonuses (if in a kingdom)
@@ -315,6 +315,12 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         if kingdom:
             current_kingdom_name = kingdom.name
     
+    # Compute total_checkins from user_kingdoms table
+    from sqlalchemy import func
+    total_checkins = db.query(func.sum(UserKingdom.checkins_count)).filter(
+        UserKingdom.user_id == user.id
+    ).scalar() or 0
+    
     return PlayerState(
         id=user.id,
         display_name=user.display_name,
@@ -350,7 +356,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         honor=state.honor or 100,
         
         # Activity (TODO: should be computed from other tables)
-        total_checkins=state.total_checkins or 0,
+        total_checkins=total_checkins,
         total_conquests=state.total_conquests or 0,
         kingdoms_ruled=kingdoms_ruled_count,
         coups_won=state.coups_won or 0,
@@ -1088,7 +1094,7 @@ def relocate_hometown(
         "new_hometown_name": new_kingdom.name,
         "old_hometown_name": old_hometown_name,
         "lost_ruler_status": will_lose_ruler_status,
-        "next_relocation_available": (datetime.utcnow() + timedelta(days=cooldown_days)).isoformat()
+        "next_relocation_available": format_datetime_iso(datetime.utcnow() + timedelta(days=cooldown_days))
     }
 
 

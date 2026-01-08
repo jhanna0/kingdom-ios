@@ -73,7 +73,7 @@ class PlayerState(Base):
     # Activity counters (TODO: should be computed from other tables)
     contracts_completed = Column(Integer, default=0)
     total_work_contributed = Column(Integer, default=0)
-    total_checkins = Column(Integer, default=0)
+    # total_checkins: REMOVED - computed from user_kingdoms.checkins_count
     total_conquests = Column(Integer, default=0)
     kingdoms_ruled = Column(Integer, default=0)
     coups_won = Column(Integer, default=0)

@@ -10,6 +10,7 @@ from typing import List, Dict, Any
 from db import get_db, User, PlayerState, Contract, Kingdom, CoupEvent, InvasionEvent
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
+from routers.actions.utils import format_datetime_iso
 
 from .utils import get_player_state
 from .player_summary import build_player_summary
@@ -58,7 +59,7 @@ def get_user_updates(
         "notifications": sorted_notifications,
         "contracts": contracts_data,
         "kingdoms": kingdoms_list,
-        "server_time": datetime.utcnow().isoformat()
+        "server_time": format_datetime_iso(datetime.utcnow())
     }
 
 

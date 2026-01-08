@@ -16,7 +16,7 @@ from db.models import User, Kingdom, PlayerState, KingdomIntelligence, UserKingd
 from db import ActionCooldown
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
-from routers.actions.utils import get_cooldown, set_cooldown, check_cooldown_from_table
+from routers.actions.utils import get_cooldown, set_cooldown, check_cooldown_from_table, format_datetime_iso
 from config import DEV_MODE
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
@@ -218,7 +218,7 @@ def get_military_strength(
                 "intel_level": intel_level,
                 "intel_age_days": days_old,
                 "gathered_by": intel.gatherer_name,
-                "gathered_at": intel.gathered_at.isoformat()
+                "gathered_at": format_datetime_iso(intel.gathered_at)
             }
             
             # Level 3+: Basic info

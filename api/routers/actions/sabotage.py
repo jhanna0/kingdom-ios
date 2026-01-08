@@ -253,7 +253,7 @@ def _handle_caught_saboteur(
         'kingdom_id': contract.kingdom_id,
         'kingdom_name': kingdom.name,
         'contract_id': contract.id,
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': format_datetime_iso(datetime.utcnow()),
         'caught': True,
         'caught_by': catcher_user.username if catcher_user else 'patrol',
         'cost': sabotage_cost,
@@ -315,7 +315,7 @@ def _handle_successful_sabotage(
     contributions['_sabotage_log'].append({
         'user_id': saboteur.id,
         'username': saboteur.username,
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': format_datetime_iso(datetime.utcnow()),
         'actions_added': delay_actions,
         'cost_paid': sabotage_cost
     })
@@ -330,7 +330,7 @@ def _handle_successful_sabotage(
         'kingdom_id': contract.kingdom_id,
         'kingdom_name': kingdom.name,
         'contract_id': contract.id,
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': format_datetime_iso(datetime.utcnow()),
         'actions_added': delay_actions,
         'cost': sabotage_cost,
         'caught': False

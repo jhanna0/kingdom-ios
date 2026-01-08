@@ -174,7 +174,7 @@ ACTION_SLOTS = {
 SLOT_DEFINITIONS = {
     "personal": {
         "id": "personal",
-        "display_name": "Personal Development",
+        "display_name": "Training",
         "icon": "figure.strengthtraining.traditional",
         "color_theme": "buttonPrimary",
         "display_order": 1,

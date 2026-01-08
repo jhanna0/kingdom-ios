@@ -11,6 +11,7 @@ from datetime import datetime
 
 from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution, UserKingdom
 from routers.auth import get_current_user
+from routers.actions.utils import format_datetime_iso
 
 router = APIRouter(prefix="/properties", tags=["properties"])
 
@@ -101,17 +102,6 @@ def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 
 
 def property_to_response(prop: Property) -> PropertyResponse:
     """Convert Property model to response"""
-    # Ensure timezone info for iOS ISO8601DateFormatter compatibility
-    purchased_str = prop.purchased_at.isoformat()
-    if not purchased_str.endswith('Z') and '+' not in purchased_str:
-        purchased_str += 'Z'
-    
-    last_upgraded_str = None
-    if prop.last_upgraded:
-        last_upgraded_str = prop.last_upgraded.isoformat()
-        if not last_upgraded_str.endswith('Z') and '+' not in last_upgraded_str:
-            last_upgraded_str += 'Z'
-    
     return PropertyResponse(
         id=prop.id,
         kingdom_id=prop.kingdom_id,
@@ -120,8 +110,8 @@ def property_to_response(prop: Property) -> PropertyResponse:
         owner_name=prop.owner_name,
         tier=prop.tier,
         location=prop.location,
-        purchased_at=purchased_str,
-        last_upgraded=last_upgraded_str
+        purchased_at=format_datetime_iso(prop.purchased_at),
+        last_upgraded=format_datetime_iso(prop.last_upgraded) if prop.last_upgraded else None
     )
 
 
@@ -150,8 +140,8 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,
             "status": "completed" if contract.completed_at else "in_progress",
-            "started_at": contract.created_at.isoformat() if contract.created_at else None,
-            "completed_at": contract.completed_at.isoformat() if contract.completed_at else None
+            "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
+            "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None
         })
     
     return result
@@ -567,13 +557,6 @@ def get_property_upgrade_status(
         actions_completed = db.query(func.count(ContractContribution.id)).filter(
             ContractContribution.contract_id == contract.id
         ).scalar()
-        
-        # Ensure timezone info for started_at
-        started_at_str = None
-        if contract.created_at:
-            started_at_str = contract.created_at.isoformat()
-            if not started_at_str.endswith('Z') and '+' not in started_at_str:
-                started_at_str += 'Z'
         
         active_contract_data = {
             "contract_id": str(contract.id),

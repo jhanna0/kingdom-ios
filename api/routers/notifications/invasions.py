@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from db import User, PlayerState, Kingdom, InvasionEvent
 from routers.alliances import are_empires_allied
+from routers.actions.utils import format_datetime_iso
 
 
 def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> List[Dict[str, Any]]:
@@ -58,7 +59,7 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
                 "message": f"{invasion.initiator_name} from {attacking_kingdom.name} is invading {target_kingdom.name}!",
                 "action": "view_invasion",
                 "action_id": str(invasion.id),
-                "created_at": invasion.declared_at.isoformat(),
+                "created_at": format_datetime_iso(invasion.declared_at),
                 "invasion_data": {
                     "id": invasion.id,
                     "target_kingdom_id": invasion.target_kingdom_id,
@@ -82,7 +83,7 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
                 "message": f"Your ally {target_kingdom.name} is being invaded by {attacking_kingdom.name}. Help defend!",
                 "action": "view_invasion",
                 "action_id": str(invasion.id),
-                "created_at": invasion.declared_at.isoformat(),
+                "created_at": format_datetime_iso(invasion.declared_at),
                 "invasion_data": {
                     "id": invasion.id,
                     "target_kingdom_id": invasion.target_kingdom_id,
@@ -106,7 +107,7 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
                 "message": f"{target_kingdom.name} is under attack! Join the defense!",
                 "action": "view_invasion",
                 "action_id": str(invasion.id),
-                "created_at": invasion.declared_at.isoformat(),
+                "created_at": format_datetime_iso(invasion.declared_at),
                 "invasion_data": {
                     "id": invasion.id,
                     "target_kingdom_id": invasion.target_kingdom_id,
@@ -130,7 +131,7 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
                 "message": f"You joined as {user_side}. Battle in {invasion.time_remaining_seconds // 60} minutes.",
                 "action": "view_invasion",
                 "action_id": str(invasion.id),
-                "created_at": invasion.declared_at.isoformat(),
+                "created_at": format_datetime_iso(invasion.declared_at),
                 "invasion_data": {
                     "id": invasion.id,
                     "target_kingdom_id": invasion.target_kingdom_id,
@@ -170,7 +171,7 @@ def get_invasion_notifications(db: Session, user: User, state: PlayerState) -> L
                 "message": f"{'Victory!' if user_won else 'Defeat.'} {target_kingdom.name if target_kingdom else 'The battle'} is over.",
                 "action": "view_invasion_results",
                 "action_id": str(invasion.id),
-                "created_at": invasion.resolved_at.isoformat(),
+                "created_at": format_datetime_iso(invasion.resolved_at),
                 "invasion_data": {
                     "id": invasion.id,
                     "target_kingdom_id": invasion.target_kingdom_id,
