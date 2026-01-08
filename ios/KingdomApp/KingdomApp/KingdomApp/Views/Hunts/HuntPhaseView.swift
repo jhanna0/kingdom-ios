@@ -389,7 +389,32 @@ struct HuntPhaseView: View {
     
     private var masterRollInProgressRow: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
-            if viewModel.masterRollAnimating {
+            // .resolving = API call in progress, .masterRollAnimation = animation phase
+            if case .resolving = viewModel.uiState {
+                // API call in progress - show loading
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .tint(KingdomTheme.Colors.gold)
+                    Text("Rolling...")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 70)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black)
+                            .offset(x: 3, y: 3)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(KingdomTheme.Colors.parchment)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
+                            )
+                    }
+                )
+            } else if viewModel.masterRollAnimating {
                 // Animation in progress - show spinner
                 HStack(spacing: 12) {
                     ProgressView()
@@ -414,17 +439,17 @@ struct HuntPhaseView: View {
                     }
                 )
             } else {
-                // Waiting for user to tap - BIG TAP BUTTON
+                // Animation done - show NEXT button to proceed
                 Button {
                     Task {
-                        await viewModel.executeMasterRoll()
+                        await viewModel.userTappedNextAfterMasterRoll()
                     }
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "hand.tap.fill")
-                            .font(.title2)
-                        Text("TAP TO ROLL!")
+                        Text("Next")
                             .font(.system(size: 18, weight: .black))
+                        Image(systemName: "arrow.right")
+                            .font(.title2)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 70)

@@ -211,18 +211,29 @@ class HuntViewModel: ObservableObject {
     }
     
     /// User taps "Master Roll" / "Resolve" button
-    /// This now shows a waiting screen where user must tap to actually roll
+    /// Immediately executes the roll - NO intermediate tap screen
     func userTappedResolve() async {
         guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
         
-        // Transition to resolving state - shows the "tap to roll" screen
+        // Go straight to resolving and execute
         uiState = .resolving(currentPhase)
+        await resolveCurrentPhase()
     }
     
-    /// User taps the actual roll button on the master roll screen
-    /// This triggers the API call and animation
-    func executeMasterRoll() async {
-        await resolveCurrentPhase()
+    /// User taps "Next" after master roll animation completes
+    /// Transitions to the result screen
+    func userTappedNextAfterMasterRoll() async {
+        guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
+        
+        // Check if we should show creature reveal (Track phase found animal)
+        if currentPhase == .track,
+           let result = currentPhaseResult,
+           let effects = result.effects,
+           effects["animal_found"]?.boolValue == true {
+            uiState = .creatureReveal
+        } else {
+            uiState = .phaseComplete(currentPhase)
+        }
     }
     
     /// User taps "Continue" after seeing phase result
@@ -321,18 +332,8 @@ class HuntViewModel: ObservableObject {
                     await showMasterRollAnimation(value: rollValue, phase: currentPhase)
                 }
                 
-                // After animation completes, show appropriate next screen
-                // Small delay to let animation settle
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                
-                // Special handling for Track phase - show creature reveal
-                if currentPhase == .track,
-                   let effects = response.phase_result?.effects,
-                   effects["animal_found"]?.boolValue == true {
-                    uiState = .creatureReveal
-                } else {
-                    uiState = .phaseComplete(currentPhase)
-                }
+                // Animation done - stay on this screen!
+                // User must tap "Next" to proceed (no auto-transition BS)
             } else {
                 error = response.message
                 showError = true
