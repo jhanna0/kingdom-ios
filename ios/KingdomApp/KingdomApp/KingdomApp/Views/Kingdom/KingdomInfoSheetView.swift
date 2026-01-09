@@ -232,17 +232,17 @@ struct KingdomInfoSheetView: View {
                         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                         
                         VStack(spacing: 8) {
-                            Image(systemName: "calendar")
+                            Image(systemName: "person.2.circle.fill")
                                 .font(FontStyles.iconMedium)
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 10)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 10)
                             
-                            Text("\(kingdom.weeklyUniqueCheckIns)")
+                            Text("\(kingdom.activeCitizens)")
                                 .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
-                            Text("This Week")
+                            Text("Citizens")
                                 .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }

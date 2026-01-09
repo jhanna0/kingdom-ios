@@ -3,6 +3,7 @@ Game endpoints - Kingdoms, check-ins, conquests
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import List
 import uuid
@@ -111,6 +112,8 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     from routers.contracts import calculate_actions_required, calculate_construction_cost
     from routers.tiers import BUILDING_TYPES
     from schemas.common import BUILDING_COLORS
+    from db.models import PlayerState, UserKingdom
+    from datetime import datetime, timedelta
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -126,6 +129,17 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
         if ruler:
             ruler_name = ruler.display_name
+    
+    # CALCULATE LIVE: Count players in kingdom RIGHT NOW
+    checked_in_count = db.query(PlayerState).filter(
+        PlayerState.current_kingdom_id == kingdom.id
+    ).count()
+    
+    # CALCULATE LIVE: Count active citizens (alive citizens whose hometown is this kingdom)
+    active_citizens_count = db.query(PlayerState).filter(
+        PlayerState.hometown_kingdom_id == kingdom.id,
+        PlayerState.is_alive == True
+    ).count()
     
     # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
     # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
@@ -156,7 +170,8 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "population": kingdom.population,
         "level": kingdom.level,
         "treasury_gold": kingdom.treasury_gold,
-        "checked_in_players": kingdom.checked_in_players,
+        "checked_in_players": checked_in_count,  # LIVE COUNT
+        "active_citizens": active_citizens_count,  # LIVE COUNT of citizens
         "buildings": buildings,  # DYNAMIC BUILDINGS with metadata
         "wall_level": kingdom.wall_level,
         "vault_level": kingdom.vault_level,
@@ -458,7 +473,8 @@ def get_my_kingdoms(
     db: Session = Depends(get_db)
 ):
     """Get all kingdoms where current user is the ruler"""
-    from db.models import KingdomHistory
+    from db.models import KingdomHistory, PlayerState, UserKingdom
+    from datetime import datetime, timedelta
     
     # Query kingdoms directly by ruler_id (source of truth)
     ruled_kingdoms = db.query(Kingdom).filter(
@@ -480,11 +496,16 @@ def get_my_kingdoms(
             KingdomHistory.ended_at == None  # Current reign
         ).first()
         
+        # CALCULATE LIVE: Count players in kingdom RIGHT NOW
+        checked_in_count = db.query(PlayerState).filter(
+            PlayerState.current_kingdom_id == kingdom.id
+        ).count()
+        
         kingdoms.append({
             "id": kingdom.id,
             "name": kingdom.name,
             "treasury_gold": kingdom.treasury_gold,
-            "checked_in_players": kingdom.checked_in_players
+            "checked_in_players": checked_in_count  # LIVE COUNT
         })
     
     return kingdoms

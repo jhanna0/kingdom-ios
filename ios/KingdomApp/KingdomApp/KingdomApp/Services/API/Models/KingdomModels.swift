@@ -30,6 +30,7 @@ struct APIKingdom: Codable {
     let level: Int
     let treasury_gold: Int
     let checked_in_players: Int
+    let active_citizens: Int?  // Optional for backwards compatibility
     
     // DYNAMIC BUILDINGS - Array with full metadata from backend
     let buildings: [APIBuildingData]?
@@ -83,6 +84,7 @@ struct CityKingdomData: Codable {
     let ruler_name: String?
     let level: Int
     let population: Int
+    let active_citizens: Int?  // Optional for backwards compatibility
     let treasury_gold: Int
     
     // DYNAMIC BUILDINGS - Array with full metadata from backend

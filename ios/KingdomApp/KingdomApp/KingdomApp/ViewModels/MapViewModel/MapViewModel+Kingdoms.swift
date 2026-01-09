@@ -223,6 +223,7 @@ extension MapViewModel {
             kingdom.buildingLevels["lumbermill"] = kingdomData.lumbermill_level ?? 0
             kingdom.travelFee = kingdomData.travel_fee
             kingdom.checkedInPlayers = kingdomData.population
+            kingdom.activeCitizens = kingdomData.active_citizens ?? 0
         }
         
         return kingdom
@@ -282,6 +283,7 @@ extension MapViewModel {
                 kingdoms[index].taxRate = apiKingdom.tax_rate
                 kingdoms[index].travelFee = apiKingdom.travel_fee
                 kingdoms[index].checkedInPlayers = apiKingdom.population
+                kingdoms[index].activeCitizens = apiKingdom.active_citizens ?? 0
                 kingdoms[index].activeContract = nil // Clear completed contract
                     
                     // Update building upgrade costs

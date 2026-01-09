@@ -54,7 +54,8 @@ class KingdomData(BaseModel):
     ruler_id: Optional[int] = None  # PostgreSQL integer user ID
     ruler_name: Optional[str] = None
     level: int
-    population: int
+    population: int  # Currently present players (LIVE COUNT)
+    active_citizens: int = 0  # Active citizens (hometown residents, LIVE COUNT)
     treasury_gold: int
     
     # DYNAMIC BUILDINGS - All building data with metadata

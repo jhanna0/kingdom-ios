@@ -6,8 +6,9 @@ FAST LOADING - TWO ENDPOINTS:
 2. /cities/neighbors - Returns neighbor cities IMMEDIATELY, fetches boundaries in background
 """
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 import asyncio
 
@@ -88,6 +89,33 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         ruler_users = db.query(User).filter(User.id.in_(ruler_ids)).all()
         rulers = {u.id: u.display_name for u in ruler_users}
     
+    # Batch calculate population stats for all kingdoms
+    from db.models import PlayerState, UserKingdom
+    kingdom_ids = [k.id for k in kingdoms]
+    
+    # Count currently checked-in players per kingdom
+    current_players = {}
+    if kingdom_ids:
+        player_counts = db.query(
+            PlayerState.current_kingdom_id,
+            func.count(PlayerState.user_id)
+        ).filter(
+            PlayerState.current_kingdom_id.in_(kingdom_ids)
+        ).group_by(PlayerState.current_kingdom_id).all()
+        current_players = {kingdom_id: count for kingdom_id, count in player_counts}
+    
+    # Count active citizens (all alive citizens whose hometown is this kingdom)
+    active_citizens = {}
+    if kingdom_ids:
+        citizen_counts = db.query(
+            PlayerState.hometown_kingdom_id,
+            func.count(PlayerState.user_id)
+        ).filter(
+            PlayerState.hometown_kingdom_id.in_(kingdom_ids),
+            PlayerState.is_alive == True
+        ).group_by(PlayerState.hometown_kingdom_id).all()
+        active_citizens = {kingdom_id: count for kingdom_id, count in citizen_counts}
+    
     # Build result
     result = {}
     for kingdom in kingdoms:
@@ -142,12 +170,17 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 max_level=building_meta["max_tier"]
             ))
         
+        # CALCULATE LIVE: Count players in kingdom RIGHT NOW
+        checked_in_count = current_players.get(kingdom.id, 0)
+        citizen_count = active_citizens.get(kingdom.id, 0)
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
             ruler_name=ruler_name,
             level=kingdom.level,
-            population=kingdom.population,
+            population=checked_in_count,  # LIVE COUNT of players in kingdom
+            active_citizens=citizen_count,  # LIVE COUNT of active citizens
             treasury_gold=kingdom.treasury_gold,
             buildings=buildings,  # DYNAMIC BUILDINGS with metadata
             wall_level=kingdom.wall_level,

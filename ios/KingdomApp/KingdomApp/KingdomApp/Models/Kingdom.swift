@@ -77,6 +77,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Game stats
     var treasuryGold: Int
     var checkedInPlayers: Int
+    var activeCitizens: Int  // Active citizens (hometown residents)
     
     // DYNAMIC BUILDINGS - use these for new code!
     var buildingLevels: [String: Int] = [:]  // building_type -> level
@@ -172,7 +173,6 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     
     // Income tracking
     var lastIncomeCollection: Date
-    var weeklyUniqueCheckIns: Int  // Track unique players who checked in this week
     var totalIncomeCollected: Int  // Lifetime income collected
     var incomeHistory: [IncomeRecord]  // Recent income collections
     
@@ -208,6 +208,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         // Setting defaults here to satisfy Swift's requirement for initialization
         self.treasuryGold = 0
         self.checkedInPlayers = 0
+        self.activeCitizens = 0
         self.buildingLevels = [:]  // Will be populated from API
         self.buildingUpgradeCosts = [:]  // Will be populated from API
         self.taxRate = 10
@@ -215,7 +216,6 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         
         // Local-only defaults (not game-critical)
         self.lastIncomeCollection = Date().addingTimeInterval(-86400)
-        self.weeklyUniqueCheckIns = 0
         self.totalIncomeCollected = 0
         self.incomeHistory = []
         self.activeContract = nil
