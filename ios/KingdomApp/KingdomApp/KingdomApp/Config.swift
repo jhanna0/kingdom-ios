@@ -11,7 +11,7 @@ enum AppConfig {
     }
     
     /// Set this to switch between local and Lambda API
-    static let apiEnvironment: APIEnvironment = .local
+    static let apiEnvironment: APIEnvironment = .lambda
     
     /// Backend API base URL
     static var apiBaseURL: String {
@@ -38,7 +38,7 @@ enum AppConfig {
     /// - Shows dev-only UI hints
     /// - May skip certain validations
     /// - Enables debug features
-    static let devMode = true
+    static let devMode = false
     
     /// Contract completion hint time (matches backend behavior)
     /// In dev mode: instant completion
