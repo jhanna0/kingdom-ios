@@ -32,7 +32,9 @@ class Kingdom(Base):
     treasury_gold = Column(Integer, default=0)
     checked_in_players = Column(Integer, default=0)
     
-    # Buildings
+    # Buildings - NOW STORED IN kingdom_buildings TABLE!
+    # Legacy columns kept for backward compatibility during migration
+    # TODO: Remove these columns after refactoring all code to use buildings relationship
     wall_level = Column(Integer, default=0)
     vault_level = Column(Integer, default=0)
     mine_level = Column(Integer, default=0)  # Unlocks material availability for purchase
@@ -78,6 +80,31 @@ class Kingdom(Base):
     # Relationships
     user_kingdoms = relationship("UserKingdom", back_populates="kingdom")
     contracts = relationship("Contract", back_populates="kingdom")
+    buildings = relationship("KingdomBuilding", back_populates="kingdom", cascade="all, delete-orphan")
+    
+    # Helper methods for building access
+    def get_building_level(self, building_type: str) -> int:
+        """Get building level from buildings relationship (new way)"""
+        for building in self.buildings:
+            if building.building_type == building_type:
+                return building.level
+        return 0
+    
+    def set_building_level(self, building_type: str, level: int):
+        """Set building level in buildings relationship (new way)"""
+        for building in self.buildings:
+            if building.building_type == building_type:
+                building.level = level
+                building.updated_at = datetime.utcnow()
+                return
+        # Create new building if it doesn't exist
+        from .kingdom_building import KingdomBuilding
+        new_building = KingdomBuilding(
+            kingdom_id=self.id,
+            building_type=building_type,
+            level=level
+        )
+        self.buildings.append(new_building)
     
     def __repr__(self):
         return f"<Kingdom(id='{self.id}', name='{self.name}')>"

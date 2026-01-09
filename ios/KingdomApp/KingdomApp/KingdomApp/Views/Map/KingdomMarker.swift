@@ -63,7 +63,7 @@ struct KingdomMarker: View {
                                 .stroke(Color.black, lineWidth: 2)
                         )
                     
-                    Text("\(kingdom.wallLevel)")
+                    Text("\(kingdom.buildingLevel("wall"))")
                         .font(.system(size: 11, weight: .black))
                         .foregroundColor(.white)
                 }

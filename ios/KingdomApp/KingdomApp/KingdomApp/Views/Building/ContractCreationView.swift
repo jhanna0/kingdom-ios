@@ -14,7 +14,7 @@ struct ContractCreationView: View {
     
     private var buildingName: String {
         // FULLY DYNAMIC - Get from kingdom metadata
-        if let meta = kingdom.buildingMetadata(buildingType) {
+        if let meta = kingdom.getBuildingMetadata(buildingType) {
             return meta.displayName
         }
         return buildingType.capitalized

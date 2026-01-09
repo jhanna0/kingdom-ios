@@ -141,13 +141,54 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         PlayerState.is_alive == True
     ).count()
     
-    # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
-    # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
+    # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata with upgrade costs
+    # Read from kingdom_buildings table (NEW WAY) with fallback to columns (OLD WAY)
+    from db.models import KingdomBuilding
+    
+    # Load all buildings for this kingdom from the table
+    kingdom_buildings_rows = db.query(KingdomBuilding).filter(
+        KingdomBuilding.kingdom_id == kingdom.id
+    ).all()
+    building_levels_map = {b.building_type: b.level for b in kingdom_buildings_rows}
+    
     buildings = []
     for building_type, building_meta in BUILDING_TYPES.items():
-        # Get level from kingdom model (e.g. kingdom.wall_level, kingdom.education_level)
-        level_attr = f"{building_type}_level"
-        level = getattr(kingdom, level_attr, 0)
+        # Try new table first, fallback to old column
+        level = building_levels_map.get(building_type)
+        if level is None:
+            # Fallback to old column for backward compatibility
+            level_attr = f"{building_type}_level"
+            level = getattr(kingdom, level_attr, 0)
+        
+        # Calculate upgrade cost for next level (None if at max)
+        max_level = building_meta["max_tier"]
+        upgrade_cost = None
+        if level < max_level:
+            next_level = level + 1
+            actions = calculate_actions_required(building_meta["display_name"], next_level, kingdom.population)
+            construction_cost = calculate_construction_cost(next_level, kingdom.population)
+            upgrade_cost = {
+                "actions_required": actions,
+                "construction_cost": construction_cost,
+                "can_afford": kingdom.treasury_gold >= construction_cost
+            }
+        
+        # Get current tier info
+        tiers_data = building_meta.get("tiers", {})
+        current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
+        tier_name = current_tier_data.get("name", f"Level {level}")
+        tier_benefit = current_tier_data.get("benefit", "")
+        
+        # Build all tiers info for detail view
+        all_tiers = []
+        for tier_num in range(1, max_level + 1):
+            tier_data = tiers_data.get(tier_num, {})
+            all_tiers.append({
+                "tier": tier_num,
+                "name": tier_data.get("name", f"Level {tier_num}"),
+                "benefit": tier_data.get("benefit", ""),
+                "description": tier_data.get("description", "")
+            })
         
         buildings.append({
             "type": building_type,
@@ -157,10 +198,15 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
             "category": building_meta["category"],
             "description": building_meta["description"],
             "level": level,
-            "max_level": building_meta["max_tier"]
+            "max_level": max_level,
+            "upgrade_cost": upgrade_cost,
+            "tier_name": tier_name,
+            "tier_benefit": tier_benefit,
+            "all_tiers": all_tiers
         })
     
-    # Convert to dict and add calculated upgrade costs
+    # Return kingdom data - buildings array is the SINGLE SOURCE OF TRUTH
+    # Frontend should iterate buildings array - no hardcoded building references!
     kingdom_dict = {
         "id": kingdom.id,
         "name": kingdom.name,
@@ -172,14 +218,7 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "treasury_gold": kingdom.treasury_gold,
         "checked_in_players": checked_in_count,  # LIVE COUNT
         "active_citizens": active_citizens_count,  # LIVE COUNT of citizens
-        "buildings": buildings,  # DYNAMIC BUILDINGS with metadata
-        "wall_level": kingdom.wall_level,
-        "vault_level": kingdom.vault_level,
-        "mine_level": kingdom.mine_level,
-        "market_level": kingdom.market_level,
-        "farm_level": kingdom.farm_level,
-        "education_level": kingdom.education_level,
-        "lumbermill_level": kingdom.lumbermill_level,
+        "buildings": buildings,  # DYNAMIC BUILDINGS with metadata + upgrade costs
         "tax_rate": kingdom.tax_rate,
         "travel_fee": kingdom.travel_fee,
         "subject_reward_rate": kingdom.subject_reward_rate,
@@ -190,31 +229,6 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "created_at": kingdom.created_at,
         "updated_at": kingdom.updated_at
     }
-    
-    # Calculate upgrade costs for each building
-    building_types = [
-        ("wall", kingdom.wall_level),
-        ("vault", kingdom.vault_level),
-        ("mine", kingdom.mine_level),
-        ("market", kingdom.market_level),
-        ("farm", kingdom.farm_level),
-        ("education", kingdom.education_level),
-        ("lumbermill", kingdom.lumbermill_level)
-    ]
-    
-    for building_name, current_level in building_types:
-        if current_level < 5:  # Max level is 5
-            next_level = current_level + 1
-            actions = calculate_actions_required(building_name.capitalize(), next_level, kingdom.population)
-            construction_cost = calculate_construction_cost(next_level, kingdom.population)
-            # No more reward pool - rewards given per action now
-            kingdom_dict[f"{building_name}_upgrade_cost"] = {
-                "actions_required": actions,
-                "construction_cost": construction_cost,
-                "can_afford": kingdom.treasury_gold >= construction_cost
-            }
-        else:
-            kingdom_dict[f"{building_name}_upgrade_cost"] = None
     
     return kingdom_dict
 

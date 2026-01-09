@@ -183,6 +183,21 @@ BUILDING_TYPES = {
             4: {"name": "Industrial Mill", "benefit": "Gather 50 wood per action", "wood_per_action": 50, "description": "Advanced lumber processing"},
             5: {"name": "Lumber Empire", "benefit": "Gather 75 wood per action", "wood_per_action": 75, "description": "Massive wood production"},
         }
+    },
+    "townhall": {
+        "display_name": "Town Hall",
+        "icon": "building.columns.fill",
+        "category": "civic",
+        "description": "Community center that unlocks group activities",
+        "max_tier": 5,
+        "benefit_formula": "Unlocks group hunting and social features",
+        "tiers": {
+            1: {"name": "Meeting Hall", "benefit": "Unlocks Group Hunting", "description": "Basic gathering place for citizens"},
+            2: {"name": "Town Hall", "benefit": "Group Hunting + larger parties", "description": "Organized community center"},
+            3: {"name": "Grand Hall", "benefit": "Enhanced hunting rewards", "description": "Impressive civic building"},
+            4: {"name": "Council Chamber", "benefit": "Advanced group activities", "description": "Strategic planning center"},
+            5: {"name": "Great Hall", "benefit": "Maximum hunting benefits", "description": "Legendary meeting place"},
+        }
     }
 }
 

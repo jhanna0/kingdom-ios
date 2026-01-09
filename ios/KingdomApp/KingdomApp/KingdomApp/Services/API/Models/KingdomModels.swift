@@ -2,7 +2,23 @@ import Foundation
 
 // MARK: - Kingdom Models
 
-/// DYNAMIC Building data from backend - includes metadata
+/// Building upgrade cost - included in each building
+struct APIBuildingUpgradeCost: Codable {
+    let actions_required: Int
+    let construction_cost: Int
+    let can_afford: Bool
+}
+
+/// Info for a single building tier - FULLY DYNAMIC from backend
+struct APIBuildingTierInfo: Codable {
+    let tier: Int
+    let name: String  // e.g. "Wooden Palisade", "Stone Wall"
+    let benefit: String  // e.g. "+2 defenders", "20% protected"
+    let description: String  // e.g. "Basic wooden wall"
+}
+
+/// DYNAMIC Building data from backend - includes metadata, upgrade costs, and tier info
+/// Frontend iterates this array - NO HARDCODING required!
 struct APIBuildingData: Codable {
     let type: String  // e.g. "wall", "vault", "mine"
     let display_name: String  // e.g. "Walls", "Vault"
@@ -12,14 +28,18 @@ struct APIBuildingData: Codable {
     let description: String  // Building description
     let level: Int  // Current building level
     let max_level: Int  // Maximum level
+    let upgrade_cost: APIBuildingUpgradeCost?  // Cost to upgrade (nil if at max)
+    
+    // Current tier info
+    let tier_name: String  // Name of current tier (e.g. "Stone Wall")
+    let tier_benefit: String  // Benefit of current tier (e.g. "+4 defenders")
+    
+    // All tiers info - for detail view to show all levels
+    let all_tiers: [APIBuildingTierInfo]
 }
 
-struct APIBuildingUpgradeCost: Codable {
-    let actions_required: Int
-    let construction_cost: Int
-    let can_afford: Bool
-}
-
+/// Full kingdom response from /kingdoms/{id} endpoint
+/// FULLY DYNAMIC - buildings array contains all building data with upgrade costs
 struct APIKingdom: Codable {
     let id: String
     let name: String
@@ -32,17 +52,9 @@ struct APIKingdom: Codable {
     let checked_in_players: Int
     let active_citizens: Int?  // Optional for backwards compatibility
     
-    // DYNAMIC BUILDINGS - Array with full metadata from backend
+    // DYNAMIC BUILDINGS - Array with full metadata + upgrade costs from backend
+    // Frontend should iterate this array - NO HARDCODING!
     let buildings: [APIBuildingData]?
-    
-    // Legacy building levels (kept for backwards compatibility)
-    let wall_level: Int
-    let vault_level: Int
-    let mine_level: Int
-    let market_level: Int
-    let farm_level: Int
-    let education_level: Int
-    let lumbermill_level: Int
     
     let tax_rate: Int
     let travel_fee: Int
@@ -51,15 +63,6 @@ struct APIKingdom: Codable {
     let enemies: [String]?
     let created_at: String?
     let updated_at: String?
-    
-    // Building upgrade costs
-    let wall_upgrade_cost: APIBuildingUpgradeCost?
-    let vault_upgrade_cost: APIBuildingUpgradeCost?
-    let mine_upgrade_cost: APIBuildingUpgradeCost?
-    let market_upgrade_cost: APIBuildingUpgradeCost?
-    let farm_upgrade_cost: APIBuildingUpgradeCost?
-    let education_upgrade_cost: APIBuildingUpgradeCost?
-    let lumbermill_upgrade_cost: APIBuildingUpgradeCost?
 }
 
 struct APIKingdomSimple: Codable {
@@ -78,6 +81,8 @@ struct LocationData: Codable {
 
 // MARK: - City Boundary Models
 
+/// Kingdom data attached to a city boundary response
+/// FULLY DYNAMIC - buildings array contains all building data with upgrade costs
 struct CityKingdomData: Codable {
     let id: String
     let ruler_id: Int?  // PostgreSQL auto-generated integer
@@ -87,17 +92,9 @@ struct CityKingdomData: Codable {
     let active_citizens: Int?  // Optional for backwards compatibility
     let treasury_gold: Int
     
-    // DYNAMIC BUILDINGS - Array with full metadata from backend
+    // DYNAMIC BUILDINGS - Array with full metadata + upgrade costs from backend
+    // Frontend should iterate this array - NO HARDCODING!
     let buildings: [APIBuildingData]?
-    
-    // Legacy building levels (kept for backwards compatibility)
-    let wall_level: Int
-    let vault_level: Int
-    let mine_level: Int
-    let market_level: Int
-    let farm_level: Int
-    let education_level: Int
-    let lumbermill_level: Int?  // Optional for backwards compatibility
     
     let travel_fee: Int
     let can_claim: Bool  // Backend determines if current user can claim

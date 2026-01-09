@@ -3,6 +3,7 @@ import SwiftUI
 struct BuildingUpgradeCardWithContract: View {
     let icon: String
     let name: String
+    let buildingType: String  // For fetching dynamic tier info
     let currentLevel: Int
     let maxLevel: Int
     let benefit: String
@@ -53,15 +54,15 @@ struct BuildingUpgradeCardWithContract: View {
                         
                         Spacer()
                         
-                        // View all levels link
+                        // View all levels link - FULLY DYNAMIC from backend
                         NavigationLink(destination: BuildingLevelsView(
                             buildingName: name,
                             icon: icon,
                             currentLevel: currentLevel,
                             maxLevel: maxLevel,
-                            benefitForLevel: { level in benefit },
+                            benefitForLevel: { level in getBenefitForLevel(level) },
                             costForLevel: { level in constructionCost },
-                            detailedBenefits: getDetailedBenefitsForBuilding(name: name),
+                            detailedBenefits: getDetailedBenefitsForBuilding(),
                             accentColor: iconColor
                         )) {
                             HStack(spacing: 4) {
@@ -255,77 +256,31 @@ struct BuildingUpgradeCardWithContract: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func getDetailedBenefitsForBuilding(name: String) -> ((Int) -> [String])? {
-        switch name {
-        case "Mine":
-            return { level in
-                switch level {
-                case 1: return ["Unlock Stone mining", "+5 Stone/day"]
-                case 2: return ["+10 Stone/day", "+5 Iron/day"]
-                case 3: return ["+15 Stone/day", "+10 Iron/day", "+5 Steel/day"]
-                case 4: return ["+20 Stone/day", "+15 Iron/day", "+10 Steel/day"]
-                case 5: return ["All materials at 2x quantity", "Maximum production"]
-                default: return []
-                }
-            }
-        case "Market":
-            return { level in
-                switch level {
-                case 1: return ["+15g/day passive income", "Basic trade routes"]
-                case 2: return ["+35g/day passive income", "Improved merchants"]
-                case 3: return ["+65g/day passive income", "Regional trade hub"]
-                case 4: return ["+100g/day passive income", "Major trade center"]
-                case 5: return ["+150g/day passive income", "Economic powerhouse"]
-                default: return []
-                }
-            }
-        case "Farm":
-            return { level in
-                let reduction: Int = {
-                    switch level {
-                    case 1: return 5
-                    case 2: return 10
-                    case 3: return 20
-                    case 4: return 25
-                    case 5: return 33
-                    default: return 0
-                    }
-                }()
-                return [
-                    "Citizens complete contracts \(reduction)% faster",
-                    "Speeds up all kingdom projects",
-                    "Attracts more workers"
-                ]
-            }
-        case "Education Hall":
-            return { level in
-                let reduction = level * 5
-                return [
-                    "-\(reduction)% training actions required",
-                    "Citizens train skills faster",
-                    "Knowledge hub for kingdom"
-                ]
-            }
-        case "Walls":
-            return { level in
-                let defenders = level * 2
-                return [
-                    "+\(defenders) defenders during coups",
-                    "Harder to overthrow kingdom",
-                    "Protects citizens & treasury"
-                ]
-            }
-        case "Vault":
-            return { level in
-                let protection = level * 20
-                return [
-                    "\(protection)% of treasury protected from theft",
-                    "Reduces gold loss in coups",
-                    "Deters vault heists"
-                ]
-            }
-        default:
+    // FULLY DYNAMIC - Get benefit for a specific level from backend
+    private func getBenefitForLevel(_ level: Int) -> String {
+        guard let meta = kingdom.getBuildingMetadata(buildingType),
+              let tierInfo = meta.allTiers.first(where: { $0.tier == level }) else {
+            return "Level \(level)"
+        }
+        return tierInfo.benefit
+    }
+    
+    // FULLY DYNAMIC - Get detailed benefits for all levels from backend
+    private func getDetailedBenefitsForBuilding() -> ((Int) -> [String])? {
+        guard let meta = kingdom.getBuildingMetadata(buildingType) else {
             return nil
+        }
+        
+        return { level in
+            guard let tierInfo = meta.allTiers.first(where: { $0.tier == level }) else {
+                return ["Level \(level)"]
+            }
+            
+            var benefits = [tierInfo.benefit]
+            if !tierInfo.tierDescription.isEmpty && tierInfo.tierDescription != tierInfo.benefit {
+                benefits.append(tierInfo.tierDescription)
+            }
+            return benefits
         }
     }
 }

@@ -253,8 +253,39 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
-                // TOWN PUB - Kingdom Chat (only if player is inside)
-                if isPlayerInside {
+                // TOWN HALL - Community Hub (only if player is inside AND Town Hall is built)
+                if isPlayerInside && kingdom.townhallLevel >= 1 {
+                    NavigationLink {
+                        TownHallView(kingdom: kingdom, playerId: player.playerId)
+                    } label: {
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
+                            Image(systemName: "building.columns.fill")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Town Hall")
+                                    .font(FontStyles.bodyLargeBold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                Text("Community activities & social hub")
+                                    .font(FontStyles.labelMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.iconMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        .padding(KingdomTheme.Spacing.medium)
+                    }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    .padding(.horizontal)
+                } else if isPlayerInside {
+                    // Fallback to Town Pub if no Town Hall
                     NavigationLink {
                         TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
                     } label: {
@@ -591,13 +622,8 @@ struct KingdomInfoSheetView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // DYNAMIC: Get ALL buildings from backend metadata
-            let sortedBuildings = kingdom.buildingMetadata.values.sorted { a, b in
-                // Built first, then alphabetical
-                if a.level > 0 && b.level <= 0 { return true }
-                if a.level <= 0 && b.level > 0 { return false }
-                return a.displayName < b.displayName
-            }
+            // DYNAMIC: Get ALL buildings from backend metadata (sorted)
+            let sortedBuildings = kingdom.sortedBuildings()
             
             if sortedBuildings.isEmpty {
                 VStack(spacing: 12) {

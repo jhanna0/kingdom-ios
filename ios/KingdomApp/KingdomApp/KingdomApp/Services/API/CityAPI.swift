@@ -108,11 +108,40 @@ class CityAPI {
         
         if let kingdomData = city.kingdom {
             kingdom.treasuryGold = kingdomData.treasury_gold
+            kingdom.travelFee = kingdomData.travel_fee
+            kingdom.checkedInPlayers = kingdomData.population
+            kingdom.activeCitizens = kingdomData.active_citizens ?? 0
+            kingdom.isAllied = kingdomData.is_allied
+            kingdom.isEnemy = kingdomData.is_enemy
             
-            // DYNAMIC BUILDINGS - Populate metadata from backend
+            // DYNAMIC BUILDINGS - Iterate buildings array from backend
+            // NO HARDCODING - just loop through whatever buildings the backend sends!
             if let buildings = kingdomData.buildings {
                 for building in buildings {
-                    // Store metadata
+                    // Store level in dynamic dict
+                    kingdom.buildingLevels[building.type] = building.level
+                    
+                    // Convert upgrade cost if present
+                    let upgradeCost: BuildingUpgradeCost? = building.upgrade_cost.map {
+                        BuildingUpgradeCost(
+                            actionsRequired: $0.actions_required,
+                            constructionCost: $0.construction_cost,
+                            canAfford: $0.can_afford
+                        )
+                    }
+                    kingdom.buildingUpgradeCosts[building.type] = upgradeCost
+                    
+                    // Convert all tiers info
+                    let allTiers = building.all_tiers.map { tier in
+                        BuildingTierInfo(
+                            tier: tier.tier,
+                            name: tier.name,
+                            benefit: tier.benefit,
+                            tierDescription: tier.description
+                        )
+                    }
+                    
+                    // Store full metadata
                     kingdom.buildingMetadata[building.type] = BuildingMetadata(
                         type: building.type,
                         displayName: building.display_name,
@@ -121,25 +150,14 @@ class CityAPI {
                         category: building.category,
                         description: building.description,
                         level: building.level,
-                        maxLevel: building.max_level
+                        maxLevel: building.max_level,
+                        upgradeCost: upgradeCost,
+                        tierName: building.tier_name,
+                        tierBenefit: building.tier_benefit,
+                        allTiers: allTiers
                     )
-                    // Store level in dynamic dict
-                    kingdom.buildingLevels[building.type] = building.level
                 }
             }
-            
-            // Legacy: Also populate individual building levels for backwards compatibility
-            kingdom.wallLevel = kingdomData.wall_level
-            kingdom.vaultLevel = kingdomData.vault_level
-            kingdom.mineLevel = kingdomData.mine_level
-            kingdom.marketLevel = kingdomData.market_level
-            kingdom.farmLevel = kingdomData.farm_level
-            kingdom.educationLevel = kingdomData.education_level
-            kingdom.travelFee = kingdomData.travel_fee
-            kingdom.checkedInPlayers = kingdomData.population
-            kingdom.activeCitizens = kingdomData.active_citizens ?? 0
-            kingdom.isAllied = kingdomData.is_allied
-            kingdom.isEnemy = kingdomData.is_enemy
         }
         
         return kingdom

@@ -78,13 +78,14 @@ struct BuildMenuView: View {
     @ViewBuilder
     private func buildingCard(for buildingType: String) -> some View {
         // FULLY DYNAMIC - Get metadata from kingdom (populated from backend)
-        if let metadata = kingdom.buildingMetadata(buildingType) {
+        if let metadata = kingdom.getBuildingMetadata(buildingType) {
             let level = kingdom.buildingLevel(buildingType)
             let nextLevel = level + 1
             
             BuildingUpgradeCardWithContract(
                 icon: metadata.icon,
                 name: metadata.displayName,
+                buildingType: buildingType,
                 currentLevel: level,
                 maxLevel: metadata.maxLevel,
                 benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),

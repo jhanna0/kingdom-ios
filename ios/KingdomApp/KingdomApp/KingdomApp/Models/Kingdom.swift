@@ -1,8 +1,24 @@
 import Foundation
 import CoreLocation
 
-// DYNAMIC Building metadata from backend
-struct BuildingMetadata: Codable, Hashable {
+// Building upgrade cost information - constructed manually from API data
+struct BuildingUpgradeCost: Hashable {
+    let actionsRequired: Int
+    let constructionCost: Int
+    let canAfford: Bool
+}
+
+/// Info for a single building tier - FULLY DYNAMIC from backend
+struct BuildingTierInfo: Hashable {
+    let tier: Int
+    let name: String  // e.g. "Wooden Palisade", "Stone Wall"
+    let benefit: String  // e.g. "+2 defenders", "20% protected"
+    let tierDescription: String  // e.g. "Basic wooden wall"
+}
+
+// DYNAMIC Building metadata from backend - includes upgrade costs and tier info
+// Constructed manually from API response - not decoded directly
+struct BuildingMetadata: Hashable {
     let type: String  // e.g. "wall", "vault", "mine"
     let displayName: String  // e.g. "Walls", "Vault"
     let icon: String  // SF Symbol name
@@ -11,30 +27,14 @@ struct BuildingMetadata: Codable, Hashable {
     let description: String
     let level: Int
     let maxLevel: Int
+    let upgradeCost: BuildingUpgradeCost?  // Cost to upgrade (nil if at max)
     
-    enum CodingKeys: String, CodingKey {
-        case type
-        case displayName = "display_name"
-        case icon
-        case colorHex = "color"
-        case category
-        case description
-        case level
-        case maxLevel = "max_level"
-    }
-}
-
-// Building upgrade cost information
-struct BuildingUpgradeCost: Codable, Hashable {
-    let actionsRequired: Int
-    let constructionCost: Int
-    let canAfford: Bool
+    // Current tier info
+    let tierName: String  // Name of current tier (e.g. "Stone Wall")
+    let tierBenefit: String  // Benefit of current tier (e.g. "+4 defenders")
     
-    enum CodingKeys: String, CodingKey {
-        case actionsRequired = "actions_required"
-        case constructionCost = "construction_cost"
-        case canAfford = "can_afford"
-    }
+    // All tiers info - for detail view to show all levels
+    let allTiers: [BuildingTierInfo]
 }
 
 // Income record for tracking city revenue
@@ -79,62 +79,15 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var checkedInPlayers: Int
     var activeCitizens: Int  // Active citizens (hometown residents)
     
-    // DYNAMIC BUILDINGS - use these for new code!
+    // DYNAMIC BUILDINGS - use these dictionaries for all building data!
+    // Populated from backend buildings array - NO HARDCODING required
     var buildingLevels: [String: Int] = [:]  // building_type -> level
-    var buildingUpgradeCosts: [String: BuildingUpgradeCost] = [:]  // building_type -> cost
-    var buildingMetadata: [String: BuildingMetadata] = [:]  // building_type -> metadata (from backend)
+    var buildingUpgradeCosts: [String: BuildingUpgradeCost?] = [:]  // building_type -> cost (nil if max level)
+    var buildingMetadata: [String: BuildingMetadata] = [:]  // building_type -> full metadata from backend
     
-    // Legacy building properties (kept for backwards compatibility)
-    // TODO: Migrate all code to use buildingLevels dict instead
-    var wallLevel: Int {
-        get { buildingLevels["wall"] ?? 0 }
-        set { buildingLevels["wall"] = newValue }
-    }
-    var vaultLevel: Int {
-        get { buildingLevels["vault"] ?? 0 }
-        set { buildingLevels["vault"] = newValue }
-    }
-    var mineLevel: Int {
-        get { buildingLevels["mine"] ?? 0 }
-        set { buildingLevels["mine"] = newValue }
-    }
-    var marketLevel: Int {
-        get { buildingLevels["market"] ?? 0 }
-        set { buildingLevels["market"] = newValue }
-    }
-    var farmLevel: Int {
-        get { buildingLevels["farm"] ?? 0 }
-        set { buildingLevels["farm"] = newValue }
-    }
-    var educationLevel: Int {
-        get { buildingLevels["education"] ?? 0 }
-        set { buildingLevels["education"] = newValue }
-    }
-    
-    // Legacy upgrade cost properties (kept for backwards compatibility)
-    var wallUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["wall"] }
-        set { if let v = newValue { buildingUpgradeCosts["wall"] = v } }
-    }
-    var vaultUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["vault"] }
-        set { if let v = newValue { buildingUpgradeCosts["vault"] = v } }
-    }
-    var mineUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["mine"] }
-        set { if let v = newValue { buildingUpgradeCosts["mine"] = v } }
-    }
-    var marketUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["market"] }
-        set { if let v = newValue { buildingUpgradeCosts["market"] = v } }
-    }
-    var farmUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["farm"] }
-        set { if let v = newValue { buildingUpgradeCosts["farm"] = v } }
-    }
-    var educationUpgradeCost: BuildingUpgradeCost? {
-        get { buildingUpgradeCosts["education"] }
-        set { if let v = newValue { buildingUpgradeCosts["education"] = v } }
+    // Convenience computed property for Town Hall level (frequently checked)
+    var townhallLevel: Int {
+        buildingLevels["townhall"] ?? 0
     }
     
     // Helper to get building level by type
@@ -144,17 +97,26 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     
     // Helper to get upgrade cost by type
     func upgradeCost(_ type: String) -> BuildingUpgradeCost? {
-        buildingUpgradeCosts[type]
+        buildingUpgradeCosts[type] ?? nil
     }
     
-    // Helper to get building metadata by type (with fallback to BuildingConfig)
-    func buildingMetadata(_ type: String) -> BuildingMetadata? {
+    // Helper to get building metadata by type
+    func getBuildingMetadata(_ type: String) -> BuildingMetadata? {
         buildingMetadata[type]
     }
     
     // Get all building types - FULLY DYNAMIC from backend metadata
     func allBuildingTypes() -> [String] {
         return Array(buildingMetadata.keys).sorted()
+    }
+    
+    // Get sorted buildings for display (built buildings first, then alphabetical)
+    func sortedBuildings() -> [BuildingMetadata] {
+        return buildingMetadata.values.sorted { a, b in
+            if a.level > 0 && b.level <= 0 { return true }
+            if a.level <= 0 && b.level > 0 { return false }
+            return a.displayName < b.displayName
+        }
     }
     
     // Tax system (0-100%)

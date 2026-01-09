@@ -32,11 +32,11 @@ extension MapViewModel {
         
         // Upgrade the building - FULLY DYNAMIC using metadata
         let currentLevel = kingdoms[index].buildingLevel(buildingType)
-        let maxLevel = kingdoms[index].buildingMetadata(buildingType)?.maxLevel ?? 5
+        let maxLevel = kingdoms[index].getBuildingMetadata(buildingType)?.maxLevel ?? 5
         
         if currentLevel < maxLevel {
             kingdoms[index].buildingLevels[buildingType] = currentLevel + 1
-            let displayName = kingdoms[index].buildingMetadata(buildingType)?.displayName ?? buildingType.capitalized
+            let displayName = kingdoms[index].getBuildingMetadata(buildingType)?.displayName ?? buildingType.capitalized
             print("✅ Upgraded \(displayName) to level \(currentLevel + 1)")
         }
         

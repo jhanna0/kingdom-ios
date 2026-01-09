@@ -392,7 +392,7 @@ extension Kingdom {
     /// Mine Level 1: 10 Iron, Level 2: 20 Iron
     /// Level 3-4: No iron (steel only), Level 5: 10 Iron + Steel
     func getIronPerMiningAction() -> Int {
-        switch mineLevel {
+        switch buildingLevel("mine") {
         case 0: return 0
         case 1: return 10
         case 2: return 20
@@ -406,7 +406,7 @@ extension Kingdom {
     /// Steel production per mining action (from docs)
     /// Mine Level 3: 10 Steel, Level 4: 20 Steel, Level 5: 10 Steel + Iron
     func getSteelPerMiningAction() -> Int {
-        switch mineLevel {
+        switch buildingLevel("mine") {
         case 0: return 0
         case 1: return 0
         case 2: return 0
@@ -419,12 +419,14 @@ extension Kingdom {
     
     /// Damage production buildings (from invasion) - mine -2 levels
     mutating func damageProduction() {
-        mineLevel = max(0, mineLevel - 2)
+        let currentLevel = buildingLevel("mine")
+        buildingLevels["mine"] = max(0, currentLevel - 2)
     }
     
     /// Damage walls (from invasion)
     mutating func damageWalls() {
-        wallLevel = max(0, wallLevel - 2)
+        let currentLevel = buildingLevel("wall")
+        buildingLevels["wall"] = max(0, currentLevel - 2)
     }
 }
 

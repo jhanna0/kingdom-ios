@@ -193,11 +193,38 @@ extension MapViewModel {
         
         if let kingdomData = city.kingdom {
             kingdom.treasuryGold = kingdomData.treasury_gold
+            kingdom.travelFee = kingdomData.travel_fee
+            kingdom.checkedInPlayers = kingdomData.population
+            kingdom.activeCitizens = kingdomData.active_citizens ?? 0
             
-            // DYNAMIC BUILDINGS - Populate metadata from backend
+            // DYNAMIC BUILDINGS - Iterate buildings array from backend
+            // NO HARDCODING - just loop through whatever buildings the backend sends!
             if let buildings = kingdomData.buildings {
                 for building in buildings {
-                    // Store metadata
+                    // Store level in dynamic dict
+                    kingdom.buildingLevels[building.type] = building.level
+                    
+                    // Convert upgrade cost if present
+                    let upgradeCost: BuildingUpgradeCost? = building.upgrade_cost.map {
+                        BuildingUpgradeCost(
+                            actionsRequired: $0.actions_required,
+                            constructionCost: $0.construction_cost,
+                            canAfford: $0.can_afford
+                        )
+                    }
+                    kingdom.buildingUpgradeCosts[building.type] = upgradeCost
+                    
+                    // Convert all tiers info
+                    let allTiers = building.all_tiers.map { tier in
+                        BuildingTierInfo(
+                            tier: tier.tier,
+                            name: tier.name,
+                            benefit: tier.benefit,
+                            tierDescription: tier.description
+                        )
+                    }
+                    
+                    // Store full metadata
                     kingdom.buildingMetadata[building.type] = BuildingMetadata(
                         type: building.type,
                         displayName: building.display_name,
@@ -206,24 +233,14 @@ extension MapViewModel {
                         category: building.category,
                         description: building.description,
                         level: building.level,
-                        maxLevel: building.max_level
+                        maxLevel: building.max_level,
+                        upgradeCost: upgradeCost,
+                        tierName: building.tier_name,
+                        tierBenefit: building.tier_benefit,
+                        allTiers: allTiers
                     )
-                    // Store level in dynamic dict
-                    kingdom.buildingLevels[building.type] = building.level
                 }
             }
-            
-            // Legacy: BACKEND IS SOURCE OF TRUTH - all building levels from API
-            kingdom.wallLevel = kingdomData.wall_level
-            kingdom.vaultLevel = kingdomData.vault_level
-            kingdom.mineLevel = kingdomData.mine_level
-            kingdom.marketLevel = kingdomData.market_level
-            kingdom.farmLevel = kingdomData.farm_level
-            kingdom.educationLevel = kingdomData.education_level
-            kingdom.buildingLevels["lumbermill"] = kingdomData.lumbermill_level ?? 0
-            kingdom.travelFee = kingdomData.travel_fee
-            kingdom.checkedInPlayers = kingdomData.population
-            kingdom.activeCitizens = kingdomData.active_citizens ?? 0
         }
         
         return kingdom
@@ -272,41 +289,56 @@ extension MapViewModel {
             
             await MainActor.run {
                 if let index = kingdoms.firstIndex(where: { $0.id == kingdomId }) {
-                kingdoms[index].treasuryGold = apiKingdom.treasury_gold
-                kingdoms[index].wallLevel = apiKingdom.wall_level
-                kingdoms[index].vaultLevel = apiKingdom.vault_level
-                kingdoms[index].mineLevel = apiKingdom.mine_level
-                kingdoms[index].marketLevel = apiKingdom.market_level
-                kingdoms[index].farmLevel = apiKingdom.farm_level
-                kingdoms[index].educationLevel = apiKingdom.education_level
-                kingdoms[index].buildingLevels["lumbermill"] = apiKingdom.lumbermill_level
-                kingdoms[index].taxRate = apiKingdom.tax_rate
-                kingdoms[index].travelFee = apiKingdom.travel_fee
-                kingdoms[index].checkedInPlayers = apiKingdom.population
-                kingdoms[index].activeCitizens = apiKingdom.active_citizens ?? 0
-                kingdoms[index].activeContract = nil // Clear completed contract
+                    kingdoms[index].treasuryGold = apiKingdom.treasury_gold
+                    kingdoms[index].taxRate = apiKingdom.tax_rate
+                    kingdoms[index].travelFee = apiKingdom.travel_fee
+                    kingdoms[index].checkedInPlayers = apiKingdom.checked_in_players
+                    kingdoms[index].activeCitizens = apiKingdom.active_citizens ?? 0
+                    kingdoms[index].activeContract = nil // Clear completed contract
                     
-                    // Update building upgrade costs
-                    kingdoms[index].wallUpgradeCost = apiKingdom.wall_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].vaultUpgradeCost = apiKingdom.vault_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].mineUpgradeCost = apiKingdom.mine_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].marketUpgradeCost = apiKingdom.market_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].farmUpgradeCost = apiKingdom.farm_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].educationUpgradeCost = apiKingdom.education_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
-                    }
-                    kingdoms[index].buildingUpgradeCosts["lumbermill"] = apiKingdom.lumbermill_upgrade_cost.map {
-                        BuildingUpgradeCost(actionsRequired: $0.actions_required, constructionCost: $0.construction_cost, canAfford: $0.can_afford)
+                    // DYNAMIC BUILDINGS - Iterate buildings array from backend
+                    // NO HARDCODING - just loop through whatever buildings the backend sends!
+                    if let buildings = apiKingdom.buildings {
+                        for building in buildings {
+                            // Store level
+                            kingdoms[index].buildingLevels[building.type] = building.level
+                            
+                            // Convert and store upgrade cost
+                            let upgradeCost: BuildingUpgradeCost? = building.upgrade_cost.map {
+                                BuildingUpgradeCost(
+                                    actionsRequired: $0.actions_required,
+                                    constructionCost: $0.construction_cost,
+                                    canAfford: $0.can_afford
+                                )
+                            }
+                            kingdoms[index].buildingUpgradeCosts[building.type] = upgradeCost
+                            
+                            // Convert all tiers info
+                            let allTiers = building.all_tiers.map { tier in
+                                BuildingTierInfo(
+                                    tier: tier.tier,
+                                    name: tier.name,
+                                    benefit: tier.benefit,
+                                    tierDescription: tier.description
+                                )
+                            }
+                            
+                            // Store full metadata
+                            kingdoms[index].buildingMetadata[building.type] = BuildingMetadata(
+                                type: building.type,
+                                displayName: building.display_name,
+                                icon: building.icon,
+                                colorHex: building.color,
+                                category: building.category,
+                                description: building.description,
+                                level: building.level,
+                                maxLevel: building.max_level,
+                                upgradeCost: upgradeCost,
+                                tierName: building.tier_name,
+                                tierBenefit: building.tier_benefit,
+                                allTiers: allTiers
+                            )
+                        }
                     }
                     
                     // Update currentKingdomInside if it's the same kingdom
@@ -314,7 +346,12 @@ extension MapViewModel {
                         currentKingdomInside = kingdoms[index]
                     }
                     
-                    print("✅ Refreshed kingdom \(apiKingdom.name) - Market Lv.\(apiKingdom.market_level)")
+                    // Log first building for debugging
+                    let firstBuilding = apiKingdom.buildings?.first
+                    print("✅ Refreshed kingdom \(apiKingdom.name) - \(apiKingdom.buildings?.count ?? 0) buildings loaded")
+                    if let b = firstBuilding {
+                        print("   First building: \(b.display_name) Lv.\(b.level)")
+                    }
                 }
             }
         } catch {

@@ -162,10 +162,10 @@ class TierManager {
                 var legacyBuildings: [String: BuildingTypeData] = [:]
                 
                 for (buildingType, typeData) in buildingData.types {
-                    var tiers: [Int: BuildingTierInfo] = [:]
+                    var tiers: [Int: TMBuildingTierInfo] = [:]
                     for (key, value) in typeData.tiers {
                         if let tier = Int(key) {
-                            tiers[tier] = BuildingTierInfo(
+                            tiers[tier] = TMBuildingTierInfo(
                                 name: value.name,
                                 description: value.description,
                                 benefit: value.benefit ?? ""
@@ -497,10 +497,11 @@ struct EquipmentTierInfo {
 }
 
 struct BuildingTypeData {
-    let tiers: [Int: BuildingTierInfo]
+    let tiers: [Int: TMBuildingTierInfo]
 }
 
-struct BuildingTierInfo {
+// TierManager's internal building tier info (prefixed to avoid conflict with Kingdom.BuildingTierInfo)
+struct TMBuildingTierInfo {
     let name: String
     let description: String
     let benefit: String
@@ -520,7 +521,7 @@ struct BuildingTypeInfo {
     let description: String
     let maxTier: Int
     let benefitFormula: String
-    let tiers: [Int: BuildingTierInfo]
+    let tiers: [Int: TMBuildingTierInfo]
 }
 
 struct ReputationTiersData {

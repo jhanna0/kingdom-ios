@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 # Building colors for frontend - matches BuildingConfig colors
+# SINGLE SOURCE OF TRUTH - add new buildings here!
 BUILDING_COLORS = {
     "wall": "#6B949C",  # Steel blue
     "vault": "#D4AF37",  # Imperial gold
@@ -12,7 +13,8 @@ BUILDING_COLORS = {
     "market": "#50C878",  # Royal emerald
     "farm": "#8C9973",  # Sage green
     "education": "#7851A9",  # Royal purple
-    "lumbermill": "#73593F"  # Dark brown
+    "lumbermill": "#73593F",  # Dark brown
+    "townhall": "#4169E1",  # Royal blue
 }
 
 
@@ -36,6 +38,21 @@ class CheckInResponse(BaseModel):
     rewards: CheckInRewards
 
 
+class BuildingUpgradeCost(BaseModel):
+    """Building upgrade cost - included in each building"""
+    actions_required: int
+    construction_cost: int
+    can_afford: bool
+
+
+class BuildingTierInfo(BaseModel):
+    """Info for a single building tier - FULLY DYNAMIC"""
+    tier: int
+    name: str  # e.g. "Wooden Palisade", "Stone Wall"
+    benefit: str  # e.g. "+2 defenders", "20% protected"
+    description: str  # e.g. "Basic wooden wall"
+
+
 class BuildingData(BaseModel):
     """Building data with metadata - FULLY DYNAMIC from backend"""
     type: str  # e.g. "wall", "vault", "mine"
@@ -46,10 +63,23 @@ class BuildingData(BaseModel):
     description: str  # Building description
     level: int  # Current building level
     max_level: int  # Maximum level
+    upgrade_cost: Optional['BuildingUpgradeCost'] = None  # Cost to upgrade to next level (None if max)
+    
+    # Current tier info
+    tier_name: str = ""  # Name of current tier (e.g. "Stone Wall")
+    tier_benefit: str = ""  # Benefit of current tier (e.g. "+4 defenders")
+    
+    # All tiers info - for detail view to show all levels
+    all_tiers: List['BuildingTierInfo'] = []
 
 
 class KingdomData(BaseModel):
-    """Kingdom data attached to a city"""
+    """
+    Kingdom data attached to a city - FULLY DYNAMIC from backend!
+    
+    All building data comes from the 'buildings' array with full metadata.
+    Frontend iterates buildings array - NO HARDCODING required!
+    """
     id: str
     ruler_id: Optional[int] = None  # PostgreSQL integer user ID
     ruler_name: Optional[str] = None
@@ -58,17 +88,9 @@ class KingdomData(BaseModel):
     active_citizens: int = 0  # Active citizens (hometown residents, LIVE COUNT)
     treasury_gold: int
     
-    # DYNAMIC BUILDINGS - All building data with metadata
+    # DYNAMIC BUILDINGS - All building data with metadata and upgrade costs
+    # Frontend should ONLY use this array - no hardcoded building references!
     buildings: List['BuildingData'] = []
-    
-    # Legacy building levels (kept for backwards compatibility)
-    wall_level: int
-    vault_level: int
-    mine_level: int
-    market_level: int
-    farm_level: int = 0
-    education_level: int = 0
-    lumbermill_level: int = 0  # FULLY DYNAMIC - add new buildings without iOS changes
     
     travel_fee: int = 10
     can_claim: bool = False  # Backend determines if current user can claim this kingdom

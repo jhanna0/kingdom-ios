@@ -193,8 +193,8 @@ struct KingdomCard: View {
             // Kingdom stats
             HStack(spacing: 20) {
                 KingdomStatItem(icon: "figure.stand", label: "Subjects", value: "\(kingdom.checkedInPlayers)")
-                KingdomStatItem(icon: "building.2.fill", label: "Walls", value: "Lvl \(kingdom.wallLevel)")
-                KingdomStatItem(icon: "lock.shield.fill", label: "Vault", value: "Lvl \(kingdom.vaultLevel)")
+                KingdomStatItem(icon: "building.2.fill", label: "Walls", value: "Lvl \(kingdom.buildingLevel("wall"))")
+                KingdomStatItem(icon: "lock.shield.fill", label: "Vault", value: "Lvl \(kingdom.buildingLevel("vault"))")
             }
             
             Rectangle()

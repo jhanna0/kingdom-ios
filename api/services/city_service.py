@@ -13,7 +13,7 @@ import math
 import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BUILDING_COLORS
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS
 from osm_service import (
     find_user_city_fast,
     fetch_nearby_city_candidates,
@@ -153,11 +153,44 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         
         # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
         # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
+        # Import cost calculation functions
+        from routers.contracts import calculate_actions_required, calculate_construction_cost
+        
         buildings = []
         for building_type, building_meta in BUILDING_TYPES.items():
             # Get level from kingdom model (e.g. kingdom.wall_level, kingdom.education_level)
             level_attr = f"{building_type}_level"
             level = getattr(kingdom, level_attr, 0)
+            
+            # Calculate upgrade cost for next level (None if at max)
+            upgrade_cost = None
+            max_level = building_meta["max_tier"]
+            if level < max_level:
+                next_level = level + 1
+                actions = calculate_actions_required(building_meta["display_name"], next_level, kingdom.population)
+                construction_cost = calculate_construction_cost(next_level, kingdom.population)
+                upgrade_cost = BuildingUpgradeCost(
+                    actions_required=actions,
+                    construction_cost=construction_cost,
+                    can_afford=kingdom.treasury_gold >= construction_cost
+                )
+            
+            # Get current tier info
+            tiers_data = building_meta.get("tiers", {})
+            current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
+            tier_name = current_tier_data.get("name", f"Level {level}")
+            tier_benefit = current_tier_data.get("benefit", "")
+            
+            # Build all tiers info for detail view
+            all_tiers = []
+            for tier_num in range(1, max_level + 1):
+                tier_data = tiers_data.get(tier_num, {})
+                all_tiers.append(BuildingTierInfo(
+                    tier=tier_num,
+                    name=tier_data.get("name", f"Level {tier_num}"),
+                    benefit=tier_data.get("benefit", ""),
+                    description=tier_data.get("description", "")
+                ))
             
             buildings.append(BuildingData(
                 type=building_type,
@@ -167,7 +200,11 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 category=building_meta["category"],
                 description=building_meta["description"],
                 level=level,
-                max_level=building_meta["max_tier"]
+                max_level=max_level,
+                upgrade_cost=upgrade_cost,
+                tier_name=tier_name,
+                tier_benefit=tier_benefit,
+                all_tiers=all_tiers
             ))
         
         # CALCULATE LIVE: Count players in kingdom RIGHT NOW
@@ -182,14 +219,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             population=checked_in_count,  # LIVE COUNT of players in kingdom
             active_citizens=citizen_count,  # LIVE COUNT of active citizens
             treasury_gold=kingdom.treasury_gold,
-            buildings=buildings,  # DYNAMIC BUILDINGS with metadata
-            wall_level=kingdom.wall_level,
-            vault_level=kingdom.vault_level,
-            mine_level=kingdom.mine_level,
-            market_level=kingdom.market_level,
-            farm_level=kingdom.farm_level,
-            education_level=kingdom.education_level,
-            lumbermill_level=kingdom.lumbermill_level,  # FULLY DYNAMIC from DB
+            buildings=buildings,  # DYNAMIC BUILDINGS with metadata + upgrade costs
             travel_fee=kingdom.travel_fee,
             can_claim=can_claim,
             can_declare_war=can_interact,

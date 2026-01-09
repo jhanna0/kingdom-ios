@@ -4,6 +4,7 @@ SQLAlchemy models
 from .user import User
 from .player_state import PlayerState
 from .kingdom import Kingdom, UserKingdom
+from .kingdom_building import KingdomBuilding
 from .contract import Contract
 from .property import Property
 from .city_boundary import CityBoundary
@@ -30,6 +31,7 @@ __all__ = [
     "PlayerState",
     "Kingdom",
     "UserKingdom",
+    "KingdomBuilding",
     "Contract",
     "Property",
     "CityBoundary",

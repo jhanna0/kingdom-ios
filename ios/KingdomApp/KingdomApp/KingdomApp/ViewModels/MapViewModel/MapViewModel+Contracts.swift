@@ -20,7 +20,7 @@ extension MapViewModel {
         let currentLevel = kingdoms[index].buildingLevel(buildingType)
         
         // Check if building can be upgraded
-        let maxLevel = kingdoms[index].buildingMetadata(buildingType)?.maxLevel ?? 5
+        let maxLevel = kingdoms[index].getBuildingMetadata(buildingType)?.maxLevel ?? 5
         if currentLevel >= maxLevel {
             print("❌ Building already at max level")
             throw NSError(domain: "MapViewModel", code: 3, userInfo: [NSLocalizedDescriptionKey: "Building already at max level"])

@@ -32,6 +32,8 @@ from .common import (
     BoundaryResponse,
     KingdomData,
     BuildingData,
+    BuildingUpgradeCost,
+    BuildingTierInfo,
     BUILDING_COLORS,
 )
 from .coup import (
@@ -100,6 +102,8 @@ __all__ = [
     "BoundaryResponse",
     "KingdomData",
     "BuildingData",
+    "BuildingUpgradeCost",
+    "BuildingTierInfo",
     "BUILDING_COLORS",
     # Coup
     "CoupInitiateRequest",

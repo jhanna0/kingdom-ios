@@ -323,105 +323,19 @@ struct KingdomDetailView: View {
     private func getKingdomBonuses() -> [KingdomBonus] {
         var bonuses: [KingdomBonus] = []
         
-        // Farm bonuses
-        if kingdom.farmLevel > 0 {
-            let reduction = getFarmReduction(kingdom.farmLevel)
+        // Dynamically generate bonuses from all buildings with tier benefits
+        for (_, metadata) in kingdom.buildingMetadata {
+            guard metadata.level > 0 else { continue }
+            
             bonuses.append(KingdomBonus(
-                description: "Citizens complete contracts \(reduction)% faster",
-                source: "Farm Level \(kingdom.farmLevel)",
-                icon: "leaf.fill",
-                color: KingdomTheme.Colors.buttonSuccess
-            ))
-        }
-        
-        // Education bonuses
-        if kingdom.educationLevel > 0 {
-            let reduction = kingdom.educationLevel * 5
-            bonuses.append(KingdomBonus(
-                description: "-\(reduction)% training actions required",
-                source: "Education Hall Level \(kingdom.educationLevel)",
-                icon: "graduationcap.fill",
-                color: KingdomTheme.Colors.royalBlue
-            ))
-        }
-        
-        // Wall bonuses
-        if kingdom.wallLevel > 0 {
-            let defenders = kingdom.wallLevel * 2
-            bonuses.append(KingdomBonus(
-                description: "+\(defenders) defenders during coups",
-                source: "Walls Level \(kingdom.wallLevel)",
-                icon: "building.2.fill",
-                color: KingdomTheme.Colors.buttonDanger
-            ))
-        }
-        
-        // Vault bonuses
-        if kingdom.vaultLevel > 0 {
-            let protection = kingdom.vaultLevel * 20
-            bonuses.append(KingdomBonus(
-                description: "\(protection)% of treasury protected from looting",
-                source: "Vault Level \(kingdom.vaultLevel)",
-                icon: "lock.shield.fill",
-                color: KingdomTheme.Colors.imperialGold
-            ))
-        }
-        
-        // Mine bonuses
-        if kingdom.mineLevel > 0 {
-            bonuses.append(KingdomBonus(
-                description: "Unlocked materials: \(getMineMaterials(kingdom.mineLevel))",
-                source: "Mine Level \(kingdom.mineLevel)",
-                icon: "hammer.fill",
-                color: KingdomTheme.Colors.buttonWarning
-            ))
-        }
-        
-        // Market bonuses
-        if kingdom.marketLevel > 0 {
-            let income = getMarketIncome(kingdom.marketLevel)
-            bonuses.append(KingdomBonus(
-                description: "+\(income)g/day from trade activity",
-                source: "Market Level \(kingdom.marketLevel)",
-                icon: "cart.fill",
-                color: KingdomTheme.Colors.royalPurple
+                description: metadata.tierBenefit,
+                source: "\(metadata.displayName) Level \(metadata.level)",
+                icon: metadata.icon,
+                color: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium
             ))
         }
         
         return bonuses
-    }
-    
-    private func getFarmReduction(_ level: Int) -> Int {
-        switch level {
-        case 1: return 5
-        case 2: return 10
-        case 3: return 20
-        case 4: return 25
-        case 5: return 33
-        default: return 0
-        }
-    }
-    
-    private func getMineMaterials(_ level: Int) -> String {
-        switch level {
-        case 1: return "Stone"
-        case 2: return "Stone, Iron"
-        case 3: return "Stone, Iron, Steel"
-        case 4: return "Stone, Iron, Steel, Titanium"
-        case 5: return "All materials (2x quantity)"
-        default: return ""
-        }
-    }
-    
-    private func getMarketIncome(_ level: Int) -> Int {
-        switch level {
-        case 1: return 15
-        case 2: return 35
-        case 3: return 65
-        case 4: return 100
-        case 5: return 150
-        default: return 0
-        }
     }
     
     // MARK: - Weather Loading

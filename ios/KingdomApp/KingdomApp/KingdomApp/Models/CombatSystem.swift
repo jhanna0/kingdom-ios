@@ -189,7 +189,7 @@ class CombatResolver {
         }
         
         // Add wall defense
-        let wallDefense = targetKingdom.wallLevel * 5
+        let wallDefense = targetKingdom.buildingLevel("wall") * 5
         let totalDefense = defenderStrength + wallDefense
         
         // Attackers need 25% advantage
@@ -197,7 +197,7 @@ class CombatResolver {
         let attackerVictory = attackerStrength > requiredAttackStrength
         
         // Calculate loot
-        let vaultProtection = Double(targetKingdom.vaultLevel) * 0.20
+        let vaultProtection = Double(targetKingdom.buildingLevel("vault")) * 0.20
         let lootable = Int(Double(targetKingdom.treasuryGold) * (1.0 - vaultProtection))
         let lootPerAttacker = attackerVictory ? lootable / invasion.signups.count : 0
         
