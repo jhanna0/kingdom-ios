@@ -10,6 +10,7 @@ import json
 from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
+from routers.notifications.alliances import get_pending_alliance_requests
 from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso
 from .training import calculate_training_cost, TRAINING_TYPES
 from routers.tiers import get_total_skill_points, SKILL_TYPES
@@ -466,5 +467,7 @@ def get_action_status(
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,
         "property_upgrade_contracts": property_contracts,
-        "contracts": contracts
+        "contracts": contracts,
+        # Alliance requests for rulers - shows in ActionsView with accept/decline buttons
+        "pending_alliance_requests": get_pending_alliance_requests(db, current_user, state)
     }

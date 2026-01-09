@@ -209,9 +209,70 @@ struct ActionsView: View {
     
     private func beneficialActionsSection(status: AllActionStatus) -> some View {
         Group {
+            // Alliance Requests Section (Ruler Only - Critical Priority)
+            allianceRequestsSection(status: status)
+            
             // DYNAMIC: Render all home slots from backend
             ForEach(status.homeSlots) { slot in
                 dynamicSlotSection(slot: slot, status: status)
+            }
+        }
+    }
+    
+    // MARK: - Alliance Requests Section
+    
+    @ViewBuilder
+    private func allianceRequestsSection(status: AllActionStatus) -> some View {
+        if let requests = status.pendingAllianceRequests, !requests.isEmpty {
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                // Section header
+                VStack(alignment: .leading, spacing: 4) {
+                    Rectangle()
+                        .fill(KingdomTheme.Colors.buttonSuccess)
+                        .frame(height: 3)
+                        .padding(.horizontal)
+                    
+                    HStack {
+                        Image(systemName: "handshake.fill")
+                            .font(.headline)
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        
+                        Text("Alliance Proposals")
+                            .font(FontStyles.headingLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        // Badge showing count
+                        Text("\(requests.count)")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                                cornerRadius: 8,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, KingdomTheme.Spacing.medium)
+                    
+                    Text("Respond to alliance requests from other rulers")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .padding(.horizontal)
+                }
+                
+                // Alliance request cards
+                ForEach(requests) { request in
+                    AllianceRequestCard(
+                        request: request,
+                        onAccept: { acceptAllianceRequest(request) },
+                        onDecline: { declineAllianceRequest(request) }
+                    )
+                }
             }
         }
     }
@@ -693,6 +754,56 @@ extension ActionsView {
                     )
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showReward = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - Alliance Actions
+    
+    private func acceptAllianceRequest(_ request: PendingAllianceRequest) {
+        Task {
+            do {
+                let response = try await APIClient.shared.acceptAlliance(allianceId: request.id)
+                
+                await loadActionStatus(force: true)
+                
+                await MainActor.run {
+                    actionResultSuccess = response.success
+                    actionResultTitle = "Alliance Accepted!"
+                    actionResultMessage = response.message
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showActionResult = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func declineAllianceRequest(_ request: PendingAllianceRequest) {
+        Task {
+            do {
+                let response = try await APIClient.shared.declineAlliance(allianceId: request.id)
+                
+                await loadActionStatus(force: true)
+                
+                await MainActor.run {
+                    actionResultSuccess = response.success
+                    actionResultTitle = "Alliance Declined"
+                    actionResultMessage = response.message
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showActionResult = true
                     }
                 }
             } catch {

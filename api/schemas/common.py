@@ -73,6 +73,13 @@ class BuildingData(BaseModel):
     all_tiers: List['BuildingTierInfo'] = []
 
 
+class AllianceInfo(BaseModel):
+    """Alliance details when kingdoms are allied"""
+    id: int
+    days_remaining: int
+    expires_at: Optional[str] = None
+
+
 class KingdomData(BaseModel):
     """
     Kingdom data attached to a city - FULLY DYNAMIC from backend!
@@ -98,6 +105,7 @@ class KingdomData(BaseModel):
     can_form_alliance: bool = False  # Backend determines if current user can form alliance with this kingdom
     is_allied: bool = False  # True if this kingdom is allied with any of user's kingdoms
     is_enemy: bool = False  # True if this kingdom is at war with any of user's kingdoms
+    alliance_info: Optional[AllianceInfo] = None  # Details about alliance if is_allied is True
 
 
 class CityBoundaryResponse(BaseModel):

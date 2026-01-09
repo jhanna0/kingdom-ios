@@ -158,6 +158,7 @@ struct AllActionStatus: Codable {
     let craftingCosts: CraftingCosts
     let propertyUpgradeContracts: [PropertyUpgradeContract]?
     let contracts: [APIContract]
+    let pendingAllianceRequests: [PendingAllianceRequest]?
     
     // Helper to check if parallel actions are enabled
     var supportsParallelActions: Bool {
@@ -182,6 +183,7 @@ struct AllActionStatus: Codable {
         case craftingQueue = "crafting_queue"
         case craftingCosts = "crafting_costs"
         case propertyUpgradeContracts = "property_upgrade_contracts"
+        case pendingAllianceRequests = "pending_alliance_requests"
     }
     
     // Helper to get slots for a specific location

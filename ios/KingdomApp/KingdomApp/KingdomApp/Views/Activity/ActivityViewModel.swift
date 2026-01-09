@@ -85,6 +85,30 @@ class ActivityViewModel: ObservableObject {
             
         case .kingdomEvent:
             break  // Just informational, no action needed
+            
+        case .allianceRequestReceived:
+            // Navigate to actions view to accept/decline
+            if let allianceData = notification.allianceData {
+                print("Alliance request from: \(allianceData.initiatorRulerName ?? "unknown")")
+            }
+            
+        case .allianceRequestSent:
+            // Just informational - awaiting response
+            if let allianceData = notification.allianceData {
+                print("Alliance pending with: \(allianceData.targetEmpireName ?? "unknown")")
+            }
+            
+        case .allianceAccepted:
+            // Show alliance formed
+            if let allianceData = notification.allianceData {
+                print("Alliance formed with: \(allianceData.otherEmpireName ?? "unknown")")
+            }
+            
+        case .allianceDeclined:
+            // Just informational
+            if let allianceData = notification.allianceData {
+                print("Alliance declined by: \(allianceData.targetEmpireName ?? "unknown")")
+            }
         }
     }
     

@@ -13,7 +13,8 @@ import math
 import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS, AllianceInfo
+from routers.alliances import are_empires_allied, get_alliance_between
 from osm_service import (
     find_user_city_fast,
     fetch_nearby_city_candidates,
@@ -139,16 +140,36 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             kingdom.ruler_id != current_user.id if current_user else False
         )
         
-        # Determine relationship to player
+        # Determine relationship to player using Alliance table
         is_allied = False
         is_enemy = False
+        alliance_info = None
         
-        if user_kingdom_ids:
-            # Check if this kingdom is allied or at war with any of player's kingdoms
-            kingdom_allies = set(kingdom.allies) if kingdom.allies else set()
-            kingdom_enemies = set(kingdom.enemies) if kingdom.enemies else set()
+        if user_kingdom_ids and kingdom.ruler_id and kingdom.ruler_id != (current_user.id if current_user else None):
+            # Get this kingdom's empire ID
+            target_empire_id = kingdom.empire_id or kingdom.id
             
-            is_allied = bool(user_kingdom_ids & kingdom_allies)
+            # Check each of user's ruled kingdoms for alliance
+            for user_kingdom_id in user_kingdom_ids:
+                user_kingdom = db.query(Kingdom).filter(Kingdom.id == user_kingdom_id).first()
+                if user_kingdom:
+                    user_empire_id = user_kingdom.empire_id or user_kingdom.id
+                    
+                    # Check if allied using the Alliance table
+                    if are_empires_allied(db, user_empire_id, target_empire_id):
+                        is_allied = True
+                        # Get alliance details for display
+                        alliance = get_alliance_between(db, user_empire_id, target_empire_id)
+                        if alliance:
+                            alliance_info = {
+                                "id": alliance.id,
+                                "days_remaining": alliance.days_remaining,
+                                "expires_at": alliance.expires_at.isoformat() if alliance.expires_at else None
+                            }
+                        break
+            
+            # Legacy enemy check (still using JSONB for now - wars not implemented yet)
+            kingdom_enemies = set(kingdom.enemies) if kingdom.enemies else set()
             is_enemy = bool(user_kingdom_ids & kingdom_enemies)
         
         # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
@@ -223,9 +244,10 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             travel_fee=kingdom.travel_fee,
             can_claim=can_claim,
             can_declare_war=can_interact,
-            can_form_alliance=can_interact,
+            can_form_alliance=can_interact and not is_allied,  # Can't form if already allied
             is_allied=is_allied,
-            is_enemy=is_enemy
+            is_enemy=is_enemy,
+            alliance_info=AllianceInfo(**alliance_info) if alliance_info else None
         )
     
     return result

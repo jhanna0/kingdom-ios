@@ -238,50 +238,50 @@ struct NotificationCard: View {
         .padding(.horizontal)
     }
     
+    // MARK: - Dynamic from Backend (no switch statements!)
+    
     private var iconForNotification: String {
-        switch notification.type {
-        case .coupVoteNeeded, .coupInProgress, .coupAgainstYou:
-            return "crown.fill"
-        case .coupResolved:
-            return "flag.checkered"
-        case .invasionAgainstYou:
-            return "exclamationmark.shield.fill"
-        case .allyUnderAttack:
-            return "handshake.fill"
-        case .invasionDefenseNeeded, .invasionInProgress:
-            return "shield.fill"
-        case .invasionResolved:
-            return "flag.checkered"
-        case .contractReady:
-            return "checkmark.circle.fill"
-        case .levelUp:
-            return "star.fill"
-        case .skillPoints:
-            return "sparkles"
-        case .treasuryFull:
-            return "dollarsign.circle.fill"
-        case .checkinReady:
-            return "location.fill"
-        case .kingdomEvent:
-            return "scroll.fill"
-        }
+        // Use backend-provided icon, fallback to bell
+        notification.icon ?? "bell.fill"
     }
     
     private var iconColor: Color {
-        switch notification.priority {
-        case .critical: return KingdomTheme.Colors.buttonDanger
-        case .high: return KingdomTheme.Colors.buttonWarning
-        case .medium: return KingdomTheme.Colors.inkMedium
-        case .low: return KingdomTheme.Colors.inkMedium
+        // Use backend-provided color, fallback based on priority
+        if let colorName = notification.priorityColor {
+            return ThemeColorHelper.color(for: colorName)
         }
+        // Fallback
+        return KingdomTheme.Colors.inkMedium
     }
     
     private var borderColor: Color {
-        switch notification.priority {
-        case .critical: return KingdomTheme.Colors.buttonDanger.opacity(0.5)
-        case .high: return KingdomTheme.Colors.buttonWarning.opacity(0.5)
-        case .medium: return KingdomTheme.Colors.inkMedium.opacity(0.3)
-        case .low: return KingdomTheme.Colors.inkLight.opacity(0.3)
+        // Use backend-provided border color
+        if let colorName = notification.borderColor {
+            return ThemeColorHelper.color(for: colorName).opacity(0.5)
+        }
+        // Fallback
+        return KingdomTheme.Colors.inkMedium.opacity(0.3)
+    }
+}
+
+// MARK: - Theme Color Helper
+
+/// Maps backend color names to KingdomTheme.Colors
+/// SINGLE SOURCE OF TRUTH - backend sends color name, frontend renders
+struct ThemeColorHelper {
+    static func color(for name: String) -> Color {
+        switch name {
+        case "buttonDanger": return KingdomTheme.Colors.buttonDanger
+        case "buttonWarning": return KingdomTheme.Colors.buttonWarning
+        case "buttonSuccess": return KingdomTheme.Colors.buttonSuccess
+        case "buttonPrimary": return KingdomTheme.Colors.buttonPrimary
+        case "imperialGold": return KingdomTheme.Colors.imperialGold
+        case "inkDark": return KingdomTheme.Colors.inkDark
+        case "inkMedium": return KingdomTheme.Colors.inkMedium
+        case "inkLight": return KingdomTheme.Colors.inkLight
+        case "royalBlue": return KingdomTheme.Colors.royalBlue
+        case "royalEmerald": return KingdomTheme.Colors.royalEmerald
+        default: return KingdomTheme.Colors.inkMedium
         }
     }
 }

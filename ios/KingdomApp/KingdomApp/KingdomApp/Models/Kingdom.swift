@@ -54,6 +54,13 @@ struct IncomeRecord: Identifiable, Codable, Hashable {
     }
 }
 
+// Alliance info when kingdoms are allied
+struct KingdomAllianceInfo: Hashable {
+    let id: Int
+    let daysRemaining: Int
+    let expiresAt: Date?
+}
+
 
 struct Kingdom: Identifiable, Equatable, Hashable {
     let id: String  // OSM ID - matches city_boundary_osm_id in backend
@@ -69,6 +76,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Relationship to player (from backend)
     var isAllied: Bool  // True if allied with any of player's kingdoms
     var isEnemy: Bool  // True if at war with any of player's kingdoms
+    var allianceInfo: KingdomAllianceInfo?  // Details about alliance if isAllied is true
     
     // Loading state
     var isCurrentCity: Bool  // True if user is currently inside this city (from API)

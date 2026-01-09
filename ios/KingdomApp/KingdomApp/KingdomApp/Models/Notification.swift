@@ -14,6 +14,13 @@ struct ActivityNotification: Codable, Identifiable {
     let coupData: CoupNotificationData?
     let invasionData: InvasionNotificationData?
     let eventData: KingdomEventData?
+    let allianceData: AllianceNotificationData?
+    
+    // DYNAMIC from backend - no switch statements needed!
+    let icon: String?  // SF Symbol name from backend
+    let iconColor: String?  // Theme color name from backend
+    let priorityColor: String?  // Priority-based color from backend
+    let borderColor: String?  // Border color from backend
     
     enum CodingKeys: String, CodingKey {
         case type, priority, title, message, action
@@ -22,6 +29,11 @@ struct ActivityNotification: Codable, Identifiable {
         case coupData = "coup_data"
         case invasionData = "invasion_data"
         case eventData = "event_data"
+        case allianceData = "alliance_data"
+        case icon
+        case iconColor = "icon_color"
+        case priorityColor = "priority_color"
+        case borderColor = "border_color"
     }
     
     enum NotificationType: String, Codable {
@@ -41,6 +53,11 @@ struct ActivityNotification: Codable, Identifiable {
         case invasionResolved = "invasion_resolved"
         // Kingdom events
         case kingdomEvent = "kingdom_event"
+        // Alliance events
+        case allianceRequestReceived = "alliance_request_received"
+        case allianceRequestSent = "alliance_request_sent"
+        case allianceAccepted = "alliance_accepted"
+        case allianceDeclined = "alliance_declined"
     }
     
     enum NotificationPriority: String, Codable {
@@ -170,6 +187,52 @@ struct InvasionNotificationData: Codable, Identifiable {
             return "\(minutes)m \(seconds)s"
         } else {
             return "\(seconds)s"
+        }
+    }
+}
+
+// MARK: - Alliance Notification Data
+
+struct AllianceNotificationData: Codable, Identifiable {
+    let id: Int
+    let initiatorEmpireId: String?
+    let initiatorEmpireName: String?
+    let initiatorRulerName: String?
+    let targetEmpireId: String?
+    let targetEmpireName: String?
+    let otherEmpireId: String?
+    let otherEmpireName: String?
+    let otherRulerName: String?
+    let hoursToRespond: Int?
+    let daysRemaining: Int?
+    let createdAt: String?
+    let proposalExpiresAt: String?
+    let expiresAt: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case initiatorEmpireId = "initiator_empire_id"
+        case initiatorEmpireName = "initiator_empire_name"
+        case initiatorRulerName = "initiator_ruler_name"
+        case targetEmpireId = "target_empire_id"
+        case targetEmpireName = "target_empire_name"
+        case otherEmpireId = "other_empire_id"
+        case otherEmpireName = "other_empire_name"
+        case otherRulerName = "other_ruler_name"
+        case hoursToRespond = "hours_to_respond"
+        case daysRemaining = "days_remaining"
+        case createdAt = "created_at"
+        case proposalExpiresAt = "proposal_expires_at"
+        case expiresAt = "expires_at"
+    }
+    
+    var hoursToRespondFormatted: String {
+        guard let hours = hoursToRespond else { return "Unknown" }
+        if hours > 24 {
+            let days = hours / 24
+            return "\(days) days"
+        } else {
+            return "\(hours) hours"
         }
     }
 }

@@ -13,6 +13,10 @@ struct KingdomInfoSheetView: View {
     @State private var showClaimError = false
     @State private var claimErrorMessage = ""
     @State private var isClaiming = false
+    @State private var isProposingAlliance = false
+    @State private var showAllianceResult = false
+    @State private var allianceResultMessage = ""
+    @State private var allianceResultSuccess = false
     
     var body: some View {
         NavigationStack {
@@ -307,8 +311,47 @@ struct KingdomInfoSheetView: View {
                     .padding(.horizontal)
                 }
                 
+                // Alliance status banner (if allied)
+                if kingdom.isAllied, let allianceInfo = kingdom.allianceInfo {
+                    HStack(spacing: KingdomTheme.Spacing.medium) {
+                        Image(systemName: "handshake.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                                cornerRadius: 10,
+                                shadowOffset: 2,
+                                borderWidth: 2
+                            )
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Allied Kingdom")
+                                .font(FontStyles.headingMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text("\(allianceInfo.daysRemaining) days remaining")
+                                .font(FontStyles.labelMedium)
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "checkmark.shield.fill")
+                            .font(.title)
+                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                    }
+                    .padding(KingdomTheme.Spacing.medium)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.1), cornerRadius: 12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(KingdomTheme.Colors.buttonSuccess, lineWidth: 2)
+                    )
+                    .padding(.horizontal)
+                }
+                
                 // Action buttons - Medieval war council style (backend controls visibility)
-                if kingdom.canDeclareWar || kingdom.canFormAlliance {
+                if kingdom.canDeclareWar || kingdom.canFormAlliance || !kingdom.isAllied {
                     Rectangle()
                         .fill(Color.black)
                         .frame(height: 2)
@@ -331,26 +374,50 @@ struct KingdomInfoSheetView: View {
                                 .padding(KingdomTheme.Spacing.medium)
                                 .foregroundColor(.white)
                             }
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
                         }
                         
                         if kingdom.canFormAlliance {
                             Button(action: {
-                                // TODO: Implement form alliance
-                                print("Form alliance with \(kingdom.name)")
+                                isProposingAlliance = true
+                                Task {
+                                    await proposeAlliance()
+                                }
                             }) {
                                 HStack(spacing: 8) {
-                                    Image(systemName: "hand.raised.fill")
-                                        .font(FontStyles.iconSmall)
-                                        .foregroundColor(.white)
-                                    Text("Form Alliance")
+                                    if isProposingAlliance {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(0.9)
+                                    } else {
+                                        Image(systemName: "handshake.fill")
+                                            .font(FontStyles.iconSmall)
+                                            .foregroundColor(.white)
+                                    }
+                                    Text(isProposingAlliance ? "Proposing..." : "Propose Alliance")
                                         .font(FontStyles.bodyMediumBold)
+                                    
+                                    Spacer()
+                                    
+                                    // Show cost
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "g.circle.fill")
+                                            .font(.caption)
+                                        Text("500")
+                                            .font(FontStyles.labelSmall)
+                                    }
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.black.opacity(0.2))
+                                    .cornerRadius(6)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(KingdomTheme.Spacing.medium)
                                 .foregroundColor(.white)
                             }
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
+                            .disabled(isProposingAlliance)
                         }
                         
                         Button(action: {
@@ -368,7 +435,7 @@ struct KingdomInfoSheetView: View {
                             .padding(KingdomTheme.Spacing.medium)
                             .foregroundColor(.white)
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -377,6 +444,33 @@ struct KingdomInfoSheetView: View {
             .padding(.top)
             }
             .background(KingdomTheme.Colors.parchment)
+        }
+        .alert(allianceResultSuccess ? "Alliance Proposed!" : "Alliance Failed", isPresented: $showAllianceResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(allianceResultMessage)
+        }
+    }
+    
+    // MARK: - Alliance Actions
+    
+    private func proposeAlliance() async {
+        do {
+            let response = try await APIClient.shared.proposeAlliance(targetEmpireId: kingdom.id)
+            
+            await MainActor.run {
+                isProposingAlliance = false
+                allianceResultSuccess = response.success
+                allianceResultMessage = response.message
+                showAllianceResult = true
+            }
+        } catch {
+            await MainActor.run {
+                isProposingAlliance = false
+                allianceResultSuccess = false
+                allianceResultMessage = error.localizedDescription
+                showAllianceResult = true
+            }
         }
     }
     

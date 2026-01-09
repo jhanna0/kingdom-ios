@@ -81,6 +81,13 @@ struct LocationData: Codable {
 
 // MARK: - City Boundary Models
 
+/// Alliance info when kingdoms are allied
+struct AllianceInfo: Codable {
+    let id: Int
+    let days_remaining: Int
+    let expires_at: String?
+}
+
 /// Kingdom data attached to a city boundary response
 /// FULLY DYNAMIC - buildings array contains all building data with upgrade costs
 struct CityKingdomData: Codable {
@@ -102,6 +109,7 @@ struct CityKingdomData: Codable {
     let can_form_alliance: Bool  // Backend determines if current user can form alliance
     let is_allied: Bool  // True if allied with any of player's kingdoms
     let is_enemy: Bool  // True if at war with any of player's kingdoms
+    let alliance_info: AllianceInfo?  // Details about alliance if is_allied is true
 }
 
 struct CityBoundaryResponse: Codable {
