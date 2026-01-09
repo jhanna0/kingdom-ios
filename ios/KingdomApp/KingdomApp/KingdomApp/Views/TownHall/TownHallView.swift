@@ -11,10 +11,10 @@ struct TownHallView: View {
                 // Header
                 VStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: "building.columns.fill")
-                        .font(.system(size: 60))
+                        .font(FontStyles.iconExtraLarge)
                         .foregroundColor(.white)
-                        .frame(width: 80, height: 80)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
+                        .frame(width: 48, height: 48)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
                     
                     Text("Town Hall")
                         .font(FontStyles.displayMedium)
@@ -88,7 +88,7 @@ struct TownHallView: View {
                 
                 Spacer(minLength: 40)
             }
-            .padding()
+            .padding(.top)
         }
         .background(KingdomTheme.Colors.parchment)
         .navigationTitle("Town Hall")
@@ -109,34 +109,34 @@ struct TownHallActivityCard: View {
     let badge: String?
     
     var body: some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
+        HStack(spacing: 10) {
             // Icon
             Image(systemName: icon)
-                .font(.system(size: 32, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
-                .frame(width: 70, height: 70)
-                .brutalistBadge(backgroundColor: color, cornerRadius: 16, shadowOffset: 3, borderWidth: 3)
+                .frame(width: 32, height: 32)
+                .brutalistBadge(backgroundColor: color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
             
             // Content
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(title)
-                        .font(FontStyles.headingMedium)
+                        .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     if let badge = badge {
                         Text(badge)
                             .font(FontStyles.labelTiny)
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
                             .background(color)
-                            .cornerRadius(6)
+                            .cornerRadius(4)
                     }
                 }
                 
                 Text(description)
-                    .font(FontStyles.bodySmall)
+                    .font(FontStyles.labelTiny)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
@@ -144,11 +144,13 @@ struct TownHallActivityCard: View {
             
             // Chevron
             Image(systemName: "chevron.right")
-                .font(FontStyles.iconMedium)
+                .font(FontStyles.iconMini)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
-        .padding(KingdomTheme.Spacing.medium)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
+        .padding(10)
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
         .padding(.horizontal)
     }
 }
@@ -161,19 +163,19 @@ struct TownHallComingSoonCard: View {
     let description: String
     
     var body: some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
+        HStack(spacing: 10) {
             // Icon (dimmed)
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
-                .frame(width: 60, height: 60)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkLight, cornerRadius: 14, shadowOffset: 2, borderWidth: 2)
+                .frame(width: 32, height: 32)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkLight, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
             
             // Content
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(title)
-                        .font(FontStyles.bodyMediumBold)
+                        .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     Text("Soon")
@@ -186,19 +188,19 @@ struct TownHallComingSoonCard: View {
                 }
                 
                 Text(description)
-                    .font(FontStyles.bodySmall)
+                    .font(FontStyles.labelTiny)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
             }
             
             Spacer()
         }
-        .padding(KingdomTheme.Spacing.small)
+        .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(KingdomTheme.Colors.parchmentLight.opacity(0.5))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5]))
                         .foregroundColor(KingdomTheme.Colors.inkLight.opacity(0.3))
                 )
         )

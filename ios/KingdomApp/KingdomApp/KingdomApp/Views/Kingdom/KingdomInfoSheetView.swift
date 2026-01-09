@@ -17,10 +17,12 @@ struct KingdomInfoSheetView: View {
     @State private var showAllianceResult = false
     @State private var allianceResultMessage = ""
     @State private var allianceResultSuccess = false
+    @State private var showTownHall = false
+    @State private var showTownPub = false
+    @State private var showMarket = false
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
                 // Header with medieval styling
                 HStack(alignment: .top, spacing: 12) {
@@ -443,12 +445,47 @@ struct KingdomInfoSheetView: View {
             }
             .padding(.top)
             }
-            .background(KingdomTheme.Colors.parchment)
-        }
+        .background(KingdomTheme.Colors.parchment)
         .alert(allianceResultSuccess ? "Alliance Proposed!" : "Alliance Failed", isPresented: $showAllianceResult) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(allianceResultMessage)
+        }
+        .fullScreenCover(isPresented: $showTownHall) {
+            NavigationStack {
+                TownHallView(kingdom: kingdom, playerId: player.playerId)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button { showTownHall = false } label: {
+                                Image(systemName: "xmark")
+                            }
+                        }
+                    }
+            }
+        }
+        .fullScreenCover(isPresented: $showTownPub) {
+            NavigationStack {
+                TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button { showTownPub = false } label: {
+                                Image(systemName: "xmark")
+                            }
+                        }
+                    }
+            }
+        }
+        .fullScreenCover(isPresented: $showMarket) {
+            NavigationStack {
+                MarketView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button { showMarket = false } label: {
+                                Image(systemName: "xmark")
+                            }
+                        }
+                    }
+            }
         }
     }
     
@@ -615,13 +652,17 @@ struct KingdomInfoSheetView: View {
         
         // Make Town Hall and Market tappable
         if building.type == "townhall" && isPlayerInside {
-            if isBuilt {
-                NavigationLink { TownHallView(kingdom: kingdom, playerId: player.playerId) } label: { content }
-            } else {
-                NavigationLink { TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name) } label: { content }
-            }
+            Button {
+                if isBuilt {
+                    showTownHall = true
+                } else {
+                    showTownPub = true
+                }
+            } label: { content }
+            .buttonStyle(.plain)
         } else if building.type == "market" && isBuilt && isPlayerInside {
-            NavigationLink { MarketView() } label: { content }
+            Button { showMarket = true } label: { content }
+                .buttonStyle(.plain)
         } else {
             content
         }
