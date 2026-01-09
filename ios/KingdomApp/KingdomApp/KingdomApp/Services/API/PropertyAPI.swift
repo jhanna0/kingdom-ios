@@ -107,13 +107,12 @@ class PropertyAPI {
     struct PropertyUpgradeStatusItem: Codable {
         let property_id: String
         let current_tier: Int
+        let max_tier: Int?
         let can_upgrade: Bool
-        let upgrade_cost: Int
-        let wood_required: Int
+        let resource_costs: [ResourceCost]  // DYNAMIC - any resources!
         let actions_required: Int
         let can_afford: Bool
-        let has_enough_gold: Bool
-        let has_enough_wood: Bool
+        let missing_resources: [MissingResource]?
         let active_contract: ActiveUpgradeContract?
     }
     
@@ -172,20 +171,31 @@ class PropertyAPI {
     
     // MARK: - Get Upgrade Status
     
+    /// Dynamic resource cost - any resource type!
+    struct ResourceCost: Codable {
+        let resource: String
+        let amount: Int
+        let display_name: String
+        let icon: String
+        let player_has: Int?
+        let has_enough: Bool?
+    }
+    
+    struct MissingResource: Codable {
+        let resource: String
+        let needed: Int
+    }
+    
     struct PropertyUpgradeStatus: Codable {
         let property_id: String
         let current_tier: Int
         let max_tier: Int
         let can_upgrade: Bool
-        let upgrade_cost: Int
-        let wood_required: Int
+        let resource_costs: [ResourceCost]  // Dynamic list of ALL costs!
         let actions_required: Int
         let can_afford: Bool
-        let has_enough_gold: Bool
-        let has_enough_wood: Bool
+        let missing_resources: [MissingResource]?
         let active_contract: ActiveUpgradeContract?
-        let player_gold: Int
-        let player_wood: Int
         let player_building_skill: Int
     }
     

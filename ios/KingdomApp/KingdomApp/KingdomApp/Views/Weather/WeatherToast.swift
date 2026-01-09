@@ -8,14 +8,23 @@ struct WeatherToast: View {
     @State private var opacity: Double = 1.0
     
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: weatherIcon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+        VStack(alignment: .trailing, spacing: 2) {
+            HStack(spacing: 6) {
+                Image(systemName: weatherIcon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text("\(weather.display_description) · \(Int(weather.temperature_f))°")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+            }
             
-            Text("\(weather.display_description) · \(Int(weather.temperature_f))°")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
+            Text(weather.flavor_text)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(.white.opacity(0.85))
+                .italic()
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 180, alignment: .trailing)
         }
         .shadow(color: .black.opacity(0.6), radius: 3, x: 0, y: 1)
         .opacity(opacity)

@@ -29,13 +29,13 @@ class TierManager {
         // Resources loaded from backend ONLY - no defaults!
         resources = [:]
         
-        // Property defaults
+        // Property defaults (icons match backend PROPERTY_TIERS)
         properties = PropertyTiersData(maxTier: 5, tiers: [
-            1: PropertyTierInfo(name: "Land", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil),
-            2: PropertyTierInfo(name: "House", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil),
-            3: PropertyTierInfo(name: "Workshop", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil),
-            4: PropertyTierInfo(name: "Beautiful Property", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil),
-            5: PropertyTierInfo(name: "Estate", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil)
+            1: PropertyTierInfo(name: "Land", icon: "square.dashed", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil),
+            2: PropertyTierInfo(name: "House", icon: "house.fill", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil),
+            3: PropertyTierInfo(name: "Workshop", icon: "hammer.fill", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil),
+            4: PropertyTierInfo(name: "Beautiful Property", icon: "building.columns.fill", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil),
+            5: PropertyTierInfo(name: "Estate", icon: "shield.fill", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil)
         ])
         
         // Skill tier names
@@ -98,6 +98,7 @@ class TierManager {
                     if let tier = Int(key) {
                         tiers[tier] = PropertyTierInfo(
                             name: value.name,
+                            icon: value.icon ?? "star.fill",
                             description: value.description,
                             benefits: value.benefits,
                             baseGoldCost: value.base_gold_cost,
@@ -221,8 +222,16 @@ class TierManager {
     
     // MARK: - Property Accessors
     
+    var propertyMaxTier: Int {
+        properties?.maxTier ?? 5
+    }
+    
     func propertyTierName(_ tier: Int) -> String {
         properties?.tiers[tier]?.name ?? "Tier \(tier)"
+    }
+    
+    func propertyTierIcon(_ tier: Int) -> String {
+        properties?.tiers[tier]?.icon ?? "star.fill"
     }
     
     func propertyTierDescription(_ tier: Int) -> String {
@@ -405,6 +414,7 @@ struct PropertyTiersResponseData: Codable {
 
 struct PropertyTierInfoResponse: Codable {
     let name: String
+    let icon: String?
     let description: String
     let benefits: [String]
     let base_gold_cost: Int?
@@ -475,6 +485,7 @@ struct PropertyTiersData {
 
 struct PropertyTierInfo {
     let name: String
+    let icon: String
     let description: String
     let benefits: [String]
     let baseGoldCost: Int?

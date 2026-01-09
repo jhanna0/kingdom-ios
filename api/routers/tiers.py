@@ -8,49 +8,100 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/tiers", tags=["tiers"])
 
 
-# ===== PROPERTY TIERS (1-5) =====
+# ===== PROPERTY TIERS - FULLY DYNAMIC =====
+# Add new tiers here and they'll appear in iOS automatically!
+# upgrade_costs: Resources required to upgrade TO this tier (from previous tier)
+# base_actions: Base actions required (reduced by building skill)
 
 PROPERTY_TIERS = {
     1: {
         "name": "Land",
+        "icon": "square.dashed",
         "description": "Cleared land with travel benefits",
         "benefits": [
             "Free travel to this kingdom"
-        ]
+        ],
+        "upgrade_costs": [
+            {"resource": "gold", "amount": 500}  # Base price, modified by population
+        ],
+        "base_actions": 5
     },
     2: {
         "name": "House",
+        "icon": "house.fill",
         "description": "Basic dwelling",
         "benefits": [
             "All Land benefits",
             "Ability to train skills in this kingdom"
-        ]
+        ],
+        "upgrade_costs": [
+            {"resource": "gold", "amount": 500},
+            {"resource": "wood", "amount": 40}
+        ],
+        "base_actions": 7
     },
     3: {
         "name": "Workshop",
+        "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": [
             "All House benefits",
             "Allows crafting of weapons and armor"
-        ]
+        ],
+        "upgrade_costs": [
+            {"resource": "gold", "amount": 1000},
+            {"resource": "wood", "amount": 80},
+            {"resource": "iron", "amount": 50}
+        ],
+        "base_actions": 9
     },
     4: {
         "name": "Beautiful Property",
+        "icon": "building.columns.fill",
         "description": "Luxurious property",
         "benefits": [
             "All Workshop benefits",
             "Pay 50% less tax on all income"
-        ]
+        ],
+        "upgrade_costs": [
+            {"resource": "gold", "amount": 2000},
+            {"resource": "wood", "amount": 160}
+        ],
+        "base_actions": 11
     },
     5: {
         "name": "Defensive Walls",
+        "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": [
             "All Beautiful Property benefits",
             "If your kingdom is invaded, a 50% less chance your property gets destroyed"
-        ]
+        ],
+        "upgrade_costs": [
+            {"resource": "gold", "amount": 4000},
+            {"resource": "wood", "amount": 320},
+            {"resource": "iron", "amount": 100}
+        ],
+        "base_actions": 13
     }
 }
+
+
+def get_property_max_tier() -> int:
+    """Get max property tier dynamically"""
+    return max(PROPERTY_TIERS.keys())
+
+
+def get_property_upgrade_costs(to_tier: int) -> list:
+    """Get upgrade costs for a specific tier"""
+    tier_data = PROPERTY_TIERS.get(to_tier, {})
+    return tier_data.get("upgrade_costs", [])
+
+
+def get_property_base_actions(to_tier: int) -> int:
+    """Get base actions required for a tier"""
+    tier_data = PROPERTY_TIERS.get(to_tier, {})
+    return tier_data.get("base_actions", 5)
 
 
 # ===== SKILL TIERS (1-10) =====
@@ -599,7 +650,7 @@ def get_all_tiers():
             "types": RESOURCES  # Import from resources.py
         },
         "properties": {
-            "max_tier": 5,
+            "max_tier": get_property_max_tier(),
             "tiers": {str(k): v for k, v in PROPERTY_TIERS.items()}
         },
         "skills": {

@@ -1,13 +1,10 @@
 import Foundation
 
 // MARK: - Property System
-// ONE property per kingdom - progressive 5-tier upgrade system
+// ONE property per kingdom - progressive tier upgrade system
 // Players buy land (T1) in a kingdom, then upgrade it to unlock more benefits
-// T1: Land (travel benefits)
-// T2: House (residence)
-// T3: Workshop (crafting)
-// T4: Beautiful Property (tax exemption)
-// T5: Estate (conquest protection)
+// Tier names, descriptions, and max tier are fetched from backend via TierManager
+// See api/routers/tiers.py PROPERTY_TIERS for the source of truth
 
 struct Property: Identifiable, Codable, Hashable {
     let id: String
@@ -16,7 +13,7 @@ struct Property: Identifiable, Codable, Hashable {
     let ownerId: String
     let ownerName: String
     
-    var tier: Int  // 1-5, each tier unlocks new features
+    var tier: Int  // Each tier unlocks new features (max tier from backend)
     var location: String?  // "north", "south", "east", "west"
     let purchasedAt: Date
     var lastUpgraded: Date?
@@ -84,7 +81,7 @@ struct Property: Identifiable, Codable, Hashable {
     // MARK: - Mutations
     
     mutating func upgrade() -> Bool {
-        guard tier < 5 else { return false }
+        guard tier < TierManager.shared.propertyMaxTier else { return false }
         tier += 1
         lastUpgraded = Date()
         return true

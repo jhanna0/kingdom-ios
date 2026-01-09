@@ -42,7 +42,7 @@ struct PropertyDetailView: View {
                 locationCard
                 
                 // Upgrade section
-                if property.tier < 5 {
+                if property.tier < TierManager.shared.propertyMaxTier {
                     upgradeCard
                 } else {
                     maxLevelCard
@@ -87,9 +87,9 @@ struct PropertyDetailView: View {
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
             
-            // Tier progress with brutalist style
+            // Tier progress with brutalist style (dynamic from backend)
             HStack(spacing: 8) {
-                ForEach(1...5, id: \.self) { tier in
+                ForEach(1...TierManager.shared.propertyMaxTier, id: \.self) { tier in
                     Circle()
                         .fill(tier <= property.tier ? tierColor : KingdomTheme.Colors.inkDark.opacity(0.2))
                         .frame(width: 14, height: 14)
@@ -109,7 +109,7 @@ struct PropertyDetailView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Tier Visual
+    // MARK: - Tier Visual (FULLY DYNAMIC from backend)
     
     private var tierVisual: some View {
         ZStack {
@@ -122,68 +122,14 @@ struct PropertyDetailView: View {
                 )
                 .frame(height: 120)
             
-            // Tier-specific illustration
-            switch property.tier {
-            case 1:
-                // T1: Empty lot
-                VStack(spacing: 8) {
-                    Image(systemName: "square.dashed")
-                        .font(.system(size: 60, weight: .regular))
-                        .foregroundColor(tierColor)
-                    Text("Vacant Lot")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-            case 2:
-                // T2: Simple house
-                VStack(spacing: 8) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(tierColor)
-                    Text("Simple House")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-            case 3:
-                // T3: House with workshop
-                HStack(spacing: 12) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(tierColor)
-                    Image(systemName: "hammer.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(tierColor.opacity(0.8))
-                        .offset(y: 12)
-                }
-                
-            case 4:
-                // T4: Beautiful property
-                VStack(spacing: 8) {
-                    Image(systemName: "building.columns.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(tierColor)
-                    Text("Luxurious Estate")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-            case 5:
-                // T5: Estate with crown
-                VStack(spacing: -8) {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    Image(systemName: "building.columns.fill")
-                        .font(.system(size: 55))
-                        .foregroundColor(tierColor)
-                }
-                
-            default:
-                Image(systemName: "questionmark")
+            // Icon and name from backend
+            VStack(spacing: 8) {
+                Image(systemName: TierManager.shared.propertyTierIcon(property.tier))
                     .font(.system(size: 60))
                     .foregroundColor(tierColor)
+                Text(TierManager.shared.propertyTierName(property.tier))
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
     }
@@ -239,24 +185,17 @@ struct PropertyDetailView: View {
                 
                 Spacer()
                 
+                // FULLY DYNAMIC - iterate over all resource costs from backend
                 if let status = upgradeStatus {
                     VStack(alignment: .trailing, spacing: 4) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .font(.system(size: 12))
-                            Text("\(status.upgrade_cost)g")
-                                .font(FontStyles.headingSmall)
-                        }
-                        .foregroundColor(status.has_enough_gold ? KingdomTheme.Colors.inkMedium : .red)
-                        
-                        if status.wood_required > 0 {
+                        ForEach(status.resource_costs, id: \.resource) { cost in
                             HStack(spacing: 4) {
-                                Image(systemName: "tree.fill")
+                                Image(systemName: cost.icon)
                                     .font(.system(size: 12))
-                                Text("\(status.wood_required) wood")
+                                Text("\(cost.amount) \(cost.display_name)")
                                     .font(FontStyles.labelMedium)
                             }
-                            .foregroundColor(status.has_enough_wood ? KingdomTheme.Colors.inkMedium : .red)
+                            .foregroundColor((cost.has_enough ?? true) ? KingdomTheme.Colors.inkMedium : .red)
                         }
                     }
                 }
@@ -371,17 +310,13 @@ struct PropertyDetailView: View {
                     ProgressView()
                         .padding()
                 } else if let status = upgradeStatus {
+                    // FULLY DYNAMIC button text
                     Button(action: purchaseUpgrade) {
                         HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
                                 .font(.system(size: 14, weight: .bold))
-                            if status.wood_required > 0 {
-                                Text("Start Upgrade (\(status.upgrade_cost)g, \(status.wood_required) wood)")
-                                    .font(.system(size: 14, weight: .bold))
-                            } else {
-                                Text("Start Upgrade (\(status.upgrade_cost)g)")
-                                    .font(.system(size: 14, weight: .bold))
-                            }
+                            Text("Start Upgrade (\(formatResourceCosts(status.resource_costs)))")
+                                .font(.system(size: 14, weight: .bold))
                         }
                     }
                     .buttonStyle(.brutalist(
@@ -396,25 +331,17 @@ struct PropertyDetailView: View {
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
-                    // Show missing resources
-                    if !status.has_enough_gold {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(FontStyles.iconMini)
-                            Text("Need \(status.upgrade_cost - status.player_gold) more gold")
-                                .font(FontStyles.labelSmall)
+                    // FULLY DYNAMIC - show missing resources from backend
+                    if let missing = status.missing_resources, !missing.isEmpty {
+                        ForEach(missing, id: \.resource) { item in
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .font(FontStyles.iconMini)
+                                Text("Need \(item.needed) more \(item.resource)")
+                                    .font(FontStyles.labelSmall)
+                            }
+                            .foregroundColor(.red)
                         }
-                        .foregroundColor(.red)
-                    }
-                    
-                    if !status.has_enough_wood && status.wood_required > 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(FontStyles.iconMini)
-                            Text("Need \(status.wood_required) wood. Chop wood at a lumbermill!")
-                                .font(FontStyles.labelSmall)
-                        }
-                        .foregroundColor(.red)
                     }
                     
                     if hasAnyPropertyUpgradeInProgress {
@@ -446,23 +373,11 @@ struct PropertyDetailView: View {
     }
     
     private var nextTierName: String {
-        switch property.tier + 1 {
-        case 2: return "House"
-        case 3: return "Workshop"
-        case 4: return "Beautiful Property"
-        case 5: return "Estate"
-        default: return "Next Tier"
-        }
+        TierManager.shared.propertyTierName(property.tier + 1)
     }
     
     private var nextTierDescription: String {
-        switch property.tier + 1 {
-        case 2: return "Build a personal residence"
-        case 3: return "Add workshop for crafting"
-        case 4: return "Luxurious estate with tax exemption"
-        case 5: return "Fortified estate with maximum protection"
-        default: return ""
-        }
+        TierManager.shared.propertyTierDescription(property.tier + 1)
     }
     
     // MARK: - Max Level Card
@@ -491,23 +406,12 @@ struct PropertyDetailView: View {
     
     
     private func tierNameFor(_ tier: Int) -> String {
-        switch tier {
-        case 2: return "House"
-        case 3: return "Workshop"
-        case 4: return "Beautiful Property"
-        case 5: return "Estate"
-        default: return "Tier \(tier)"
-        }
+        TierManager.shared.propertyTierName(tier)
     }
     
     private func tierBenefitsFor(_ tier: Int) -> String {
-        switch tier {
-        case 2: return "Residence"
-        case 3: return "Crafting"
-        case 4: return "No taxes"
-        case 5: return "Conquest protection"
-        default: return ""
-        }
+        // Return first benefit as summary, or empty string
+        TierManager.shared.propertyTierBenefits(tier).first ?? ""
     }
     
     // MARK: - Helper Functions
@@ -614,6 +518,17 @@ struct PropertyDetailView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    /// Format resource costs for button display - FULLY DYNAMIC
+    private func formatResourceCosts(_ costs: [PropertyAPI.ResourceCost]) -> String {
+        costs.map { cost in
+            if cost.resource == "gold" {
+                return "\(cost.amount)g"
+            } else {
+                return "\(cost.amount) \(cost.display_name.lowercased())"
+            }
+        }.joined(separator: ", ")
     }
 }
 

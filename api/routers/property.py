@@ -65,39 +65,92 @@ def get_tier_name(tier: int) -> str:
     return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
 
 
-def calculate_land_price(population: int) -> int:
-    """Calculate land purchase price based on kingdom population"""
-    base_price = 500
-    population_multiplier = 1.0 + (population / 50.0)
-    return int(base_price * population_multiplier)
-
-
-def calculate_upgrade_cost(current_tier: int) -> int:
-    """Calculate upgrade cost for next tier"""
-    if current_tier >= 5:
-        return 0
-    base_price = 500
-    next_tier = current_tier + 1
-    return base_price * (2 ** (next_tier - 2))
-
-
-def calculate_wood_required(current_tier: int) -> int:
-    """Calculate wood required for next tier - exponential scaling
-    
-    Formula: 10 * (2 ** tier)
+def get_upgrade_resource_costs(current_tier: int, population: int = 0) -> list:
     """
+    Get upgrade costs for next tier - FULLY DYNAMIC from PROPERTY_TIERS!
+    Returns list of {resource, amount, display_name, icon}
+    """
+    from routers.tiers import PROPERTY_TIERS, get_property_max_tier
+    from routers.resources import RESOURCES
+    
     next_tier = current_tier + 1
-    if next_tier <= 1:
-        return 0  # T1 land clearing doesn't need wood
-    return int(10 * (2 ** next_tier))
+    if current_tier >= get_property_max_tier():
+        return []
+    
+    tier_data = PROPERTY_TIERS.get(next_tier, {})
+    base_costs = tier_data.get("upgrade_costs", [])
+    
+    result = []
+    for cost in base_costs:
+        resource_id = cost["resource"]
+        amount = cost["amount"]
+        
+        # Special case: T1 land price scales with population
+        if next_tier == 1 and resource_id == "gold" and population > 0:
+            population_multiplier = 1.0 + (population / 50.0)
+            amount = int(amount * population_multiplier)
+        
+        # Get display info from RESOURCES
+        resource_info = RESOURCES.get(resource_id, {})
+        
+        result.append({
+            "resource": resource_id,
+            "amount": amount,
+            "display_name": resource_info.get("display_name", resource_id.capitalize()),
+            "icon": resource_info.get("icon", "questionmark.circle")
+        })
+    
+    return result
 
 
 def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 0) -> int:
     """Calculate how many actions required to complete property upgrade"""
-    base_actions = 5 + (current_tier * 2)
+    from routers.tiers import PROPERTY_TIERS, get_property_max_tier
+    
+    next_tier = current_tier + 1
+    if current_tier >= get_property_max_tier():
+        return 0
+    
+    tier_data = PROPERTY_TIERS.get(next_tier, {})
+    base_actions = tier_data.get("base_actions", 5 + (current_tier * 2))
+    
     building_reduction = 1.0 - min(building_skill * 0.05, 0.5)
     reduced_actions = int(base_actions * building_reduction)
     return max(1, reduced_actions)
+
+
+def check_player_can_afford(state, resource_costs: list) -> dict:
+    """Check if player can afford all resource costs"""
+    results = {"can_afford": True, "missing": []}
+    
+    for cost in resource_costs:
+        resource_id = cost["resource"]
+        required = cost["amount"]
+        
+        # Get player's amount of this resource
+        player_amount = getattr(state, resource_id, 0) or 0
+        
+        has_enough = player_amount >= required
+        cost["player_has"] = player_amount
+        cost["has_enough"] = has_enough
+        
+        if not has_enough:
+            results["can_afford"] = False
+            results["missing"].append({
+                "resource": resource_id,
+                "needed": required - player_amount
+            })
+    
+    return results
+
+
+def deduct_resource_costs(state, resource_costs: list):
+    """Deduct resources from player state"""
+    for cost in resource_costs:
+        resource_id = cost["resource"]
+        amount = cost["amount"]
+        current = getattr(state, resource_id, 0) or 0
+        setattr(state, resource_id, current - amount)
 
 
 def property_to_response(prop: Property) -> PropertyResponse:
@@ -185,7 +238,9 @@ def get_property_status(
                 "population": kingdom.population
             }
             
-            land_price = calculate_land_price(kingdom.population)
+            # Get land price from dynamic resource costs (tier 0 -> 1)
+            land_costs = get_upgrade_resource_costs(0, population=kingdom.population)
+            land_price = next((c["amount"] for c in land_costs if c["resource"] == "gold"), 500)
             
             # Check if player already owns property in THIS kingdom
             already_owns_property_in_current_kingdom = any(
@@ -220,12 +275,16 @@ def get_property_status(
         and can_afford
     )
     
-    # Get upgrade status for each property
+    # Get upgrade status for each property - FULLY DYNAMIC
+    from routers.tiers import get_property_max_tier
+    max_tier = get_property_max_tier()
+    
     properties_upgrade_status = []
     for prop in properties:
-        if prop.tier < 5:
-            upgrade_cost = calculate_upgrade_cost(prop.tier)
-            wood_required = calculate_wood_required(prop.tier)
+        if prop.tier < max_tier:
+            # Get dynamic resource costs
+            resource_costs = get_upgrade_resource_costs(prop.tier)
+            affordability = check_player_can_afford(state, resource_costs)
             actions_required = calculate_upgrade_actions_required(prop.tier, state.building_skill)
             
             # Find active contract for this property
@@ -238,13 +297,12 @@ def get_property_status(
             properties_upgrade_status.append({
                 "property_id": prop.id,
                 "current_tier": prop.tier,
-                "can_upgrade": prop.tier < 5,
-                "upgrade_cost": upgrade_cost,
-                "wood_required": wood_required,
+                "max_tier": max_tier,
+                "can_upgrade": prop.tier < max_tier,
+                "resource_costs": resource_costs,  # Dynamic list!
                 "actions_required": actions_required,
-                "can_afford": state.gold >= upgrade_cost and state.wood >= wood_required,
-                "has_enough_gold": state.gold >= upgrade_cost,
-                "has_enough_wood": state.wood >= wood_required,
+                "can_afford": affordability["can_afford"],
+                "missing_resources": affordability["missing"],
                 "active_contract": active_contract
             })
     
@@ -423,10 +481,14 @@ def start_property_upgrade(
             detail="Property not found or not owned by you"
         )
     
-    if property.tier >= 5:
+    # FULLY DYNAMIC - check max tier from config
+    from routers.tiers import get_property_max_tier
+    max_tier = get_property_max_tier()
+    
+    if property.tier >= max_tier:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Property is already at maximum tier (5)"
+            detail=f"Property is already at maximum tier ({max_tier})"
         )
     
     # Check if ANY property upgrade in progress
@@ -442,25 +504,23 @@ def start_property_upgrade(
             detail="You already have a property upgrade in progress. Complete it first."
         )
     
-    upgrade_cost = calculate_upgrade_cost(property.tier)
-    wood_required = calculate_wood_required(property.tier)
+    # Get dynamic resource costs
+    resource_costs = get_upgrade_resource_costs(property.tier)
+    affordability = check_player_can_afford(state, resource_costs)
     
-    if state.gold < upgrade_cost:
+    if not affordability["can_afford"]:
+        missing = affordability["missing"]
+        missing_str = ", ".join([f"{m['needed']} more {m['resource']}" for m in missing])
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {upgrade_cost}g, have {state.gold}g"
-        )
-    
-    # Check wood requirements (ensure wood is not None)
-    player_wood = state.wood if state.wood is not None else 0
-    if player_wood < wood_required:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough wood. Need {wood_required} wood, have {state.wood} wood. Chop wood at a lumbermill!"
+            detail=f"Not enough resources. Need: {missing_str}"
         )
     
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill)
     next_tier = property.tier + 1
+    
+    # Calculate total gold for contract record (for backwards compat)
+    gold_paid = next((c["amount"] for c in resource_costs if c["resource"] == "gold"), 0)
     
     # Create contract
     contract = UnifiedContract(
@@ -472,13 +532,12 @@ def start_property_upgrade(
         tier=next_tier,
         target_id=property_id,
         actions_required=actions_required,
-        gold_paid=upgrade_cost,
-        wood_paid=wood_required
+        gold_paid=gold_paid
     )
     db.add(contract)
     
-    state.gold -= upgrade_cost
-    state.wood -= wood_required
+    # Deduct ALL resources dynamically
+    deduct_resource_costs(state, resource_costs)
     
     db.commit()
     db.refresh(contract)
@@ -492,8 +551,7 @@ def start_property_upgrade(
         "property_id": property_id,
         "from_tier": property.tier,
         "to_tier": next_tier,
-        "cost": upgrade_cost,
-        "wood_cost": wood_required,
+        "resource_costs": resource_costs,  # Return what was spent
         "actions_required": actions_required
     }
 
@@ -567,25 +625,23 @@ def get_property_upgrade_status(
             "status": "completed" if contract.completed_at else "in_progress"
         }
     
-    upgrade_cost = calculate_upgrade_cost(property.tier) if property.tier < 5 else 0
-    wood_required = calculate_wood_required(property.tier) if property.tier < 5 else 0
-    actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < 5 else 0
+    # FULLY DYNAMIC resource costs
+    from routers.tiers import get_property_max_tier
+    max_tier = get_property_max_tier()
     
-    player_wood = state.wood if state.wood is not None else 0
+    resource_costs = get_upgrade_resource_costs(property.tier) if property.tier < max_tier else []
+    affordability = check_player_can_afford(state, resource_costs) if resource_costs else {"can_afford": False, "missing": []}
+    actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < max_tier else 0
     
     return {
         "property_id": property_id,
         "current_tier": property.tier,
-        "max_tier": 5,
-        "can_upgrade": property.tier < 5,
-        "upgrade_cost": upgrade_cost,
-        "wood_required": wood_required,
+        "max_tier": max_tier,
+        "can_upgrade": property.tier < max_tier,
+        "resource_costs": resource_costs,  # Dynamic list of all costs!
         "actions_required": actions_required,
-        "can_afford": state.gold >= upgrade_cost and player_wood >= wood_required,
-        "has_enough_gold": state.gold >= upgrade_cost,
-        "has_enough_wood": player_wood >= wood_required,
+        "can_afford": affordability["can_afford"],
+        "missing_resources": affordability["missing"],
         "active_contract": active_contract_data,
-        "player_gold": state.gold,
-        "player_wood": player_wood,
         "player_building_skill": state.building_skill
     }
