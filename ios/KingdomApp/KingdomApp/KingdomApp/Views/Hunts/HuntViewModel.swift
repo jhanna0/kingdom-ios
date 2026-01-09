@@ -134,38 +134,29 @@ class HuntViewModel: ObservableObject {
         case .cancelled:
             uiState = .noHunt
         case .inProgress:
-            // If we're in an ANIMATION state, don't override
-            // But DO override phaseActive if phase is resolved!
+            // If we're in an ANIMATION or TRANSITION state, don't override
             switch uiState {
-            case .rolling, .rollRevealing, .resolving, .masterRollAnimation, .creatureReveal:
-                return
-            case .phaseComplete:
-                // Already showing complete, don't re-trigger
-                return
-            case .phaseActive(let currentPhase):
-                // Check if phase was resolved externally (e.g., page reload)
-                if let phaseState = hunt.phase_state, phaseState.is_resolved {
-                    uiState = .phaseComplete(currentPhase)
-                    return
-                }
-                // Otherwise stay in active state
+            case .rolling, .rollRevealing, .resolving, .masterRollAnimation, .creatureReveal, .phaseComplete, .phaseActive:
                 return
             default:
                 break
             }
             
-            // Determine current state from phase_state
+            // Determine current state from phase_state (only on initial load)
             if let phaseState = hunt.phase_state {
-                let phase = phaseState.huntPhase
                 if phaseState.is_resolved {
-                    // Phase completed - show result
-                    uiState = .phaseComplete(phase)
+                    // Phase resolved - if there's a next phase, show its intro
+                    if let next = nextPhase {
+                        uiState = .phaseIntro(next)
+                    } else {
+                        uiState = .results
+                    }
                 } else if phaseState.rounds_completed > 0 {
                     // Already started rolling - active phase
-                    uiState = .phaseActive(phase)
+                    uiState = .phaseActive(phaseState.huntPhase)
                 } else {
                     // Fresh phase - show intro
-                    uiState = .phaseIntro(phase)
+                    uiState = .phaseIntro(phaseState.huntPhase)
                 }
             } else if let nextPhase = nextPhase {
                 uiState = .phaseIntro(nextPhase)
@@ -220,8 +211,8 @@ class HuntViewModel: ObservableObject {
         await resolveCurrentPhase()
     }
     
-    /// User taps "Next" after master roll animation completes
-    /// Transitions to the result screen
+    /// User taps "Continue" after master roll animation completes
+    /// Goes directly to next phase or results - NO intermediate screens
     func userTappedNextAfterMasterRoll() async {
         guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
         
@@ -232,7 +223,11 @@ class HuntViewModel: ObservableObject {
            effects["animal_found"]?.boolValue == true {
             uiState = .creatureReveal
         } else {
-            uiState = .phaseComplete(currentPhase)
+            // Skip PhaseCompleteOverlay - go directly to next phase or results
+            currentPhaseResult = nil
+            roundResults = []
+            lastRollResult = nil
+            await advanceToNextPhase()
         }
     }
     
@@ -383,27 +378,30 @@ class HuntViewModel: ObservableObject {
         uiState = .masterRollAnimation(targetPhase)
         masterRollAnimating = true
         
-        // Animate the marker bouncing across the probability bar
-        // Start from 0 and quickly bounce around before landing on final value
-        for i in stride(from: 0, through: 100, by: 5) {
-            masterRollValue = (i + Int.random(in: -10...10)).clamped(to: 0...100)
-            try? await Task.sleep(nanoseconds: 30_000_000)
+        // SMOOTH animation - sweep across the bar then settle on final value
+        // Phase 1: Quick sweep from 0 to ~80 (building anticipation)
+        for i in stride(from: 0, through: 80, by: 4) {
+            masterRollValue = i
+            try? await Task.sleep(nanoseconds: 25_000_000) // 25ms per step
         }
         
-        // Slow down and approach final value
-        for i in 0..<10 {
-            let progress = Double(i) / 10.0
-            let targetValue = Int(Double(masterRollValue) * (1.0 - progress) + Double(value) * progress)
-            masterRollValue = targetValue
-            try? await Task.sleep(nanoseconds: 100_000_000)
+        // Phase 2: Slow down and home in on the final value
+        let startValue = masterRollValue
+        let steps = 15
+        for i in 1...steps {
+            let progress = Double(i) / Double(steps)
+            // Ease-out curve for smooth deceleration
+            let easedProgress = 1 - pow(1 - progress, 3)
+            masterRollValue = Int(Double(startValue) + (Double(value) - Double(startValue)) * easedProgress)
+            try? await Task.sleep(nanoseconds: 60_000_000) // 60ms per step (slowing down)
         }
         
-        // Land on final value
+        // Land on exact final value
         masterRollValue = value
         masterRollAnimating = false
         
         // Brief pause to show result
-        try? await Task.sleep(nanoseconds: 800_000_000)
+        try? await Task.sleep(nanoseconds: 600_000_000)
     }
     
     /// Update drop table displays based on phase update
@@ -499,7 +497,8 @@ class HuntViewModel: ObservableObject {
             let response = try await KingdomAPIService.shared.hunts.createHunt(kingdomId: kingdomId)
             if response.success {
                 hunt = response.hunt
-                syncUIState()
+                // Creator is auto-ready, just start immediately
+                await startHunt()
             } else {
                 error = response.message
                 showError = true
@@ -564,7 +563,10 @@ class HuntViewModel: ObservableObject {
     }
     
     func startHunt() async {
-        guard let huntId = hunt?.hunt_id else { return }
+        guard let huntId = hunt?.hunt_id else {
+            uiState = .noHunt
+            return
+        }
         
         do {
             let response = try await KingdomAPIService.shared.hunts.startHunt(huntId: huntId)
@@ -579,10 +581,12 @@ class HuntViewModel: ObservableObject {
             } else {
                 error = response.message
                 showError = true
+                syncUIState()  // Reset to correct state on failure
             }
         } catch {
             self.error = error.localizedDescription
             showError = true
+            syncUIState()  // Reset to correct state on failure
         }
     }
     

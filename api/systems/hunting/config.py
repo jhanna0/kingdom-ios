@@ -112,66 +112,99 @@ ANIMALS = {
 # from bad outcomes to good outcomes. Simple and visual!
 
 # --- TRACKING: Which creature will you find? ---
+# ALL outcomes must be ON THE BAR! Including "no trail" (failure)
 TRACK_DROP_TABLE = {
-    "squirrel": 35,   # Common - 35 slots
-    "rabbit": 30,     # Common - 30 slots  
-    "deer": 20,       # Uncommon - 20 slots
-    "boar": 10,       # Rare - 10 slots
-    "bear": 4,        # Very Rare - 4 slots
-    "moose": 1,       # Legendary - 1 slot
+    "no_trail": 40,   # FAILURE - no creature found! Start with big fail section
+    "squirrel": 25,   # Common - 25 slots
+    "rabbit": 20,     # Common - 20 slots  
+    "deer": 10,       # Uncommon - 10 slots
+    "boar": 4,        # Rare - 4 slots
+    "bear": 1,        # Very Rare - 1 slot
+    "moose": 0,       # Legendary - 0 slots (must earn it!)
 }  # Total: 100 slots
 
 TRACK_SHIFT_PER_SUCCESS = {
-    "squirrel": -5,   # Lose 5 slots
-    "rabbit": -4,     # Lose 4 slots
-    "deer": +3,       # Gain 3 slots
-    "boar": +3,       # Gain 3 slots
-    "bear": +2,       # Gain 2 slots
-    "moose": +1,      # Gain 1 slot
+    "no_trail": -8,   # Each success shrinks the fail zone!
+    "squirrel": -2,   # Shrink common
+    "rabbit": +1,     # Slight gain
+    "deer": +3,       # Good gain
+    "boar": +3,       # Good gain
+    "bear": +2,       # Gain
+    "moose": +1,      # Gain (starts at 0, builds up)
 }
 
-# --- ATTACK: How much damage will you deal? ---
-ATTACK_DROP_TABLE = {
-    "miss": 35,       # Miss - 0 damage
-    "graze": 30,      # Graze - 1 damage
-    "hit": 25,        # Solid hit - 2 damage
-    "crit": 10,       # Critical - 3 damage
-}  # Total: 100 slots
+# DISPLAY CONFIG for drop table items - sent to frontend!
+# Order matters - this is the order they appear on the bar (left to right)
+TRACK_DROP_TABLE_DISPLAY = [
+    {"key": "no_trail", "icon": "❌", "name": "Lost", "color": "#665544"},
+    {"key": "squirrel", "icon": "🐿️", "name": "Squirrel", "color": "#888888"},
+    {"key": "rabbit", "icon": "🐰", "name": "Rabbit", "color": "#888888"},
+    {"key": "deer", "icon": "🦌", "name": "Deer", "color": "#4CAF50"},
+    {"key": "boar", "icon": "🐗", "name": "Boar", "color": "#FF9800"},
+    {"key": "bear", "icon": "🐻", "name": "Bear", "color": "#F44336"},
+    {"key": "moose", "icon": "🫎", "name": "Moose", "color": "#9C27B0"},
+]
+
+ATTACK_DROP_TABLE_DISPLAY = [
+    {"key": "scare", "icon": "😱", "name": "Scare", "color": "#CC6666"},
+    {"key": "miss", "icon": "💨", "name": "Miss", "color": "#AAAAAA"},
+    {"key": "hit", "icon": "⚔️", "name": "Hit!", "color": "#4CAF50"},
+]
+
+BLESSING_DROP_TABLE_DISPLAY = [
+    {"key": "common", "icon": "📦", "name": "Common", "color": "#888888"},
+    {"key": "rare", "icon": "✨", "name": "Rare!", "color": "#DAB24D"},
+]
+
+# --- ATTACK: Three sections - Scare / Miss / Hit ---
+# Only HIT kills! Scare and Miss both = animal escapes (just visual variety)
+# Higher tier = smaller HIT section
+
+# Base tables by animal tier
+ATTACK_DROP_TABLE_BY_TIER = {
+    0: {"scare": 20, "miss": 20, "hit": 60},   # Squirrel/Rabbit - 60% hit
+    1: {"scare": 25, "miss": 30, "hit": 45},   # Deer - 45% hit
+    2: {"scare": 30, "miss": 35, "hit": 35},   # Boar - 35% hit
+    3: {"scare": 35, "miss": 40, "hit": 25},   # Bear - 25% hit
+    4: {"scare": 40, "miss": 45, "hit": 15},   # Moose - 15% hit (legendary!)
+}
+
+# Default for unknown tiers
+ATTACK_DROP_TABLE = {"scare": 30, "miss": 30, "hit": 40}
 
 ATTACK_SHIFT_PER_SUCCESS = {
-    "miss": -8,       # Less likely to miss
-    "graze": -4,      # Less likely to graze
-    "hit": +7,        # More likely to hit solid
-    "crit": +5,       # More likely to crit
+    "scare": -5,      # Each success: shrink scare
+    "miss": -5,       # Each success: shrink miss
+    "hit": +10,       # Each success: grow hit
 }
+# Example on Boar (35% base):
+# 0 successes: 35% hit
+# 1 success: 45% hit
+# 2 successes: 55% hit
+# 3 successes: 65% hit
+# 5 successes (max): 85% hit
 
-ATTACK_DAMAGE = {
-    "miss": 0,
-    "graze": 1,
-    "hit": 2,
-    "crit": 3,
-}
-
-# --- BLESSING: How good is your loot bonus? ---
+# --- BLESSING: Common vs Rare loot ---
+# Simple 2-tier system: faith shifts odds from common to rare
 BLESSING_DROP_TABLE = {
-    "none": 40,       # No bonus
-    "small": 35,      # +10% bonus
-    "medium": 20,     # +25% bonus  
-    "large": 5,       # +50% bonus
+    "common": 97,     # Just meat - very likely by default
+    "rare": 3,        # Meat + sinew - ultra rare base chance!
 }  # Total: 100 slots
 
 BLESSING_SHIFT_PER_SUCCESS = {
-    "none": -10,      # Less likely no bonus
-    "small": -5,      # Less likely small
-    "medium": +8,     # More likely medium
-    "large": +7,      # More likely large
+    "common": -8,     # Each success: lose 8 common slots
+    "rare": +8,       # Each success: gain 8 rare slots
 }
+# 0 successes: 3% rare
+# 1 success: 11% rare  
+# 2 successes: 19% rare
+# 3 successes: 27% rare
+# 3 crits: 51% rare (6 effective successes)
 
+# Legacy - kept for backwards compatibility but not used
 BLESSING_BONUS = {
-    "none": 0.0,
-    "small": 0.10,
-    "medium": 0.25,
-    "large": 0.50,
+    "common": 0.0,
+    "rare": 1.0,  # Guarantees sinew drop
 }
 
 # Legacy aliases for backwards compatibility
@@ -192,37 +225,33 @@ ANIMAL_WEIGHTS_BY_TIER = {
 
 
 # ============================================================
-# DROP TABLE CONFIGURATION - RARE HUNTING LOOT
+# LOOT CONFIGURATION
 # ============================================================
-# Loot chances are modified by blessing phase success
-# Format: {"item": base_chance} where chance is 0-1
-# 
-# IMPORTANT: Hunts drop MEAT (always) + SINEW (rare chance)
-# NO GOLD DROPS! Meat can be sold at market for gold if needed.
+# Two-tier loot system:
+# - COMMON: Just meat (always)
+# - RARE: Meat + Sinew (determined by blessing phase master roll)
 #
+# The blessing phase shifts odds from common to rare.
 # Sinew is used to craft hunting bow (10 wood + 3 sinew)
+# NO GOLD DROPS! Meat can be sold at market for gold if needed.
 
+# What drops for each loot tier (applied after blessing resolution)
+LOOT_TIERS = {
+    "common": {
+        "items": [],  # No bonus items, just meat
+    },
+    "rare": {
+        "items": ["sinew"],  # Sinew drops!
+    },
+}
+
+# Legacy - kept for backwards compatibility
 DROP_TABLES = {
-    # Tier 0 - Small game (Squirrel, Rabbit) - sinew is rare
-    0: {
-        "sinew": 0.05,  # 5% chance
-    },
-    # Tier 1 - Medium game (Deer)
-    1: {
-        "sinew": 0.15,  # 15% chance
-    },
-    # Tier 2 - Dangerous game (Boar)
-    2: {
-        "sinew": 0.25,  # 25% chance
-    },
-    # Tier 3 - Big game (Bear)
-    3: {
-        "sinew": 0.40,  # 40% chance
-    },
-    # Tier 4 - Legendary game (Moose)
-    4: {
-        "sinew": 0.60,  # 60% chance
-    },
+    0: {},
+    1: {},
+    2: {},
+    3: {},
+    4: {},
 }
 
 # Faith bonus to drop chances (per blessing_score point)
@@ -233,6 +262,10 @@ FAITH_DROP_BONUS_PER_POINT = 0.05  # +5% per faith success
 # PHASE CONFIGURATION
 # ============================================================
 # Each phase uses different stats and has different effects
+#
+# TEMPLATE SYSTEM: Backend sends ALL display data to frontend!
+# This allows the same iOS views to be reused for other minigames
+# (fishing, mining, combat arenas, etc.)
 
 class HuntPhase(Enum):
     LOBBY = "lobby"
@@ -243,62 +276,90 @@ class HuntPhase(Enum):
     RESULTS = "results"
 
 
+# NEW SYSTEM: Stat level = number of rolls!
+# Hit chance is FLAT (from rolls/config.py ROLL_HIT_CHANCE)
+# This config defines the DISPLAY data for frontend templating
+
 PHASE_CONFIG = {
     HuntPhase.TRACK: {
         "name": "Track",
         "display_name": "Tracking",
         "stat": "intelligence",
+        "stat_display_name": "Intelligence",
         "icon": "magnifyingglass",
         "description": "Scout the area - successes shift odds toward rare creatures!",
         "success_effect": "Found fresh tracks!",
         "failure_effect": "The trail goes cold...",
         "critical_effect": "Discovered a prime hunting ground!",
-        # Multi-roll configuration
-        "max_rolls": 5,           # Max scout rolls before forced resolution
+        # DISPLAY CONFIG - sent to frontend for templating
+        "stat_icon": "brain.head.profile",
+        "roll_button_label": "Scout",
+        "roll_button_icon": "binoculars.fill",
+        "resolve_button_label": "Master Roll",
+        "resolve_button_icon": "target",
+        "phase_color": "royalBlue",  # Theme color for this phase
+        "drop_table_title": "CREATURE ODDS",
+        "drop_table_title_resolving": "MASTER ROLL",
+        "drop_table_display_type": "creatures",  # How frontend renders the bar
+        # Roll configuration
         "min_rolls": 1,           # Must roll at least once
-        "roll_label": "Scout",    # Button text for prep rolls
-        "resolve_label": "Master Roll",  # Button text for resolution
-        # Uses DROP TABLE system - see BASE_DROP_TABLE and SLOTS_SHIFT_PER_SUCCESS
+        # max_rolls is now DYNAMIC based on player's stat level!
     },
     # APPROACH phase removed - was boring and just caused spooking frustration
     HuntPhase.STRIKE: {
         "name": "Strike",
         "display_name": "Combat",
         "stat": "attack_power",
+        "stat_display_name": "Attack",
         "icon": "bolt.fill",
-        "description": "Attack the beast - keep striking until it falls!",
+        "description": "Attack the beast - shift odds toward a killing blow!",
         "success_effect": "Clean hit!",
         "failure_effect": "Miss!",
         "critical_effect": "Perfect strike!",
-        # Multi-roll configuration: fight until HP=0 or out of rolls
-        "max_rolls": 5,           # Max combat rounds - animal escapes if you run out
-        "min_rolls": 1,           # Must attack at least once
-        "roll_label": "Strike!",  # Button text
-        "resolve_label": None,    # No manual resolve - auto-ends when HP=0
-        # Scoring: deal damage until HP reaches 0
+        # DISPLAY CONFIG
+        "stat_icon": "bolt.fill",
+        "roll_button_label": "Strike!",
+        "roll_button_icon": "bolt.fill",
+        "resolve_button_label": "Finish Hunt",
+        "resolve_button_icon": "checkmark.circle.fill",
+        "phase_color": "buttonDanger",  # Red for combat
+        "drop_table_title": "DAMAGE ODDS",
+        "drop_table_title_resolving": "FINAL DAMAGE",
+        "drop_table_display_type": "damage",
+        # Roll configuration  
+        "min_rolls": 1,
+        # Legacy scoring (kept for backwards compat)
         "score_type": "damage",
         "damage_per_success": 1,
         "damage_per_critical": 2,
-        "counterattack_chance": 0.08,      # 8% chance animal fights back on miss (just flavor)
+        "counterattack_chance": 0.08,
     },
     HuntPhase.BLESSING: {
         "name": "Blessing",
         "display_name": "Blessing",
         "stat": "faith",
+        "stat_display_name": "Faith",
         "icon": "sparkles",
-        "description": "Pray for better loot - each prayer stacks!",
+        "description": "Pray for better loot - each prayer shifts the odds!",
         "success_effect": "The gods smile upon you!",
         "failure_effect": "Your prayers go unanswered...",
         "critical_effect": "Divine favor!",
-        # Multi-roll configuration
-        "max_rolls": 3,           # Max prayers
-        "min_rolls": 1,           # Must pray at least once
-        "roll_label": "Pray",     # Button text
-        "resolve_label": "Claim Rewards",  # Button text for resolution
-        # Scoring: improves loot quality (stacks)
+        # DISPLAY CONFIG
+        "stat_icon": "sparkles",
+        "roll_button_label": "Pray",
+        "roll_button_icon": "hands.sparkles.fill",
+        "resolve_button_label": "Claim Loot",
+        "resolve_button_icon": "gift.fill",
+        "phase_color": "regalPurple",  # Purple for faith
+        "drop_table_title": "LOOT BONUS ODDS",
+        "drop_table_title_resolving": "LOOT ROLL",
+        "drop_table_display_type": "blessing",
+        # Roll configuration
+        "min_rolls": 1,
+        # Legacy scoring
         "score_type": "loot_bonus",
-        "bonus_per_success": 0.1,  # +10% loot chance per success
-        "bonus_per_critical": 0.25,  # +25% for criticals
+        "bonus_per_success": 0.1,
+        "bonus_per_critical": 0.25,
     },
 }
 

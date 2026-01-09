@@ -324,33 +324,24 @@ def leave_hunt(
     user: User = Depends(get_current_user),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
-    """Leave a hunt lobby."""
+    """Leave or abandon a hunt."""
     session = manager.get_hunt(hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
-    if session.status != HuntStatus.LOBBY:
-        return HuntResponse(
-            success=False,
-            message="Cannot leave - hunt in progress",
-            hunt=session.to_dict(),
-        )
-    
-    if not session.remove_participant(user.id):
+    if user.id not in session.participants:
         return HuntResponse(
             success=False,
             message="You're not in this hunt",
             hunt=session.to_dict(),
         )
     
-    # If creator leaves, cancel the hunt
-    if session.created_by == user.id:
+    # Remove participant
+    session.remove_participant(user.id)
+    
+    # If no participants left or creator left, cancel the hunt
+    if len(session.participants) == 0 or session.created_by == user.id:
         session.status = HuntStatus.CANCELLED
-        return HuntResponse(
-            success=True,
-            message="Hunt cancelled (leader left)",
-            hunt=session.to_dict(),
-        )
     
     return HuntResponse(
         success=True,

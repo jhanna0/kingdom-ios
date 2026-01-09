@@ -140,7 +140,7 @@ struct HuntResultsView: View {
         case .failed:
             if viewModel.hunt?.animal_escaped == true {
                 return "It Got Away!"
-            } else if viewModel.hunt?.track_score ?? 0 <= 0 {
+            } else if viewModel.hunt?.animal == nil {
                 return "No Trail Found"
             }
             return "Hunt Failed"
@@ -158,7 +158,7 @@ struct HuntResultsView: View {
         case .failed:
             if viewModel.hunt?.animal_escaped == true {
                 return "The prey escaped into the forest..."
-            } else if viewModel.hunt?.track_score ?? 0 <= 0 {
+            } else if viewModel.hunt?.animal == nil {
                 return "The forest was quiet today."
             }
             return "Better luck next time."

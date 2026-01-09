@@ -115,17 +115,19 @@ struct CreatureRevealOverlay: View {
                 Button {
                     onContinue()
                 } label: {
-                    HStack(spacing: 12) {
-                        Text("BEGIN THE HUNT")
-                            .font(.system(size: 18, weight: .black))
+                    HStack(spacing: 8) {
+                        Text("Begin the Hunt")
+                            .font(FontStyles.headingSmall)
                         Image(systemName: "arrow.right")
-                            .font(.title3)
+                            .font(.headline)
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.brutalist(backgroundColor: tierColor, foregroundColor: .white))
+                .buttonStyle(.brutalist(backgroundColor: tierColor, foregroundColor: .white, fullWidth: true))
                 .opacity(buttonOpacity)
                 .padding(.bottom, 50)
             }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
         }
         .onAppear {
             animateEntrance()

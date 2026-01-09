@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
 from ..rolls import RollEngine, RollResult, GroupRollResult
+from ..rolls.config import ROLL_HIT_CHANCE
 from .config import (
     HuntPhase,
     HuntConfig,
@@ -28,12 +29,15 @@ from .config import (
     # Drop tables for all phases
     TRACK_DROP_TABLE,
     TRACK_SHIFT_PER_SUCCESS,
+    TRACK_DROP_TABLE_DISPLAY,
     ATTACK_DROP_TABLE,
+    ATTACK_DROP_TABLE_BY_TIER,
     ATTACK_SHIFT_PER_SUCCESS,
-    ATTACK_DAMAGE,
+    ATTACK_DROP_TABLE_DISPLAY,
     BLESSING_DROP_TABLE,
     BLESSING_SHIFT_PER_SUCCESS,
-    BLESSING_BONUS,
+    BLESSING_DROP_TABLE_DISPLAY,
+    LOOT_TIERS,
     get_max_tier_from_track_score,
 )
 
@@ -143,11 +147,21 @@ class PhaseRoundResult:
 
 @dataclass
 class PhaseState:
-    """Tracks current phase progress for multi-roll system"""
+    """
+    Tracks current phase progress for multi-roll system.
+    
+    TEMPLATE SYSTEM: This sends ALL display data to frontend!
+    Frontend is a dumb template - no hardcoded phase logic.
+    This allows reuse for other minigames (fishing, mining, etc.)
+    """
     phase: HuntPhase
     rounds_completed: int = 0
     total_score: float = 0.0
     round_results: List[PhaseRoundResult] = field(default_factory=list)
+    
+    # NEW SYSTEM: max_rolls = player's stat level for this phase
+    max_rolls: int = 1
+    stat_value: int = 0  # Player's stat value (also = max_rolls)
     
     # Phase-specific tracking (legacy)
     damage_dealt: int = 0          # Strike phase
@@ -168,19 +182,71 @@ class PhaseState:
     resolution_outcome: Optional[str] = None  # The chosen outcome key
     
     def to_dict(self) -> dict:
+        """
+        Convert to dict for API response.
+        TEMPLATE SYSTEM: Include ALL display data for frontend!
+        Frontend is a DUMB TEMPLATE - no hardcoded logic!
+        """
+        config = PHASE_CONFIG.get(self.phase, {})
+        hit_chance_percent = int(ROLL_HIT_CHANCE * 100)
+        
+        # Get the correct drop table display config for this phase
+        if self.phase == HuntPhase.TRACK:
+            drop_table_display = TRACK_DROP_TABLE_DISPLAY
+        elif self.phase == HuntPhase.STRIKE:
+            drop_table_display = ATTACK_DROP_TABLE_DISPLAY
+        elif self.phase == HuntPhase.BLESSING:
+            drop_table_display = BLESSING_DROP_TABLE_DISPLAY
+        else:
+            drop_table_display = []
+        
         return {
+            # Core state
             "phase": self.phase.value,
             "rounds_completed": self.rounds_completed,
-            "max_rolls": PHASE_CONFIG.get(self.phase, {}).get("max_rolls", 1),
+            "max_rolls": self.max_rolls,
             "total_score": round(self.total_score, 2),
             "round_results": [r.to_dict() for r in self.round_results],
+            
+            # TEMPLATE DISPLAY DATA - frontend reads these directly!
+            "display": {
+                "phase_name": config.get("display_name", self.phase.value),
+                "phase_icon": config.get("icon", "questionmark"),
+                "description": config.get("description", ""),
+                "phase_color": config.get("phase_color", "inkMedium"),
+                # Stat info
+                "stat_name": config.get("stat", ""),
+                "stat_display_name": config.get("stat_display_name", "Skill"),
+                "stat_icon": config.get("stat_icon", "star.fill"),
+                "stat_value": self.stat_value,
+                # Hit chance - FLAT, not scaled!
+                "hit_chance": hit_chance_percent,
+                # Roll/resolve buttons
+                "roll_button_label": config.get("roll_button_label", "Roll"),
+                "roll_button_icon": config.get("roll_button_icon", "dice.fill"),
+                "resolve_button_label": config.get("resolve_button_label", "Resolve"),
+                "resolve_button_icon": config.get("resolve_button_icon", "checkmark"),
+                # Drop table display - FULL CONFIG FROM BACKEND!
+                "drop_table_title": config.get("drop_table_title", "ODDS"),
+                "drop_table_title_resolving": config.get("drop_table_title_resolving", "ROLLING"),
+                "drop_table_items": drop_table_display,  # Full display config for each item!
+                # Roll messages
+                "success_message": config.get("success_effect", "Success!"),
+                "failure_message": config.get("failure_effect", "Miss!"),
+                "critical_message": config.get("critical_effect", "Critical!"),
+            },
+            
+            # Legacy fields (kept for backwards compat)
             "damage_dealt": self.damage_dealt,
             "animal_remaining_hp": self.animal_remaining_hp,
             "escape_risk": round(self.escape_risk, 2),
             "blessing_bonus": round(self.blessing_bonus, 2),
+            
             # Generic drop table info for all phases
             "drop_table_slots": self.drop_table_slots.copy(),
             "creature_probabilities": {k: round(v, 3) for k, v in self.creature_probabilities.items()},
+            
+            # Phase completion
             "is_resolved": self.is_resolved,
             "resolution_roll": self.resolution_roll,
             "resolution_outcome": self.resolution_outcome,
@@ -192,8 +258,7 @@ class PhaseState:
         """Check if more rolls are allowed"""
         if self.is_resolved:
             return False
-        max_rolls = PHASE_CONFIG.get(self.phase, {}).get("max_rolls", 1)
-        return self.rounds_completed < max_rolls
+        return self.rounds_completed < self.max_rolls
     
     def can_resolve(self) -> bool:
         """Check if phase can be resolved"""
@@ -444,17 +509,39 @@ class HuntManager:
     # ============================================================
     
     def _init_phase_state(self, session: HuntSession, phase: HuntPhase) -> None:
-        """Initialize state for a new phase with its drop table."""
-        state = PhaseState(phase=phase)
+        """
+        Initialize state for a new phase with its drop table.
+        
+        NEW SYSTEM: max_rolls = sum of all participants' stat levels for this phase!
+        More skilled party = more attempts to shift the odds.
+        """
+        config = PHASE_CONFIG.get(phase, {})
+        stat_name = config.get("stat", "intelligence")
+        
+        # Calculate max_rolls from party's combined stat levels
+        # Each player's stat level contributes to total rolls available
+        total_stat = 0
+        for participant in session.participants.values():
+            stat_value = participant.stats.get(stat_name, 0)
+            total_stat += max(1, stat_value)  # Minimum 1 per player
+        
+        # Ensure at least 1 roll
+        max_rolls = max(1, total_stat)
+        
+        state = PhaseState(
+            phase=phase,
+            max_rolls=max_rolls,
+            stat_value=total_stat,  # Combined party stat
+        )
         
         if phase == HuntPhase.TRACK:
             # Creature drop table
             state.drop_table_slots = TRACK_DROP_TABLE.copy()
         elif phase == HuntPhase.STRIKE:
-            # Damage drop table
-            state.drop_table_slots = ATTACK_DROP_TABLE.copy()
-            if session.animal_data:
-                state.animal_remaining_hp = session.animal_data.get("hp", 1)
+            # Attack drop table - based on animal tier!
+            # Higher tier = smaller HIT section (harder to kill)
+            tier = session.animal_data.get("tier", 0) if session.animal_data else 0
+            state.drop_table_slots = ATTACK_DROP_TABLE_BY_TIER.get(tier, ATTACK_DROP_TABLE).copy()
         elif phase == HuntPhase.BLESSING:
             # Loot bonus drop table
             state.drop_table_slots = BLESSING_DROP_TABLE.copy()
@@ -469,8 +556,8 @@ class HuntManager:
         """
         Execute a single roll within the current phase.
         
-        This is the core of the multi-roll system - each roll affects
-        the phase state (shifts probabilities, deals damage, etc.)
+        NEW SYSTEM: Flat hit chance (15%), stat level = number of rolls!
+        This creates exciting variance - each roll is hard but you get many attempts.
         
         Returns:
             Roll result dict with updated phase state
@@ -487,42 +574,45 @@ class HuntManager:
         stat_name = config.get("stat", "intelligence")
         stat_value = participant.stats.get(stat_name, 0)
         
-        # Execute the roll
-        roll_result = self.roll_engine.roll(
-            player_id=player_id,
-            player_name=participant.player_name,
-            stat_name=stat_name,
-            stat_value=stat_value,
-        )
+        # NEW SYSTEM: Flat hit chance, not scaled by stat!
+        # Stat level determines NUMBER of rolls, not success chance
+        roll_value = self.rng.random()
+        is_success = roll_value < ROLL_HIT_CHANCE
+        
+        # Critical: top 25% of successes are critical (extra shift!)
+        is_critical = is_success and roll_value < (ROLL_HIT_CHANCE * 0.25)
+        
+        # Contribution for tracking purposes
+        contribution = 1.5 if is_critical else (1.0 if is_success else 0.0)
         
         # Create round result
-        # roll_value is 0-1 float, convert to 1-100 int for display
+        # Convert roll to 1-100 for display
         round_result = PhaseRoundResult(
             round_number=state.rounds_completed + 1,
             player_id=player_id,
             player_name=participant.player_name,
-            roll_value=int(roll_result.roll_value * 100),
+            roll_value=int(roll_value * 100),
             stat_value=stat_value,
-            is_success=roll_result.is_success,
-            is_critical=roll_result.is_critical,
-            contribution=roll_result.contribution,
-            effect_message=self._get_roll_message(roll_result, config),
+            is_success=is_success,
+            is_critical=is_critical,
+            contribution=contribution,
+            effect_message=self._get_roll_message_simple(is_success, is_critical, config),
         )
         
         # Update phase state based on phase type
         phase_update = self._apply_roll_to_phase(session, state, round_result, config)
         
         # Update participant stats
-        participant.total_contribution += roll_result.contribution
-        if roll_result.is_success:
+        participant.total_contribution += contribution
+        if is_success:
             participant.successful_rolls += 1
-        if roll_result.is_critical:
+        if is_critical:
             participant.critical_rolls += 1
         
         # Record round
         state.round_results.append(round_result)
         state.rounds_completed += 1
-        state.total_score += roll_result.contribution
+        state.total_score += contribution
         
         return {
             "success": True,
@@ -533,13 +623,22 @@ class HuntManager:
         }
     
     def _get_roll_message(self, roll_result, config: dict) -> str:
-        """Get the message for a roll result."""
+        """Get the message for a roll result (legacy - uses RollResult object)."""
         if roll_result.is_critical and roll_result.is_success:
             return config.get("critical_effect", "Critical!")
         elif roll_result.is_success:
             return config.get("success_effect", "Success!")
         elif roll_result.is_critical:
             return "Critical fail!"
+        else:
+            return config.get("failure_effect", "Miss!")
+    
+    def _get_roll_message_simple(self, is_success: bool, is_critical: bool, config: dict) -> str:
+        """Get the message for a roll result (new flat-chance system)."""
+        if is_critical:
+            return config.get("critical_effect", "Critical!")
+        elif is_success:
+            return config.get("success_effect", "Success!")
         else:
             return config.get("failure_effect", "Miss!")
     
@@ -702,113 +801,116 @@ class HuntManager:
         return result
     
     def _resolve_track_phase(self, session: HuntSession, state: PhaseState) -> dict:
-        """Resolve tracking - do the master roll!"""
-        # Master roll: random 0-100 that slides along the probability bar
-        master_roll = self.rng.random()
-        state.resolution_roll = int(master_roll * 100)
+        """
+        Resolve tracking using DROP TABLE!
+        
+        ALL outcomes are ON THE BAR:
+        - no_trail: Failed to find anything
+        - squirrel, rabbit, deer, boar, bear, moose: Found that creature
+        
+        Master roll lands on one section - what you see is what you get!
+        """
+        # MASTER ROLL on the drop table
+        outcome, master_roll = self._roll_on_drop_table(state.drop_table_slots)
+        
+        state.resolution_roll = master_roll
+        state.resolution_outcome = outcome
         
         session.track_score = state.total_score
         session.max_tier_unlocked = get_max_tier_from_track_score(state.total_score)
         
-        # Select creature based on master roll and probabilities
-        cumulative = 0
-        selected_animal = None
+        # Calculate probabilities for display
+        total_slots = sum(state.drop_table_slots.values())
         
-        for animal_id, prob in state.creature_probabilities.items():
-            cumulative += prob
-            if master_roll <= cumulative and prob > 0:
-                selected_animal = animal_id
-                break
-        
-        # Fallback to a valid creature if something went wrong
-        if not selected_animal:
-            valid_animals = [aid for aid, p in state.creature_probabilities.items() if p > 0]
-            if valid_animals:
-                selected_animal = self.rng.choice(valid_animals)
-            else:
-                # Worst case - pick squirrel
-                selected_animal = "squirrel"
-        
-        if state.total_score <= 0:
-            # Failed tracking entirely
+        # Check if we landed on "no_trail" (failure section)
+        if outcome == "no_trail":
+            no_trail_chance = state.drop_table_slots.get("no_trail", 0) / total_slots if total_slots > 0 else 0
             return {
-                "message": "No trail found. The forest is quiet...",
-                "effects": {"no_trail": True, "master_roll": state.resolution_roll},
+                "message": "❌ Trail lost... The forest reveals nothing.",
+                "effects": {
+                    "no_trail": True,
+                    "outcome": outcome,
+                    "no_trail_chance": round(no_trail_chance, 3),
+                    "master_roll": master_roll,
+                    "drop_table_slots": state.drop_table_slots.copy(),
+                },
             }
         
-        session.animal_id = selected_animal
-        session.animal_data = ANIMALS[selected_animal].copy()
+        # We found a creature!
+        if outcome not in ANIMALS:
+            # Fallback - shouldn't happen but just in case
+            outcome = "squirrel"
+        
+        session.animal_id = outcome
+        session.animal_data = ANIMALS[outcome].copy()
+        
+        animal_chance = state.drop_table_slots.get(outcome, 0) / total_slots if total_slots > 0 else 0
         
         return {
             "message": f"🎯 Master Roll landed on {session.animal_data['icon']} {session.animal_data['name']}!",
             "effects": {
                 "animal_found": True,
-                "master_roll": state.resolution_roll,
-                "animal_id": selected_animal,
+                "outcome": outcome,
+                "animal_chance": round(animal_chance, 3),
+                "master_roll": master_roll,
+                "animal_id": outcome,
                 "animal_name": session.animal_data["name"],
                 "animal_icon": session.animal_data["icon"],
                 "animal_tier": session.animal_data["tier"],
                 "animal_hp": session.animal_data["hp"],
+                "drop_table_slots": state.drop_table_slots.copy(),
             },
-            "master_roll": state.resolution_roll,
-            "probabilities": state.creature_probabilities,
         }
     
     def _resolve_strike_phase(self, session: HuntSession, state: PhaseState) -> dict:
         """
         Resolve strike phase using DROP TABLE!
         
-        Each roll shifted the damage table. Now we roll on it to see final damage.
-        Total damage from all resolution rolls determines kill/escape.
+        Three sections: SCARE / MISS / HIT
+        Only HIT kills. Scare and Miss both = animal escapes.
         """
-        # MASTER ROLL on the damage table!
-        master_roll = self.rng.randint(1, 100)
+        # MASTER ROLL - returns (outcome, roll_value)
+        outcome, master_roll = self._roll_on_drop_table(state.drop_table_slots)
+        
         state.resolution_roll = master_roll
+        state.resolution_outcome = outcome
         
-        # Roll on table for each attack round
-        animal_hp = session.animal_data.get("hp", 1)
-        total_damage = 0
-        damage_breakdown = []
+        # Calculate hit chance for display
+        total_slots = sum(state.drop_table_slots.values())
+        hit_slots = state.drop_table_slots.get("hit", 0)
+        hit_chance = hit_slots / total_slots if total_slots > 0 else 0
         
-        for i in range(state.rounds_completed):
-            # Roll on the damage table
-            outcome = self._roll_on_drop_table(state.drop_table_slots)
-            damage = ATTACK_DAMAGE.get(outcome, 0)
-            total_damage += damage
-            damage_breakdown.append({"round": i + 1, "outcome": outcome, "damage": damage})
-        
-        state.resolution_outcome = "kill" if total_damage >= animal_hp else "escape"
-        state.damage_dealt = total_damage
-        state.animal_remaining_hp = max(0, animal_hp - total_damage)
-        
-        if total_damage >= animal_hp:
+        if outcome == "hit":
             # VICTORY! Animal slain
             return {
-                "message": f"🎯 {session.animal_data['icon']} {session.animal_data['name']} slain! ({total_damage} damage)",
+                "message": f"🎯 {session.animal_data['icon']} {session.animal_data['name']} slain!",
                 "effects": {
                     "killed": True,
-                    "damage_dealt": total_damage,
-                    "overkill": total_damage - animal_hp,
+                    "outcome": outcome,
+                    "hit_chance": round(hit_chance, 3),
                     "master_roll": master_roll,
-                    "damage_breakdown": damage_breakdown,
                     "drop_table_slots": state.drop_table_slots.copy(),
                 },
             }
         else:
-            # Not enough damage - animal escapes (get partial meat from wounds)
+            # SCARE or MISS - animal escapes
             session.animal_escaped = True
             escaped_meat = int(session.animal_data.get("meat", 0) * ESCAPED_MEAT_PERCENT)
             session.total_meat = escaped_meat
             
+            if outcome == "scare":
+                message = f"💨 The {session.animal_data['name']} got spooked and fled!"
+            else:  # miss
+                message = f"😤 You missed! The {session.animal_data['name']} escaped!"
+            
             return {
-                "message": f"The {session.animal_data['name']} took {total_damage} damage but escaped!",
+                "message": message,
                 "effects": {
                     "escaped": True,
-                    "damage_dealt": total_damage,
-                    "remaining_hp": state.animal_remaining_hp,
+                    "outcome": outcome,
+                    "hit_chance": round(hit_chance, 3),
                     "consolation_meat": escaped_meat,
                     "master_roll": master_roll,
-                    "damage_breakdown": damage_breakdown,
                     "drop_table_slots": state.drop_table_slots.copy(),
                 },
             }
@@ -817,47 +919,37 @@ class HuntManager:
         """
         Resolve blessing phase using DROP TABLE!
         
-        Roll on the loot bonus table to determine final loot multiplier.
+        Simple 2-tier system: Common vs Rare
+        Your faith rolls shifted the odds. Master roll determines which tier you get.
         """
-        # MASTER ROLL on the loot bonus table!
-        master_roll = self.rng.randint(1, 100)
+        # MASTER ROLL - returns (outcome, roll_value)
+        loot_tier, master_roll = self._roll_on_drop_table(state.drop_table_slots)
+        
         state.resolution_roll = master_roll
+        state.resolution_outcome = loot_tier
         
-        # Determine which bonus tier we got
-        bonus_tier = self._roll_on_drop_table(state.drop_table_slots)
-        bonus_amount = BLESSING_BONUS.get(bonus_tier, 0.0)
-        state.resolution_outcome = bonus_tier
-        state.blessing_bonus = bonus_amount
+        # Calculate current rare chance for display
+        total_slots = sum(state.drop_table_slots.values())
+        rare_slots = state.drop_table_slots.get("rare", 0)
+        rare_chance = rare_slots / total_slots if total_slots > 0 else 0
         
-        # Apply loot with blessing bonus
+        # Apply loot based on tier
         if not session.animal_escaped and session.animal_data:
-            self._calculate_loot(session, bonus_amount)
+            self._calculate_loot(session, loot_tier)
         
-        # Get base sinew chance for this tier to show in message
-        tier = session.animal_data.get("tier", 0) if session.animal_data else 0
-        base_sinew_chance = DROP_TABLES.get(tier, {}).get("sinew", 0)
-        final_sinew_chance = min(1.0, base_sinew_chance + bonus_amount)
-        
-        tier_messages = {
-            "none": f"The gods are silent... (Sinew chance: {int(final_sinew_chance * 100)}%)",
-            "small": f"✨ Minor blessing: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
-            "medium": f"🌟 Divine favor: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
-            "large": f"⚡ LEGENDARY BLESSING: +{int(bonus_amount * 100)}% rare drops! (Sinew: {int(final_sinew_chance * 100)}%)",
-        }
-        
-        # Build detailed message showing what dropped
-        message = tier_messages.get(bonus_tier, tier_messages["none"])
-        if session.items_dropped:
-            items_str = ", ".join(session.items_dropped)
-            message += f" → Received: {items_str}!"
+        # Build message based on outcome
+        if loot_tier == "rare":
+            items_str = ", ".join(session.items_dropped) if session.items_dropped else "Sinew"
+            message = f"✨ RARE LOOT! You found: {items_str}!"
+        else:
+            message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
         return {
             "message": message,
             "effects": {
-                "bonus_tier": bonus_tier,
-                "blessing_bonus": bonus_amount,
-                "base_sinew_chance": base_sinew_chance,
-                "final_sinew_chance": final_sinew_chance,
+                "loot_tier": loot_tier,
+                "is_rare": loot_tier == "rare",
+                "rare_chance": round(rare_chance, 3),
                 "items_dropped": session.items_dropped,
                 "meat": session.total_meat,
                 "bonus_meat": session.bonus_meat,
@@ -866,21 +958,30 @@ class HuntManager:
             },
         }
     
-    def _roll_on_drop_table(self, slots: Dict[str, int]) -> str:
-        """Roll 1-100 and find which outcome it lands on."""
+    def _roll_on_drop_table(self, slots: Dict[str, int], roll_value: Optional[int] = None) -> Tuple[str, int]:
+        """
+        Roll on the drop table and return (outcome, roll_value).
+        
+        If roll_value is provided, use it. Otherwise generate a random one.
+        Returns both so the frontend can display where the roll landed.
+        """
         total = sum(slots.values())
         if total == 0:
-            return list(slots.keys())[0]  # Fallback
+            return (list(slots.keys())[0], 1)  # Fallback
         
-        roll = self.rng.randint(1, total)
+        # Use provided roll or generate one
+        if roll_value is None:
+            roll_value = self.rng.randint(1, total)
+        
         cumulative = 0
-        
         for outcome, slot_count in slots.items():
             cumulative += slot_count
-            if roll <= cumulative:
-                return outcome
+            if roll_value <= cumulative:
+                # Convert roll to 1-100 scale for display
+                roll_percent = int((roll_value / total) * 100)
+                return (outcome, roll_percent)
         
-        return list(slots.keys())[-1]  # Fallback to last
+        return (list(slots.keys())[-1], 100)  # Fallback to last
     
     def advance_to_next_phase(self, session: HuntSession) -> Optional[HuntPhase]:
         """
@@ -889,10 +990,12 @@ class HuntManager:
         """
         phase_order = [HuntPhase.TRACK, HuntPhase.STRIKE, HuntPhase.BLESSING]
         current = session.current_phase
-        
+
         # Check for early termination
-        if current == HuntPhase.TRACK and session.track_score <= 0:
-            return None  # Hunt failed
+        # Track: if no animal was found (master roll landed on no_trail), hunt ends
+        if current == HuntPhase.TRACK and not session.animal_id:
+            return None  # No creature found - hunt ends
+        # Strike: if animal escaped (miss/scare), hunt ends
         if current == HuntPhase.STRIKE and session.animal_escaped:
             return None  # Animal escaped
         
@@ -1003,40 +1106,31 @@ class HuntManager:
                     effects["counterattack"] = victim
         
         elif phase == HuntPhase.BLESSING:
-            blessing_score = phase_score
-            bonus_multiplier = (
-                group_roll.success_count * config["bonus_per_success"] +
-                group_roll.critical_count * config["bonus_per_critical"]
-            )
-            effects["loot_bonus"] = bonus_multiplier
+            # Legacy single-roll blessing - use success count to determine loot tier
+            # More successes = higher chance of rare
+            rare_chance = 0.03 + (group_roll.success_count * 0.08) + (group_roll.critical_count * 0.16)
+            rare_chance = min(0.5, rare_chance)  # Cap at 50%
             
-            # Apply loot bonus and calculate drops BEFORE setting message
+            loot_tier = "rare" if self.rng.random() < rare_chance else "common"
+            effects["loot_tier"] = loot_tier
+            effects["rare_chance"] = round(rare_chance, 3)
+            
+            # Apply loot
             if not session.animal_escaped and session.animal_data:
-                self._calculate_loot(session, bonus_multiplier)
+                self._calculate_loot(session, loot_tier)
             
             # Include items in effects so frontend can show them
             effects["items_dropped"] = session.items_dropped.copy()
             effects["total_meat"] = session.total_meat + session.bonus_meat
             effects["bonus_meat"] = session.bonus_meat
             
-            # Set outcome message based on ACTUAL results, not just prayer rolls!
-            if session.items_dropped:
-                # Got rare items - this is a success!
+            # Set outcome message based on loot tier
+            if loot_tier == "rare":
                 item_names = [item.replace("_", " ").title() for item in session.items_dropped]
-                if group_roll.critical_count > 0:
-                    outcome_message = f"✨ Divine favor! You found: {', '.join(item_names)}!"
-                else:
-                    outcome_message = f"🎁 Fortune smiles! You found: {', '.join(item_names)}!"
+                outcome_message = f"✨ RARE LOOT! You found: {', '.join(item_names)}!"
                 effects["loot_success"] = True
-            elif group_roll.critical_count > 0:
-                outcome_message = "✨ The gods bestow their blessing!"
-            elif group_roll.success_count > 0:
-                outcome_message = "Your prayers are heard."
-            elif session.bonus_meat > 0:
-                # Got bonus meat from previous successes
-                outcome_message = "A modest blessing upon your hunt."
             else:
-                outcome_message = "The gods are silent... but you still have your catch!"
+                outcome_message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
         # Create phase result
         result = PhaseResult(
@@ -1071,30 +1165,31 @@ class HuntManager:
                 session.animal_data = ANIMALS[animal_id].copy()
                 break
     
-    def _calculate_loot(self, session: HuntSession, blessing_bonus: float) -> None:
+    def _calculate_loot(self, session: HuntSession, loot_tier: str) -> None:
         """Calculate and assign loot based on hunt results.
         
-        Hunts drop MEAT (main reward) + RARE ITEMS (for bow crafting).
+        Two-tier system:
+        - COMMON: Just meat
+        - RARE: Meat + Sinew
+        
         NO GOLD DROPS - players can sell meat at market for gold.
         """
         if not session.animal_data:
             return
         
         animal = session.animal_data
-        tier = animal["tier"]
         
-        # Base meat reward
+        # Base meat reward (always)
         session.total_meat = animal["meat"]
         
-        # Blessing bonus adds extra meat!
-        session.bonus_meat = int(session.total_meat * blessing_bonus)
-        
-        # Get drop table and apply blessing bonus to rare item chances
-        drop_table = DROP_TABLES.get(tier, {})
-        for item, base_chance in drop_table.items():
-            modified_chance = min(1.0, base_chance + blessing_bonus)
-            if self.rng.random() < modified_chance:
-                session.items_dropped.append(item)
+        # Rare tier gives bonus meat too!
+        if loot_tier == "rare":
+            session.bonus_meat = int(session.total_meat * 0.25)  # +25% bonus meat for rare
+            # Add rare items from the loot tier config
+            rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
+            session.items_dropped.extend(rare_items)
+        else:
+            session.bonus_meat = 0
         
         # Distribute meat among participants
         party_size = len(session.participants)
@@ -1114,28 +1209,27 @@ class HuntManager:
     def finalize_hunt(self, session: HuntSession) -> dict:
         """
         Finalize the hunt and return complete results.
-        
+
         Args:
             session: The hunt session to finalize
-            
+
         Returns:
             Complete hunt results dict
         """
         session.completed_at = datetime.utcnow()
-        
-        if session.animal_escaped or session.track_score <= 0:
+
+        # Hunt fails if: no animal found OR animal escaped
+        if not session.animal_id or session.animal_escaped:
             session.status = HuntStatus.FAILED
-        else:
-            session.status = HuntStatus.COMPLETED
-        
-        # If no trail was found, no rewards (you found nothing!)
-        if session.track_score <= 0:
+            # No animal found = no rewards
             for p in session.participants.values():
                 p.meat_earned = NO_TRAIL_MEAT
             session.total_meat = NO_TRAIL_MEAT
-        
+        else:
+            session.status = HuntStatus.COMPLETED
+
         session.current_phase = HuntPhase.RESULTS
-        
+
         return session.to_dict()
     
     def cleanup_old_hunts(self, max_age_hours: int = 24) -> int:
@@ -1159,9 +1253,11 @@ class HuntManager:
 def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
     """
     Generate a probability preview for the hunt UI.
-    Shows the player their chances at each phase.
+    
+    NEW SYSTEM: Shows player their stat value = number of rolls,
+    and the flat hit chance per roll.
     """
-    from ..rolls.config import get_chance_display
+    hit_chance_percent = int(ROLL_HIT_CHANCE * 100)
     
     phases = {}
     for phase, config in PHASE_CONFIG.items():
@@ -1170,18 +1266,31 @@ def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
         
         stat_name = config["stat"]
         stat_value = player_stats.get(stat_name, 0)
+        max_rolls = max(1, stat_value)  # Stat level = number of rolls
+        
+        # Calculate probability of at least one success
+        # P(at least 1) = 1 - P(all fail) = 1 - (1 - hit_chance)^rolls
+        prob_all_fail = (1 - ROLL_HIT_CHANCE) ** max_rolls
+        prob_at_least_one = 1 - prob_all_fail
         
         phases[phase.value] = {
             "phase_name": config["display_name"],
             "stat_used": stat_name,
+            "stat_display_name": config.get("stat_display_name", stat_name),
             "stat_value": stat_value,
+            "max_rolls": max_rolls,
+            "hit_chance_per_roll": hit_chance_percent,
+            "prob_at_least_one_success": int(prob_at_least_one * 100),
             "icon": config["icon"],
             "description": config["description"],
-            **get_chance_display(stat_value),
+            # Display info
+            "roll_button_label": config.get("roll_button_label", "Roll"),
+            "phase_color": config.get("phase_color", "inkMedium"),
         }
     
     return {
         "phases": phases,
+        "hit_chance_per_roll": hit_chance_percent,
         "animals": [
             {
                 "id": animal_id,

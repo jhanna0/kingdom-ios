@@ -11,8 +11,18 @@ Base success chance scales with player stat level (1-10).
 # ============================================================
 # CORE ROLL FORMULA CONSTANTS
 # ============================================================
-# Success probability formula: p = clamp(BASE + (SCALING * stat), MIN, MAX)
+# NEW SYSTEM: Stat level = number of rolls, flat hit chance per roll
+# This creates exciting variance - more rolls = more chances to shift!
+#
+# Example at 15% per roll:
+#   Level 1: 1 roll  → 15% chance of any shift
+#   Level 5: 5 rolls → 56% chance of ≥1 shift, 16% chance of ≥2
+#   Level 10: 10 rolls → 80% chance of ≥1 shift, 46% chance of ≥2
 
+# Flat hit chance per roll (stat level determines NUMBER of rolls, not chance)
+ROLL_HIT_CHANCE = 0.15           # 15% chance per roll - low but exciting!
+
+# Legacy formula constants (kept for backwards compatibility)
 ROLL_BASE_CHANCE = 0.15          # Base chance at stat level 0
 ROLL_SCALING_PER_LEVEL = 0.08   # +8% per stat level
 ROLL_MIN_CHANCE = 0.10          # Minimum success chance (even at level 0)

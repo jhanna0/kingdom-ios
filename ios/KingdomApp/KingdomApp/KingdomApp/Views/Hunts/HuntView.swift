@@ -10,6 +10,7 @@ struct HuntView: View {
     
     @StateObject private var viewModel = HuntViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var showAbandonConfirmation = false
     
     var body: some View {
         ZStack {
@@ -25,11 +26,35 @@ struct HuntView: View {
             // Content based on UI state machine
             contentForState
         }
-        .navigationTitle("Group Hunt")
+        .navigationTitle("Hunt")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .toolbar {
+            // Show exit button when there's an active hunt
+            if viewModel.hunt != nil {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showAbandonConfirmation = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Abandon Hunt?", isPresented: $showAbandonConfirmation, titleVisibility: .visible) {
+            Button("Abandon", role: .destructive) {
+                Task {
+                    await viewModel.leaveHunt()
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("You will lose all progress in this hunt.")
+        }
         .task {
             viewModel.currentUserId = playerId
             await viewModel.loadConfig()
@@ -47,8 +72,13 @@ struct HuntView: View {
     private var contentForState: some View {
         switch viewModel.uiState {
         case .loading:
-            ProgressView("Loading...")
-                .tint(KingdomTheme.Colors.inkMedium)
+            VStack(spacing: 12) {
+                ProgressView()
+                    .tint(KingdomTheme.Colors.inkMedium)
+                Text("Loading...")
+                    .font(KingdomTheme.Typography.body())
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
             
         case .noHunt:
             HuntStartView(viewModel: viewModel, kingdomId: kingdomId, kingdomName: kingdomName)
@@ -128,11 +158,11 @@ struct HuntStartView: View {
                         .font(.system(size: 60))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
-                    Text("Group Hunt")
+                    Text("Hunt")
                         .font(KingdomTheme.Typography.largeTitle())
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text("Hunt together for gold and glory!")
+                    Text("Track prey and bring back meat for your kingdom!")
                         .font(KingdomTheme.Typography.body())
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .multilineTextAlignment(.center)
@@ -151,15 +181,15 @@ struct HuntStartView: View {
                         .padding(.horizontal)
                 }
                 
-                // Create Hunt Button
+                // Start Hunt Button
                 Button {
                     Task {
                         await viewModel.createHunt(kingdomId: kingdomId)
                     }
                 } label: {
                     HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Start a Hunt")
+                        Image(systemName: "arrow.right.circle.fill")
+                        Text("Start Hunt")
                     }
                     .frame(maxWidth: .infinity)
                 }

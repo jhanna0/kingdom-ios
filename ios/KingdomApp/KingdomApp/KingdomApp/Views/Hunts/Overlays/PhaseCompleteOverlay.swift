@@ -127,17 +127,19 @@ struct PhaseCompleteOverlay: View {
                 Button {
                     onContinue()
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Text(buttonText)
-                            .font(.system(size: 18, weight: .black))
+                            .font(FontStyles.headingSmall)
                         Image(systemName: buttonIcon)
-                            .font(.title3)
+                            .font(.headline)
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.brutalist(backgroundColor: resultColor, foregroundColor: .white))
+                .buttonStyle(.brutalist(backgroundColor: resultColor, foregroundColor: .white, fullWidth: true))
                 .opacity(buttonOpacity)
                 .padding(.bottom, 50)
             }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
         }
         .onAppear {
             animateEntrance()

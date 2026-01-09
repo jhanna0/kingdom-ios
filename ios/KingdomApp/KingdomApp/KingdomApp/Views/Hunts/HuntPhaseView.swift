@@ -1,223 +1,17 @@
 import SwiftUI
 
 // MARK: - Hunt Phase View
-// Shows the current phase with probability displays and roll results
-// MOBILE-FIRST LAYOUT: Content at top, BUTTONS AT BOTTOM
 
 struct HuntPhaseView: View {
     @ObservedObject var viewModel: HuntViewModel
     let phase: HuntPhase
     let showingIntro: Bool
     
-    var body: some View {
-        ZStack {
-            // Base parchment background
-            KingdomTheme.Colors.parchment
-                .ignoresSafeArea()
-            
-            // Main phase content (visible when not showing intro)
-            if !showingIntro {
-                phaseContent
-            }
-            
-            // Phase intro overlay
-            if showingIntro {
-                PhaseIntroOverlay(
-                    phase: phase,
-                    config: viewModel.config,
-                    onBegin: {
-                        Task {
-                            await viewModel.userTappedBeginPhase()
-                        }
-                    }
-                )
-            }
-            
-            // PhaseCompleteOverlay is now shown directly from HuntView
-            // to prevent flashing during state transitions
-        }
+    @State private var isShowingIntelSheet = false
+    
+    private var displayConfig: PhaseDisplayConfig? {
+        viewModel.hunt?.phase_state?.display
     }
-    
-    // MARK: - Phase Content
-    // MOBILE-FIRST: Content scrolls at top, buttons pinned at bottom
-    
-    private var phaseContent: some View {
-        VStack(spacing: 0) {
-            // Scrollable content area
-            ScrollView {
-                VStack(spacing: KingdomTheme.Spacing.medium) {
-                    // Phase header with icon
-                    phaseHeader
-                    
-                    // Compact stats row: Skill | Chance | Attempts
-                    compactStatsRow
-                    
-                    // Phase-specific goal display (creature odds / damage bar / blessing odds)
-                    phaseGoalDisplay
-                        .padding(.horizontal)
-                    
-                    // Result message
-                    rollResultMessage
-                        .padding(.top, 8)
-                    
-                    // Round results (roll history) - horizontal scroll
-                    roundResultsSection
-                }
-                .padding(.top, KingdomTheme.Spacing.medium)
-                .padding(.bottom, 160) // Space for pinned buttons
-            }
-            
-            // PINNED ACTION BUTTONS AT BOTTOM - MOBILE GAME STYLE!
-            pinnedActionButtons
-        }
-    }
-    
-    // MARK: - Phase Header
-    
-    private var phaseHeader: some View {
-        HStack(spacing: 12) {
-            // Phase icon with brutalist badge
-            Image(systemName: phase.icon)
-                .font(.title2)
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .brutalistBadge(
-                    backgroundColor: rollButtonColor,
-                    cornerRadius: 10,
-                    shadowOffset: 2,
-                    borderWidth: 2
-                )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(phase.displayName)
-                    .font(KingdomTheme.Typography.headline())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text(rollInstructionText)
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-            
-            Spacer()
-            
-            // Rolling indicator
-            if case .rolling = viewModel.uiState {
-                ProgressView()
-                    .tint(KingdomTheme.Colors.inkMedium)
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Compact Stats Row
-    // Horizontal: [SKILL] | [CHANCE] | [ATTEMPTS]
-    
-    private var compactStatsRow: some View {
-        HStack(spacing: 8) {
-            // Skill badge
-            statBadge(
-                icon: statIcon,
-                label: statDisplayName,
-                value: "\(getStatValue(for: phase))",
-                color: KingdomTheme.Colors.inkMedium
-            )
-            
-            // Hit chance badge
-            statBadge(
-                icon: "target",
-                label: "Hit Chance",
-                value: "\(successChance)%",
-                color: chanceColor
-            )
-            
-            // Attempts badge
-            statBadge(
-                icon: "dice.fill",
-                label: "Attempts",
-                value: "\(viewModel.maxRolls - viewModel.rollsCompleted)/\(viewModel.maxRolls)",
-                color: viewModel.rollsCompleted >= viewModel.maxRolls - 1 ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkMedium
-            )
-        }
-        .padding(.horizontal)
-    }
-    
-    private func statBadge(icon: String, label: String, value: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundColor(color)
-                Text(value)
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-            }
-        )
-    }
-    
-    private var statDisplayName: String {
-        switch phase {
-        case .track: return "Intelligence"
-        case .strike: return "Attack"
-        case .blessing: return "Faith"
-        default: return "Skill"
-        }
-    }
-    
-    private var statIcon: String {
-        switch phase {
-        case .track: return "brain.head.profile"
-        case .strike: return "bolt.fill"
-        case .blessing: return "sparkles"
-        default: return "star.fill"
-        }
-    }
-    
-    private var successChance: Int {
-        let statValue = getStatValue(for: phase)
-        let base = 15 + (statValue * 8)
-        return min(95, max(10, base))
-    }
-    
-    private var chanceColor: Color {
-        if successChance >= 65 { return KingdomTheme.Colors.buttonSuccess }
-        if successChance >= 45 { return KingdomTheme.Colors.buttonWarning }
-        return KingdomTheme.Colors.buttonDanger
-    }
-    
-    private func getStatValue(for phase: HuntPhase) -> Int {
-        guard let hunt = viewModel.hunt,
-              let participant = hunt.participants.values.first(where: { $0.player_id == viewModel.currentUserId }) else {
-            return 0
-        }
-        
-        switch phase {
-        case .track: return participant.stats?["intelligence"] ?? 0
-        case .strike: return participant.stats?["attack_power"] ?? 0
-        case .blessing: return participant.stats?["faith"] ?? 0
-        default: return 0
-        }
-    }
-    
-    // MARK: - Phase Goal Display
-    // Now includes INLINE master roll animation - no overlay!
     
     private var isShowingMasterRoll: Bool {
         if case .resolving = viewModel.uiState { return true }
@@ -225,337 +19,578 @@ struct HuntPhaseView: View {
         return false
     }
     
-    @ViewBuilder
-    private var phaseGoalDisplay: some View {
-        switch phase {
-        case .track:
-            DropTableBar(
-                title: isShowingMasterRoll ? "MASTER ROLL" : "CREATURE ODDS",
-                slots: viewModel.dropTableSlots,
-                displayConfig: .creatures(config: viewModel.config),
-                masterRollValue: viewModel.masterRollValue,
-                isAnimatingMasterRoll: viewModel.masterRollAnimating
-            )
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
             
-        case .strike:
-            VStack(spacing: 8) {
-                CombatHPBar(
-                    animal: viewModel.hunt?.animal,
-                    animalHP: viewModel.hunt?.animal?.hp ?? 1
-                )
-                DropTableBar(
-                    title: isShowingMasterRoll ? "FINAL DAMAGE" : "DAMAGE ODDS",
-                    slots: viewModel.dropTableSlots,
-                    displayConfig: .damage,
-                    masterRollValue: viewModel.masterRollValue,
-                    isAnimatingMasterRoll: viewModel.masterRollAnimating
-                )
+            if !showingIntro {
+                mainContent
             }
             
-        case .blessing:
-            DropTableBar(
-                title: isShowingMasterRoll ? "LOOT ROLL" : "LOOT BONUS ODDS",
-                slots: viewModel.dropTableSlots,
-                displayConfig: .blessing,
-                masterRollValue: viewModel.masterRollValue,
-                isAnimatingMasterRoll: viewModel.masterRollAnimating
-            )
-            
-        default:
-            EmptyView()
+            if showingIntro {
+                PhaseIntroOverlay(
+                    phase: phase,
+                    config: viewModel.config,
+                    onBegin: {
+                        Task { await viewModel.userTappedBeginPhase() }
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingIntelSheet) {
+            intelSheet
         }
     }
     
-    // MARK: - Roll Result Message
+    // MARK: - Main Content
     
-    private var rollResultMessage: some View {
-        Group {
-            if let lastRoll = viewModel.lastRollResult {
-                HStack(spacing: 8) {
-                    Text(lastRoll.message)
-                        .font(.system(size: 18, weight: .bold, design: .serif))
-                        .foregroundColor(lastRoll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    headerRow
+                    hudChips
+                    arenaCard
+                    rollResultCard
+                    rollHistoryCard
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.top, KingdomTheme.Spacing.medium)
+                .padding(.bottom, KingdomTheme.Spacing.large)
+            }
+            
+            bottomButtons
+        }
+    }
+    
+    // MARK: - Header Row
+    
+    private var headerRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                // Phase name
+                HStack(spacing: KingdomTheme.Spacing.small) {
+                    Image(systemName: displayConfig?.phase_icon ?? phase.icon)
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(phaseColor)
                     
-                    if lastRoll.is_critical {
-                        Text("⚡")
-                            .font(.title2)
+                    Text(displayConfig?.phase_name.uppercased() ?? phase.displayName.uppercased())
+                        .font(.system(size: 14, weight: .black, design: .serif))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                Spacer()
+                
+                // Intel button
+                Button { isShowingIntelSheet = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "scope")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Intel")
+                            .font(.system(size: 12, weight: .bold, design: .serif))
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 10,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+            }
+            
+            Text("Rolls have chance to give better odds. Higher skill gives more rolls.")
+                .font(.system(size: 11, weight: .medium, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+    }
+    
+    // MARK: - HUD Chips (3 equal width)
+    
+    private var hudChips: some View {
+        HStack(spacing: KingdomTheme.Spacing.small) {
+            // Stat chip
+            hudChip(
+                label: abbreviate(displayConfig?.stat_display_name ?? "STAT"),
+                value: "\(displayConfig?.stat_value ?? 0)",
+                icon: displayConfig?.stat_icon ?? "star.fill",
+                tint: phaseColor
+            )
+            
+            // Hit chance chip
+            hudChip(
+                label: "HIT",
+                value: "\(displayConfig?.hit_chance ?? 0)%",
+                icon: "scope",
+                tint: hitTint
+            )
+            
+            // Attempts chip
+            attemptsChip
+        }
+    }
+    
+    private func hudChip(label: String, value: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(tint)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 9, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text(value)
+                    .font(.system(size: 14, weight: .black, design: .monospaced))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: 10,
+            shadowOffset: 2,
+            borderWidth: 2
+        )
+    }
+    
+    private var attemptsChip: some View {
+        let remaining = max(0, viewModel.maxRolls - viewModel.rollsCompleted)
+        return HStack(spacing: 8) {
+            Image(systemName: "dice.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(KingdomTheme.Colors.inkDark)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("LEFT")
+                    .font(.system(size: 9, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                HStack(spacing: 3) {
+                    ForEach(0..<viewModel.maxRolls, id: \.self) { i in
+                        Circle()
+                            .fill(i < remaining ? KingdomTheme.Colors.buttonSuccess : Color.black.opacity(0.2))
+                            .frame(width: 8, height: 8)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.black)
-                            .offset(x: 2, y: 2)
-                        // SOLID tinted parchment - no opacity!
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(lastRoll.is_success ? Color(red: 0.85, green: 0.92, blue: 0.82) : Color(red: 0.95, green: 0.85, blue: 0.82))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(lastRoll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger, lineWidth: 2)
-                            )
-                    }
-                )
-                .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(height: 50)
-        .animation(.spring(response: 0.3), value: viewModel.lastRollResult?.round)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: 10,
+            shadowOffset: 2,
+            borderWidth: 2
+        )
     }
     
-    private var rollInstructionText: String {
+    // MARK: - Arena Card
+    
+    private var arenaCard: some View {
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                colors: [KingdomTheme.Colors.parchmentRich, KingdomTheme.Colors.parchmentDark],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            VStack {
+                // Nameplates at top
+                HStack {
+                    nameplate(title: "YOU", subtitle: nil)
+                    Spacer()
+                    nameplate(title: enemyTitle, subtitle: enemySubtitle)
+                }
+                .padding(12)
+                
+                Spacer()
+                
+                // Sprites at bottom
+                HStack {
+                    // Player
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 50, weight: .black))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Spacer()
+                    
+                    // Enemy
+                    if phase == .strike, let icon = viewModel.hunt?.animal?.icon, !icon.isEmpty {
+                        Text(icon).font(.system(size: 70))
+                    } else {
+                        Image(systemName: displayConfig?.phase_icon ?? phase.icon)
+                            .font(.system(size: 50, weight: .black))
+                            .foregroundColor(phaseColor)
+                            .opacity(0.4)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            }
+        }
+        .frame(height: 200)
+        .clipShape(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium))
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+    }
+    
+    private func nameplate(title: String, subtitle: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 11, weight: .black, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            if let sub = subtitle {
+                Text(sub)
+                    .font(.system(size: 10, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: 8,
+            shadowOffset: 2,
+            borderWidth: 2
+        )
+    }
+    
+    private var enemyTitle: String {
         switch phase {
-        case .track: return "Scout the area to improve your odds"
-        case .strike: return "Strike to deal damage"
-        case .blessing: return "Pray for better loot"
-        default: return "Roll to take action"
+        case .strike: return viewModel.hunt?.animal?.name ?? "PREY"
+        case .track: return "WILDERNESS"
+        case .blessing: return "ALTAR"
+        default: return "ENCOUNTER"
         }
     }
     
-    // MARK: - Round Results Section
+    private var enemySubtitle: String? {
+        switch phase {
+        case .strike:
+            if let hp = viewModel.hunt?.animal?.hp {
+                return "HP \(viewModel.currentAnimalHP)/\(hp)"
+            }
+            return nil
+        case .track: return "Find prey"
+        case .blessing: return "Seek fortune"
+        default: return nil
+        }
+    }
     
-    private var roundResultsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !viewModel.roundResults.isEmpty {
-                Text("ROLL HISTORY")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1)
+    // MARK: - Roll Result Card
+    
+    private var rollResultCard: some View {
+        VStack(spacing: 10) {
+            // Result or prompt
+            ZStack {
+                if isShowingMasterRoll {
+                    resultRow(
+                        badge: "MASTER ROLL",
+                        message: viewModel.masterRollAnimating ? "Rolling…" : "Locked in",
+                        value: "\(viewModel.masterRollValue)",
+                        tint: KingdomTheme.Colors.regalPurple
+                    )
+                } else if let roll = viewModel.lastRollResult {
+                    resultRow(
+                        badge: roll.is_critical ? "CRITICAL" : (roll.is_success ? "SUCCESS" : "MISS"),
+                        message: roll.message,
+                        value: "\(roll.roll)",
+                        tint: roll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+                    )
+                } else {
+                    promptRow
+                }
+            }
+            .frame(height: 50)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.lastRollResult?.round)
+            
+            // Mini odds bar
+            oddsBarMini
+        }
+        .padding(14)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+    }
+    
+    private var promptRow: some View {
+        HStack {
+            Image(systemName: "arrow.right.circle.fill")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(phaseColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("What will you do?")
+                    .font(.system(size: 12, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                Text("Tap Roll to act")
+                    .font(.system(size: 11, weight: .medium, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .padding(.horizontal)
+            }
+            
+            Spacer()
+        }
+    }
+    
+    private func resultRow(badge: String, message: String, value: String, tint: Color) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(badge)
+                    .font(.system(size: 10, weight: .black, design: .serif))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(tint)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 
+                Text(message)
+                    .font(.system(size: 11, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 32, weight: .black, design: .monospaced))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+        }
+    }
+    
+    private var oddsBarMini: some View {
+        let items = displayConfig?.drop_table_items ?? []
+        let total = viewModel.dropTableSlots.values.reduce(0, +)
+        
+        return VStack(spacing: 4) {
+            HStack {
+                Text(isShowingMasterRoll ? "ROLLING" : "ODDS")
+                    .font(.system(size: 9, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Spacer()
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            GeometryReader { geo in
+                ZStack {
+                    // Segments
+                    HStack(spacing: 0) {
+                        ForEach(items, id: \.key) { item in
+                            let count = viewModel.dropTableSlots[item.key] ?? 0
+                            let frac = total > 0 ? CGFloat(count) / CGFloat(total) : 0
+                            if frac > 0.01 {
+                                Rectangle()
+                                    .fill(Color(hex: item.color) ?? KingdomTheme.Colors.inkMedium)
+                                    .frame(width: geo.size.width * frac)
+                            }
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
+                    
+                    // Master roll crosshairs
+                    if isShowingMasterRoll && viewModel.masterRollValue > 0 {
+                        let markerX = geo.size.width * CGFloat(viewModel.masterRollValue) / 100.0
+                        
+                        Image(systemName: "scope")
+                            .font(.system(size: 28, weight: .black))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .shadow(color: .black, radius: 0, x: 1, y: 1)
+                            .position(x: markerX, y: 10)
+                    }
+                }
+            }
+            .frame(height: 20)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { isShowingIntelSheet = true }
+    }
+    
+    // MARK: - Roll History Card
+    
+    private var rollHistoryCard: some View {
+        ZStack {
+            if viewModel.roundResults.isEmpty {
+                Text("No rolls yet")
+                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(maxWidth: .infinity)
+            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         ForEach(viewModel.roundResults) { result in
                             RoundResultCard(result: result)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
                 }
-                .frame(height: 110)
-            } else {
-                // Empty state - subtle prompt
-                HStack(spacing: 12) {
-                    Image(systemName: phase == .track ? "pawprint.fill" : phase == .strike ? "bolt.fill" : "sparkles")
-                        .font(.title2)
-                        .foregroundColor(rollButtonColor.opacity(0.5))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Ready to \(rollButtonLabel.lowercased())")
-                            .font(FontStyles.bodySmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Text("Tap the button below to attempt")
-                            .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                    }
-                    Spacer()
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(KingdomTheme.Colors.parchmentLight)
-                )
-                .padding(.horizontal)
             }
         }
+        .frame(height: 60)
+        .frame(maxWidth: .infinity)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
     }
     
-    // MARK: - Pinned Action Buttons (BOTTOM OF SCREEN!)
+    // MARK: - Bottom Buttons
     
-    private var pinnedActionButtons: some View {
+    private var bottomButtons: some View {
         VStack(spacing: 0) {
-            // Divider
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 3)
             
-            // Buttons area - show during ALL active states (no overlay BS)
             Group {
                 switch viewModel.uiState {
                 case .phaseActive, .rolling, .rollRevealing:
-                    actionButtonsRow
+                    twoButtonRow
                 case .resolving, .masterRollAnimation:
-                    // Show rolling state - same screen, just disabled buttons
-                    masterRollInProgressRow
+                    if viewModel.masterRollAnimating || (viewModel.uiState == .resolving(phase)) {
+                        loadingRow
+                    } else {
+                        continueButton
+                    }
                 default:
-                    // Placeholder maintains consistent height
-                    Color.clear
-                        .frame(height: 100)
+                    Color.clear.frame(height: 50)
                 }
             }
-            .background(KingdomTheme.Colors.parchmentLight)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.vertical, KingdomTheme.Spacing.medium)
         }
+        .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
     }
     
-    private var masterRollInProgressRow: some View {
+    private var twoButtonRow: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
-            // .resolving = API call in progress, .masterRollAnimation = animation phase
-            if case .resolving = viewModel.uiState {
-                // API call in progress - show loading
-                HStack(spacing: 12) {
-                    ProgressView()
-                        .tint(KingdomTheme.Colors.gold)
-                    Text("Rolling...")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 70)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black)
-                            .offset(x: 3, y: 3)
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(KingdomTheme.Colors.parchment)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
-                            )
-                    }
-                )
-            } else if viewModel.masterRollAnimating {
-                // Animation in progress - show spinner
-                HStack(spacing: 12) {
-                    ProgressView()
-                        .tint(KingdomTheme.Colors.gold)
-                    Text("Rolling...")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 70)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black)
-                            .offset(x: 3, y: 3)
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(KingdomTheme.Colors.parchment)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
-                            )
-                    }
-                )
-            } else {
-                // Animation done - show NEXT button to proceed
-                Button {
-                    Task {
-                        await viewModel.userTappedNextAfterMasterRoll()
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Text("Next")
-                            .font(.system(size: 18, weight: .black))
-                        Image(systemName: "arrow.right")
-                            .font(.title2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 70)
-                }
-                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.gold, foregroundColor: KingdomTheme.Colors.inkDark, fullWidth: true))
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 16)
-    }
-    
-    private var actionButtonsRow: some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
-            // Roll button - PHASE-COLORED
             Button {
-                Task {
-                    await viewModel.userTappedRollAgain()
-                }
+                Task { await viewModel.userTappedRollAgain() }
             } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: rollButtonIcon)
-                        .font(.title2)
-                    Text(rollButtonLabel)
-                        .font(.system(size: 14, weight: .bold))
+                HStack {
+                    Image(systemName: displayConfig?.roll_button_icon ?? "dice.fill")
+                    Text(displayConfig?.roll_button_label ?? "Roll")
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 70)
             }
             .buttonStyle(.brutalist(
-                backgroundColor: viewModel.canRoll ? rollButtonColor : KingdomTheme.Colors.disabled,
-                foregroundColor: .white
+                backgroundColor: viewModel.canRoll ? phaseColor : KingdomTheme.Colors.disabled,
+                foregroundColor: .white,
+                fullWidth: true
             ))
             .disabled(!viewModel.canRoll)
             
-            // Resolve/Master Roll button - GOLD for visibility
             Button {
-                Task {
-                    await viewModel.userTappedResolve()
-                }
+                Task { await viewModel.userTappedResolve() }
             } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: resolveButtonIcon)
-                        .font(.title2)
-                    Text(resolveButtonLabel)
-                        .font(.system(size: 14, weight: .bold))
+                HStack {
+                    Image(systemName: displayConfig?.resolve_button_icon ?? "checkmark")
+                    Text(displayConfig?.resolve_button_label ?? "Resolve")
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 70)
             }
             .buttonStyle(.brutalist(
-                backgroundColor: viewModel.canResolve ? KingdomTheme.Colors.gold : KingdomTheme.Colors.disabled,
-                foregroundColor: KingdomTheme.Colors.inkDark
+                backgroundColor: viewModel.canResolve ? KingdomTheme.Colors.regalPurple : KingdomTheme.Colors.disabled,
+                foregroundColor: .white,
+                fullWidth: true
             ))
             .disabled(!viewModel.canResolve)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 16)
     }
     
-    private var rollButtonLabel: String {
-        switch phase {
-        case .track: return "Scout"
-        case .strike: return "Strike!"
-        case .blessing: return "Pray"
-        default: return "Roll"
+    private var loadingRow: some View {
+        HStack {
+            ProgressView().tint(KingdomTheme.Colors.regalPurple)
+            Text("Master Roll...").font(KingdomTheme.Typography.headline())
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, KingdomTheme.Spacing.medium)
     }
     
-    private var rollButtonIcon: String {
-        switch phase {
-        case .track: return "binoculars.fill"
-        case .strike: return "bolt.fill"
-        case .blessing: return "hands.sparkles.fill"
-        default: return "dice.fill"
+    private var continueButton: some View {
+        Button {
+            Task { await viewModel.userTappedNextAfterMasterRoll() }
+        } label: {
+            HStack {
+                Text("Continue")
+                Image(systemName: "arrow.right")
+            }
+            .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
     }
     
-    private var rollButtonColor: Color {
-        switch phase {
-        case .track: return KingdomTheme.Colors.royalBlue
-        case .strike: return KingdomTheme.Colors.buttonDanger
-        case .blessing: return KingdomTheme.Colors.regalPurple
+    // MARK: - Intel Sheet
+    
+    private var intelSheet: some View {
+        VStack(spacing: KingdomTheme.Spacing.large) {
+            HStack {
+                Text("Intel").font(KingdomTheme.Typography.title2())
+                Spacer()
+                Button("Done") { isShowingIntelSheet = false }
+                    .buttonStyle(.toolbar(color: KingdomTheme.Colors.inkDark))
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.top, KingdomTheme.Spacing.large)
+            
+            DropTableBar(
+                title: displayConfig?.drop_table_title ?? "ODDS",
+                slots: viewModel.dropTableSlots,
+                itemConfigs: displayConfig?.drop_table_items ?? [],
+                masterRollValue: viewModel.masterRollValue,
+                isAnimatingMasterRoll: viewModel.masterRollAnimating
+            )
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            
+            if phase == .strike {
+                CombatHPBar(animal: viewModel.hunt?.animal, animalHP: viewModel.hunt?.animal?.hp ?? 1)
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+            }
+            
+            Spacer()
+        }
+        .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
+    }
+    
+    // MARK: - Helpers
+    
+    private var phaseColor: Color {
+        guard let name = displayConfig?.phase_color else { return KingdomTheme.Colors.buttonPrimary }
+        switch name {
+        case "royalBlue": return KingdomTheme.Colors.royalBlue
+        case "buttonDanger": return KingdomTheme.Colors.buttonDanger
+        case "regalPurple": return KingdomTheme.Colors.regalPurple
+        case "buttonSuccess": return KingdomTheme.Colors.buttonSuccess
+        case "buttonWarning": return KingdomTheme.Colors.buttonWarning
+        case "gold": return KingdomTheme.Colors.gold
         default: return KingdomTheme.Colors.buttonPrimary
         }
     }
     
-    private var resolveButtonLabel: String {
-        switch phase {
-        case .track: return "Master Roll"
-        case .strike: return "Finish Hunt"
-        case .blessing: return "Claim Loot"
-        default: return "Resolve"
-        }
+    private var hitTint: Color {
+        let v = displayConfig?.hit_chance ?? 0
+        if v >= 65 { return KingdomTheme.Colors.buttonSuccess }
+        if v >= 45 { return KingdomTheme.Colors.buttonWarning }
+        return KingdomTheme.Colors.buttonDanger
     }
     
-    private var resolveButtonIcon: String {
-        switch phase {
-        case .track: return "target"
-        case .strike: return "checkmark.circle.fill"
-        case .blessing: return "gift.fill"
-        default: return "checkmark"
+    private func abbreviate(_ s: String) -> String {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return "STAT" }
+        let parts = t.split(separator: " ")
+        if parts.count > 1 {
+            return String(parts.compactMap { $0.first }.prefix(3)).uppercased()
         }
+        return String(t.prefix(3)).uppercased()
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     HuntPhaseView(viewModel: HuntViewModel(), phase: .track, showingIntro: true)

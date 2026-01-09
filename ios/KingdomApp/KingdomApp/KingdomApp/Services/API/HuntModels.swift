@@ -182,12 +182,66 @@ struct PhaseRoundResult: Codable, Identifiable {
     var id: String { "\(round)-\(player_id)" }
 }
 
+// MARK: - Drop Table Item Display (from backend!)
+// Backend sends ALL display info - NO hardcoding on frontend!
+
+struct DropTableItemConfig: Codable {
+    let key: String      // e.g. "no_trail", "squirrel", "hit"
+    let icon: String     // e.g. "❌", "🐿️", "⚔️"
+    let name: String     // e.g. "Lost", "Squirrel", "Hit!"
+    let color: String    // Hex color e.g. "#4CAF50"
+}
+
+// MARK: - Phase Display Config (TEMPLATE SYSTEM!)
+// Backend sends ALL display data - frontend is just a dumb template
+// This allows reuse for other minigames (fishing, mining, etc.)
+
+struct PhaseDisplayConfig: Codable {
+    // Phase info
+    let phase_name: String
+    let phase_icon: String
+    let description: String
+    let phase_color: String
+    
+    // Stat info
+    let stat_name: String
+    let stat_display_name: String
+    let stat_icon: String
+    let stat_value: Int
+    
+    // Hit chance - FLAT, not scaled by stat!
+    let hit_chance: Int
+    
+    // Roll button
+    let roll_button_label: String
+    let roll_button_icon: String
+    
+    // Resolve button
+    let resolve_button_label: String
+    let resolve_button_icon: String
+    
+    // Drop table display - FULL CONFIG FROM BACKEND!
+    let drop_table_title: String
+    let drop_table_title_resolving: String
+    let drop_table_items: [DropTableItemConfig]?  // All items with their display info!
+    
+    // Roll messages
+    let success_message: String
+    let failure_message: String
+    let critical_message: String
+}
+
 struct PhaseState: Codable {
     let phase: String
     let rounds_completed: Int
     let max_rolls: Int
     let total_score: Double
     let round_results: [PhaseRoundResult]
+    
+    // TEMPLATE SYSTEM: All display data from backend!
+    let display: PhaseDisplayConfig?
+    
+    // Legacy fields
     let damage_dealt: Int
     let animal_remaining_hp: Int
     let escape_risk: Double
@@ -336,16 +390,24 @@ struct ActiveHuntResponse: Codable {
 }
 
 // MARK: - Hunt Preview (Probability Display)
+// NEW SYSTEM: Stat level = number of rolls, flat hit chance per roll
 
 struct HuntPhasePreview: Codable {
     let phase_name: String
     let stat_used: String
+    let stat_display_name: String?
     let stat_value: Int
+    let max_rolls: Int
+    let hit_chance_per_roll: Int
+    let prob_at_least_one_success: Int
     let icon: String
     let description: String
-    let percentage: Int
-    let tier: String
-    let color: String
+    let roll_button_label: String?
+    let phase_color: String?
+    
+    // Computed for backwards compat with views
+    var percentage: Int { prob_at_least_one_success }
+    var color: String { phase_color ?? "inkMedium" }
 }
 
 struct HuntAnimalPreview: Codable, Identifiable {
@@ -359,8 +421,9 @@ struct HuntAnimalPreview: Codable, Identifiable {
 }
 
 struct HuntPreviewResponse: Codable {
-    let player_stats: [String: Int]
+    let player_stats: [String: Int]?
     let phases: [String: HuntPhasePreview]
+    let hit_chance_per_roll: Int?  // NEW: flat hit chance for all phases
     let animals: [HuntAnimalPreview]
 }
 

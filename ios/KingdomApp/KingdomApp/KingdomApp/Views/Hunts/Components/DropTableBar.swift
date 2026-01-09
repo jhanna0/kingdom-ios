@@ -1,28 +1,22 @@
 import SwiftUI
 
-// MARK: - Drop Table Display Configuration
-enum DropTableDisplayConfig {
-    case creatures(config: HuntConfigResponse?)
-    case damage
-    case blessing
-}
-
-// MARK: - Drop Table Item Display
+// MARK: - Drop Table Item Display (local view model)
 struct DropTableItemDisplay {
+    let key: String
     let icon: String
     let name: String
     let color: Color
 }
 
 // MARK: - Drop Table Bar
-// Universal drop table visualization used across all hunt phases
+// Universal drop table visualization - FULLY DATA-DRIVEN FROM BACKEND!
 // Shows probability segments in a horizontal bar with brutalist styling
 // NOW WITH INLINE MASTER ROLL ANIMATION - no overlay needed!
 
 struct DropTableBar: View {
     let title: String
     let slots: [String: Int]
-    let displayConfig: DropTableDisplayConfig
+    let itemConfigs: [DropTableItemConfig]  // FROM BACKEND - no hardcoding!
     
     // Master roll animation state (optional - only used during resolve)
     var masterRollValue: Int = 0
@@ -32,35 +26,21 @@ struct DropTableBar: View {
         slots.values.reduce(0, +)
     }
     
-    private var orderedItems: [(key: String, slots: Int, display: DropTableItemDisplay)] {
-        switch displayConfig {
-        case .creatures(let config):
-            let animals = (config?.animals ?? []).sorted { $0.tier < $1.tier }
-            return animals.compactMap { animal in
-                let slotCount = slots[animal.id] ?? 0
-                return (animal.id, slotCount, DropTableItemDisplay(
-                    icon: animal.icon,
-                    name: animal.name,
-                    color: creatureTierColor(animal.tier)
-                ))
-            }
-        case .damage:
-            // SOLID colors - no opacity that shows black through!
-            return [
-                ("miss", slots["miss"] ?? 0, DropTableItemDisplay(icon: "💨", name: "Miss", color: Color(red: 0.7, green: 0.7, blue: 0.7))),
-                ("graze", slots["graze"] ?? 0, DropTableItemDisplay(icon: "🩹", name: "Graze", color: Color(red: 0.9, green: 0.6, blue: 0.3))),
-                ("hit", slots["hit"] ?? 0, DropTableItemDisplay(icon: "⚔️", name: "Hit", color: Color(red: 0.4, green: 0.7, blue: 0.4))),
-                ("crit", slots["crit"] ?? 0, DropTableItemDisplay(icon: "💥", name: "Crit!", color: Color(red: 0.8, green: 0.3, blue: 0.3))),
-            ]
-        case .blessing:
-            // SOLID colors - no opacity that shows black through!
-            return [
-                ("none", slots["none"] ?? 0, DropTableItemDisplay(icon: "😶", name: "None", color: Color(red: 0.7, green: 0.7, blue: 0.7))),
-                ("small", slots["small"] ?? 0, DropTableItemDisplay(icon: "✨", name: "+10%", color: Color(red: 0.4, green: 0.5, blue: 0.8))),
-                ("medium", slots["medium"] ?? 0, DropTableItemDisplay(icon: "🌟", name: "+25%", color: Color(red: 0.6, green: 0.4, blue: 0.7))),
-                ("large", slots["large"] ?? 0, DropTableItemDisplay(icon: "⚡", name: "+50%", color: Color(red: 0.85, green: 0.7, blue: 0.3))),
-            ]
+    /// Convert backend configs to display items with slot counts
+    /// Order is preserved from backend - that's the left-to-right order on the bar!
+    private var orderedItems: [DropTableItemDisplay] {
+        itemConfigs.map { config in
+            DropTableItemDisplay(
+                key: config.key,
+                icon: config.icon,
+                name: config.name,
+                color: Color(hex: config.color) ?? .gray
+            )
         }
+    }
+    
+    private func slotsForKey(_ key: String) -> Int {
+        slots[key] ?? 0
     }
     
     var body: some View {
@@ -70,7 +50,7 @@ struct DropTableBar: View {
                 .tracking(1)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            // Horizontal bar with segments - brutalist styling
+            // Horizontal bar with segments - brutalist styling - FULL WIDTH
             GeometryReader { geo in
                 ZStack {
                     // Offset shadow
@@ -84,9 +64,10 @@ struct DropTableBar: View {
                     
                     HStack(spacing: 0) {
                         ForEach(orderedItems, id: \.key) { item in
-                            let fraction = totalSlots > 0 ? CGFloat(item.slots) / CGFloat(totalSlots) : 0
+                            let slotCount = slotsForKey(item.key)
+                            let fraction = totalSlots > 0 ? CGFloat(slotCount) / CGFloat(totalSlots) : 0
                             if fraction > 0.01 {
-                                DropTableSegment(display: item.display, fraction: fraction)
+                                DropTableSegment(icon: item.icon, color: item.color, fraction: fraction)
                                     .frame(width: geo.size.width * fraction)
                             }
                         }
@@ -97,39 +78,28 @@ struct DropTableBar: View {
                             .stroke(Color.black, lineWidth: 3)
                     )
                     
-                    // MASTER ROLL MARKER - animates across the bar!
+                    // MASTER ROLL CROSSHAIRS - animates across the bar!
                     if isAnimatingMasterRoll || masterRollValue > 0 {
                         let markerX = geo.size.width * CGFloat(masterRollValue) / 100.0
                         
-                        VStack(spacing: 0) {
-                            // Arrow pointing down
-                            Image(systemName: "arrowtriangle.down.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(KingdomTheme.Colors.gold)
-                            
-                            // Vertical line
-                            Rectangle()
-                                .fill(KingdomTheme.Colors.gold)
-                                .frame(width: 3, height: 60)
-                        }
-                        .shadow(color: Color.black.opacity(0.5), radius: 2, x: 1, y: 1)
-                        .position(x: markerX, y: 25)
-                        .animation(
-                            isAnimatingMasterRoll ? .linear(duration: 0.03) : .spring(response: 0.5, dampingFraction: 0.6),
-                            value: masterRollValue
-                        )
+                        Image(systemName: "scope")
+                            .font(.system(size: 44, weight: .black))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .shadow(color: .black, radius: 0, x: 2, y: 2)
+                            .position(x: markerX, y: 25)
                     }
                 }
             }
             .frame(height: 50)
-            .padding(.horizontal, 16)
+            // NO internal padding - bar should be full width of container
             
-            // Legend with icons
+            // Legend with icons - FROM BACKEND DATA!
             HStack(spacing: 6) {
                 ForEach(orderedItems, id: \.key) { item in
-                    let percent = totalSlots > 0 ? Int(Double(item.slots) / Double(totalSlots) * 100) : 0
+                    let slotCount = slotsForKey(item.key)
+                    let percent = totalSlots > 0 ? Int(Double(slotCount) / Double(totalSlots) * 100) : 0
                     HStack(spacing: 2) {
-                        Text(item.display.icon)
+                        Text(item.icon)
                             .font(.system(size: 14))
                             .opacity(percent > 0 ? 1 : 0.3)
                         Text("\(percent)%")
@@ -141,34 +111,24 @@ struct DropTableBar: View {
         }
         .padding(.vertical, 8)
     }
-    
-    private func creatureTierColor(_ tier: Int) -> Color {
-        // SOLID colors - no opacity!
-        switch tier {
-        case 0: return KingdomTheme.Colors.inkMedium
-        case 1: return KingdomTheme.Colors.buttonSuccess
-        case 2: return KingdomTheme.Colors.buttonWarning
-        case 3: return KingdomTheme.Colors.buttonDanger
-        case 4: return KingdomTheme.Colors.regalPurple
-        default: return KingdomTheme.Colors.inkMedium
-        }
-    }
 }
 
 // MARK: - Drop Table Segment
 struct DropTableSegment: View {
-    let display: DropTableItemDisplay
+    let icon: String
+    let color: Color
     let fraction: CGFloat
     
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(display.color)
+                .fill(color)
             
             if fraction > 0.15 {
-                Text(display.icon)
+                Text(icon)
                     .font(.system(size: fraction > 0.3 ? 28 : 20))
             }
         }
     }
 }
+
