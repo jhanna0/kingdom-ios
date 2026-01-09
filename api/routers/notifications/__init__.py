@@ -90,64 +90,60 @@ def get_quick_summary(
 ):
     """
     Quick summary for app badge/widget
-    Returns counts only, no detailed data
+    
+    Shows badge if any notification is newer than user's last_notifications_viewed.
     """
     state = get_player_state(db, current_user)
     
-    # Count contracts where user has contributed
-    user_id_str = str(current_user.id)
-    all_contracts = db.query(Contract).all()
+    last_viewed = state.last_notifications_viewed
     
-    ready_contracts = sum(1 for c in all_contracts 
-                         if c.status == 'completed' 
-                         and c.action_contributions 
-                         and user_id_str in c.action_contributions)
+    # Gather ALL notifications
+    notifications = []
+    notifications.extend(get_coup_notifications(db, current_user, state))
+    notifications.extend(get_invasion_notifications(db, current_user, state))
+    notifications.extend(get_kingdom_event_notifications(db, current_user, state))
+    notifications.extend(get_alliance_notifications(db, current_user, state))
     
-    active_contracts = sum(1 for c in all_contracts 
-                          if c.status == 'in_progress' 
-                          and c.action_contributions 
-                          and user_id_str in c.action_contributions)
-    
-    # Count active coups where user can participate or is involved
-    active_coups = db.query(CoupEvent).filter(CoupEvent.status == 'voting').all()
-    
-    relevant_coups = 0
-    for coup in active_coups:
-        attacker_ids = coup.get_attacker_ids()
-        defender_ids = coup.get_defender_ids()
-        user_involved = current_user.id in attacker_ids or current_user.id in defender_ids
-        can_join = state.current_kingdom_id == coup.kingdom_id and not user_involved
-        
-        if user_involved or can_join:
-            relevant_coups += 1
-    
-    # Count active invasions where user can participate or is involved
-    active_invasions = db.query(InvasionEvent).filter(InvasionEvent.status == 'declared').all()
-    
-    relevant_invasions = 0
-    for invasion in active_invasions:
-        attacker_ids = invasion.get_attacker_ids()
-        defender_ids = invasion.get_defender_ids()
-        user_involved = current_user.id in attacker_ids or current_user.id in defender_ids
-        
-        target_kingdom = db.query(Kingdom).filter(Kingdom.id == invasion.target_kingdom_id).first()
-        if target_kingdom:
-            # Check if user's city is being attacked or user is allied
-            home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first() if state.hometown_kingdom_id else None
-            is_allied = home_kingdom and are_empires_allied(
-                db,
-                home_kingdom.empire_id or home_kingdom.id,
-                target_kingdom.empire_id or target_kingdom.id
-            )
-            is_ruler = target_kingdom.ruler_id == current_user.id
-            
-            if user_involved or is_ruler or is_allied:
-                relevant_invasions += 1
+    # Check if any notification is newer than last viewed
+    has_unread = False
+    if notifications:
+        if not last_viewed:
+            # Never viewed notifications = all are new
+            has_unread = True
+        else:
+            # IMPORTANT: Strip microseconds to match notification timestamps
+            # (notifications are serialized without microseconds for iOS compatibility)
+            from dateutil.parser import parse as parse_datetime
+            last_viewed_no_micro = last_viewed.replace(microsecond=0)
+            for n in notifications:
+                created_at_str = n.get("created_at")
+                if created_at_str:
+                    try:
+                        created_at = parse_datetime(created_at_str).replace(tzinfo=None)
+                        if created_at > last_viewed_no_micro:
+                            has_unread = True
+                            break
+                    except:
+                        pass
     
     return {
-        "ready_contracts": ready_contracts,
-        "active_contracts": active_contracts,
-        "skill_points": state.skill_points,
-        "unread_notifications": relevant_coups + relevant_invasions
+        "has_unread": has_unread
     }
+
+
+@router.post("/mark-read")
+def mark_notifications_read(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark all notifications as read.
+    
+    Call this when user opens the notifications panel.
+    """
+    state = get_player_state(db, current_user)
+    state.last_notifications_viewed = datetime.utcnow()
+    db.commit()
+    
+    return {"success": True}
 

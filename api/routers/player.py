@@ -507,39 +507,9 @@ def get_player_state(
                             visibility="public"
                         )
             
-            # Update current kingdom IMMEDIATELY (even if on cooldown)
-            # This prevents charging travel fee multiple times
+            # Update current_kingdom_id if entering a new kingdom
             if is_entering_new_kingdom:
                 state.current_kingdom_id = kingdom.id
-                
-                # Create or update user_kingdoms record (tracks per-kingdom reputation and check-ins)
-                user_kingdom = db.query(UserKingdom).filter(
-                    UserKingdom.user_id == current_user.id,
-                    UserKingdom.kingdom_id == kingdom.id
-                ).first()
-                
-                if not user_kingdom:
-                    # First time visiting this kingdom - create record with starting reputation
-                    user_kingdom = UserKingdom(
-                        user_id=current_user.id,
-                        kingdom_id=kingdom.id,
-                        local_reputation=0,  # Start at 0 reputation
-                        checkins_count=1,
-                        gold_earned=0,
-                        gold_spent=0
-                    )
-                    db.add(user_kingdom)
-                    print(f"📍 {current_user.display_name} first time entering {kingdom.name}")
-                else:
-                    # Increment check-in counter
-                    user_kingdom.checkins_count += 1
-                    print(f"📍 {current_user.display_name} entered {kingdom.name} (visit #{user_kingdom.checkins_count})")
-                
-                # Update kingdom activity
-                kingdom.last_activity = datetime.utcnow()
-                kingdom.checked_in_players = db.query(DBPlayerState).filter(
-                    DBPlayerState.current_kingdom_id == kingdom.id
-                ).count()
                 
                 # Create travel event for response
                 from schemas.user import TravelEvent
@@ -549,6 +519,33 @@ def get_player_state(
                     travel_fee_paid=travel_fee_paid,
                     free_travel_reason=free_travel_reason
                 )
+            
+            # ALWAYS track check-in (every app load in this kingdom)
+            user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == current_user.id,
+                UserKingdom.kingdom_id == kingdom.id
+            ).first()
+            
+            if not user_kingdom:
+                user_kingdom = UserKingdom(
+                    user_id=current_user.id,
+                    kingdom_id=kingdom.id,
+                    local_reputation=0,
+                    checkins_count=1,
+                    last_checkin=datetime.utcnow(),
+                    gold_earned=0,
+                    gold_spent=0
+                )
+                db.add(user_kingdom)
+            else:
+                user_kingdom.checkins_count += 1
+                user_kingdom.last_checkin = datetime.utcnow()
+            
+            # Update kingdom activity
+            kingdom.last_activity = datetime.utcnow()
+            kingdom.checked_in_players = db.query(DBPlayerState).filter(
+                DBPlayerState.current_kingdom_id == kingdom.id
+            ).count()
             
             # Commit changes (travel fee and/or current_kingdom_id update)
             db.commit()

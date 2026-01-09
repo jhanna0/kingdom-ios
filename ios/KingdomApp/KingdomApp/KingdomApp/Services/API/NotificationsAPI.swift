@@ -18,19 +18,23 @@ class NotificationsAPI {
         let request = client.request(endpoint: "/notifications/summary", method: "GET")
         return try await client.execute(request)
     }
+    
+    /// Mark all notifications as read
+    func markRead() async throws {
+        let request = client.request(endpoint: "/notifications/mark-read", method: "POST")
+        let _: MarkReadResponse = try await client.execute(request)
+    }
 }
 
 struct NotificationSummary: Codable {
-    let readyContracts: Int
-    let activeContracts: Int
-    let skillPoints: Int
-    let unreadNotifications: Int
+    let hasUnread: Bool
     
     enum CodingKeys: String, CodingKey {
-        case readyContracts = "ready_contracts"
-        case activeContracts = "active_contracts"
-        case skillPoints = "skill_points"
-        case unreadNotifications = "unread_notifications"
+        case hasUnread = "has_unread"
     }
+}
+
+struct MarkReadResponse: Codable {
+    let success: Bool
 }
 

@@ -220,7 +220,7 @@ struct AuthenticatedView: View {
     @State private var kingdomToShow: Kingdom?
     @State private var showActivity = false
     @State private var showNotifications = false
-    @State private var notificationBadgeCount = 0
+    @State private var hasUnreadNotifications = false
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
     @State private var displayedTravelEvent: TravelEvent?
@@ -248,13 +248,12 @@ struct AuthenticatedView: View {
                     showCharacterSheet: $showCharacterSheet,
                     showActions: $showActions,
                     showProperties: $showProperties,
-                    showActivity: $showActivity,
-                    notificationBadgeCount: notificationBadgeCount
+                    showActivity: $showActivity
                 )
                 
                 FloatingNotificationsButton(
                     showNotifications: $showNotifications,
-                    badgeCount: notificationBadgeCount
+                    hasUnread: hasUnreadNotifications
                 )
             }
             
@@ -394,6 +393,12 @@ struct AuthenticatedView: View {
         .sheet(isPresented: $showNotifications) {
             NotificationsSheet()
         }
+        .onChange(of: showNotifications) { _, isShowing in
+            if isShowing {
+                // Clear badge when user opens notifications
+                hasUnreadNotifications = false
+            }
+        }
         .task {
             // Clear notification badge when app opens
             NotificationManager.shared.clearDeliveredNotifications()
@@ -463,7 +468,7 @@ struct AuthenticatedView: View {
         do {
             let summary = try await viewModel.apiService.notifications.getSummary()
             await MainActor.run {
-                notificationBadgeCount = summary.unreadNotifications
+                hasUnreadNotifications = summary.hasUnread
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")

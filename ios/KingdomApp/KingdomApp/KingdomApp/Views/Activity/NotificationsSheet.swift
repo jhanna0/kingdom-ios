@@ -81,6 +81,8 @@ struct NotificationsSheet: View {
             }
             .task {
                 await viewModel.loadActivity()
+                // Mark notifications as read when user views them
+                try? await NotificationsAPI(client: APIClient.shared).markRead()
             }
             .sheet(item: $viewModel.selectedCoup) { coupData in
                 CoupVotingSheet(coupData: coupData, onVote: { side in

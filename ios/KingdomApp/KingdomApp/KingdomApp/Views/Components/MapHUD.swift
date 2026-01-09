@@ -8,7 +8,6 @@ struct MapHUD: View {
     @Binding var showActivity: Bool
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
-    let notificationBadgeCount: Int
     
     // Get home kingdom name
     private var homeKingdomName: String? {

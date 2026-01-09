@@ -2,7 +2,7 @@ import SwiftUI
 
 struct FloatingNotificationsButton: View {
     @Binding var showNotifications: Bool
-    let badgeCount: Int
+    let hasUnread: Bool
     
     var body: some View {
         VStack {
@@ -14,7 +14,7 @@ struct FloatingNotificationsButton: View {
                 Button(action: {
                     showNotifications = true
                 }) {
-                    ZStack(alignment: .topTrailing) {
+                    ZStack {
                         // Brutalist offset shadow
                         Circle()
                             .fill(Color.black)
@@ -33,32 +33,30 @@ struct FloatingNotificationsButton: View {
                         Image(systemName: "scroll.fill")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
                         
-                        // Badge with brutalist style
-                        if badgeCount > 0 {
+                        // Simple dot indicator centered on top-right of circle border
+                        if hasUnread {
                             ZStack {
-                                // Badge shadow
+                                // Dot shadow
                                 Circle()
                                     .fill(Color.black)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 16, height: 16)
                                     .offset(x: 2, y: 2)
                                 
                                 Circle()
                                     .fill(KingdomTheme.Colors.buttonDanger)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 16, height: 16)
                                     .overlay(
                                         Circle()
                                             .stroke(Color.black, lineWidth: 2)
                                     )
-                                
-                                Text("\(min(badgeCount, 99))")
-                                    .font(.system(size: 12, weight: .black))
-                                    .foregroundColor(.white)
                             }
-                            .offset(x: 6, y: -6)
+                            // Position at 45° on the circle border (radius 30)
+                            // cos(45°) ≈ 0.707, so offset ≈ 21
+                            .offset(x: 21, y: -21)
                         }
                     }
+                    .frame(width: 60, height: 60)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.trailing, 20)
@@ -72,7 +70,7 @@ struct FloatingNotificationsButton: View {
 #Preview {
     ZStack {
         Color.gray
-        FloatingNotificationsButton(showNotifications: .constant(false), badgeCount: 3)
+        FloatingNotificationsButton(showNotifications: .constant(false), hasUnread: true)
     }
 }
 
