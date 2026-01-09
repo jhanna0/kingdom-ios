@@ -128,15 +128,15 @@ BUILDING_TYPES = {
         "display_name": "Market",
         "icon": "cart.fill",
         "category": "economy",
-        "description": "Generates passive gold income",
+        "description": "Enables trading and generates income",
         "max_tier": 5,
-        "benefit_formula": "+{income}g per day",
+        "benefit_formula": "Trading unlocks and citizen income",
         "tiers": {
-            1: {"name": "Stalls", "benefit": "+15g per day", "income": 15, "description": "Basic market stalls"},
-            2: {"name": "Market Square", "benefit": "+35g per day", "income": 35, "description": "Town market"},
-            3: {"name": "Trading Post", "benefit": "+65g per day", "income": 65, "description": "Regional trading hub"},
-            4: {"name": "Commercial District", "benefit": "+100g per day", "income": 100, "description": "Large commercial area"},
-            5: {"name": "Trade Empire", "benefit": "+150g per day", "income": 150, "description": "Major trade center"},
+            1: {"name": "Stalls", "benefit": "Unlocks intrakingdom trading", "income": 0, "description": "Unlocks intrakingdom trading"},
+            2: {"name": "Market Square", "benefit": "1 gold to treasury per citizen per day", "income": 0, "description": "1 gold to treasury per citizen per day"},
+            3: {"name": "Trading Post", "benefit": "Market trade with allied kingdoms", "income": 0, "description": "Market trade with allied kingdoms"},
+            4: {"name": "Commercial District", "benefit": "2 gold per citizen per day", "income": 0, "description": "2 gold per citizen per day"},
+            5: {"name": "Trade Empire", "benefit": "Market trade with any neighboring kingdom", "income": 0, "description": "Market trade with any neighboring kingdom"},
         }
     },
     "farm": {

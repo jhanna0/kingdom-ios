@@ -219,12 +219,13 @@ struct AuthenticatedView: View {
     @State private var showProperties = false
     @State private var kingdomToShow: Kingdom?
     @State private var showActivity = false
-    @State private var showMarket = false
     @State private var showNotifications = false
     @State private var notificationBadgeCount = 0
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
     @State private var displayedTravelEvent: TravelEvent?
+    @State private var showWeatherToast = false
+    @State private var currentWeather: WeatherData?
     
     var body: some View {
         ZStack {
@@ -248,7 +249,6 @@ struct AuthenticatedView: View {
                     showActions: $showActions,
                     showProperties: $showProperties,
                     showActivity: $showActivity,
-                    showMarket: $showMarket,
                     notificationBadgeCount: notificationBadgeCount
                 )
                 
@@ -292,6 +292,28 @@ struct AuthenticatedView: View {
                     Spacer()
                 }
                 .zIndex(999)
+            }
+            
+            // Weather toast - white text with icon, top right under HUD
+            if showWeatherToast, let weather = currentWeather {
+                VStack {
+                    HStack {
+                        Spacer()
+                        WeatherToast(
+                            weather: weather,
+                            onDismiss: {
+                                showWeatherToast = false
+                                currentWeather = nil
+                            }
+                        )
+                        .padding(.trailing, 16)
+                    }
+                    .padding(.top, 155) // Further down under HUD
+                    
+                    Spacer()
+                }
+                .transition(.opacity)
+                .zIndex(998)
             }
         }
         .onReceive(locationManager.$currentLocation) { location in
@@ -369,11 +391,6 @@ struct AuthenticatedView: View {
         .sheet(isPresented: $showActivity) {
             FriendsView()
         }
-        .sheet(isPresented: $showMarket) {
-            NavigationStack {
-                MarketView()
-            }
-        }
         .sheet(isPresented: $showNotifications) {
             NotificationsSheet()
         }
@@ -411,6 +428,13 @@ struct AuthenticatedView: View {
                     }
                 }
             }
+            
+            // Load and show weather when entering a kingdom
+            if let kingdom = newValue, oldValue?.id != newValue?.id {
+                Task {
+                    await loadWeatherForKingdom(kingdom.id)
+                }
+            }
         }
         .onChange(of: viewModel.latestTravelEvent) { oldValue, newValue in
             // Show travel notification when travel event occurs
@@ -443,6 +467,20 @@ struct AuthenticatedView: View {
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")
+        }
+    }
+    
+    private func loadWeatherForKingdom(_ kingdomId: String) async {
+        do {
+            let response = try await KingdomAPIService.shared.weather.getKingdomWeather(kingdomId: kingdomId)
+            await MainActor.run {
+                currentWeather = response.weather
+                withAnimation(.easeIn(duration: 0.3)) {
+                    showWeatherToast = true
+                }
+            }
+        } catch {
+            print("⚠️ Weather error: \(error)")
         }
     }
 }
