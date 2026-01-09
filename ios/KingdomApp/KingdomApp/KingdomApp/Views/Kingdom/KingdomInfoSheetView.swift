@@ -14,10 +14,10 @@ struct KingdomInfoSheetView: View {
     @State private var claimErrorMessage = ""
     @State private var isClaiming = false
     @State private var weather: WeatherData?
-    @State private var showTownPub = false
     
     var body: some View {
-        ScrollView {
+        NavigationStack {
+            ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
                 // Header with medieval styling
                 HStack(alignment: .top, spacing: 12) {
@@ -255,8 +255,8 @@ struct KingdomInfoSheetView: View {
                 
                 // TOWN PUB - Kingdom Chat (only if player is inside)
                 if isPlayerInside {
-                    Button {
-                        showTownPub = true
+                    NavigationLink {
+                        TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
                     } label: {
                         HStack(spacing: KingdomTheme.Spacing.medium) {
                             Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -482,20 +482,8 @@ struct KingdomInfoSheetView: View {
                 }
             }
             .padding(.top)
-        }
-        .background(KingdomTheme.Colors.parchment)
-        .sheet(isPresented: $showTownPub) {
-            NavigationStack {
-                TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Close") {
-                                showTownPub = false
-                            }
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                    }
             }
+            .background(KingdomTheme.Colors.parchment)
         }
         .task {
             // Load weather

@@ -229,6 +229,7 @@ struct NotificationCard: View {
                         }
                     }
                 }
+                
             }
             .padding()
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
@@ -261,6 +262,8 @@ struct NotificationCard: View {
             return "dollarsign.circle.fill"
         case .checkinReady:
             return "location.fill"
+        case .kingdomEvent:
+            return "scroll.fill"
         }
     }
     

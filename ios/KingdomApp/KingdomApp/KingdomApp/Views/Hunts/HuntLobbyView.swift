@@ -202,17 +202,17 @@ struct PartyMemberCard: View {
             // Name and stats
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(participant.player_name)
-                        .font(KingdomTheme.Typography.headline())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    if isLeader {
+                if isLeader {
                         Text("Leader")
                             .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.gold)
                     }
                 }
-                
+                    Text(participant.player_name)
+                        .font(KingdomTheme.Typography.headline())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    
                 if let stats = participant.stats {
                     HStack(spacing: 8) {
                         HuntStatBadge(icon: "eye.fill", value: stats["intelligence"] ?? 0)

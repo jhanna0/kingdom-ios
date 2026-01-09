@@ -8,8 +8,10 @@ from typing import List
 import uuid
 
 from db import get_db, User, PlayerState, Kingdom, UserKingdom, CityBoundary
+from db.models.kingdom_event import KingdomEvent
 from schemas import CheckInRequest, CheckInResponse, CheckInRewards
 from routers.auth import get_current_user
+from routers.actions.utils import format_datetime_iso
 from config import DEV_MODE
 
 
@@ -520,9 +522,23 @@ def set_kingdom_tax_rate(
             detail="Only the ruler can change the tax rate"
         )
     
+    # Store old rate for event logging
+    old_rate = kingdom.tax_rate
+    
     # Update tax rate
     kingdom.tax_rate = tax_rate
     kingdom.updated_at = datetime.utcnow()
+    
+    # Log tax change event for kingdom activity feed
+    if old_rate != tax_rate:
+        action = "raised" if tax_rate > old_rate else "lowered"
+        tax_event = KingdomEvent(
+            kingdom_id=kingdom.id,
+            title=f"{current_user.display_name} {action} taxes",
+            description=f"Tax rate changed to {tax_rate}%"
+        )
+        db.add(tax_event)
+    
     db.commit()
     
     return {
@@ -531,6 +547,74 @@ def set_kingdom_tax_rate(
         "kingdom_id": kingdom.id,
         "kingdom_name": kingdom.name,
         "tax_rate": tax_rate
+    }
+
+
+from pydantic import BaseModel
+
+class DecreeRequest(BaseModel):
+    text: str
+
+@router.post("/kingdoms/{kingdom_id}/decree")
+def make_decree(
+    kingdom_id: str,
+    request: DecreeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Make a royal decree (ruler only) - appears in kingdom activity feed"""
+    decree_text = request.text.strip()
+    
+    # Validate decree text
+    if not decree_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Decree text cannot be empty"
+        )
+    
+    if len(decree_text) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Decree text cannot exceed 500 characters"
+        )
+    
+    # Get kingdom
+    kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+    if not kingdom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kingdom not found"
+        )
+    
+    # Check if user is the ruler
+    if kingdom.ruler_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the ruler can make decrees"
+        )
+    
+    # Create decree event
+    decree = KingdomEvent(
+        kingdom_id=kingdom.id,
+        title=f"Decree from {current_user.display_name}",
+        description=decree_text
+    )
+    db.add(decree)
+    
+    # Update kingdom activity timestamp
+    kingdom.last_activity = datetime.utcnow()
+    db.commit()
+    db.refresh(decree)
+    
+    return {
+        "success": True,
+        "message": "Decree proclaimed successfully",
+        "decree_id": decree.id,
+        "kingdom_id": kingdom.id,
+        "kingdom_name": kingdom.name,
+        "decree_text": decree.description,
+        "ruler_name": current_user.display_name,
+        "created_at": format_datetime_iso(decree.created_at)
     }
 
 

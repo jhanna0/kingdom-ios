@@ -8,6 +8,7 @@ class ActivityViewModel: ObservableObject {
     @Published var notifications: [ActivityNotification] = []
     @Published var selectedCoup: CoupNotificationData?
     @Published var errorMessage: String?
+    @Published var unreadKingdomEvents: Int = 0
     
     private let api = KingdomAPIService.shared
     
@@ -18,8 +19,9 @@ class ActivityViewModel: ObservableObject {
         do {
             let response = try await api.notifications.getUpdates()
             notifications = response.notifications
+            unreadKingdomEvents = response.unreadKingdomEvents ?? 0
             
-            print("✅ Loaded \(notifications.count) activity events")
+            print("✅ Loaded \(notifications.count) activity events, \(unreadKingdomEvents) unread")
         } catch {
             print("❌ Failed to load activity: \(error)")
             errorMessage = "Failed to load activity"
@@ -80,6 +82,9 @@ class ActivityViewModel: ObservableObject {
         case .treasuryFull:
             // TODO: Navigate to kingdom management
             print("Navigate to kingdom: \(notification.actionId ?? "unknown")")
+            
+        case .kingdomEvent:
+            break  // Just informational, no action needed
         }
     }
     

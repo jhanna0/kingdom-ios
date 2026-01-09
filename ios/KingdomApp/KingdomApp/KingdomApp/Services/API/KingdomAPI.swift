@@ -126,6 +126,44 @@ class KingdomAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Decrees
+    
+    struct DecreeRequest: Codable {
+        let text: String
+    }
+    
+    struct MakeDecreeResponse: Codable {
+        let success: Bool
+        let message: String
+        let decreeId: Int
+        let kingdomId: String
+        let kingdomName: String
+        let decreeText: String
+        let rulerName: String
+        let createdAt: String
+        
+        enum CodingKeys: String, CodingKey {
+            case success, message
+            case decreeId = "decree_id"
+            case kingdomId = "kingdom_id"
+            case kingdomName = "kingdom_name"
+            case decreeText = "decree_text"
+            case rulerName = "ruler_name"
+            case createdAt = "created_at"
+        }
+    }
+    
+    /// Make a royal decree (ruler only)
+    func makeDecree(kingdomId: String, decreeText: String) async throws -> MakeDecreeResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let body = DecreeRequest(text: decreeText)
+        let request = try client.request(endpoint: "/kingdoms/\(kingdomId)/decree", method: "POST", body: body)
+        return try await client.execute(request)
+    }
+    
     // MARK: - Leaderboard
     
     struct LeaderboardResponse: Codable {

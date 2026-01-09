@@ -51,8 +51,9 @@ struct TownPubView: View {
         .background(KingdomTheme.Colors.parchment)
         .navigationTitle("Town Pub")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(KingdomTheme.Colors.parchmentDark, for: .navigationBar)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
         .onAppear {
             connectToChat()
         }

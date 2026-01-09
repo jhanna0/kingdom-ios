@@ -13,6 +13,7 @@ struct ActivityNotification: Codable, Identifiable {
     let createdAt: String
     let coupData: CoupNotificationData?
     let invasionData: InvasionNotificationData?
+    let eventData: KingdomEventData?
     
     enum CodingKeys: String, CodingKey {
         case type, priority, title, message, action
@@ -20,6 +21,7 @@ struct ActivityNotification: Codable, Identifiable {
         case createdAt = "created_at"
         case coupData = "coup_data"
         case invasionData = "invasion_data"
+        case eventData = "event_data"
     }
     
     enum NotificationType: String, Codable {
@@ -37,6 +39,8 @@ struct ActivityNotification: Codable, Identifiable {
         case invasionDefenseNeeded = "invasion_defense_needed"
         case invasionInProgress = "invasion_in_progress"
         case invasionResolved = "invasion_resolved"
+        // Kingdom events
+        case kingdomEvent = "kingdom_event"
     }
     
     enum NotificationPriority: String, Codable {
@@ -170,6 +174,26 @@ struct InvasionNotificationData: Codable, Identifiable {
     }
 }
 
+// MARK: - Kingdom Event Data
+
+struct KingdomEventData: Codable {
+    let eventId: Int
+    let eventType: String
+    let rulerName: String
+    let message: String
+    let oldValue: Int?
+    let newValue: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case eventId = "event_id"
+        case eventType = "event_type"
+        case rulerName = "ruler_name"
+        case message
+        case oldValue = "old_value"
+        case newValue = "new_value"
+    }
+}
+
 // MARK: - Activity Response
 
 struct ActivityResponse: Codable {
@@ -178,10 +202,12 @@ struct ActivityResponse: Codable {
     let notifications: [ActivityNotification]
     let contracts: ContractActivity
     let kingdoms: [ActivityKingdomUpdate]
+    let unreadKingdomEvents: Int?
     let serverTime: String
     
     enum CodingKeys: String, CodingKey {
         case success, summary, notifications, contracts, kingdoms
+        case unreadKingdomEvents = "unread_kingdom_events"
         case serverTime = "server_time"
     }
 }

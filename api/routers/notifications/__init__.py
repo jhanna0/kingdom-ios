@@ -18,6 +18,7 @@ from .contracts import build_contract_updates
 from .kingdoms import build_kingdom_updates
 from .coups import get_coup_notifications
 from .invasions import get_invasion_notifications
+from .kingdom_events import get_kingdom_event_notifications, get_unread_kingdom_events_count
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -49,9 +50,13 @@ def get_user_updates(
     notifications = []
     notifications.extend(get_coup_notifications(db, current_user, state))
     notifications.extend(get_invasion_notifications(db, current_user, state))
+    notifications.extend(get_kingdom_event_notifications(db, current_user, state))
     
     # Sort by timestamp (most recent first)
     sorted_notifications = sorted(notifications, key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Count unread kingdom events since last check-in
+    unread_kingdom_events = get_unread_kingdom_events_count(db, current_user, state)
     
     return {
         "success": True,
@@ -59,6 +64,7 @@ def get_user_updates(
         "notifications": sorted_notifications,
         "contracts": contracts_data,
         "kingdoms": kingdoms_list,
+        "unread_kingdom_events": unread_kingdom_events,
         "server_time": format_datetime_iso(datetime.utcnow())
     }
 
