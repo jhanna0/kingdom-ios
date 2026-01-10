@@ -39,6 +39,9 @@ struct CoupEventResponse: Codable, Identifiable {
     let initiatorId: Int
     let initiatorName: String
     let initiatorStats: InitiatorStats?
+    let rulerId: Int?  // Current ruler being challenged
+    let rulerName: String?  // Current ruler's name
+    let rulerStats: InitiatorStats?  // Ruler's character sheet
     let status: String  // 'pledge', 'battle', 'resolved'
     
     // Timing
@@ -69,6 +72,9 @@ struct CoupEventResponse: Codable, Identifiable {
         case initiatorId = "initiator_id"
         case initiatorName = "initiator_name"
         case initiatorStats = "initiator_stats"
+        case rulerId = "ruler_id"
+        case rulerName = "ruler_name"
+        case rulerStats = "ruler_stats"
         case status
         case startTime = "start_time"
         case pledgeEndTime = "pledge_end_time"

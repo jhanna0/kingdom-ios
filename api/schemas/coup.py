@@ -69,7 +69,10 @@ class CoupEventResponse(BaseModel):
     kingdom_name: Optional[str] = None
     initiator_id: int
     initiator_name: str
-    initiator_stats: Optional[InitiatorStats] = None  # Full character sheet
+    initiator_stats: Optional[InitiatorStats] = None  # Full character sheet for challenger
+    ruler_id: Optional[int] = None  # Current ruler being challenged
+    ruler_name: Optional[str] = None  # Current ruler's name
+    ruler_stats: Optional[InitiatorStats] = None  # Full character sheet for ruler
     status: str  # 'pledge', 'battle', 'resolved'
     
     # Timing

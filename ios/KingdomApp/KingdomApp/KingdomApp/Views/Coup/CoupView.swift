@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 /// Main container view for Coup V2
-/// Displays appropriate phase view based on coup status
+/// Full-screen game modal - no nav bar
 struct CoupView: View {
     let coupId: Int
     let onDismiss: () -> Void
@@ -10,36 +10,16 @@ struct CoupView: View {
     @StateObject private var viewModel = CoupViewModel()
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                KingdomTheme.Colors.parchment.ignoresSafeArea()
-                
-                if viewModel.isLoading {
-                    loadingView
-                } else if let error = viewModel.error {
-                    errorView(error: error)
-                } else if let coup = viewModel.coup {
-                    phaseContent(coup: coup)
-                }
+        ZStack {
+            KingdomTheme.Colors.parchment.ignoresSafeArea()
+            
+            if viewModel.isLoading {
+                loadingView
+            } else if let error = viewModel.error {
+                errorView(error: error)
+            } else if let coup = viewModel.coup {
+                phaseContent(coup: coup)
             }
-            .navigationTitle("Coup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        onDismiss()
-                    }
-                    .buttonStyle(.toolbar)
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { viewModel.refresh() }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.toolbar)
-                }
-            }
-            .parchmentNavigationBar()
         }
         .onAppear {
             viewModel.loadCoup(id: coupId)
@@ -52,7 +32,7 @@ struct CoupView: View {
     private func phaseContent(coup: CoupEventResponse) -> some View {
         switch coup.status {
         case "pledge":
-            CoupPledgeView(coup: coup) { side in
+            CoupPledgeView(coup: coup, onDismiss: onDismiss) { side in
                 viewModel.pledge(side: side)
             }
         case "battle":
@@ -68,13 +48,12 @@ struct CoupView: View {
     // MARK: - Battle View
     
     private func battleView(coup: CoupEventResponse) -> some View {
-        let rulerName = coup.defenders.first?.playerName ?? "Current Ruler"
+        let rulerName = coup.rulerName ?? "The Crown"
         let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
-        let rulerStats = coup.defenders.first.map { FighterStats(from: $0) } ?? .empty
+        let rulerStats = coup.rulerStats.map { FighterStats(from: $0) } ?? .empty
         
         return ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                // VS Poster with stats
+            VStack(spacing: KingdomTheme.Spacing.medium) {
                 CoupVsPosterView(
                     kingdomName: coup.kingdomName ?? "Kingdom",
                     challengerName: coup.initiatorName,
@@ -85,40 +64,31 @@ struct CoupView: View {
                     status: coup.status,
                     userSide: coup.userSide,
                     challengerStats: challengerStats,
-                    rulerStats: rulerStats
+                    rulerStats: rulerStats,
+                    onDismiss: onDismiss
                 )
                 
-                // Battle status card
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "bolt.horizontal.fill")
-                            .font(.system(size: 20, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                        
+                // Battle status
+                HStack(spacing: 12) {
+                    Image(systemName: "bolt.horizontal.fill")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("BATTLE IN PROGRESS")
                             .font(.system(size: 14, weight: .black, design: .serif))
                             .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Spacer()
+                        Text("Wait for the outcome...")
+                            .font(.system(size: 12, weight: .medium, design: .serif))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
-                    Text("The battle is underway! Wait for the outcome...")
-                        .font(.system(size: 12, weight: .medium, design: .serif))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
                 }
                 .padding(16)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black)
-                            .offset(x: 3, y: 3)
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(KingdomTheme.Colors.buttonDanger.opacity(0.1))
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
-                    }
-                )
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
             }
             .padding(.horizontal, KingdomTheme.Spacing.medium)
             .padding(.vertical, KingdomTheme.Spacing.medium)
@@ -128,9 +98,9 @@ struct CoupView: View {
     // MARK: - Resolved View
     
     private func resolvedView(coup: CoupEventResponse) -> some View {
-        let rulerName = coup.defenders.first?.playerName ?? "Current Ruler"
+        let rulerName = coup.rulerName ?? "The Crown"
         let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
-        let rulerStats = coup.defenders.first.map { FighterStats(from: $0) } ?? .empty
+        let rulerStats = coup.rulerStats.map { FighterStats(from: $0) } ?? .empty
         let attackerWon = coup.attackerVictory == true
         let userWon: Bool? = {
             guard let side = coup.userSide else { return nil }
@@ -139,8 +109,7 @@ struct CoupView: View {
         }()
         
         return ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                // VS Poster with stats (shows final state)
+            VStack(spacing: KingdomTheme.Spacing.medium) {
                 CoupVsPosterView(
                     kingdomName: coup.kingdomName ?? "Kingdom",
                     challengerName: coup.initiatorName,
@@ -151,66 +120,55 @@ struct CoupView: View {
                     status: coup.status,
                     userSide: coup.userSide,
                     challengerStats: challengerStats,
-                    rulerStats: rulerStats
+                    rulerStats: rulerStats,
+                    onDismiss: onDismiss
                 )
                 
                 // Result card
-                VStack(spacing: 16) {
-                    // Victory/defeat indicator
+                VStack(spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: attackerWon ? "crown.fill" : "shield.lefthalf.filled")
-                            .font(.system(size: 32, weight: .black))
-                            .foregroundColor(attackerWon ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.royalBlue)
+                            .font(.system(size: 24, weight: .black))
+                            .foregroundColor(.white)
+                            .frame(width: 48, height: 48)
+                            .brutalistBadge(
+                                backgroundColor: attackerWon ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.royalBlue,
+                                cornerRadius: 12,
+                                shadowOffset: 2,
+                                borderWidth: 2
+                            )
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(attackerWon ? "COUP SUCCEEDED" : "COUP FAILED")
-                                .font(.system(size: 14, weight: .black, design: .serif))
+                                .font(.system(size: 16, weight: .black, design: .serif))
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
                             Text(attackerWon ? "\(coup.initiatorName) seized the throne!" : "The crown defended its rule.")
-                                .font(.system(size: 11, weight: .medium, design: .serif))
+                                .font(.system(size: 12, weight: .medium, design: .serif))
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         
                         Spacer()
                     }
                     
-                    // User result (if participated)
                     if let won = userWon {
+                        let tint = won ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
                         HStack(spacing: 10) {
                             Image(systemName: won ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(won ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                                .foregroundColor(tint)
                             
-                            Text(won ? "Victory! You were on the winning side." : "Defeat. You were on the losing side.")
-                                .font(.system(size: 12, weight: .medium, design: .serif))
+                            Text(won ? "Victory! You won." : "Defeat. You lost.")
+                                .font(.system(size: 13, weight: .bold, design: .serif))
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
                             Spacer()
                         }
                         .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(won ? KingdomTheme.Colors.buttonSuccess.opacity(0.1) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(won ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger, lineWidth: 2)
-                        )
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
                     }
                 }
                 .padding(16)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black)
-                            .offset(x: 3, y: 3)
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(KingdomTheme.Colors.parchmentLight)
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.black, lineWidth: 2)
-                    }
-                )
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
             }
             .padding(.horizontal, KingdomTheme.Spacing.medium)
             .padding(.vertical, KingdomTheme.Spacing.medium)
@@ -223,10 +181,11 @@ struct CoupView: View {
         VStack(spacing: KingdomTheme.Spacing.medium) {
             ProgressView()
                 .tint(KingdomTheme.Colors.loadingTint)
-            Text("Loading coup details...")
+            Text("Loading...")
                 .font(KingdomTheme.Typography.subheadline())
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private func errorView(error: String) -> some View {
@@ -249,6 +208,7 @@ struct CoupView: View {
             }
             .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
 }
@@ -301,7 +261,6 @@ class CoupViewModel: ObservableObject {
                     body: ["side": side]
                 )
                 let _: CoupJoinResponse = try await APIClient.shared.execute(request)
-                // Refresh to get updated state
                 loadCoup(id: id)
             } catch {
                 self.error = error.localizedDescription
@@ -310,8 +269,6 @@ class CoupViewModel: ObservableObject {
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     CoupView(coupId: 1, onDismiss: {})

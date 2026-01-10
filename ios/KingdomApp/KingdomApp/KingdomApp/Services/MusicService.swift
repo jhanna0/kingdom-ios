@@ -30,8 +30,13 @@ class MusicService: ObservableObject {
         }
     }
     
+    @Published var isInWarMode: Bool = false  // Track if currently playing war music
+    
     private var backgroundMusicPlayer: AVAudioPlayer?
+    private var nextMusicPlayer: AVAudioPlayer?  // For crossfading
     private var soundEffectPlayers: [String: AVAudioPlayer] = [:]
+    private var currentFilename: String?
+    private var fadeTimer: Timer?
     
     init() {
         // Load user preferences
@@ -55,8 +60,14 @@ class MusicService: ObservableObject {
     func playBackgroundMusic(filename: String, volume: Float = 0.3) {
         guard isMusicEnabled else { return }
         
+        // Don't restart if already playing this file
+        if currentFilename == filename && backgroundMusicPlayer?.isPlaying == true {
+            return
+        }
+        
         // Stop current music if playing
         backgroundMusicPlayer?.stop()
+        fadeTimer?.invalidate()
         
         guard let url = Bundle.main.url(forResource: filename, withExtension: nil) else {
             print("Could not find music file: \(filename)")
@@ -69,6 +80,7 @@ class MusicService: ObservableObject {
             backgroundMusicPlayer?.volume = volume
             backgroundMusicPlayer?.prepareToPlay()
             backgroundMusicPlayer?.play()
+            currentFilename = filename
             print("Started playing background music: \(filename)")
         } catch {
             print("Failed to play background music: \(error)")
@@ -124,22 +136,126 @@ class MusicService: ObservableObject {
         }
     }
     
+    /// Transition from current music to new music - fade out completely, then fade in new track
+    func crossfadeToMusic(filename: String, targetVolume: Float = 0.3, duration: TimeInterval = 2.0) {
+        guard isMusicEnabled else { return }
+        
+        // Don't transition if already playing this file
+        if currentFilename == filename && backgroundMusicPlayer?.isPlaying == true {
+            return
+        }
+        
+        guard let url = Bundle.main.url(forResource: filename, withExtension: nil) else {
+            print("Could not find music file: \(filename)")
+            return
+        }
+        
+        // Prepare the next track (but don't play yet)
+        do {
+            nextMusicPlayer = try AVAudioPlayer(contentsOf: url)
+            nextMusicPlayer?.numberOfLoops = -1
+            nextMusicPlayer?.volume = 0.0
+            nextMusicPlayer?.prepareToPlay()
+            
+            // PHASE 1: Fade out old track completely
+            let oldPlayer = backgroundMusicPlayer
+            let startVolume = oldPlayer?.volume ?? 0.0
+            
+            let fadeOutDuration = duration / 2.0  // Half the time for fade out
+            let steps = 60
+            let timeInterval = fadeOutDuration / Double(steps)
+            
+            fadeTimer?.invalidate()
+            var currentStep = 0
+            
+            fadeTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { [weak self] timer in
+                currentStep += 1
+                let progress = Float(currentStep) / Float(steps)
+                
+                // Fade out old track with gentle curve
+                if let old = oldPlayer {
+                    old.volume = startVolume * (1.0 - progress)
+                }
+                
+                if currentStep >= steps {
+                    timer.invalidate()
+                    oldPlayer?.stop()
+                    self?.fadeTimer = nil
+                    
+                    // PHASE 2: Now fade in the new track
+                    self?.fadeInNewTrack(targetVolume: targetVolume, duration: duration / 2.0, filename: filename)
+                }
+            }
+        } catch {
+            print("Failed to transition music: \(error)")
+        }
+    }
+    
+    /// Fade in the new track after old track has faded out
+    private func fadeInNewTrack(targetVolume: Float, duration: TimeInterval, filename: String) {
+        guard let newPlayer = nextMusicPlayer else { return }
+        
+        // Start playing at 0 volume
+        newPlayer.volume = 0.0
+        newPlayer.play()
+        
+        let steps = 60
+        let timeInterval = duration / Double(steps)
+        var currentStep = 0
+        
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { [weak self] timer in
+            currentStep += 1
+            let progress = Float(currentStep) / Float(steps)
+            
+            // Fade in with gentle curve
+            newPlayer.volume = targetVolume * progress
+            
+            if currentStep >= steps {
+                timer.invalidate()
+                newPlayer.volume = targetVolume
+                self?.backgroundMusicPlayer = newPlayer
+                self?.nextMusicPlayer = nil
+                self?.currentFilename = filename
+                self?.fadeTimer = nil
+                print("Transitioned to: \(filename)")
+            }
+        }
+    }
+    
+    /// Transition to war music
+    func transitionToWarMusic() {
+        guard !isInWarMode else { return }
+        isInWarMode = true
+        crossfadeToMusic(filename: "war_music.mp3", targetVolume: 0.35, duration: 8.0)
+        print("🎵 Transitioning to WAR MUSIC")
+    }
+    
+    /// Transition back to peaceful music
+    func transitionToPeacefulMusic() {
+        guard isInWarMode else { return }
+        isInWarMode = false
+        crossfadeToMusic(filename: "ambient_background_full.mp3", targetVolume: 0.25, duration: 10.0)
+        print("🎵 Transitioning to PEACEFUL MUSIC")
+    }
+    
     /// Fade out music over duration (in seconds)
     func fadeOut(duration: TimeInterval = 1.0) {
         guard let player = backgroundMusicPlayer else { return }
         
+        fadeTimer?.invalidate()
         let steps = 20
         let volumeDecrement = player.volume / Float(steps)
         let timeInterval = duration / Double(steps)
         
         var currentStep = 0
-        Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { timer in
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { [weak self] timer in
             currentStep += 1
             player.volume -= volumeDecrement
             
             if currentStep >= steps {
                 timer.invalidate()
                 player.stop()
+                self?.fadeTimer = nil
             }
         }
     }
@@ -151,18 +267,20 @@ class MusicService: ObservableObject {
         player.volume = 0.0
         player.play()
         
+        fadeTimer?.invalidate()
         let steps = 20
         let volumeIncrement = targetVolume / Float(steps)
         let timeInterval = duration / Double(steps)
         
         var currentStep = 0
-        Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { timer in
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: true) { [weak self] timer in
             currentStep += 1
             player.volume += volumeIncrement
             
             if currentStep >= steps {
                 timer.invalidate()
                 player.volume = targetVolume
+                self?.fadeTimer = nil
             }
         }
     }

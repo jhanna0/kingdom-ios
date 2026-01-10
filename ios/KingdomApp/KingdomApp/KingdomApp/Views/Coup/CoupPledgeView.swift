@@ -5,13 +5,14 @@ import SwiftUI
 
 struct CoupPledgeView: View {
     let coup: CoupEventResponse
+    let onDismiss: () -> Void
     let onPledge: (String) -> Void
     
     @State private var selectedSide: String?
     @State private var showParticipants = false
     
     private var rulerName: String {
-        coup.defenders.first?.playerName ?? "Current Ruler"
+        coup.rulerName ?? "The Crown"
     }
     
     private var challengerStats: FighterStats {
@@ -22,8 +23,8 @@ struct CoupPledgeView: View {
     }
     
     private var rulerStats: FighterStats {
-        if let defender = coup.defenders.first {
-            return FighterStats(from: defender)
+        if let stats = coup.rulerStats {
+            return FighterStats(from: stats)
         }
         return .empty
     }
@@ -42,7 +43,8 @@ struct CoupPledgeView: View {
                     status: coup.status,
                     userSide: coup.userSide,
                     challengerStats: challengerStats,
-                    rulerStats: rulerStats
+                    rulerStats: rulerStats,
+                    onDismiss: onDismiss
                 )
                 
                 // Pledge buttons OR pledged status - NO card wrapper
@@ -170,10 +172,7 @@ struct CoupPledgeView: View {
             .foregroundColor(KingdomTheme.Colors.inkMedium)
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KingdomTheme.Colors.parchmentDark.opacity(0.5))
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         }
         .buttonStyle(.plain)
     }
@@ -337,6 +336,21 @@ struct CoupPledgeView: View {
                 coupsWon: 2,
                 coupsFailed: 1
             ),
+            rulerId: 200,
+            rulerName: "King Marcus",
+            rulerStats: InitiatorStats(
+                level: 20,
+                kingdomReputation: 800,
+                attackPower: 5,
+                defensePower: 15,
+                leadership: 5,
+                buildingSkill: 12,
+                intelligence: 10,
+                contractsCompleted: 120,
+                totalWorkContributed: 850,
+                coupsWon: 0,
+                coupsFailed: 0
+            ),
             status: "pledge",
             startTime: "2024-01-01T00:00:00Z",
             pledgeEndTime: "2024-01-01T12:00:00Z",
@@ -357,6 +371,7 @@ struct CoupPledgeView: View {
             attackerVictory: nil,
             resolvedAt: nil
         ),
+        onDismiss: {},
         onPledge: { _ in }
     )
 }

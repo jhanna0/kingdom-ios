@@ -34,8 +34,12 @@ class MapViewModel: ObservableObject {
     // Active coup in home kingdom (for map badge)
     @Published var activeCoupInHomeKingdom: ActiveCoupData?
     
+    // War state tracking (for music)
+    @Published var isInWarState: Bool = false
+    
     // MARK: - Services
     var apiService = KingdomAPIService.shared
+    var musicService = MusicService.shared
     let contractAPI = ContractAPI()
     let actionsAPI = ActionsAPI()
     
@@ -78,6 +82,37 @@ class MapViewModel: ObservableObject {
         Task {
             await syncPlayerIdWithBackend()
         }
+        
+        // Monitor war state changes for music
+        setupWarStateMonitoring()
+    }
+    
+    /// Setup continuous monitoring of war state for music transitions
+    private func setupWarStateMonitoring() {
+        // Monitor active coup changes
+        $activeCoupInHomeKingdom
+            .sink { [weak self] coup in
+                self?.updateWarState()
+            }
+            .store(in: &cancellables)
+        
+        // Monitor kingdoms array changes (for coup updates)
+        $kingdoms
+            .sink { [weak self] _ in
+                self?.updateWarState()
+            }
+            .store(in: &cancellables)
+        
+        // Monitor player hometown changes - fixes race condition where kingdoms load before player state
+        // When /player/state sets hometownKingdomId, re-check for active coups
+        player.$hometownKingdomId
+            .dropFirst() // Skip initial nil value
+            .sink { [weak self] newHometownId in
+                guard newHometownId != nil else { return }
+                print("🏠 Hometown kingdom ID updated to: \(newHometownId ?? "nil") - rechecking for coups")
+                self?.updateActiveCoupFromKingdoms()
+            }
+            .store(in: &cancellables)
     }
     
     /// Update active coup in home kingdom from current kingdom data
@@ -108,6 +143,47 @@ class MapViewModel: ObservableObject {
                 print("   - No hometownKingdomId set")
             }
             activeCoupInHomeKingdom = nil
+        }
+        
+        // Update war state and music
+        updateWarState()
+    }
+    
+    /// Check if player is in a war state (active coup or invasion in their kingdom)
+    /// Updates music accordingly
+    func updateWarState() {
+        let wasInWar = isInWarState
+        
+        // Check if there's an active coup in home kingdom
+        let hasCoupInHomeKingdom = activeCoupInHomeKingdom != nil
+        
+        // Check if any of player's ruled kingdoms have active coups
+        let ruledKingdoms = kingdoms.filter { $0.rulerId == player.playerId }
+        let hasCoupInRuledKingdoms = ruledKingdoms.contains { $0.activeCoup != nil }
+        
+        // TODO: Check for active invasions when invasion system is implemented
+        // Will check if:
+        // - Any ruled kingdom is being invaded (under attack)
+        // - Any ruled kingdom is invading another kingdom (attacking)
+        let hasInvasion = false  // Placeholder
+        
+        isInWarState = hasCoupInHomeKingdom || hasCoupInRuledKingdoms || hasInvasion
+        
+        // Update music if war state changed
+        if isInWarState != wasInWar {
+            if isInWarState {
+                print("🎵 ⚔️ WAR STATE DETECTED - Switching to war music")
+                if hasCoupInHomeKingdom {
+                    print("   - Coup in home kingdom")
+                }
+                if hasCoupInRuledKingdoms {
+                    print("   - Coup in ruled kingdom(s)")
+                }
+                musicService.transitionToWarMusic()
+            } else {
+                print("🎵 ☮️ PEACE RESTORED - Switching to peaceful music")
+                musicService.transitionToPeacefulMusic()
+            }
         }
     }
     

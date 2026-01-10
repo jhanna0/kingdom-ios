@@ -37,8 +37,8 @@ struct FighterStats {
 }
 
 // MARK: - Coup VS Poster View
-/// Smash Bros-style vertical "VS" fight poster for coup events
-/// Challenger on top, VS in middle, Crown on bottom - centered and dramatic
+/// Clean, cohesive VS poster for coup events
+/// One unified card - no fragmented strips
 
 struct CoupVsPosterView: View {
     let kingdomName: String
@@ -54,94 +54,58 @@ struct CoupVsPosterView: View {
     var challengerStats: FighterStats = .empty
     var rulerStats: FighterStats = .empty
     
+    // Optional dismiss action
+    var onDismiss: (() -> Void)?
+    
     var body: some View {
         VStack(spacing: 0) {
-            // Header strip with kingdom name and status
-            headerStrip
+            // Header row
+            headerRow
             
-            // Main VS arena - vertical stack
-            VStack(spacing: 0) {
-                // Challenger (top)
-                fighterSection(
-                    role: "CHALLENGER",
-                    name: challengerName,
-                    icon: "figure.fencing",
-                    tint: KingdomTheme.Colors.buttonDanger,
-                    count: attackerCount,
-                    countLabel: "ATTACKERS",
-                    stats: challengerStats
-                )
-                
-                // VS divider
-                vsDivider
-                
-                // Crown (bottom)
-                fighterSection(
-                    role: "THE CROWN",
-                    name: rulerName,
-                    icon: "crown.fill",
-                    tint: KingdomTheme.Colors.royalBlue,
-                    count: defenderCount,
-                    countLabel: "DEFENDERS",
-                    stats: rulerStats
-                )
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                LinearGradient(
-                    colors: [
-                        KingdomTheme.Colors.parchmentRich,
-                        KingdomTheme.Colors.parchmentDark
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            
-            // Timer strip
-            timerStrip
-        }
-        .clipShape(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium))
-        .overlay(
-            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                .stroke(Color.black, lineWidth: 3)
-        )
-        .background(
-            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+            // Black separator
+            Rectangle()
                 .fill(Color.black)
-                .offset(x: 4, y: 4)
-        )
+                .frame(height: 2)
+            
+            // Main VS content
+            VStack(spacing: 0) {
+                challengerSection
+                vsDivider
+                crownSection
+            }
+            .padding(.vertical, 8)
+            
+            // Black separator
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Footer row
+            footerRow
+        }
+        .padding(16)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Header Strip
+    // MARK: - Header Row
     
-    private var headerStrip: some View {
-        HStack(spacing: 10) {
-            // Coup icon
+    private var headerRow: some View {
+        HStack(spacing: 12) {
+            // Coup icon badge
             Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
                 .font(.system(size: 14, weight: .black))
                 .foregroundColor(.white)
-                .frame(width: 32, height: 32)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.black)
-                            .offset(x: 2, y: 2)
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(statusTint)
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    }
-                )
+                .frame(width: 36, height: 36)
+                .brutalistBadge(backgroundColor: statusTint, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
             
+            // Title
             VStack(alignment: .leading, spacing: 2) {
                 Text("COUP")
                     .font(.system(size: 10, weight: .black, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .tracking(1)
+                    .tracking(2)
                 Text(kingdomName)
-                    .font(.system(size: 16, weight: .black, design: .serif))
+                    .font(.system(size: 18, weight: .black, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .lineLimit(1)
             }
@@ -154,151 +118,132 @@ struct CoupVsPosterView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.black)
-                            .offset(x: 2, y: 2)
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(statusTint)
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.black, lineWidth: 2)
-                    }
-                )
+                .brutalistBadge(backgroundColor: statusTint, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+            
+            // Close button
+            if let dismiss = onDismiss {
+                Button(action: dismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(width: 32, height: 32)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 16, shadowOffset: 2, borderWidth: 2)
+                }
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(KingdomTheme.Colors.parchmentLight)
+        .padding(.bottom, 12)
     }
     
-    // MARK: - Fighter Section
+    // MARK: - Challenger Section
     
-    private func fighterSection(role: String, name: String, icon: String, tint: Color, count: Int, countLabel: String, stats: FighterStats) -> some View {
-        VStack(spacing: 12) {
-            // Big icon - the hero element
-            Image(systemName: icon)
-                .font(.system(size: 60, weight: .black))
-                .foregroundColor(tint)
-                .frame(width: 100, height: 80)
+    private var challengerSection: some View {
+        VStack(spacing: 6) {
+            // Role label
+            Text("CHALLENGER")
+                .font(.system(size: 12, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                .tracking(2)
             
-            // Name and role
-            VStack(spacing: 4) {
-                Text(role)
-                    .font(.system(size: 10, weight: .bold, design: .serif))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .tracking(1)
-                
-                Text(name)
-                    .font(.system(size: 18, weight: .black, design: .serif))
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .lineLimit(1)
+            // Name - BIG
+            Text(challengerName)
+                .font(.system(size: 26, weight: .black, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            
+            // Stats row
+            if challengerStats.level > 0 || challengerStats.reputation > 0 {
+                HStack(spacing: 12) {
+                    if challengerStats.level > 0 {
+                        statLabel(icon: "star.fill", value: "Lv.\(challengerStats.level)", color: KingdomTheme.Colors.gold)
+                    }
+                    if challengerStats.reputation > 0 {
+                        statLabel(icon: "crown.fill", value: "\(challengerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
+                    }
+                }
+                .padding(.top, 2)
             }
             
-            // Stats pills - only Level and Rep for minimal clutter
-            HStack(spacing: 8) {
-                if stats.level > 0 {
-                    statPill(label: "LV", value: "\(stats.level)", color: KingdomTheme.Colors.gold)
-                }
-                if stats.reputation > 0 {
-                    statPill(label: "REP", value: "\(stats.reputation)", color: KingdomTheme.Colors.buttonSpecial)
-                }
-            }
-            
-            // Count badge - prominent
-            countBadge(count: count, label: countLabel, tint: tint)
+            // Icon
+            Image(systemName: "figure.fencing")
+                .font(.system(size: 48, weight: .black))
+                .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
     }
     
-    private func statPill(label: String, value: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
-                .font(.system(size: 9, weight: .bold, design: .serif))
-                .foregroundColor(color)
-            Text(value)
-                .font(.system(size: 12, weight: .black, design: .monospaced))
+    // MARK: - Crown Section
+    
+    private var crownSection: some View {
+        VStack(spacing: 6) {
+            // Icon
+            Image(systemName: "crown.fill")
+                .font(.system(size: 48, weight: .black))
+                .foregroundColor(KingdomTheme.Colors.royalBlue)
+                .padding(.bottom, 4)
+            
+            // Stats row
+            if rulerStats.level > 0 || rulerStats.reputation > 0 {
+                HStack(spacing: 12) {
+                    if rulerStats.level > 0 {
+                        statLabel(icon: "star.fill", value: "Lv.\(rulerStats.level)", color: KingdomTheme.Colors.gold)
+                    }
+                    if rulerStats.reputation > 0 {
+                        statLabel(icon: "crown.fill", value: "\(rulerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
+                    }
+                }
+                .padding(.bottom, 2)
+            }
+            
+            // Name - BIG
+            Text(rulerName)
+                .font(.system(size: 26, weight: .black, design: .serif))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            
+            // Role label
+            Text("THE CROWN")
+                .font(.system(size: 12, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.royalBlue)
+                .tracking(2)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.black)
-                    .offset(x: 1.5, y: 1.5)
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(color.opacity(0.5), lineWidth: 1.5)
-            }
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
     }
     
-    private func countBadge(count: Int, label: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Text("\(count)")
-                .font(.system(size: 20, weight: .black, design: .monospaced))
-                .foregroundColor(tint)
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+    private func statLabel(icon: String, value: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .serif))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(tint, lineWidth: 2)
-            }
-        )
+        .foregroundColor(color)
     }
     
     // MARK: - VS Divider
     
     private var vsDivider: some View {
         ZStack {
-            // Horizontal line
             Rectangle()
-                .fill(Color.black.opacity(0.2))
-                .frame(height: 2)
+                .fill(KingdomTheme.Colors.border)
+                .frame(height: 1)
             
-            // VS badge
             Text("VS")
-                .font(.system(size: 24, weight: .black, design: .serif))
+                .font(.system(size: 22, weight: .black, design: .serif))
                 .foregroundColor(.white)
-                .shadow(color: .black.opacity(0.5), radius: 2, x: 1, y: 1)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black)
-                            .offset(x: 3, y: 3)
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [KingdomTheme.Colors.inkDark, Color.black],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(KingdomTheme.Colors.imperialGold, lineWidth: 3)
-                    }
-                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkDark, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
         }
-        .padding(.vertical, 4)
     }
     
-    // MARK: - Timer Strip
+    // MARK: - Footer Row
     
-    private var timerStrip: some View {
+    private var footerRow: some View {
         HStack(spacing: 12) {
             // Timer
             HStack(spacing: 8) {
@@ -307,32 +252,31 @@ struct CoupVsPosterView: View {
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(status == "pledge" ? "PLEDGE ENDS" : (status == "resolved" ? "FINISHED" : "TIME LEFT"))
+                    Text(status == "pledge" ? "PLEDGE ENDS" : (status == "resolved" ? "FINISHED" : "BATTLE ENDS"))
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .tracking(1)
                     Text(timeRemaining)
-                        .font(.system(size: 16, weight: .black, design: .monospaced))
+                        .font(.system(size: 18, weight: .black, design: .monospaced))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
             }
             
             Spacer()
             
-            // User side indicator (if pledged)
+            // User side indicator
             if let side = userSide {
                 pledgedBadge(side: side)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(KingdomTheme.Colors.parchmentLight)
+        .padding(.top, 12)
     }
     
     private func pledgedBadge(side: String) -> some View {
         let isAttacker = side.lowercased().contains("attack")
         let tint = isAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
         let icon = isAttacker ? "figure.fencing" : "shield.fill"
-        let label = isAttacker ? "ATK" : "DEF"
+        let label = isAttacker ? "ATTACKING" : "DEFENDING"
         
         return HStack(spacing: 6) {
             Image(systemName: "checkmark.circle.fill")
@@ -347,17 +291,7 @@ struct CoupVsPosterView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(tint, lineWidth: 2)
-            }
-        )
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
     }
     
     // MARK: - Helpers
@@ -371,7 +305,7 @@ struct CoupVsPosterView: View {
     }
 }
 
-// MARK: - Pledge Choice Card (Big & Bold)
+// MARK: - Pledge Choice Card
 
 struct CoupPledgeChoiceCard: View {
     let title: String
@@ -384,21 +318,16 @@ struct CoupPledgeChoiceCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
-                // Big icon
+                // Icon
                 Image(systemName: icon)
-                    .font(.system(size: 36, weight: .black))
+                    .font(.system(size: 32, weight: .black))
                     .foregroundColor(isSelected ? .white : tint)
-                    .frame(width: 64, height: 64)
-                    .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color.black)
-                                .offset(x: 2, y: 2)
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(isSelected ? tint : tint.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(tint, lineWidth: 2)
-                        }
+                    .frame(width: 56, height: 56)
+                    .brutalistBadge(
+                        backgroundColor: isSelected ? tint : KingdomTheme.Colors.parchment,
+                        cornerRadius: 12,
+                        shadowOffset: 2,
+                        borderWidth: 2
                     )
                 
                 // Text
@@ -427,16 +356,8 @@ struct CoupPledgeChoiceCard: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.black)
-                        .offset(x: 4, y: 4)
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(isSelected ? tint.opacity(0.1) : KingdomTheme.Colors.parchmentLight)
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(isSelected ? tint : Color.black, lineWidth: isSelected ? 3 : 2)
-                }
+            .brutalistCard(
+                backgroundColor: isSelected ? tint.opacity(0.1) : KingdomTheme.Colors.parchmentLight
             )
         }
         .buttonStyle(.plain)
@@ -460,17 +381,7 @@ struct CoupMapBadgeView: View {
                     .font(.system(size: 12, weight: .black))
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
-                    .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.black)
-                                .offset(x: 1.5, y: 1.5)
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(statusTint)
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.black, lineWidth: 2)
-                        }
-                    )
+                    .brutalistBadge(backgroundColor: statusTint, cornerRadius: 8, shadowOffset: 1.5, borderWidth: 2)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -512,17 +423,7 @@ struct CoupMapBadgeView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.black)
-                        .offset(x: 3, y: 3)
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(KingdomTheme.Colors.parchmentLight)
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.black, lineWidth: 2)
-                }
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }

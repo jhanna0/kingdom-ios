@@ -654,6 +654,17 @@ def _build_coup_response(
     """Build a CoupEventResponse with full participant data"""
     kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
     
+    # Get current ruler info and stats
+    ruler_id = kingdom.ruler_id if kingdom else None
+    ruler_name = None
+    ruler_stats = None
+    if ruler_id:
+        ruler = db.query(User).filter(User.id == ruler_id).first()
+        if ruler:
+            ruler_name = ruler.display_name
+            # Get ruler's stats using same function as initiator
+            ruler_stats = _get_initiator_stats(db, ruler_id, coup.kingdom_id)
+    
     attacker_ids = coup.get_attacker_ids()
     defender_ids = coup.get_defender_ids()
     
@@ -686,6 +697,9 @@ def _build_coup_response(
         initiator_id=coup.initiator_id,
         initiator_name=coup.initiator_name,
         initiator_stats=initiator_stats,
+        ruler_id=ruler_id,
+        ruler_name=ruler_name,
+        ruler_stats=ruler_stats,
         status=coup.status,
         start_time=coup.start_time,
         pledge_end_time=coup.pledge_end_time,
