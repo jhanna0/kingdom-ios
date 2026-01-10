@@ -447,11 +447,11 @@ SKILLS = {
         "category": "economy",
         "description": "Improves construction and resource gathering",
         "benefits": {
-            1: ["-5% property upgrade costs", "Work on contracts & properties"],
-            2: ["-10% property upgrade costs", "+10% gold from building contracts"],
-            3: ["-15% property upgrade costs", "+20% gold from contracts", "+1 daily Assist action"],
-            4: ["-20% property upgrade costs", "+30% gold from contracts", "10% chance to refund action cooldown"],
-            5: ["-25% property upgrade costs", "+40% gold from contracts", "25% chance to double contract progress"]
+            1: ["-5% action cooldowns", "-5% property upgrade costs", "Work on contracts & properties"],
+            2: ["-10% action cooldowns", "-10% property upgrade costs", "+10% gold from building contracts"],
+            3: ["-14% action cooldowns", "-15% property upgrade costs", "+20% gold from contracts", "+1 daily Assist action"],
+            4: ["-19% action cooldowns", "-20% property upgrade costs", "+30% gold from contracts", "10% chance to refund action cooldown"],
+            5: ["-23% action cooldowns", "-25% property upgrade costs", "+40% gold from contracts", "25% chance to double contract progress"]
         }
     },
     "intelligence": {

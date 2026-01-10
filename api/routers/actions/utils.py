@@ -39,8 +39,12 @@ def format_datetime_iso(dt: datetime) -> str:
 
 
 def calculate_cooldown(base_minutes: float, skill_level: int) -> float:
-    """Calculate action cooldown based on skill level"""
-    reduction = math.pow(0.95, skill_level - 1)
+    """Calculate action cooldown based on skill level.
+    
+    Each level of building skill reduces cooldown by 5% (compounding).
+    Level 1: 5% reduction, Level 2: ~10%, Level 3: ~14%, etc.
+    """
+    reduction = math.pow(0.95, skill_level)
     return base_minutes * reduction
 
 

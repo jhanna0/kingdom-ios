@@ -399,8 +399,9 @@ def purchase_land(
             detail="Kingdom not found"
         )
     
-    # Calculate price
-    land_price = calculate_land_price(kingdom.population)
+    # Calculate price using dynamic resource costs (tier 0 -> 1)
+    land_costs = get_upgrade_resource_costs(0, population=kingdom.population)
+    land_price = next((c["amount"] for c in land_costs if c["resource"] == "gold"), 500)
     
     if state.gold < land_price:
         raise HTTPException(

@@ -10,10 +10,12 @@ from typing import List, Optional
 import math
 
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
+from db.models.kingdom_event import KingdomEvent
 from routers.auth import get_current_user
 from routers.tiers import BUILDING_TYPES
 from config import DEV_MODE
 from schemas.contract import ContractCreate
+from websocket.broadcast import notify_kingdom, KingdomEvents
 
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
@@ -279,6 +281,30 @@ def create_contract(
     db.add(contract)
     db.commit()
     db.refresh(contract)
+    
+    # Add to kingdom activity feed
+    event = KingdomEvent(
+        kingdom_id=kingdom_id,
+        title=f"New Contract: {building_display_name}",
+        description=f"{current_user.display_name} posted a contract to upgrade {building_display_name} to level {building_level}. Reward: {action_reward}g per action."
+    )
+    db.add(event)
+    db.commit()
+    
+    # Send real-time notification to kingdom members
+    notify_kingdom(
+        kingdom_id=str(kingdom_id),
+        event_type=KingdomEvents.CONTRACT_POSTED,
+        data={
+            "contract_id": str(contract.id),
+            "building_type": building_type,
+            "building_display_name": building_display_name,
+            "building_level": building_level,
+            "action_reward": action_reward,
+            "actions_required": actions_required,
+            "posted_by": current_user.display_name
+        }
+    )
     
     return contract_to_response(contract, db)
 

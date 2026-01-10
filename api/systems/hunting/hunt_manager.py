@@ -14,6 +14,7 @@ from enum import Enum
 
 from ..rolls import RollEngine, RollResult, GroupRollResult
 from ..rolls.config import ROLL_HIT_CHANCE
+from routers.actions.utils import log_activity
 from .config import (
     HuntPhase,
     HuntConfig,
@@ -805,6 +806,10 @@ class HuntManager:
         
         state.is_resolved = True
         
+        # Broadcast rare loot drops to friends' activity feeds
+        if state.phase == HuntPhase.BLESSING and result.get("effects", {}).get("is_rare"):
+            self._broadcast_rare_loot(db, session)
+        
         # Create phase result for history
         from ..rolls import GroupRollResult, RollResult as EngineRollResult
         from ..rolls.engine import RollOutcome
@@ -1303,6 +1308,39 @@ class HuntManager:
             
             p.meat_earned = meat_per_player + bonus
             p.items_earned = session.items_dropped.copy()  # Everyone gets all drops (for now)
+    
+    def _broadcast_rare_loot(self, db, session: HuntSession) -> None:
+        """
+        Broadcast rare loot drop to all participants' activity feeds.
+        This shows up in their friends' activity feeds!
+        """
+        if not session.items_dropped:
+            return
+        
+        animal_name = session.animal_data.get("name", "creature") if session.animal_data else "creature"
+        animal_icon = session.animal_data.get("icon", "🎯") if session.animal_data else "🎯"
+        items_str = ", ".join([item.replace("_", " ").title() for item in session.items_dropped])
+        
+        # Log activity for each participant so their friends see it
+        for participant in session.participants.values():
+            log_activity(
+                db=db,
+                user_id=participant.player_id,
+                action_type="rare_loot",
+                action_category="hunt",
+                description=f"Found rare loot hunting {animal_icon} {animal_name}: {items_str}!",
+                kingdom_id=session.kingdom_id,
+                amount=None,
+                details={
+                    "hunt_id": session.hunt_id,
+                    "animal_name": animal_name,
+                    "animal_icon": animal_icon,
+                    "items": session.items_dropped,
+                    "party_size": len(session.participants),
+                    "total_meat": session.total_meat + session.bonus_meat,
+                },
+                visibility="friends"
+            )
     
     def finalize_hunt(self, db, session: HuntSession) -> dict:
         """
