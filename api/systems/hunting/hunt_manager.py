@@ -546,19 +546,21 @@ class HuntManager:
         stat_name = config.get("stat", "intelligence")
         
         # Calculate max_rolls from party's combined stat levels
-        # Each player's stat level contributes to total rolls available
-        total_stat = 0
+        # Each player contributes (1 + skill_level) rolls
+        combined_stat = 0
+        total_rolls = 0
         for participant in session.participants.values():
             stat_value = participant.stats.get(stat_name, 0)
-            total_stat += max(1, stat_value)  # Minimum 1 per player
+            combined_stat += stat_value  # Actual stat for display
+            total_rolls += 1 + stat_value  # 1 + skill_level per player for rolls
         
         # Ensure at least 1 roll
-        max_rolls = max(1, total_stat)
+        max_rolls = max(1, total_rolls)
         
         state = PhaseState(
             phase=phase,
             max_rolls=max_rolls,
-            stat_value=total_stat,  # Combined party stat
+            stat_value=combined_stat,  # Actual combined stat for display
         )
         
         if phase == HuntPhase.TRACK:
@@ -1295,7 +1297,7 @@ def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
         
         stat_name = config["stat"]
         stat_value = player_stats.get(stat_name, 0)
-        max_rolls = max(1, stat_value)  # Stat level = number of rolls
+        max_rolls = 1 + stat_value  # 1 + skill_level = number of rolls
         
         # Calculate probability of at least one success
         # P(at least 1) = 1 - P(all fail) = 1 - (1 - hit_chance)^rolls
