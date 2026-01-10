@@ -1024,24 +1024,48 @@ class HuntManager:
         
         If roll_value is provided, use it. Otherwise generate a random one.
         Returns both so the frontend can display where the roll landed.
+        
+        IMPORTANT: We iterate in EXPLICIT order (common → rare) so that:
+        - LOW rolls = COMMON outcomes (no_trail, squirrel)
+        - HIGH rolls = RARE outcomes (bear, moose)
+        
+        This is necessary because PostgreSQL JSONB doesn't preserve dict key order!
         """
+        # Define explicit iteration order for each phase's drop table
+        # Common outcomes FIRST (low rolls), rare outcomes LAST (high rolls)
+        TRACK_ORDER = ["no_trail", "squirrel", "rabbit", "deer", "boar", "bear", "moose"]
+        ATTACK_ORDER = ["scare", "miss", "hit"]  # Bad → Good
+        BLESSING_ORDER = ["common", "rare"]  # Common → Rare
+        
+        # Determine which order to use based on the keys present
+        if "no_trail" in slots:
+            order = TRACK_ORDER
+        elif "scare" in slots:
+            order = ATTACK_ORDER
+        elif "common" in slots:
+            order = BLESSING_ORDER
+        else:
+            # Fallback: use whatever keys are in slots
+            order = list(slots.keys())
+        
         total = sum(slots.values())
         if total == 0:
-            return (list(slots.keys())[0], 1)  # Fallback
+            return (order[0], 1)  # Fallback
         
         # Use provided roll or generate one
         if roll_value is None:
             roll_value = self.rng.randint(1, total)
         
         cumulative = 0
-        for outcome, slot_count in slots.items():
+        for outcome in order:
+            slot_count = slots.get(outcome, 0)
             cumulative += slot_count
             if roll_value <= cumulative:
                 # Convert roll to 1-100 scale for display
                 roll_percent = int((roll_value / total) * 100)
                 return (outcome, roll_percent)
         
-        return (list(slots.keys())[-1], 100)  # Fallback to last
+        return (order[-1], 100)  # Fallback to last
     
     def advance_to_next_phase(self, db, session: HuntSession) -> Optional[HuntPhase]:
         """
