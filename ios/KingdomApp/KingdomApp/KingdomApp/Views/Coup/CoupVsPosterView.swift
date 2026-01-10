@@ -373,59 +373,58 @@ struct CoupMapBadgeView: View {
     let defenderCount: Int
     let onTap: () -> Void
     
+    @State private var glowOpacity: Double = 0.5
+    
+    private let size: CGFloat = 70
+    
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 10) {
-                // Icon
-                Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundColor(.white)
-                    .frame(width: 28, height: 28)
-                    .brutalistBadge(backgroundColor: statusTint, cornerRadius: 8, shadowOffset: 1.5, borderWidth: 2)
+            ZStack {
+                // Glow
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(statusTint)
+                    .frame(width: size, height: size)
+                    .blur(radius: 16)
+                    .opacity(glowOpacity)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("COUP")
-                            .font(.system(size: 10, weight: .black, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        Text("•")
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        Text(status.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .serif))
-                            .foregroundColor(statusTint)
-                    }
+                // Shadow
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.black)
+                    .frame(width: size, height: size)
+                    .offset(x: 3, y: 3)
+                
+                // Main square
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(statusTint)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.black, lineWidth: 3)
+                    )
+                
+                // Content
+                VStack(spacing: 3) {
+                    Text("COUP")
+                        .font(.system(size: 10, weight: .black, design: .serif))
+                        .foregroundColor(.white.opacity(0.85))
+                        .tracking(1)
                     
-                    HStack(spacing: 8) {
-                        Text(timeRemaining)
-                            .font(.system(size: 12, weight: .black, design: .monospaced))
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        // Score
-                        HStack(spacing: 4) {
-                            Text("\(attackerCount)")
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                            Text("–")
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(defenderCount)")
-                                .foregroundColor(KingdomTheme.Colors.royalBlue)
-                        }
+                    Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundColor(.white)
+                    
+                    Text(timeRemaining)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    }
+                        .foregroundColor(.white)
                 }
-                
-                Spacer(minLength: 0)
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
         }
         .buttonStyle(.plain)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                glowOpacity = 0.9
+            }
+        }
     }
     
     private var statusTint: Color {

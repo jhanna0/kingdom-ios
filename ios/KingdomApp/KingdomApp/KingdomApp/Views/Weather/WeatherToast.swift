@@ -8,25 +8,36 @@ struct WeatherToast: View {
     @State private var opacity: Double = 1.0
     
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            HStack(spacing: 6) {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 8) {
                 Image(systemName: weatherIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black, radius: 0, x: -1, y: -1)
+                    .shadow(color: .black, radius: 0, x: 1, y: -1)
+                    .shadow(color: .black, radius: 0, x: -1, y: 1)
+                    .shadow(color: .black, radius: 0, x: 1, y: 1)
                 
                 Text("\(weather.display_description) · \(Int(weather.temperature_f))°")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black, radius: 0, x: -1, y: -1)
+                    .shadow(color: .black, radius: 0, x: 1, y: -1)
+                    .shadow(color: .black, radius: 0, x: -1, y: 1)
+                    .shadow(color: .black, radius: 0, x: 1, y: 1)
             }
             
             Text(weather.flavor_text)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(.white.opacity(0.85))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .shadow(color: .black, radius: 0, x: -1, y: -1)
+                .shadow(color: .black, radius: 0, x: 1, y: -1)
+                .shadow(color: .black, radius: 0, x: -1, y: 1)
+                .shadow(color: .black, radius: 0, x: 1, y: 1)
                 .italic()
                 .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 180, alignment: .trailing)
+                .frame(maxWidth: 200, alignment: .trailing)
         }
-        .shadow(color: .black.opacity(0.6), radius: 3, x: 0, y: 1)
         .opacity(opacity)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {

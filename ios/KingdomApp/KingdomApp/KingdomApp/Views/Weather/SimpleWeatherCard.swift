@@ -28,9 +28,9 @@ struct SimpleWeatherCard: View {
                 HStack(spacing: KingdomTheme.Spacing.medium) {
                     // Weather icon in brutalist badge
                     Image(systemName: getIcon(weather.condition))
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 32, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
+                        .frame(width: 64, height: 64)
                         .brutalistBadge(
                             backgroundColor: getColor(weather.condition),
                             cornerRadius: 14,
@@ -40,17 +40,17 @@ struct SimpleWeatherCard: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(weather.display_description)
-                            .font(FontStyles.bodyLargeBold)
+                            .font(.system(size: 16, weight: .bold, design: .serif))
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         Text("\(Int(weather.temperature_f))°F")
-                            .font(FontStyles.bodyMedium)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
                 Text(weather.flavor_text)
-                    .font(FontStyles.bodyMedium)
+                    .font(.system(size: 14, weight: .regular, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .italic()
             } else {

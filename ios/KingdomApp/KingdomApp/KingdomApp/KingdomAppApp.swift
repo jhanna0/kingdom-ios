@@ -252,10 +252,10 @@ struct AuthenticatedView: View {
                     showActivity: $showActivity
                 )
                 
-                // Active Coup Badge - positioned below MapHUD
+                // Active Coup Badge - below MapHUD
                 if let coup = viewModel.activeCoupInHomeKingdom {
                     VStack {
-                        Spacer().frame(height: 130) // Below MapHUD
+                        Spacer().frame(height: 152)
                         
                         HStack {
                             CoupMapBadgeView(
@@ -265,10 +265,9 @@ struct AuthenticatedView: View {
                                 defenderCount: coup.defender_count,
                                 onTap: { showCoupView = true }
                             )
-                            .padding(.leading, 16)
-                            
                             Spacer()
                         }
+                        .padding(.horizontal, 12)
                         
                         Spacer()
                     }
