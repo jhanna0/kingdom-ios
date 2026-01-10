@@ -373,30 +373,37 @@ struct CoupMapBadgeView: View {
     let defenderCount: Int
     let onTap: () -> Void
     
-    @State private var glowOpacity: Double = 0.5
+    @State private var shimmerOffset: CGFloat = -100
     
     private let size: CGFloat = 70
     
     var body: some View {
         Button(action: onTap) {
             ZStack {
-                // Glow
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(statusTint)
-                    .frame(width: size, height: size)
-                    .blur(radius: 16)
-                    .opacity(glowOpacity)
-                
-                // Shadow
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.black)
-                    .frame(width: size, height: size)
-                    .offset(x: 3, y: 3)
-                
                 // Main square
                 RoundedRectangle(cornerRadius: 14)
                     .fill(statusTint)
                     .frame(width: size, height: size)
+                    .overlay(
+                        // Shimmer effect
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        .clear,
+                                        .white.opacity(0.4),
+                                        .clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .offset(x: shimmerOffset)
+                            .mask(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .frame(width: size, height: size)
+                            )
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(Color.black, lineWidth: 3)
@@ -421,8 +428,8 @@ struct CoupMapBadgeView: View {
         }
         .buttonStyle(.plain)
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                glowOpacity = 0.9
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false)) {
+                shimmerOffset = 100
             }
         }
     }

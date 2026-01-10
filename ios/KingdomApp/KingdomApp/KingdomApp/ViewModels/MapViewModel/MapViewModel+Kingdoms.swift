@@ -80,19 +80,41 @@ extension MapViewModel {
                 if let kingdom = kingdom {
                     kingdoms = [kingdom]
                     syncPlayerKingdoms()
-                    updateActiveCoupFromKingdoms()
-                    
-                    // Check location
-                    if let currentLocation = userLocation {
-                        checkKingdomLocation(currentLocation)
-                    }
-                    
                     print("✅ Current city loaded: \(kingdom.name)")
                 }
                 
                 // UI IS NOW READY - user can interact
                 isLoading = false
                 loadingStatus = "Loading nearby kingdoms...\n(New areas take longer to map the first time)"
+            }
+            
+            // SEQUENTIAL: Load player state FIRST (sets hometownKingdomId), 
+            // THEN check for coups - fixes race condition
+            if let kingdom = kingdom {
+                do {
+                    let updatedState = try await apiService.loadPlayerState(kingdomId: kingdom.id)
+                    
+                    await MainActor.run {
+                        player.updateFromAPIState(updatedState)
+                        latestTravelEvent = updatedState.travel_event
+                        
+                        // Set currentKingdomInside so checkKingdomLocation doesn't duplicate
+                        currentKingdomInside = kingdoms.first { $0.id == kingdom.id }
+                        
+                        // NOW we can check for coups - hometownKingdomId is set
+                        updateActiveCoupFromKingdoms()
+                        print("✅ Auto-checked in to \(kingdom.name)")
+                    }
+                    
+                    // Refresh kingdom data
+                    await refreshKingdom(id: kingdom.id)
+                } catch {
+                    print("⚠️ Failed to load player state: \(error.localizedDescription)")
+                    // Still try to update coup state with what we have
+                    await MainActor.run {
+                        updateActiveCoupFromKingdoms()
+                    }
+                }
             }
             
             // STEP 2: Load neighbors in background with retry (can be slower)
