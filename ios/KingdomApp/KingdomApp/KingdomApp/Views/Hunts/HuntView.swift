@@ -89,7 +89,7 @@ struct HuntView: View {
         case .phaseIntro(let phase):
             HuntPhaseView(viewModel: viewModel, phase: phase, showingIntro: true)
             
-        case .phaseActive(let phase), .rolling(let phase), .rollRevealing(let phase), .resolving(let phase), .masterRollAnimation(let phase):
+        case .phaseActive(let phase), .rolling(let phase), .rollRevealing(let phase), .resolving(let phase), .masterRollAnimation(let phase), .masterRollComplete(let phase):
             HuntPhaseView(viewModel: viewModel, phase: phase, showingIntro: false)
             
         case .phaseComplete:
@@ -150,53 +150,80 @@ struct HuntStartView: View {
     let kingdomName: String
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                // Header
-                VStack(spacing: KingdomTheme.Spacing.medium) {
-                    Image(systemName: "hare.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    Text("Hunt")
-                        .font(KingdomTheme.Typography.largeTitle())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Track prey and bring back meat for your kingdom!")
-                        .font(KingdomTheme.Typography.body())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 40)
-                
-                // Probability Preview
-                if let preview = viewModel.preview {
-                    HuntPreviewCard(preview: preview)
-                        .padding(.horizontal)
-                }
-                
-                // Animals Preview
-                if let config = viewModel.config {
-                    AnimalsPreviewCard(animals: config.animals)
-                        .padding(.horizontal)
-                }
-                
-                // Start Hunt Button
-                Button {
-                    Task {
-                        await viewModel.createHunt(kingdomId: kingdomId)
+        ZStack {
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
+                        // Header
+                        VStack(spacing: 12) {
+                            // Icon with brutalist style
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 84, height: 84)
+                                    .offset(x: 3, y: 3)
+                                
+                                Circle()
+                                    .fill(KingdomTheme.Colors.parchmentLight)
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black, lineWidth: 3)
+                                    )
+                                
+                                Image(systemName: "hare.fill")
+                                    .font(.system(size: 36, weight: .bold))
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            }
+                            
+                            Text("HUNT")
+                                .font(.system(size: 28, weight: .black, design: .serif))
+                                .tracking(4)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text("Track prey and bring back meat")
+                                .font(.system(size: 14, weight: .medium, design: .serif))
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        .padding(.top, 24)
+                        
+                        // Probability Preview
+                        if let preview = viewModel.preview {
+                            HuntPreviewCard(preview: preview)
+                        }
+                        
+                        // Animals Preview
+                        if let config = viewModel.config {
+                            AnimalsPreviewCard(animals: config.animals)
+                        }
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.right.circle.fill")
-                        Text("Start Hunt")
-                    }
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+                    .padding(.bottom, 100)
                 }
-                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                .padding(.horizontal)
                 
-                Spacer(minLength: 40)
+                // Fixed bottom button
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(height: 3)
+                    
+                    Button {
+                        Task {
+                            await viewModel.createHunt(kingdomId: kingdomId)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Start Hunt")
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .bold))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+                    .padding(.vertical, KingdomTheme.Spacing.medium)
+                }
+                .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
             }
         }
     }
@@ -208,54 +235,60 @@ struct HuntPreviewCard: View {
     let preview: HuntPreviewResponse
     
     var body: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            Text("Your Chances")
-                .font(KingdomTheme.Typography.headline())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("YOUR ODDS")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(2)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            VStack(spacing: KingdomTheme.Spacing.small) {
-                // Only 3 phases: Track → Strike → Blessing
+            VStack(spacing: 8) {
                 ForEach(["track", "strike", "blessing"], id: \.self) { phaseKey in
                     if let phase = preview.phases[phaseKey] {
-                        HStack {
-                            Image(systemName: phase.icon)
-                                .font(.headline)
-                                .foregroundColor(KingdomTheme.Colors.color(fromThemeName: phase.color))
-                                .frame(width: 30)
-                            
-                            Text(phase.phase_name)
-                                .font(KingdomTheme.Typography.subheadline())
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Spacer()
-                            
-                            // Probability bar
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.black.opacity(0.1))
-                                    .frame(width: 80, height: 16)
-                                
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(KingdomTheme.Colors.color(fromThemeName: phase.color))
-                                    .frame(width: CGFloat(phase.percentage) * 0.8, height: 16)
-                            }
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Color.black, lineWidth: 1.5)
-                                    .frame(width: 80, height: 16)
-                            )
-                            
-                            Text("\(phase.percentage)%")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                .frame(width: 40, alignment: .trailing)
-                        }
+                        phaseRow(phase: phase)
                     }
                 }
             }
         }
-        .padding()
+        .padding(14)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    private func phaseRow(phase: HuntPhasePreview) -> some View {
+        let color = KingdomTheme.Colors.color(fromThemeName: phase.color)
+        
+        return HStack(spacing: 10) {
+            Image(systemName: phase.icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(color)
+                .frame(width: 24)
+            
+            Text(phase.phase_name)
+                .font(.system(size: 12, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Spacer()
+            
+            // Compact probability bar
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.black.opacity(0.1))
+                    .frame(width: 60, height: 10)
+                
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(color)
+                    .frame(width: CGFloat(phase.percentage) * 0.6, height: 10)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(Color.black, lineWidth: 1.5)
+                    .frame(width: 60, height: 10)
+            )
+            
+            Text("\(phase.percentage)%")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .frame(width: 36, alignment: .trailing)
+        }
     }
 }
 
@@ -265,45 +298,68 @@ struct AnimalsPreviewCard: View {
     let animals: [HuntAnimalConfig]
     
     var body: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            Text("Possible Prey")
-                .font(KingdomTheme.Typography.headline())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("POSSIBLE PREY")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(2)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                ForEach(animals) { animal in
-                    VStack(spacing: 4) {
-                        Text(animal.icon)
-                            .font(.system(size: 32))
-                        
-                        Text(animal.name)
-                            .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                            .lineLimit(1)
-                        
-                        Text("🥩 \(animal.meat)")
-                            .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+            // Horizontal scroll for animals
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(animals.sorted { $0.tier < $1.tier }) { animal in
+                        animalCell(animal: animal)
                     }
-                    .padding(8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(tierColor(animal.tier).opacity(0.15))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(tierColor(animal.tier).opacity(0.5), lineWidth: 1)
-                    )
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(14)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    private func animalCell(animal: HuntAnimalConfig) -> some View {
+        let color = tierColor(animal.tier)
+        
+        return VStack(spacing: 4) {
+            Text(animal.icon)
+                .font(.system(size: 26))
+            
+            Text(animal.name)
+                .font(.system(size: 10, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+            
+            // Meat yield
+            HStack(spacing: 2) {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 8))
+                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                Text("\(animal.meat)")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            // Tier dots
+            HStack(spacing: 2) {
+                ForEach(0..<max(1, animal.tier + 1), id: \.self) { _ in
+                    Circle()
+                        .fill(color)
+                        .frame(width: 4, height: 4)
                 }
             }
         }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .frame(width: 56)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
     
     private func tierColor(_ tier: Int) -> Color {

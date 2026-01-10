@@ -135,25 +135,27 @@ TRACK_SHIFT_PER_SUCCESS = {
 
 # DISPLAY CONFIG for drop table items - sent to frontend!
 # Order matters - this is the order they appear on the bar (left to right)
+# Colors are carefully chosen for visual appeal and readability
 TRACK_DROP_TABLE_DISPLAY = [
-    {"key": "no_trail", "icon": "❌", "name": "Lost", "color": "#665544"},
-    {"key": "squirrel", "icon": "🐿️", "name": "Squirrel", "color": "#888888"},
-    {"key": "rabbit", "icon": "🐰", "name": "Rabbit", "color": "#888888"},
-    {"key": "deer", "icon": "🦌", "name": "Deer", "color": "#4CAF50"},
-    {"key": "boar", "icon": "🐗", "name": "Boar", "color": "#FF9800"},
-    {"key": "bear", "icon": "🐻", "name": "Bear", "color": "#F44336"},
-    {"key": "moose", "icon": "🫎", "name": "Moose", "color": "#9C27B0"},
+    {"key": "no_trail", "icon": "●", "name": "Lost", "color": "#8B4513"},      # Saddle brown - failure
+    {"key": "squirrel", "icon": "●", "name": "Squirrel", "color": "#A0826D"},  # Warm taupe - common
+    {"key": "rabbit", "icon": "●", "name": "Rabbit", "color": "#C4A77D"},      # Wheat - common
+    {"key": "deer", "icon": "●", "name": "Deer", "color": "#5D9B5D"},          # Forest green - uncommon
+    {"key": "boar", "icon": "●", "name": "Boar", "color": "#4A7BA7"},          # Steel blue - rare
+    {"key": "bear", "icon": "●", "name": "Bear", "color": "#8B5A8B"},          # Plum purple - epic
+    {"key": "moose", "icon": "●", "name": "Moose", "color": "#CD853F"},        # Peru gold - legendary
 ]
 
 ATTACK_DROP_TABLE_DISPLAY = [
-    {"key": "scare", "icon": "😱", "name": "Scare", "color": "#CC6666"},
-    {"key": "miss", "icon": "💨", "name": "Miss", "color": "#AAAAAA"},
-    {"key": "hit", "icon": "⚔️", "name": "Hit!", "color": "#4CAF50"},
+    {"key": "scare", "icon": "●", "name": "Fled", "color": "#B85450"},   # Muted red - bad
+    {"key": "miss", "icon": "●", "name": "Miss", "color": "#8B7355"},    # Khaki brown - neutral
+    {"key": "hit", "icon": "●", "name": "Hit!", "color": "#5D9B5D"},     # Forest green - good!
 ]
 
 BLESSING_DROP_TABLE_DISPLAY = [
-    {"key": "common", "icon": "📦", "name": "Common", "color": "#888888"},
-    {"key": "rare", "icon": "✨", "name": "Rare!", "color": "#DAB24D"},
+    {"key": "nothing", "icon": "●", "name": "Nothing", "color": "#6B5344"},  # Dark brown - no loot
+    {"key": "common", "icon": "●", "name": "Meat", "color": "#A0826D"},      # Warm taupe - basic
+    {"key": "rare", "icon": "●", "name": "Sinew!", "color": "#8B5A8B"},      # Plum purple - rare!
 ]
 
 # --- ATTACK: Three sections - Scare / Miss / Hit ---
@@ -184,22 +186,35 @@ ATTACK_SHIFT_PER_SUCCESS = {
 # 3 successes: 65% hit
 # 5 successes (max): 85% hit
 
-# --- BLESSING: Common vs Rare loot ---
-# Simple 2-tier system: faith shifts odds from common to rare
+# --- BLESSING: Nothing vs Common vs Rare loot ---
+# Three-tier system: prayers shift odds from nothing → meat → sinew
+# Common creatures (tier 0-1) have higher chance of no loot
+# Rare creatures (tier 3-4) are almost guaranteed loot
 BLESSING_DROP_TABLE = {
-    "common": 97,     # Just meat - very likely by default
+    "nothing": 35,    # No loot at all - risk for common prey
+    "common": 62,     # Just meat
     "rare": 3,        # Meat + sinew - ultra rare base chance!
 }  # Total: 100 slots
 
 BLESSING_SHIFT_PER_SUCCESS = {
-    "common": -8,     # Each success: lose 8 common slots
+    "nothing": -10,   # Each success: shrink nothing zone significantly
+    "common": +2,     # Each success: slight gain to common
     "rare": +8,       # Each success: gain 8 rare slots
 }
-# 0 successes: 3% rare
-# 1 success: 11% rare  
-# 2 successes: 19% rare
-# 3 successes: 27% rare
-# 3 crits: 51% rare (6 effective successes)
+# 0 successes: 35% nothing, 62% meat, 3% sinew
+# 1 success: 25% nothing, 64% meat, 11% sinew  
+# 2 successes: 15% nothing, 66% meat, 19% sinew
+# 3 successes: 5% nothing, 68% meat, 27% sinew (almost guaranteed some loot)
+
+# Animal tier modifies the base drop table before blessing starts
+# Higher tier = less "nothing" slots, more guaranteed loot
+BLESSING_TIER_ADJUSTMENTS = {
+    0: {"nothing": +10, "common": -10, "rare": 0},   # Squirrel: 45% nothing (risky!)
+    1: {"nothing": +5, "common": -5, "rare": 0},     # Rabbit/Deer: 40% nothing
+    2: {"nothing": 0, "common": 0, "rare": 0},       # Boar: base rates
+    3: {"nothing": -15, "common": +10, "rare": +5},  # Bear: 20% nothing, better odds
+    4: {"nothing": -25, "common": +15, "rare": +10}, # Moose: 10% nothing, much better!
+}
 
 # Legacy - kept for backwards compatibility but not used
 BLESSING_BONUS = {
@@ -237,11 +252,17 @@ ANIMAL_WEIGHTS_BY_TIER = {
 
 # What drops for each loot tier (applied after blessing resolution)
 LOOT_TIERS = {
+    "nothing": {
+        "meat_multiplier": 0,  # No meat!
+        "items": [],
+    },
     "common": {
-        "items": [],  # No bonus items, just meat
+        "meat_multiplier": 1,  # Full meat
+        "items": [],
     },
     "rare": {
-        "items": ["sinew"],  # Sinew drops!
+        "meat_multiplier": 1,  # Full meat
+        "items": ["sinew"],    # Sinew drops!
     },
 }
 
@@ -293,39 +314,39 @@ PHASE_CONFIG = {
         "critical_effect": "Discovered a prime hunting ground!",
         # DISPLAY CONFIG - sent to frontend for templating
         "stat_icon": "brain.head.profile",
-        "roll_button_label": "Scout",
+        "roll_button_label": "Search",
         "roll_button_icon": "binoculars.fill",
-        "resolve_button_label": "Master Roll",
-        "resolve_button_icon": "target",
+        "resolve_button_label": "Follow",
+        "resolve_button_icon": "arrow.right.circle.fill",
         "phase_color": "royalBlue",  # Theme color for this phase
         "drop_table_title": "CREATURE ODDS",
-        "drop_table_title_resolving": "MASTER ROLL",
-        "drop_table_display_type": "creatures",  # How frontend renders the bar
+        "drop_table_title_resolving": "FOLLOWING TRAIL",
+        "drop_table_display_type": "creatures",
+        "master_roll_icon": "leaf.fill",
         # Roll configuration
-        "min_rolls": 1,           # Must roll at least once
-        # max_rolls is now DYNAMIC based on player's stat level!
+        "min_rolls": 1,
     },
-    # APPROACH phase removed - was boring and just caused spooking frustration
     HuntPhase.STRIKE: {
         "name": "Strike",
-        "display_name": "Combat",
+        "display_name": "The Hunt",
         "stat": "attack_power",
         "stat_display_name": "Attack",
-        "icon": "bolt.fill",
-        "description": "Attack the beast - shift odds toward a killing blow!",
+        "icon": "scope",
+        "description": "Take aim and bring down your quarry!",
         "success_effect": "Clean hit!",
         "failure_effect": "Miss!",
         "critical_effect": "Perfect strike!",
         # DISPLAY CONFIG
         "stat_icon": "bolt.fill",
-        "roll_button_label": "Strike!",
-        "roll_button_icon": "bolt.fill",
-        "resolve_button_label": "Finish Hunt",
-        "resolve_button_icon": "checkmark.circle.fill",
+        "roll_button_label": "Aim",
+        "roll_button_icon": "scope",
+        "resolve_button_label": "Shoot",
+        "resolve_button_icon": "target",
         "phase_color": "buttonDanger",  # Red for combat
-        "drop_table_title": "DAMAGE ODDS",
-        "drop_table_title_resolving": "FINAL DAMAGE",
+        "drop_table_title": "HIT ODDS",
+        "drop_table_title_resolving": "TAKING THE SHOT",
         "drop_table_display_type": "damage",
+        "master_roll_icon": "scope",
         # Roll configuration  
         "min_rolls": 1,
         # Legacy scoring (kept for backwards compat)
@@ -348,12 +369,16 @@ PHASE_CONFIG = {
         "stat_icon": "sparkles",
         "roll_button_label": "Pray",
         "roll_button_icon": "hands.sparkles.fill",
-        "resolve_button_label": "Claim Loot",
-        "resolve_button_icon": "gift.fill",
+        "resolve_button_label": "Show Loot",
+        "resolve_button_icon": "archivebox.fill",
         "phase_color": "regalPurple",  # Purple for faith
-        "drop_table_title": "LOOT BONUS ODDS",
-        "drop_table_title_resolving": "LOOT ROLL",
+        "drop_table_title": "LOOT ODDS",
+        "drop_table_title_resolving": "REVEALING LOOT",
         "drop_table_display_type": "blessing",
+        "master_roll_icon": "sparkles",
+        # Rare loot display info - sent to frontend (matches resources.py!)
+        "rare_item_name": "Sinew",
+        "rare_item_icon": "line.diagonal",
         # Roll configuration
         "min_rolls": 1,
         # Legacy scoring

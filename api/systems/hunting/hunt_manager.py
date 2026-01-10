@@ -230,6 +230,8 @@ class PhaseState:
                 "drop_table_title": config.get("drop_table_title", "ODDS"),
                 "drop_table_title_resolving": config.get("drop_table_title_resolving", "ROLLING"),
                 "drop_table_items": drop_table_display,  # Full display config for each item!
+                # Master roll marker icon - varies by phase/skill
+                "master_roll_icon": config.get("master_roll_icon", "scope"),
                 # Roll messages
                 "success_message": config.get("success_effect", "Success!"),
                 "failure_message": config.get("failure_effect", "Miss!"),
@@ -358,6 +360,37 @@ class HuntSession:
             for p in self.participants.values()
         ]
     
+    def _build_animal_dict(self) -> Optional[dict]:
+        """Build animal dict with rare_drop info for tier 2+ animals."""
+        if not self.animal_data:
+            return None
+        
+        # Get rare drop info (same logic as /hunts/config endpoint)
+        rare_drop = None
+        tier = self.animal_data.get("tier", 0)
+        if tier >= 2:
+            # Import RESOURCES here to avoid circular import
+            from routers.resources import RESOURCES
+            rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
+            if rare_items:
+                item_id = rare_items[0]
+                item_config = RESOURCES.get(item_id, {})
+                rare_drop = {
+                    "item_id": item_id,
+                    "item_name": item_config.get("display_name", item_id.title()),
+                    "item_icon": item_config.get("icon", "cube.fill"),
+                }
+        
+        return {
+            "id": self.animal_id,
+            "name": self.animal_data.get("name"),
+            "icon": self.animal_data.get("icon"),
+            "tier": tier,
+            "hp": self.animal_data.get("hp"),
+            "meat": self.animal_data.get("meat"),
+            "rare_drop": rare_drop,
+        }
+    
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dict."""
         return {
@@ -370,13 +403,7 @@ class HuntSession:
                 str(pid): p.to_dict() 
                 for pid, p in self.participants.items()
             },
-            "animal": {
-                "id": self.animal_id,
-                "name": self.animal_data["name"] if self.animal_data else None,
-                "icon": self.animal_data["icon"] if self.animal_data else None,
-                "tier": self.animal_data["tier"] if self.animal_data else None,
-                "hp": self.animal_data["hp"] if self.animal_data else None,
-            } if self.animal_id else None,
+            "animal": self._build_animal_dict() if self.animal_id else None,
             "track_score": round(self.track_score, 2),
             "max_tier_unlocked": self.max_tier_unlocked,
             "is_spooked": self.is_spooked,
@@ -1167,27 +1194,29 @@ class HuntManager:
     
     def _calculate_loot(self, session: HuntSession, loot_tier: str) -> None:
         """Calculate and assign loot based on hunt results.
-        
+
         Two-tier system:
         - COMMON: Just meat
-        - RARE: Meat + Sinew
-        
+        - RARE: Meat + Sinew (only for tier 2+ animals: boar, bear, moose)
+
         NO GOLD DROPS - players can sell meat at market for gold.
         """
         if not session.animal_data:
             return
-        
+
         animal = session.animal_data
-        
+        animal_tier = animal.get("tier", 0)
+
         # Base meat reward (always)
         session.total_meat = animal["meat"]
-        
+
         # Rare tier gives bonus meat too!
         if loot_tier == "rare":
             session.bonus_meat = int(session.total_meat * 0.25)  # +25% bonus meat for rare
-            # Add rare items from the loot tier config
-            rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
-            session.items_dropped.extend(rare_items)
+            # Sinew only drops from tier 2+ animals (boar, bear, moose)
+            if animal_tier >= 2:
+                rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
+                session.items_dropped.extend(rare_items)
         else:
             session.bonus_meat = 0
         

@@ -15,6 +15,7 @@ enum HuntUIState: Equatable {
     case rollRevealing(HuntPhase)             // Revealing the result of a single roll
     case resolving(HuntPhase)                 // Executing the "Master Roll" / phase resolution
     case masterRollAnimation(HuntPhase)       // Showing master roll sliding animation
+    case masterRollComplete(HuntPhase)        // Animation done, show Continue button
     case phaseComplete(HuntPhase)             // Showing phase result, waiting for user to Continue
     case creatureReveal                       // Special reveal for when creature is found
     case results                              // Final hunt results
@@ -24,6 +25,7 @@ enum HuntUIState: Equatable {
 
 @MainActor
 class HuntViewModel: ObservableObject {
+    
     // MARK: - Single State
     
     @Published var uiState: HuntUIState = .loading
@@ -61,9 +63,10 @@ class HuntViewModel: ObservableObject {
     // Legacy (for backwards compat)
     @Published var creatureProbabilities: [String: Double] = [:]
     
-    // Master roll animation
-    @Published var masterRollValue: Int = 0
-    @Published var masterRollAnimating = false
+    // Master roll state
+    @Published var masterRollFinalValue: Int = 0
+    @Published var shouldAnimateMasterRoll: Bool = false
+    
     @Published var selectedCreatureId: String?
     @Published var selectedOutcome: String?  // For attack/blessing resolution
     
@@ -136,7 +139,7 @@ class HuntViewModel: ObservableObject {
         case .inProgress:
             // If we're in an ANIMATION or TRANSITION state, don't override
             switch uiState {
-            case .rolling, .rollRevealing, .resolving, .masterRollAnimation, .creatureReveal, .phaseComplete, .phaseActive:
+            case .rolling, .rollRevealing, .resolving, .masterRollAnimation, .masterRollComplete, .creatureReveal, .phaseComplete, .phaseActive:
                 return
             default:
                 break
@@ -176,6 +179,8 @@ class HuntViewModel: ObservableObject {
         roundResults = []
         lastRollResult = nil
         lastPhaseUpdate = nil
+        masterRollFinalValue = 0  // Reset for new phase
+        shouldAnimateMasterRoll = false
         
         // ALL phases use the same drop table system!
         dropTableSlots = hunt?.phase_state?.drop_table_slots ?? [:]
@@ -215,6 +220,15 @@ class HuntViewModel: ObservableObject {
     /// Goes directly to next phase or results - NO intermediate screens
     func userTappedNextAfterMasterRoll() async {
         guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
+        
+        // If hunt is already completed (blessing auto-finalizes), go straight to results
+        if hunt?.isComplete == true {
+            currentPhaseResult = nil
+            roundResults = []
+            lastRollResult = nil
+            uiState = .results
+            return
+        }
         
         // Check if we should show creature reveal (Track phase found animal)
         if currentPhase == .track,
@@ -324,7 +338,7 @@ class HuntViewModel: ObservableObject {
                 // ALL phases get master roll animation - user already tapped, now animate!
                 if let effects = response.phase_result?.effects,
                    let rollValue = effects["master_roll"]?.intValue {
-                    await showMasterRollAnimation(value: rollValue, phase: currentPhase)
+                    showMasterRollAnimation(value: rollValue, phase: currentPhase)
                 }
                 
                 // Animation done - stay on this screen!
@@ -371,37 +385,29 @@ class HuntViewModel: ObservableObject {
         }
     }
     
-    /// Show the master roll sliding animation for ANY phase
-    private func showMasterRollAnimation(value: Int, phase: HuntPhase? = nil) async {
+    /// Trigger master roll animation - sets state and returns immediately
+    private func showMasterRollAnimation(value: Int, phase: HuntPhase? = nil) {
         let targetPhase = phase ?? hunt?.phase_state?.huntPhase ?? .track
-        
         uiState = .masterRollAnimation(targetPhase)
-        masterRollAnimating = true
+        masterRollFinalValue = value
+        shouldAnimateMasterRoll = true
+    }
+    
+    /// Called by HuntPhaseView when master roll animation completes
+    func finishMasterRollAnimation() {
+        shouldAnimateMasterRoll = false  // Animation is done
         
-        // SMOOTH animation - sweep across the bar then settle on final value
-        // Phase 1: Quick sweep from 0 to ~80 (building anticipation)
-        for i in stride(from: 0, through: 80, by: 4) {
-            masterRollValue = i
-            try? await Task.sleep(nanoseconds: 25_000_000) // 25ms per step
+        // Get the phase from current state - works for both resolving and masterRollAnimation
+        let phase: HuntPhase
+        switch uiState {
+        case .masterRollAnimation(let p), .resolving(let p):
+            phase = p
+        default:
+            // Fallback to current hunt phase
+            phase = hunt?.phase_state?.huntPhase ?? .track
         }
         
-        // Phase 2: Slow down and home in on the final value
-        let startValue = masterRollValue
-        let steps = 15
-        for i in 1...steps {
-            let progress = Double(i) / Double(steps)
-            // Ease-out curve for smooth deceleration
-            let easedProgress = 1 - pow(1 - progress, 3)
-            masterRollValue = Int(Double(startValue) + (Double(value) - Double(startValue)) * easedProgress)
-            try? await Task.sleep(nanoseconds: 60_000_000) // 60ms per step (slowing down)
-        }
-        
-        // Land on exact final value
-        masterRollValue = value
-        masterRollAnimating = false
-        
-        // Brief pause to show result
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        uiState = .masterRollComplete(phase)
     }
     
     /// Update drop table displays based on phase update
@@ -603,8 +609,8 @@ class HuntViewModel: ObservableObject {
         currentEscapeRisk = 0
         currentBlessingBonus = 0
         creatureProbabilities = [:]
-        masterRollValue = 0
-        masterRollAnimating = false
+        masterRollFinalValue = 0
+        shouldAnimateMasterRoll = false
         selectedCreatureId = nil
         uiState = .noHunt
     }

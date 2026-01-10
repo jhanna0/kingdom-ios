@@ -148,8 +148,41 @@ def get_hunt_config():
     
     NOTE: Hunts drop MEAT (not gold!) + sinew (rare) for bow crafting.
     """
-    from systems.hunting.config import PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS, DROP_TABLES, MEAT_MARKET_VALUE
-    from routers.resources import HUNTING_BOW
+    from systems.hunting.config import (
+        PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS, DROP_TABLES, MEAT_MARKET_VALUE,
+        TRACK_DROP_TABLE_DISPLAY, ATTACK_DROP_TABLE_DISPLAY, BLESSING_DROP_TABLE_DISPLAY,
+        LOOT_TIERS
+    )
+    from routers.resources import HUNTING_BOW, RESOURCES
+    
+    def _build_animal_config(animal_id: str, data: dict) -> dict:
+        """Build animal config with rare drop info from LOOT_TIERS and RESOURCES."""
+        # Get rare items from LOOT_TIERS config
+        rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
+        can_drop_rare = data["tier"] >= 2 and len(rare_items) > 0
+        
+        # Build rare_drop object from RESOURCES (single source of truth!)
+        rare_drop = None
+        if can_drop_rare and rare_items:
+            item_id = rare_items[0]  # First rare item
+            item_config = RESOURCES.get(item_id, {})
+            rare_drop = {
+                "item_id": item_id,
+                "item_name": item_config.get("display_name", item_id.title()),
+                "item_icon": item_config.get("icon", "cube.fill"),
+            }
+        
+        return {
+            "id": animal_id,
+            "name": data["name"],
+            "icon": data["icon"],
+            "tier": data["tier"],
+            "meat": data["meat"],
+            "hp": data["hp"],
+            "rare_drop": rare_drop,  # None if can't drop rare, or {item_id, item_name, item_icon}
+            "description": data["description"],
+            "track_requirement": TRACK_TIER_THRESHOLDS.get(data["tier"], 0),
+        }
     
     return {
         "timing": {
@@ -169,26 +202,25 @@ def get_hunt_config():
                 "stat": config["stat"],
                 "icon": config["icon"],
                 "description": config["description"],
+                # Include rare item info for blessing phase
+                "rare_item_name": config.get("rare_item_name"),
+                "rare_item_icon": config.get("rare_item_icon"),
             }
             for phase, config in PHASE_CONFIG.items()
         },
         "animals": [
-            {
-                "id": animal_id,
-                "name": data["name"],
-                "icon": data["icon"],
-                "tier": data["tier"],
-                "meat": data["meat"],
-                "hp": data["hp"],
-                "sinew_chance": DROP_TABLES.get(data["tier"], {}).get("sinew", 0),
-                "description": data["description"],
-                "track_requirement": TRACK_TIER_THRESHOLDS.get(data["tier"], 0),
-            }
+            _build_animal_config(animal_id, data)
             for animal_id, data in ANIMALS.items()
         ],
         "tier_thresholds": TRACK_TIER_THRESHOLDS,
         "hunting_bow": HUNTING_BOW,
         "meat_market_value": MEAT_MARKET_VALUE,
+        # Drop table display configs - sent to frontend for UI
+        "drop_tables": {
+            "track": TRACK_DROP_TABLE_DISPLAY,
+            "strike": ATTACK_DROP_TABLE_DISPLAY,
+            "blessing": BLESSING_DROP_TABLE_DISPLAY,
+        },
         "notes": {
             "rewards": "Hunts drop MEAT + sinew (rare). NO GOLD!",
             "sinew": "Rarer from small game, more common from big game",

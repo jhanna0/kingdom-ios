@@ -76,13 +76,14 @@ struct PhaseCompleteOverlay: View {
                     
                     // THE BIG ICON/EMOJI
                     if currentPhase == .strike, let animal = hunt?.animal {
-                        // Show the animal for strike results
+                        // Show the animal for strike results - animals keep emojis
                         Text(animal.icon ?? "🎯")
                             .font(.system(size: 100))
                     } else if currentPhase == .blessing {
-                        // Blessing result icon
-                        Text(blessingEmoji)
-                            .font(.system(size: 100))
+                        // Blessing result icon - SF Symbol with color
+                        Image(systemName: blessingIcon)
+                            .font(.system(size: 80, weight: .bold))
+                            .foregroundColor(blessingColor)
                     } else {
                         // Fallback icon
                         Image(systemName: resultIcon)
@@ -195,13 +196,22 @@ struct PhaseCompleteOverlay: View {
         }
     }
     
-    private var blessingEmoji: String {
+    private var blessingIcon: String {
         if let bonus = phaseResult?.effects?["loot_bonus"]?.doubleValue {
-            if bonus >= 0.5 { return "⚡" }
-            if bonus >= 0.25 { return "🌟" }
-            if bonus > 0 { return "✨" }
+            if bonus >= 0.5 { return "star.fill" }
+            if bonus >= 0.25 { return "sparkles" }
+            if bonus > 0 { return "sparkle" }
         }
-        return "😶"
+        return "hands.sparkles"
+    }
+    
+    private var blessingColor: Color {
+        if let bonus = phaseResult?.effects?["loot_bonus"]?.doubleValue {
+            if bonus >= 0.5 { return KingdomTheme.Colors.gold }
+            if bonus >= 0.25 { return KingdomTheme.Colors.regalPurple }
+            if bonus > 0 { return KingdomTheme.Colors.royalPurple }
+        }
+        return KingdomTheme.Colors.inkMedium
     }
     
     private var resultColor: Color {
@@ -214,16 +224,20 @@ struct PhaseCompleteOverlay: View {
     
     private var buttonText: String {
         if isHuntComplete {
-            return "VIEW REWARDS"
+            return "VIEW LOOT"
         }
         return "CONTINUE"
     }
     
     private var buttonIcon: String {
         if isHuntComplete {
-            return "trophy.fill"
+            return "archivebox.fill"
         }
         return "arrow.right"
+    }
+    
+    private var showRareChanceHint: Bool {
+        currentPhase == .blessing && isSuccess
     }
     
     // MARK: - Result Badges
@@ -231,21 +245,21 @@ struct PhaseCompleteOverlay: View {
     @ViewBuilder
     private func resultBadges(_ effects: [String: AnyCodableValue]) -> some View {
         VStack(spacing: 12) {
-            // Main stats row
+            // Main stats row - using SF Symbols, no emojis!
             HStack(spacing: 20) {
                 // Meat earned
                 if let meat = effects["total_meat"]?.intValue, meat > 0 {
-                    PhaseResultStatBadge(icon: "🥩", value: "\(meat)", label: "Meat", color: KingdomTheme.Colors.buttonSuccess)
+                    PhaseResultStatBadge(icon: "leaf.fill", value: "\(meat)", label: "Meat", color: KingdomTheme.Colors.buttonSuccess)
                 }
                 
                 // Damage dealt (for strike)
                 if let damage = effects["total_damage"]?.intValue, damage > 0 {
-                    PhaseResultStatBadge(icon: "⚔️", value: "\(damage)", label: "Damage", color: KingdomTheme.Colors.buttonDanger)
+                    PhaseResultStatBadge(icon: "bolt.fill", value: "\(damage)", label: "Damage", color: KingdomTheme.Colors.buttonDanger)
                 }
                 
                 // Blessing bonus
                 if let bonus = effects["loot_bonus"]?.doubleValue, bonus > 0 {
-                    PhaseResultStatBadge(icon: "✨", value: "+\(Int(bonus * 100))%", label: "Bonus", color: KingdomTheme.Colors.regalPurple)
+                    PhaseResultStatBadge(icon: "sparkles", value: "+\(Int(bonus * 100))%", label: "Bonus", color: KingdomTheme.Colors.regalPurple)
                 }
             }
             
@@ -254,8 +268,20 @@ struct PhaseCompleteOverlay: View {
                 HStack(spacing: 8) {
                     ForEach(items.compactMap { $0.stringValue }, id: \.self) { item in
                         let displayName = item.replacingOccurrences(of: "_", with: " ").capitalized
-                        ItemBadge(name: displayName)
+                        let icon = item == "sinew" ? "waveform.path" : "cube.fill"
+                        let color = item == "sinew" ? KingdomTheme.Colors.regalPurple : KingdomTheme.Colors.gold
+                        ItemBadge(name: displayName, icon: icon, color: color)
                     }
+                }
+            }
+            
+            // Show rare loot chance hint for blessing - uses backend config
+            if currentPhase == .blessing {
+                if let bonus = effects["loot_bonus"]?.doubleValue, bonus > 0.2,
+                   let rareItemName = effects["rare_item_name"]?.stringValue,
+                   let rareItemIcon = effects["rare_item_icon"]?.stringValue {
+                    RareLootHintCard(itemName: rareItemName, itemIcon: rareItemIcon)
+                        .padding(.horizontal, 20)
                 }
             }
         }
@@ -329,15 +355,16 @@ struct PhaseCompleteOverlay: View {
 // MARK: - Phase Result Stat Badge
 
 private struct PhaseResultStatBadge: View {
-    let icon: String
+    let icon: String  // SF Symbol name
     let value: String
     let label: String
     let color: Color
     
     var body: some View {
         VStack(spacing: 4) {
-            Text(icon)
-                .font(.system(size: 24))
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(color)
             Text(value)
                 .font(.system(size: 20, weight: .black, design: .monospaced))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -367,27 +394,79 @@ private struct PhaseResultStatBadge: View {
 
 private struct ItemBadge: View {
     let name: String
+    let icon: String
+    let color: Color
+    
+    init(name: String, icon: String = "cube.fill", color: Color = KingdomTheme.Colors.gold) {
+        self.name = name
+        self.icon = icon
+        self.color = color
+    }
     
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "gift.fill")
-                .font(.caption)
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
             Text(name)
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .background(
             ZStack {
                 Capsule()
                     .fill(Color.black)
                     .offset(x: 2, y: 2)
                 Capsule()
-                    .fill(KingdomTheme.Colors.gold)
+                    .fill(color)
                     .overlay(
                         Capsule()
                             .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+}
+
+// MARK: - Rare Loot Hint Card
+
+private struct RareLootHintCard: View {
+    let itemName: String
+    let itemIcon: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: itemIcon)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(KingdomTheme.Colors.regalPurple)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("RARE DROP POSSIBLE")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text(itemName)
+                    .font(.system(size: 16, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "sparkles")
+                .font(.system(size: 20))
+                .foregroundColor(KingdomTheme.Colors.regalPurple.opacity(0.5))
+        }
+        .padding(14)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KingdomTheme.Colors.parchment)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(KingdomTheme.Colors.regalPurple.opacity(0.5), lineWidth: 2)
                     )
             }
         )

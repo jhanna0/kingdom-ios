@@ -18,7 +18,7 @@ enum HuntPhase: String, Codable, CaseIterable {
         case .lobby: return "Waiting"
         case .track: return "Tracking"
         case .approach: return "Approach"
-        case .strike: return "The Kill"
+        case .strike: return "The Hunt"
         case .blessing: return "Blessing"
         case .results: return "Results"
         }
@@ -164,6 +164,14 @@ struct HuntAnimal: Codable {
     let tier: Int?
     let hp: Int?
     let meat: Int?
+    let rare_drop: RareDropInfo?  // Backend tells us what rare item this animal can drop (nil if none)
+}
+
+// Rare drop info from backend - comes from RESOURCES config
+struct RareDropInfo: Codable {
+    let item_id: String
+    let item_name: String
+    let item_icon: String
 }
 
 // MARK: - Phase State (Multi-Roll System)
@@ -224,6 +232,9 @@ struct PhaseDisplayConfig: Codable {
     let drop_table_title: String
     let drop_table_title_resolving: String
     let drop_table_items: [DropTableItemConfig]?  // All items with their display info!
+    
+    // Master roll marker icon - varies by phase/skill (leaf for track, scope for strike, sparkles for blessing)
+    let master_roll_icon: String?
     
     // Roll messages
     let success_message: String
@@ -447,6 +458,22 @@ struct HuntPhaseConfig: Codable {
     let stat: String
     let icon: String
     let description: String
+    // Rare item info (for blessing phase)
+    let rare_item_name: String?
+    let rare_item_icon: String?
+}
+
+struct DropTableDisplayItem: Codable {
+    let key: String
+    let icon: String
+    let name: String
+    let color: String
+}
+
+struct DropTablesConfig: Codable {
+    let track: [DropTableDisplayItem]?
+    let strike: [DropTableDisplayItem]?
+    let blessing: [DropTableDisplayItem]?
 }
 
 struct HuntAnimalConfig: Codable, Identifiable {
@@ -466,6 +493,22 @@ struct HuntConfigResponse: Codable {
     let phases: [String: HuntPhaseConfig]
     let animals: [HuntAnimalConfig]
     let tier_thresholds: [String: Int]
+    let drop_tables: DropTablesConfig?
+    
+    /// Get blessing drop table items
+    var blessingDropTable: [DropTableDisplayItem]? {
+        drop_tables?.blessing
+    }
+    
+    /// Get rare item name from blessing phase config
+    var rareItemName: String? {
+        phases["blessing"]?.rare_item_name
+    }
+    
+    /// Get rare item icon from blessing phase config
+    var rareItemIcon: String? {
+        phases["blessing"]?.rare_item_icon
+    }
 }
 
 // MARK: - AnyCodable for dynamic effects

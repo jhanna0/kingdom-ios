@@ -1,92 +1,47 @@
 import SwiftUI
 
 // MARK: - Hunt Results View
-// Final screen showing hunt outcome and rewards
+// Clean, focused results screen
 
 struct HuntResultsView: View {
     @ObservedObject var viewModel: HuntViewModel
-    @State private var showHeader = false
-    @State private var showAnimal = false
-    @State private var showRewards = false
-    @State private var showPlayers = false
-    @State private var showButtons = false
+    @State private var showContent = false
     @State private var meatCountUp: Int = 0
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                // Header with outcome
-                resultHeader
-                    .opacity(showHeader ? 1 : 0)
-                    .scaleEffect(showHeader ? 1 : 0.8)
-                
-                // Animal caught (if successful)
-                if viewModel.hunt?.status == .completed {
-                    animalCaughtSection
-                        .opacity(showAnimal ? 1 : 0)
-                        .offset(y: showAnimal ? 0 : 20)
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Main content
+                ScrollView {
+                    VStack(spacing: KingdomTheme.Spacing.large) {
+                        resultHeader
+                        lootSection
+                        partySection
+                    }
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+                    .padding(.top, KingdomTheme.Spacing.large)
+                    .padding(.bottom, 100) // Space for button
                 }
-                
-                // Rewards section
-                if showRewards {
-                    rewardsSection
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .bottom)),
-                            removal: .opacity
-                        ))
-                }
-                
-                // Player contributions
-                playerContributionsSection
-                    .opacity(showPlayers ? 1 : 0)
-                    .offset(y: showPlayers ? 0 : 20)
-                
-                // Action buttons
-                actionButtons
-                    .opacity(showButtons ? 1 : 0)
-                
-                Spacer(minLength: 40)
-            }
-            .padding()
-        }
-        .onAppear {
-            animateEntrance()
-        }
-    }
-    
-    private func animateEntrance() {
-        // Staggered entrance animation for smooth results reveal
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-            showHeader = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                showAnimal = true
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                showRewards = true
+                .opacity(showContent ? 1 : 0)
             }
             
-            // Count up meat animation
+            // Fixed bottom button
+            VStack {
+                Spacer()
+                bottomButton
+            }
+            .opacity(showContent ? 1 : 0)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.4).delay(0.2)) {
+                showContent = true
+            }
             if let totalMeat = viewModel.hunt?.rewards?.total_meat {
                 animateMeatCountUp(to: totalMeat)
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                showPlayers = true
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                showButtons = true
             }
         }
     }
@@ -94,29 +49,229 @@ struct HuntResultsView: View {
     // MARK: - Result Header
     
     private var resultHeader: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Success/Failure icon
+        VStack(spacing: 12) {
+            // Animal or result icon
             ZStack {
                 Circle()
-                    .fill(resultColor.opacity(0.2))
-                    .frame(width: 120, height: 120)
+                    .fill(Color.black)
+                    .frame(width: 104, height: 104)
+                    .offset(x: 4, y: 4)
                 
-                Image(systemName: resultIcon)
-                    .font(.system(size: 60))
-                    .foregroundColor(resultColor)
+                Circle()
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .frame(width: 100, height: 100)
+                    .overlay(
+                        Circle()
+                            .stroke(resultColor, lineWidth: 4)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black, lineWidth: 3)
+                    )
+                
+                if viewModel.hunt?.status == .completed, let animal = viewModel.hunt?.animal {
+                    Text(animal.icon ?? "🎯")
+                        .font(.system(size: 50))
+                } else {
+                    Image(systemName: resultIcon)
+                        .font(.system(size: 44, weight: .bold))
+                        .foregroundColor(resultColor)
+                }
             }
             
             Text(resultTitle)
-                .font(KingdomTheme.Typography.largeTitle())
+                .font(.system(size: 24, weight: .black, design: .serif))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text(resultSubtitle)
-                .font(KingdomTheme.Typography.body())
+                .font(.system(size: 14, weight: .medium, design: .serif))
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
         }
-        .padding(.top, 20)
+        .padding(.vertical, KingdomTheme.Spacing.medium)
     }
+    
+    // MARK: - Loot Section
+    
+    private var lootSection: some View {
+        VStack(spacing: 12) {
+            // Main loot row
+            if let rewards = viewModel.hunt?.rewards {
+                HStack(spacing: 16) {
+                    // Meat
+                    lootBadge(
+                        icon: "leaf.fill",
+                        value: "\(meatCountUp)",
+                        label: "Meat",
+                        color: KingdomTheme.Colors.buttonSuccess
+                    )
+                    
+                    // Gold value
+                    lootBadge(
+                        icon: "dollarsign.circle.fill",
+                        value: "\(rewards.meat_market_value)",
+                        label: "Value",
+                        color: KingdomTheme.Colors.gold
+                    )
+                    
+                    // Bonus (if any)
+                    if rewards.bonus_meat > 0 {
+                        lootBadge(
+                            icon: "sparkles",
+                            value: "+\(rewards.bonus_meat)",
+                            label: "Blessed",
+                            color: KingdomTheme.Colors.regalPurple
+                        )
+                    }
+                }
+                
+                // Special items
+                if !rewards.items.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("RARE LOOT")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(2)
+                            .foregroundColor(KingdomTheme.Colors.regalPurple)
+                        
+                        HStack(spacing: 10) {
+                            ForEach(rewards.items, id: \.self) { item in
+                                rareItemBadge(item: item)
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black)
+                                .offset(x: 3, y: 3)
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(KingdomTheme.Colors.regalPurple.opacity(0.4), lineWidth: 2)
+                                )
+                        }
+                    )
+                }
+            } else {
+                // No loot (failed hunt)
+                Text("No loot collected")
+                    .font(.system(size: 14, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .padding()
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
+    }
+    
+    private func lootBadge(icon: String, value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.system(size: 18, weight: .black, design: .monospaced))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.1))
+        )
+    }
+    
+    private func rareItemBadge(item: String) -> some View {
+        let displayName = item.replacingOccurrences(of: "_", with: " ").capitalized
+        let icon = item == "sinew" ? "waveform.path" : "cube.fill"
+        
+        return HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+            Text(displayName)
+                .font(.system(size: 13, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            ZStack {
+                Capsule()
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                Capsule()
+                    .fill(KingdomTheme.Colors.regalPurple)
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
+    // MARK: - Party Section
+    
+    private var partySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("PARTY")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(2)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            if let hunt = viewModel.hunt {
+                ForEach(hunt.participantList.sorted { $0.total_contribution > $1.total_contribution }) { participant in
+                    CompactPlayerRow(participant: participant)
+                }
+            }
+        }
+        .padding(14)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
+    }
+    
+    // MARK: - Bottom Button
+    
+    private var bottomButton: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 3)
+            
+            VStack(spacing: 10) {
+                Button {
+                    viewModel.resetForNewHunt()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Hunt Again")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+                
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Return to Kingdom")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.vertical, KingdomTheme.Spacing.medium)
+        }
+        .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
+    }
+    
+    // MARK: - Helpers
     
     private var resultColor: Color {
         switch viewModel.hunt?.status {
@@ -128,20 +283,24 @@ struct HuntResultsView: View {
     
     private var resultIcon: String {
         switch viewModel.hunt?.status {
-        case .completed: return "trophy.fill"
-        case .failed: return "xmark.circle.fill"
-        default: return "questionmark.circle.fill"
+        case .completed: return "checkmark"
+        case .failed: return "xmark"
+        default: return "questionmark"
         }
     }
     
     private var resultTitle: String {
         switch viewModel.hunt?.status {
-        case .completed: return "Hunt Successful!"
+        case .completed:
+            if let animal = viewModel.hunt?.animal {
+                return animal.name ?? "Hunt Complete"
+            }
+            return "Hunt Complete"
         case .failed:
             if viewModel.hunt?.animal_escaped == true {
-                return "It Got Away!"
+                return "Escaped!"
             } else if viewModel.hunt?.animal == nil {
-                return "No Trail Found"
+                return "Lost Trail"
             }
             return "Hunt Failed"
         default: return "Hunt Complete"
@@ -151,301 +310,121 @@ struct HuntResultsView: View {
     private var resultSubtitle: String {
         switch viewModel.hunt?.status {
         case .completed:
-            if let animal = viewModel.hunt?.animal {
-                return "You caught a \(animal.name ?? "creature")!"
-            }
-            return "Great teamwork!"
+            return "Successful hunt!"
         case .failed:
             if viewModel.hunt?.animal_escaped == true {
-                return "The prey escaped into the forest..."
+                return "The prey got away"
             } else if viewModel.hunt?.animal == nil {
-                return "The forest was quiet today."
+                return "Couldn't find any tracks"
             }
-            return "Better luck next time."
+            return "Better luck next time"
         default: return ""
         }
     }
     
-    // MARK: - Animal Caught Section
-    
-    private var animalCaughtSection: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            if let animal = viewModel.hunt?.animal {
-                Text(animal.icon ?? "🎯")
-                    .font(.system(size: 80))
-                
-                Text(animal.name ?? "Unknown")
-                    .font(KingdomTheme.Typography.title())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if let tier = animal.tier {
-                    HStack(spacing: 4) {
-                        ForEach(0..<5) { i in
-                            Image(systemName: i < tier ? "star.fill" : "star")
-                                .foregroundColor(i < tier ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium.opacity(0.3))
-                        }
-                    }
-                    .font(.title3)
-                }
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
-    }
-    
-    // MARK: - Rewards Section
-    
-    private var rewardsSection: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            Text("Rewards")
-                .font(KingdomTheme.Typography.headline())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            if let rewards = viewModel.hunt?.rewards {
-                // Meat (Primary Reward)
-                HStack {
-                    Text("🥩")
-                        .font(.title)
-                    
-                    VStack(alignment: .leading) {
-                        Text("Meat Collected")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        Text("\(meatCountUp) meat")
-                            .font(.system(size: 28, weight: .bold, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        if rewards.bonus_meat > 0 {
-                            Text("(+\(rewards.bonus_meat) from blessing)")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                        
-                        Text("Market Value: \(rewards.meat_market_value)g")
-                            .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                    }
-                    
-                    Spacer()
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(KingdomTheme.Colors.parchment)
-                )
-                
-                // Items
-                if !rewards.items.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Items Found")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        FlowLayout(spacing: 8) {
-                            ForEach(rewards.items, id: \.self) { item in
-                                Text(formatItemName(item))
-                                    .font(FontStyles.labelMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(KingdomTheme.Colors.parchmentLight)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(KingdomTheme.Colors.border, lineWidth: 1)
-                                            )
-                                    )
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(KingdomTheme.Colors.parchment)
-                    )
-                }
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
-    }
-    
-    // MARK: - Player Contributions
-    
-    private var playerContributionsSection: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            Text("Party Performance")
-                .font(KingdomTheme.Typography.headline())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            if let hunt = viewModel.hunt {
-                ForEach(hunt.participantList.sorted { $0.total_contribution > $1.total_contribution }) { participant in
-                    PlayerContributionRow(participant: participant)
-                }
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
-    }
-    
-    // MARK: - Action Buttons
-    
-    private var actionButtons: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            Button {
-                viewModel.resetForNewHunt()
-            } label: {
-                HStack {
-                    Image(systemName: "arrow.counterclockwise")
-                    Text("Hunt Again")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-            .disabled(viewModel.uiState == .loading)
-            
-            Button {
-                dismiss()
-            } label: {
-                Text("Return to Kingdom")
-            }
-            .font(KingdomTheme.Typography.subheadline())
-            .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-    }
-    
-    // MARK: - Helpers
-    
     private func animateMeatCountUp(to target: Int) {
-        let duration: Double = 1.5
-        let steps = 30
+        guard target > 0 else {
+            meatCountUp = 0
+            return
+        }
+        
+        let duration: Double = 1.0
+        let steps = min(20, target)
         let stepDuration = duration / Double(steps)
-        let increment = target / steps
         
         for i in 0...steps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + stepDuration * Double(i)) {
-                if i == steps {
-                    meatCountUp = target
-                } else {
-                    meatCountUp = increment * i
-                }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + stepDuration * Double(i)) {
+                meatCountUp = (target * i) / steps
             }
         }
-    }
-    
-    private func formatItemName(_ item: String) -> String {
-        item.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 
-// MARK: - Player Contribution Row
+// MARK: - Compact Player Row
 
-struct PlayerContributionRow: View {
+private struct CompactPlayerRow: View {
     let participant: HuntParticipant
     
     var body: some View {
-        HStack(spacing: KingdomTheme.Spacing.medium) {
+        HStack(spacing: 10) {
             // Avatar
-            Circle()
-                .fill(KingdomTheme.Colors.inkMedium)
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text(String(participant.player_name.prefix(1)).uppercased())
-                        .font(.headline)
-                        .foregroundColor(.white)
-                )
-            
-            // Name and stats
-            VStack(alignment: .leading, spacing: 2) {
-                Text(participant.player_name)
-                    .font(KingdomTheme.Typography.headline())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            ZStack {
+                Circle()
+                    .fill(Color.black)
+                    .frame(width: 34, height: 34)
+                    .offset(x: 1, y: 1)
                 
-                HStack(spacing: 12) {
-                    Label("\(participant.successful_rolls)", systemImage: "checkmark.circle.fill")
+                Circle()
+                    .fill(KingdomTheme.Colors.parchment)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                
+                Text(String(participant.player_name.prefix(1)).uppercased())
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            // Name (truncated properly)
+            Text(participant.player_name)
+                .font(.system(size: 13, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            
+            Spacer(minLength: 8)
+            
+            // Stats inline
+            HStack(spacing: 8) {
+                // Hits
+                HStack(spacing: 2) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                    
-                    if participant.critical_rolls > 0 {
-                        Label("\(participant.critical_rolls)", systemImage: "star.fill")
+                    Text("\(participant.successful_rolls)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                // Crits (if any)
+                if participant.critical_rolls > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
                             .foregroundColor(KingdomTheme.Colors.gold)
-                    }
-                    
-                    if participant.is_injured {
-                        Label("Injured", systemImage: "bandage.fill")
-                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        Text("\(participant.critical_rolls)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
                     }
                 }
-                .font(FontStyles.labelSmall)
-            }
-            
-            Spacer()
-            
-            // Meat earned
-            VStack(alignment: .trailing) {
-                Text("🥩 \(participant.meat_earned)")
-                    .font(KingdomTheme.Typography.headline())
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                Text("Contribution: \(String(format: "%.1f", participant.total_contribution))")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                // Meat earned
+                HStack(spacing: 2) {
+                    Image(systemName: "leaf.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                    Text("\(participant.meat_earned)")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(KingdomTheme.Colors.parchment)
         )
     }
 }
 
-// MARK: - Flow Layout (for items)
+// MARK: - Preview
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
-                                       y: bounds.minY + result.positions[index].y),
-                         proposal: .unspecified)
-        }
-    }
-    
-    struct FlowResult {
-        var size: CGSize = .zero
-        var positions: [CGPoint] = []
-        
-        init(in width: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var x: CGFloat = 0
-            var y: CGFloat = 0
-            var maxHeight: CGFloat = 0
-            
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
-                if x + size.width > width && x > 0 {
-                    x = 0
-                    y += maxHeight + spacing
-                    maxHeight = 0
-                }
-                
-                positions.append(CGPoint(x: x, y: y))
-                maxHeight = max(maxHeight, size.height)
-                x += size.width + spacing
-            }
-            
-            self.size = CGSize(width: width, height: y + maxHeight)
-        }
+#Preview {
+    NavigationStack {
+        HuntResultsView(viewModel: HuntViewModel())
     }
 }
 

@@ -7,16 +7,13 @@ struct HuntPhaseView: View {
     let phase: HuntPhase
     let showingIntro: Bool
     
-    @State private var isShowingIntelSheet = false
+    // Inline master roll animation state
+    @State private var masterRollDisplayValue: Int = 0
+    @State private var showMasterRollMarker: Bool = false
+    @State private var masterRollAnimationStarted: Bool = false
     
     private var displayConfig: PhaseDisplayConfig? {
         viewModel.hunt?.phase_state?.display
-    }
-    
-    private var isShowingMasterRoll: Bool {
-        if case .resolving = viewModel.uiState { return true }
-        if case .masterRollAnimation = viewModel.uiState { return true }
-        return false
     }
     
     var body: some View {
@@ -32,14 +29,12 @@ struct HuntPhaseView: View {
                 PhaseIntroOverlay(
                     phase: phase,
                     config: viewModel.config,
+                    hunt: viewModel.hunt,
                     onBegin: {
                         Task { await viewModel.userTappedBeginPhase() }
                     }
                 )
             }
-        }
-        .sheet(isPresented: $isShowingIntelSheet) {
-            intelSheet
         }
     }
     
@@ -81,25 +76,6 @@ struct HuntPhaseView: View {
                 }
                 
                 Spacer()
-                
-                // Intel button
-                Button { isShowingIntelSheet = true } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "scope")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Intel")
-                            .font(.system(size: 12, weight: .bold, design: .serif))
-                    }
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.parchmentLight,
-                    cornerRadius: 10,
-                    shadowOffset: 2,
-                    borderWidth: 2
-                )
             }
             
             Text("Rolls have chance to give better odds. Higher skill gives more rolls.")
@@ -112,12 +88,12 @@ struct HuntPhaseView: View {
     
     private var hudChips: some View {
         HStack(spacing: KingdomTheme.Spacing.small) {
-            // Stat chip
+            // Stat chip - uses SkillConfig for proper icon!
             hudChip(
-                label: abbreviate(displayConfig?.stat_display_name ?? "STAT"),
+                label: abbreviate(skillConfig.displayName),
                 value: "\(displayConfig?.stat_value ?? 0)",
-                icon: displayConfig?.stat_icon ?? "star.fill",
-                tint: phaseColor
+                icon: skillConfig.icon,
+                tint: skillConfig.color
             )
             
             // Hit chance chip
@@ -289,16 +265,58 @@ struct HuntPhaseView: View {
     
     // MARK: - Roll Result Card
     
+    /// Whether the master roll animation is actively running
+    private var isMasterRollAnimating: Bool {
+        viewModel.shouldAnimateMasterRoll && showMasterRollMarker
+    }
+    
+    /// The value to display for master roll - animates during animation, final value after
+    private var displayedMasterRollValue: Int {
+        if isMasterRollAnimating {
+            return masterRollDisplayValue
+        }
+        return viewModel.masterRollFinalValue
+    }
+    
+    /// Returns the color of the drop table segment that the given roll value lands in
+    private var masterRollColor: Color {
+        let items = displayConfig?.drop_table_items ?? []
+        let slots = viewModel.dropTableSlots
+        let total = slots.values.reduce(0, +)
+        
+        guard total > 0 else { return phaseColor }
+        
+        let rollValue = displayedMasterRollValue
+        var cumulative = 0
+        
+        for item in items {
+            let count = slots[item.key] ?? 0
+            cumulative += count
+            let threshold = (cumulative * 100) / total
+            
+            if rollValue <= threshold {
+                return Color(hex: item.color) ?? phaseColor
+            }
+        }
+        
+        // Fallback to last item's color or phase color
+        if let lastItem = items.last {
+            return Color(hex: lastItem.color) ?? phaseColor
+        }
+        return phaseColor
+    }
+    
     private var rollResultCard: some View {
         VStack(spacing: 10) {
             // Result or prompt
             ZStack {
-                if isShowingMasterRoll {
+                if viewModel.shouldAnimateMasterRoll || viewModel.masterRollFinalValue > 0 {
                     resultRow(
-                        badge: "MASTER ROLL",
-                        message: viewModel.masterRollAnimating ? "Rolling…" : "Locked in",
-                        value: "\(viewModel.masterRollValue)",
-                        tint: KingdomTheme.Colors.regalPurple
+                        badge: displayConfig?.resolve_button_label.uppercased() ?? "RESULT",
+                        message: isMasterRollAnimating ? "Rolling…" : "Locked in",
+                        value: "\(displayedMasterRollValue)",
+                        tint: phaseColor,
+                        valueColor: masterRollColor
                     )
                 } else if let roll = viewModel.lastRollResult {
                     resultRow(
@@ -314,11 +332,107 @@ struct HuntPhaseView: View {
             .frame(height: 50)
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.lastRollResult?.round)
             
-            // Mini odds bar
-            oddsBarMini
+            // Inline master roll bar
+            masterRollBar
         }
         .padding(14)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+    }
+    
+    // MARK: - Inline Master Roll Bar
+    
+    private var masterRollBar: some View {
+        let items = displayConfig?.drop_table_items ?? []
+        let slots = viewModel.dropTableSlots
+        let total = slots.values.reduce(0, +)
+        let markerIcon = displayConfig?.master_roll_icon ?? "scope"
+        
+        return VStack(spacing: 4) {
+            Text(isMasterRollAnimating ? "ROLLING" : (showMasterRollMarker ? "RESULT" : "ODDS"))
+                .font(.system(size: 9, weight: .bold, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            GeometryReader { geo in
+                ZStack {
+                    HStack(spacing: 0) {
+                        ForEach(items, id: \.key) { item in
+                            let count = slots[item.key] ?? 0
+                            let frac = total > 0 ? CGFloat(count) / CGFloat(total) : 0
+                            if frac > 0.01 {
+                                Rectangle()
+                                    .fill(Color(hex: item.color) ?? KingdomTheme.Colors.inkMedium)
+                                    .frame(width: geo.size.width * frac)
+                            }
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
+                    
+                    if showMasterRollMarker {
+                        let markerX = geo.size.width * CGFloat(max(1, masterRollDisplayValue)) / 100.0
+                        Image(systemName: markerIcon)
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundColor(.white)
+                            .shadow(color: .black, radius: 0, x: 1, y: 1)
+                            .position(x: markerX, y: 10)
+                    }
+                }
+            }
+            .frame(height: 20)
+        }
+        .onAppear {
+            // Backup: if animation should be running but hasn't started, start it
+            if viewModel.shouldAnimateMasterRoll && !masterRollAnimationStarted {
+                masterRollAnimationStarted = true
+                Task { await runMasterRollAnimation() }
+            }
+        }
+        .onChange(of: viewModel.shouldAnimateMasterRoll) { _, shouldAnimate in
+            if shouldAnimate && !masterRollAnimationStarted {
+                masterRollAnimationStarted = true
+                Task { await runMasterRollAnimation() }
+            } else if !shouldAnimate {
+                // Reset when animation flag is cleared
+                masterRollAnimationStarted = false
+            }
+        }
+        .onChange(of: viewModel.masterRollFinalValue) { _, newValue in
+            if newValue == 0 {
+                showMasterRollMarker = false
+                masterRollDisplayValue = 0
+                masterRollAnimationStarted = false
+            }
+        }
+        .onChange(of: phase) { _, _ in
+            // Reset animation state when phase changes
+            showMasterRollMarker = false
+            masterRollDisplayValue = 0
+            masterRollAnimationStarted = false
+        }
+    }
+    
+    @MainActor
+    private func runMasterRollAnimation() async {
+        let finalValue = viewModel.masterRollFinalValue
+        
+        var positions = Array(stride(from: 1, through: 100, by: 2))
+        if finalValue < 100 {
+            positions.append(contentsOf: stride(from: 98, through: max(1, finalValue), by: -2))
+        }
+        if positions.last != finalValue {
+            positions.append(finalValue)
+        }
+        
+        showMasterRollMarker = true
+        
+        for pos in positions {
+            masterRollDisplayValue = pos
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        
+        masterRollDisplayValue = finalValue
+        viewModel.finishMasterRollAnimation()
     }
     
     private var promptRow: some View {
@@ -340,7 +454,7 @@ struct HuntPhaseView: View {
         }
     }
     
-    private func resultRow(badge: String, message: String, value: String, tint: Color) -> some View {
+    private func resultRow(badge: String, message: String, value: String, tint: Color, valueColor: Color? = nil) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(badge)
@@ -350,69 +464,24 @@ struct HuntPhaseView: View {
                     .padding(.vertical, 4)
                     .background(tint)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                
+
                 Text(message)
                     .font(.system(size: 11, weight: .medium, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .lineLimit(1)
             }
-            
+
             Spacer()
-            
+
             Text(value)
                 .font(.system(size: 32, weight: .black, design: .monospaced))
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .foregroundColor(valueColor ?? KingdomTheme.Colors.inkDark)
         }
     }
     
-    private var oddsBarMini: some View {
-        let items = displayConfig?.drop_table_items ?? []
-        let total = viewModel.dropTableSlots.values.reduce(0, +)
-        
-        return VStack(spacing: 4) {
-            HStack {
-                Text(isShowingMasterRoll ? "ROLLING" : "ODDS")
-                    .font(.system(size: 9, weight: .bold, design: .serif))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Spacer()
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-            
-            GeometryReader { geo in
-                ZStack {
-                    // Segments
-                    HStack(spacing: 0) {
-                        ForEach(items, id: \.key) { item in
-                            let count = viewModel.dropTableSlots[item.key] ?? 0
-                            let frac = total > 0 ? CGFloat(count) / CGFloat(total) : 0
-                            if frac > 0.01 {
-                                Rectangle()
-                                    .fill(Color(hex: item.color) ?? KingdomTheme.Colors.inkMedium)
-                                    .frame(width: geo.size.width * frac)
-                            }
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
-                    
-                    // Master roll crosshairs
-                    if isShowingMasterRoll && viewModel.masterRollValue > 0 {
-                        let markerX = geo.size.width * CGFloat(viewModel.masterRollValue) / 100.0
-                        
-                        Image(systemName: "scope")
-                            .font(.system(size: 28, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                            .shadow(color: .black, radius: 0, x: 1, y: 1)
-                            .position(x: markerX, y: 10)
-                    }
-                }
-            }
-            .frame(height: 20)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { isShowingIntelSheet = true }
+    /// Get the resolve button tint - uses phase color instead of always purple
+    private var resolveButtonTint: Color {
+        phaseColor
     }
     
     // MARK: - Roll History Card
@@ -449,24 +518,25 @@ struct HuntPhaseView: View {
                 .fill(Color.black)
                 .frame(height: 3)
             
-            Group {
-                switch viewModel.uiState {
-                case .phaseActive, .rolling, .rollRevealing:
-                    twoButtonRow
-                case .resolving, .masterRollAnimation:
-                    if viewModel.masterRollAnimating || (viewModel.uiState == .resolving(phase)) {
-                        loadingRow
-                    } else {
-                        continueButton
-                    }
-                default:
-                    Color.clear.frame(height: 50)
-                }
-            }
-            .padding(.horizontal, KingdomTheme.Spacing.large)
-            .padding(.vertical, KingdomTheme.Spacing.medium)
+            bottomButtonContent
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.vertical, KingdomTheme.Spacing.medium)
         }
         .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
+    }
+    
+    @ViewBuilder
+    private var bottomButtonContent: some View {
+        switch viewModel.uiState {
+        case .phaseActive, .rolling, .rollRevealing:
+            twoButtonRow
+        case .resolving, .masterRollAnimation:
+            loadingRow
+        case .masterRollComplete:
+            continueButton
+        default:
+            Color.clear.frame(height: 50)
+        }
     }
     
     private var twoButtonRow: some View {
@@ -481,7 +551,7 @@ struct HuntPhaseView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.brutalist(
-                backgroundColor: viewModel.canRoll ? phaseColor : KingdomTheme.Colors.disabled,
+                backgroundColor: viewModel.canRoll ? phaseColor.opacity(0.7) : KingdomTheme.Colors.disabled,
                 foregroundColor: .white,
                 fullWidth: true
             ))
@@ -497,7 +567,7 @@ struct HuntPhaseView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.brutalist(
-                backgroundColor: viewModel.canResolve ? KingdomTheme.Colors.regalPurple : KingdomTheme.Colors.disabled,
+                backgroundColor: viewModel.canResolve ? phaseColor : KingdomTheme.Colors.disabled,
                 foregroundColor: .white,
                 fullWidth: true
             ))
@@ -507,8 +577,10 @@ struct HuntPhaseView: View {
     
     private var loadingRow: some View {
         HStack {
-            ProgressView().tint(KingdomTheme.Colors.regalPurple)
-            Text("Master Roll...").font(KingdomTheme.Typography.headline())
+            ProgressView().tint(phaseColor)
+            Text(displayConfig?.resolve_button_label ?? "Resolving...")
+                .font(KingdomTheme.Typography.headline())
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, KingdomTheme.Spacing.medium)
@@ -527,39 +599,16 @@ struct HuntPhaseView: View {
         .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
     }
     
-    // MARK: - Intel Sheet
-    
-    private var intelSheet: some View {
-        VStack(spacing: KingdomTheme.Spacing.large) {
-            HStack {
-                Text("Intel").font(KingdomTheme.Typography.title2())
-                Spacer()
-                Button("Done") { isShowingIntelSheet = false }
-                    .buttonStyle(.toolbar(color: KingdomTheme.Colors.inkDark))
-            }
-            .padding(.horizontal, KingdomTheme.Spacing.large)
-            .padding(.top, KingdomTheme.Spacing.large)
-            
-            DropTableBar(
-                title: displayConfig?.drop_table_title ?? "ODDS",
-                slots: viewModel.dropTableSlots,
-                itemConfigs: displayConfig?.drop_table_items ?? [],
-                masterRollValue: viewModel.masterRollValue,
-                isAnimatingMasterRoll: viewModel.masterRollAnimating
-            )
-            .padding(.horizontal, KingdomTheme.Spacing.large)
-            
-            if phase == .strike {
-                CombatHPBar(animal: viewModel.hunt?.animal, animalHP: viewModel.hunt?.animal?.hp ?? 1)
-                    .padding(.horizontal, KingdomTheme.Spacing.large)
-            }
-            
-            Spacer()
-        }
-        .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-    }
-    
     // MARK: - Helpers
+    
+    /// Get skill config using SkillConfig single source of truth
+    /// Maps backend stat names to SkillConfig keys (e.g. "attack_power" → "attack")
+    private var skillConfig: SkillConfig {
+        let statName = displayConfig?.stat_name ?? ""
+        // Backend uses "attack_power" but SkillConfig uses "attack"
+        let mappedName = statName == "attack_power" ? "attack" : statName
+        return SkillConfig.get(mappedName)
+    }
     
     private var phaseColor: Color {
         guard let name = displayConfig?.phase_color else { return KingdomTheme.Colors.buttonPrimary }

@@ -101,9 +101,13 @@ struct CreatureRevealOverlay: View {
                     
                     // Animal stats preview
                     if let animal = viewModel.hunt?.animal {
-                        HStack(spacing: 20) {
+                        HStack(spacing: 16) {
                             CreatureStatBadge(icon: "heart.fill", value: "\(animal.hp ?? 1) HP", color: KingdomTheme.Colors.buttonDanger)
-                            CreatureStatBadge(icon: "fork.knife", value: "\(animal.meat ?? 0) Meat", color: KingdomTheme.Colors.buttonSuccess)
+                            CreatureStatBadge(icon: "flame.fill", value: "\(animal.meat ?? 0) Meat", color: KingdomTheme.Colors.buttonSuccess)
+                            // Rare drop from backend - same style as InventoryGridItem
+                            if let rareDrop = animal.rare_drop {
+                                RareDropBadge(icon: rareDrop.item_icon, name: rareDrop.item_name)
+                            }
                         }
                     }
                 }
@@ -218,6 +222,47 @@ private struct CreatureStatBadge: View {
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
         .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.black)
+                    .offset(x: 1, y: 1)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(KingdomTheme.Colors.parchment)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.black, lineWidth: 1.5)
+                    )
+            }
+        )
+    }
+}
+
+// MARK: - Rare Drop Badge (same style as InventoryGridItem)
+private struct RareDropBadge: View {
+    let icon: String
+    let name: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .frame(width: 32, height: 32)
+                .brutalistBadge(
+                    backgroundColor: .brown,
+                    cornerRadius: 8,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+            
+            Text(name)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
             ZStack {

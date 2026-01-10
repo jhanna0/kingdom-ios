@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Round Result Card
 // Compact card showing a single roll result
+// Text color shows contribution: grey (miss) → green (hit) → blue (good) → purple (great) → gold (crit)
 
 struct RoundResultCard: View {
     let result: PhaseRoundResult
@@ -19,19 +20,14 @@ struct RoundResultCard: View {
                         .stroke(cardBorder, lineWidth: 2)
                 )
             
-            VStack(spacing: 0) {
-                Text("\(result.roll)")
-                    .font(.system(size: 20, weight: .black, design: .monospaced))
-                    .foregroundColor(resultColor)
-                
-                if result.is_critical {
-                    Text("⚡").font(.system(size: 10))
-                }
-            }
+            Text("\(result.roll)")
+                .font(.system(size: 20, weight: .black, design: .monospaced))
+                .foregroundColor(shiftColor)
         }
         .frame(width: 44, height: 44)
     }
     
+    // Original background colors - these looked fine
     private var cardBackground: Color {
         if result.is_critical && result.is_success {
             return Color(red: 0.95, green: 0.88, blue: 0.65)
@@ -51,15 +47,18 @@ struct RoundResultCard: View {
         return Color.black
     }
     
-    private var resultColor: Color {
-        if result.is_critical && result.is_success {
-            return KingdomTheme.Colors.gold
-        } else if result.is_success {
-            return KingdomTheme.Colors.buttonSuccess
-        } else if result.is_critical {
-            return KingdomTheme.Colors.buttonDanger
+    // Text color based on contribution/shift amount
+    private var shiftColor: Color {
+        let shift = result.contribution
+        
+        if shift <= 0 {
+            return KingdomTheme.Colors.inkMedium       // Miss - grey
+        } else if shift >= 2.0 {
+            return Color(hex: "#9C27B0")!              // Purple - great shift
+        } else if shift >= 1.0 {
+            return Color(hex: "#2196F3")!              // Blue - good shift
         } else {
-            return KingdomTheme.Colors.inkMedium
+            return KingdomTheme.Colors.buttonSuccess   // Green - basic hit
         }
     }
 }
