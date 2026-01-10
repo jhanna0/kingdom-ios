@@ -117,7 +117,6 @@ struct PlayerPublicProfile: Codable, Identifiable {
     // Stats
     let level: Int
     let reputation: Int
-    let honor: Int
     
     // Combat stats
     let attack_power: Int

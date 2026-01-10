@@ -351,9 +351,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         attack_debuff=state.attack_debuff,
         debuff_expires_at=state.debuff_expires_at,
         
-        # Reputation & Honor
+        # Reputation
         reputation=reputation,  # From user_kingdoms for current kingdom
-        honor=state.honor or 100,
         
         # Activity (TODO: should be computed from other tables)
         total_checkins=total_checkins,
@@ -547,6 +546,18 @@ def get_player_state(
                 DBPlayerState.current_kingdom_id == kingdom.id
             ).count()
             
+            # Only broadcast player arrival if entering a NEW kingdom
+            if is_entering_new_kingdom:
+                from websocket.broadcast import notify_kingdom, KingdomEvents
+                notify_kingdom(
+                    kingdom_id=kingdom.id,
+                    event_type=KingdomEvents.PLAYER_JOINED,
+                    data={
+                        "player_id": current_user.id,
+                        "player_name": current_user.display_name or f"Player {current_user.id}",
+                    }
+                )
+            
             # Commit changes (travel fee and/or current_kingdom_id update)
             db.commit()
             db.refresh(state)
@@ -634,7 +645,6 @@ def reset_player_state(
     
     # NOTE: Reputation is now in user_kingdoms table, not resetting here
     # To reset reputation, you'd need to update/delete user_kingdoms records separately
-    state.honor = 100
     
     # Reset territory
     state.current_kingdom_id = None

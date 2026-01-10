@@ -51,7 +51,6 @@ class UserProfile(BaseModel):
     avatar_url: Optional[str] = None
     level: int
     reputation: int
-    honor: int
     total_conquests: int
     kingdoms_ruled: int
     created_at: datetime
@@ -73,7 +72,6 @@ class UserPrivate(BaseModel):
     level: int
     experience: int
     reputation: int
-    honor: int
     
     # Activity
     total_checkins: int
@@ -168,7 +166,6 @@ class UserStats(BaseModel):
     
     # Reputation
     reputation: int
-    honor: int
     
     # Progression
     level: int

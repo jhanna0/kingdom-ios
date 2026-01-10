@@ -512,7 +512,6 @@ def get_player_profile(
         hometown_kingdom_id=state.hometown_kingdom_id,
         level=state.level,
         reputation=reputation,
-        honor=100,  # Default honor value
         attack_power=state.attack_power,
         defense_power=state.defense_power,
         leadership=state.leadership,

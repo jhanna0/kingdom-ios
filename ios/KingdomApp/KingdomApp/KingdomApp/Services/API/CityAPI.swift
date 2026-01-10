@@ -89,6 +89,8 @@ class CityAPI {
         let canClaim = city.kingdom?.can_claim ?? false
         let canDeclareWar = city.kingdom?.can_declare_war ?? false
         let canFormAlliance = city.kingdom?.can_form_alliance ?? false
+        let canStageCoup = city.kingdom?.can_stage_coup ?? false
+        let coupIneligibilityReason = city.kingdom?.coup_ineligibility_reason
         
         guard var kingdom = Kingdom(
             name: city.name,
@@ -98,7 +100,9 @@ class CityAPI {
             color: color,
             canClaim: canClaim,
             canDeclareWar: canDeclareWar,
-            canFormAlliance: canFormAlliance
+            canFormAlliance: canFormAlliance,
+            canStageCoup: canStageCoup,
+            coupIneligibilityReason: coupIneligibilityReason
         ) else {
             return nil
         }
@@ -123,6 +127,9 @@ class CityAPI {
                     expiresAt: expiresAt
                 )
             }
+            
+            // Active coup data (if any)
+            kingdom.activeCoup = kingdomData.active_coup
             
             // DYNAMIC BUILDINGS - Iterate buildings array from backend
             // NO HARDCODING - just loop through whatever buildings the backend sends!

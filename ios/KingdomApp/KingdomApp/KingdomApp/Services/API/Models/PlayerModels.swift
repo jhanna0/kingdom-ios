@@ -46,9 +46,8 @@ struct APIPlayerState: Codable {
     let attack_debuff: Int
     let debuff_expires_at: String?
     
-    // Reputation & Honor
+    // Reputation
     let reputation: Int
-    let honor: Int
     
     // Activity
     let total_checkins: Int

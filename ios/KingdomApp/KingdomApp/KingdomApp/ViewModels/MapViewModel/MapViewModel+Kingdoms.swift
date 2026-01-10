@@ -80,6 +80,7 @@ extension MapViewModel {
                 if let kingdom = kingdom {
                     kingdoms = [kingdom]
                     syncPlayerKingdoms()
+                    updateActiveCoupFromKingdoms()
                     
                     // Check location
                     if let currentLocation = userLocation {
@@ -137,6 +138,7 @@ extension MapViewModel {
                     let newKingdoms = neighborKingdoms.filter { !existingIds.contains($0.id) }
                     kingdoms.append(contentsOf: newKingdoms)
                     syncPlayerKingdoms()
+                    updateActiveCoupFromKingdoms()
                     
                     let withBoundary = kingdoms.filter { $0.hasBoundaryCached }.count
                     print("✅ Total: \(kingdoms.count) kingdoms (\(withBoundary) with boundaries)")
@@ -196,6 +198,12 @@ extension MapViewModel {
             kingdom.travelFee = kingdomData.travel_fee
             kingdom.checkedInPlayers = kingdomData.population
             kingdom.activeCitizens = kingdomData.active_citizens ?? 0
+            
+            // Active coup data (if any)
+            kingdom.activeCoup = kingdomData.active_coup
+            if let coup = kingdomData.active_coup {
+                print("🔥 COUP FOUND in \(kingdom.name): id=\(coup.id), status=\(coup.status)")
+            }
             
             // DYNAMIC BUILDINGS - Iterate buildings array from backend
             // NO HARDCODING - just loop through whatever buildings the backend sends!

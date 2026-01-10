@@ -36,8 +36,9 @@ class ActivityViewModel: ObservableObject {
         print("📱 Tapped notification: \(notification.type)")
         
         switch notification.type {
-        case .coupVoteNeeded, .coupInProgress, .coupAgainstYou:
-            // Show coup voting sheet
+        case .coupVoteNeeded, .coupInProgress, .coupAgainstYou,
+             .coupPledgeNeeded, .coupPledgeWaiting, .coupBattleActive, .coupBattleAgainstYou:
+            // Show coup view/sheet
             if let coupData = notification.coupData {
                 selectedCoup = coupData
             }

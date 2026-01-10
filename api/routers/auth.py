@@ -290,7 +290,6 @@ def get_my_stats(
         total_checkins=total_checkins,
         gold=state.gold if state else 0,
         reputation=hometown_reputation,
-        honor=100,  # honor removed from player_state, default to 100
         level=state.level if state else 1,
         experience=state.experience if state else 0,
     )

@@ -1040,7 +1040,7 @@ class HuntManager:
         # Common outcomes FIRST (low rolls), rare outcomes LAST (high rolls)
         TRACK_ORDER = ["no_trail", "squirrel", "rabbit", "deer", "boar", "bear", "moose"]
         ATTACK_ORDER = ["scare", "miss", "hit"]  # Bad → Good
-        BLESSING_ORDER = ["common", "rare"]  # Common → Rare
+        BLESSING_ORDER = ["nothing", "common", "rare"]  # Nothing → Common → Rare
         
         # Determine which order to use based on the keys present
         if "no_trail" in slots:
@@ -1070,7 +1070,7 @@ class HuntManager:
                 roll_percent = int((roll_value / total) * 100)
                 return (outcome, roll_percent)
         
-        return (order[-1], 100)  # Fallback to last
+        return (order[0], 50)  # Fallback to WORST outcome (first in order)
     
     def advance_to_next_phase(self, db, session: HuntSession) -> Optional[HuntPhase]:
         """

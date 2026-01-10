@@ -108,6 +108,15 @@ struct ActionStatus: Codable {
     let endpoint: String?  // FULLY DYNAMIC: Backend provides complete endpoint with all params
     let slot: String?  // NEW: Which slot this action belongs to (building, economy, security, etc)
     
+    // Coup-specific fields (for view_coup action)
+    let coupId: Int?
+    let canPledge: Bool?
+    let userSide: String?
+    let coupStatus: String?
+    let attackerCount: Int?
+    let defenderCount: Int?
+    let activeCoupId: Int?  // For locked stage_coup when there's already an active coup
+    
     enum CodingKeys: String, CodingKey {
         case ready
         case secondsRemaining = "seconds_remaining"
@@ -126,7 +135,15 @@ struct ActionStatus: Codable {
         case themeColor = "theme_color"
         case displayOrder = "display_order"
         case endpoint
-        case slot  // NEW
+        case slot
+        // Coup fields
+        case coupId = "coup_id"
+        case canPledge = "can_pledge"
+        case userSide = "user_side"
+        case coupStatus = "coup_status"
+        case attackerCount = "attacker_count"
+        case defenderCount = "defender_count"
+        case activeCoupId = "active_coup_id"
     }
 }
 

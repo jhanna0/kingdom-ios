@@ -106,6 +106,27 @@ class KingdomData(BaseModel):
     is_allied: bool = False  # True if this kingdom is allied with any of user's kingdoms
     is_enemy: bool = False  # True if this kingdom is at war with any of user's kingdoms
     alliance_info: Optional[AllianceInfo] = None  # Details about alliance if is_allied is True
+    
+    # Coup eligibility
+    can_stage_coup: bool = False  # Backend determines if current user can initiate a coup
+    coup_ineligibility_reason: Optional[str] = None  # Why user can't stage coup (e.g., "Need T3 leadership")
+    
+    # Active coup in this kingdom (if any)
+    active_coup: Optional['ActiveCoupData'] = None
+
+
+class ActiveCoupData(BaseModel):
+    """Active coup data for map badge and quick access"""
+    id: int
+    kingdom_id: str
+    kingdom_name: str
+    initiator_name: str
+    status: str  # 'pledge' or 'battle'
+    time_remaining_seconds: int
+    attacker_count: int
+    defender_count: int
+    user_side: Optional[str] = None  # 'attackers', 'defenders', or None
+    can_pledge: bool = False
 
 
 class CityBoundaryResponse(BaseModel):

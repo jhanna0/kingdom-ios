@@ -138,6 +138,24 @@ ACTION_TYPES = {
             "property": "owned",
             "requirement_text": "Must own a property with active upgrade"
         }
+    },
+    "stage_coup": {
+        "display_name": "Stage Coup",
+        "icon": "bolt.fill",
+        "description": "Overthrow the current ruler and seize power",
+        "category": "political",
+        "cooldown_minutes": 0,  # No cooldown - but has other restrictions
+        "theme_color": "buttonSpecial",
+        "display_order": 1,
+        "endpoint": "/coups/initiate",
+        "always_unlocked": False,
+        "requirements": {
+            "skill": "leadership",
+            "skill_level": 3,
+            "kingdom_reputation": 500,
+            "location": "not_ruler",
+            "requirement_text": "Leadership T3+, 500 kingdom rep, not the ruler"
+        }
     }
 }
 
@@ -164,6 +182,10 @@ ACTION_SLOTS = {
     # PERSONAL SLOT - Self-improvement
     "training": "personal",
     "crafting": "personal",
+    
+    # POLITICAL SLOT - Power struggles
+    "stage_coup": "political",
+    "view_coup": "political",
 }
 
 
@@ -220,6 +242,16 @@ SLOT_DEFINITIONS = {
         "display_order": 5,
         "description": "Infiltrate enemy territory",
         "location": "enemy",  # Enemy kingdom only
+        "content_type": "actions",
+    },
+    "political": {
+        "id": "political",
+        "display_name": "⚔️ Political",
+        "icon": "shield.lefthalf.filled.badge.checkmark",
+        "color_theme": "buttonDanger",
+        "display_order": 0,  # Show at top - coups are important!
+        "description": "Seize power through political action",
+        "location": "home",  # Shows in "home" but action only added when not ruler
         "content_type": "actions",
     },
 }

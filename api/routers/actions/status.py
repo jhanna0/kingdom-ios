@@ -421,6 +421,151 @@ def get_action_status(
             "endpoint": None,
         }
     
+    # STAGE COUP - Available when in a kingdom with a ruler who isn't you
+    # Check eligibility using the coup router's logic
+    from routers.coups import (
+        COUP_LEADERSHIP_REQUIREMENT,
+        COUP_REPUTATION_REQUIREMENT,
+        _check_player_cooldown,
+        _check_kingdom_cooldown,
+        _get_kingdom_reputation
+    )
+    
+    can_stage_coup = False
+    coup_ineligibility_reason = None
+    active_coup_id = None
+    
+    if state.current_kingdom_id and kingdom:
+        if kingdom.ruler_id is None:
+            coup_ineligibility_reason = "Kingdom has no ruler"
+        elif kingdom.ruler_id == current_user.id:
+            coup_ineligibility_reason = "You are the ruler"
+        else:
+            # Check for active coup first
+            from db.models import CoupEvent
+            active_coup = db.query(CoupEvent).filter(
+                CoupEvent.kingdom_id == kingdom.id,
+                CoupEvent.status.in_(['pledge', 'battle'])
+            ).first()
+            
+            if active_coup:
+                coup_ineligibility_reason = "Coup already in progress"
+                active_coup_id = active_coup.id
+            else:
+                # Check player stats
+                kingdom_rep = _get_kingdom_reputation(db, current_user.id, kingdom.id)
+                
+                if state.leadership < COUP_LEADERSHIP_REQUIREMENT:
+                    coup_ineligibility_reason = f"Need T{COUP_LEADERSHIP_REQUIREMENT} leadership (you have T{state.leadership})"
+                elif kingdom_rep < COUP_REPUTATION_REQUIREMENT:
+                    coup_ineligibility_reason = f"Need {COUP_REPUTATION_REQUIREMENT} kingdom rep (you have {kingdom_rep})"
+                else:
+                    # Check cooldowns
+                    can_player, player_msg = _check_player_cooldown(db, current_user.id)
+                    can_kingdom, kingdom_msg = _check_kingdom_cooldown(db, kingdom.id)
+                    
+                    if not can_player:
+                        coup_ineligibility_reason = player_msg
+                    elif not can_kingdom:
+                        coup_ineligibility_reason = kingdom_msg
+                    else:
+                        can_stage_coup = True
+    
+    # Only add coup action if user is in a kingdom with a ruler (not themselves)
+    if state.current_kingdom_id and kingdom and kingdom.ruler_id and kingdom.ruler_id != current_user.id:
+        if can_stage_coup:
+            actions["stage_coup"] = {
+                "ready": True,
+                "seconds_remaining": 0,
+                "unlocked": True,
+                "action_type": "stage_coup",
+                "requirements_met": True,
+                "title": "Stage Coup",
+                "icon": "bolt.fill",
+                "description": "Overthrow the current ruler",
+                "category": "political",
+                "theme_color": "buttonSpecial",
+                "display_order": 1,
+                "endpoint": "/coups/initiate",
+                "kingdom_id": kingdom.id,
+            }
+        else:
+            actions["stage_coup"] = {
+                "ready": False,
+                "seconds_remaining": 0,
+                "unlocked": False,
+                "action_type": "stage_coup",
+                "requirements_met": False,
+                "requirement_description": coup_ineligibility_reason,
+                "title": "Stage Coup",
+                "icon": "bolt.fill",
+                "description": "Overthrow the current ruler",
+                "category": "political",
+                "theme_color": "buttonSpecial",
+                "display_order": 1,
+                "endpoint": None,
+                "active_coup_id": active_coup_id,  # If there's an active coup, frontend can show it
+            }
+    
+    # VIEW COUP - Show when there's an active coup in the user's current kingdom
+    if state.current_kingdom_id:
+        from db.models import CoupEvent
+        active_coup = db.query(CoupEvent).filter(
+            CoupEvent.kingdom_id == state.current_kingdom_id,
+            CoupEvent.status.in_(['pledge', 'battle'])
+        ).first()
+        
+        if active_coup:
+            # Check if user already pledged
+            attacker_ids = active_coup.get_attacker_ids()
+            defender_ids = active_coup.get_defender_ids()
+            user_pledged = current_user.id in attacker_ids or current_user.id in defender_ids
+            user_side = None
+            if current_user.id in attacker_ids:
+                user_side = "attackers"
+            elif current_user.id in defender_ids:
+                user_side = "defenders"
+            
+            # Can pledge if: pledge phase, not already pledged
+            can_pledge = (
+                active_coup.status == 'pledge' and
+                not user_pledged
+            )
+            
+            # Determine display text based on phase and user status
+            if active_coup.status == 'pledge':
+                if user_pledged:
+                    title = "View Coup"
+                    description = f"You've pledged as {user_side} - waiting for battle"
+                else:
+                    minutes_left = active_coup.time_remaining_seconds // 60
+                    title = "Join Coup"
+                    description = f"A coup is underway! {minutes_left}m to pledge"
+            else:  # battle phase
+                title = "View Battle"
+                description = "The battle for the throne is underway"
+            
+            actions["view_coup"] = {
+                "ready": True,
+                "seconds_remaining": 0,
+                "unlocked": True,
+                "action_type": "view_coup",
+                "requirements_met": True,
+                "title": title,
+                "icon": "bolt.fill",
+                "description": description,
+                "category": "political",
+                "theme_color": "buttonDanger",
+                "display_order": 0,  # Show first in political slot
+                "endpoint": None,  # No endpoint - frontend handles opening CoupView
+                "coup_id": active_coup.id,
+                "can_pledge": can_pledge,
+                "user_side": user_side,
+                "coup_status": active_coup.status,
+                "attacker_count": len(attacker_ids),
+                "defender_count": len(defender_ids),
+            }
+    
     # Add slot information to each action
     for action_key, action_data in actions.items():
         action_data["slot"] = get_action_slot(action_key)

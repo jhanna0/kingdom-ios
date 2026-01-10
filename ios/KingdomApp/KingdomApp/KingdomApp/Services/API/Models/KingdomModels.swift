@@ -110,6 +110,41 @@ struct CityKingdomData: Codable {
     let is_allied: Bool  // True if allied with any of player's kingdoms
     let is_enemy: Bool  // True if at war with any of player's kingdoms
     let alliance_info: AllianceInfo?  // Details about alliance if is_allied is true
+    
+    // Coup eligibility
+    let can_stage_coup: Bool?  // Backend determines if current user can stage coup
+    let coup_ineligibility_reason: String?  // Why user can't stage coup (e.g., "Need T3 leadership")
+    
+    // Active coup in this kingdom (if any)
+    let active_coup: ActiveCoupData?
+}
+
+/// Active coup data for map badge and quick access
+struct ActiveCoupData: Codable, Identifiable {
+    let id: Int
+    let kingdom_id: String
+    let kingdom_name: String
+    let initiator_name: String
+    let status: String  // 'pledge' or 'battle'
+    let time_remaining_seconds: Int
+    let attacker_count: Int
+    let defender_count: Int
+    let user_side: String?  // 'attackers', 'defenders', or nil
+    let can_pledge: Bool
+    
+    /// Formatted time remaining
+    var timeRemainingFormatted: String {
+        let hours = time_remaining_seconds / 3600
+        let minutes = (time_remaining_seconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            let seconds = time_remaining_seconds % 60
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(time_remaining_seconds)s"
+        }
+    }
 }
 
 struct CityBoundaryResponse: Codable {

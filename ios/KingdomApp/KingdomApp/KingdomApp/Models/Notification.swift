@@ -42,10 +42,19 @@ struct ActivityNotification: Codable, Identifiable {
         case levelUp = "level_up"
         case skillPoints = "skill_points"
         case checkinReady = "checkin_ready"
+        // Coup V2 - Pledge phase
+        case coupPledgeNeeded = "coup_pledge_needed"
+        case coupPledgeWaiting = "coup_pledge_waiting"
+        case coupAgainstYou = "coup_against_you"
+        // Coup V2 - Battle phase
+        case coupBattleActive = "coup_battle_active"
+        case coupBattleAgainstYou = "coup_battle_against_you"
+        // Coup - Resolution
+        case coupResolved = "coup_resolved"
+        // Legacy (for backwards compatibility)
         case coupVoteNeeded = "coup_vote_needed"
         case coupInProgress = "coup_in_progress"
-        case coupAgainstYou = "coup_against_you"
-        case coupResolved = "coup_resolved"
+        // Invasions
         case invasionAgainstYou = "invasion_against_you"
         case allyUnderAttack = "ally_under_attack"
         case invasionDefenseNeeded = "invasion_defense_needed"
@@ -77,8 +86,11 @@ struct ActivityNotification: Codable, Identifiable {
     }
 }
 
+// MARK: - Coup V2 Models
+
+/// Full character sheet for the coup initiator
 struct InitiatorStats: Codable {
-    let reputation: Int
+    let level: Int
     let kingdomReputation: Int
     let attackPower: Int
     let defensePower: Int
@@ -87,10 +99,11 @@ struct InitiatorStats: Codable {
     let intelligence: Int
     let contractsCompleted: Int
     let totalWorkContributed: Int
-    let level: Int
+    let coupsWon: Int
+    let coupsFailed: Int
     
     enum CodingKeys: String, CodingKey {
-        case reputation
+        case level
         case kingdomReputation = "kingdom_reputation"
         case attackPower = "attack_power"
         case defensePower = "defense_power"
@@ -99,6 +112,30 @@ struct InitiatorStats: Codable {
         case intelligence
         case contractsCompleted = "contracts_completed"
         case totalWorkContributed = "total_work_contributed"
+        case coupsWon = "coups_won"
+        case coupsFailed = "coups_failed"
+    }
+}
+
+/// A player participating in a coup, with stats for display
+struct CoupParticipant: Codable, Identifiable {
+    let playerId: Int
+    let playerName: String
+    let kingdomReputation: Int
+    let attackPower: Int
+    let defensePower: Int
+    let leadership: Int
+    let level: Int
+    
+    var id: Int { playerId }
+    
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case playerName = "player_name"
+        case kingdomReputation = "kingdom_reputation"
+        case attackPower = "attack_power"
+        case defensePower = "defense_power"
+        case leadership
         case level
     }
 }
@@ -109,11 +146,12 @@ struct CoupNotificationData: Codable, Identifiable {
     let kingdomName: String
     let initiatorName: String
     let initiatorStats: InitiatorStats?
+    let status: String  // 'pledge', 'battle', 'resolved'
     let timeRemainingSeconds: Int
     let attackerCount: Int
     let defenderCount: Int
     let userSide: String?
-    let canJoin: Bool
+    let canPledge: Bool
     let attackerVictory: Bool?
     let userWon: Bool?
     
@@ -123,23 +161,43 @@ struct CoupNotificationData: Codable, Identifiable {
         case kingdomName = "kingdom_name"
         case initiatorName = "initiator_name"
         case initiatorStats = "initiator_stats"
+        case status
         case timeRemainingSeconds = "time_remaining_seconds"
         case attackerCount = "attacker_count"
         case defenderCount = "defender_count"
         case userSide = "user_side"
-        case canJoin = "can_join"
+        case canPledge = "can_pledge"
         case attackerVictory = "attacker_victory"
         case userWon = "user_won"
     }
     
+    /// Formatted time remaining in current phase
     var timeRemainingFormatted: String {
-        let minutes = timeRemainingSeconds / 60
-        let seconds = timeRemainingSeconds % 60
-        if minutes > 0 {
+        let hours = timeRemainingSeconds / 3600
+        let minutes = (timeRemainingSeconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            let seconds = timeRemainingSeconds % 60
             return "\(minutes)m \(seconds)s"
         } else {
-            return "\(seconds)s"
+            return "\(timeRemainingSeconds)s"
         }
+    }
+    
+    /// Is this coup in pledge phase?
+    var isPledgePhase: Bool {
+        status == "pledge"
+    }
+    
+    /// Is this coup in battle phase?
+    var isBattlePhase: Bool {
+        status == "battle"
+    }
+    
+    /// Is this coup resolved?
+    var isResolved: Bool {
+        status == "resolved"
     }
 }
 

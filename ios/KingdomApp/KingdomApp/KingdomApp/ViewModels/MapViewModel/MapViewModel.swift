@@ -31,6 +31,9 @@ class MapViewModel: ObservableObject {
     @Published var slotCooldowns: [String: SlotCooldown]? // Per-slot cooldowns for parallel actions
     @Published var cooldownFetchedAt: Date?
     
+    // Active coup in home kingdom (for map badge)
+    @Published var activeCoupInHomeKingdom: ActiveCoupData?
+    
     // MARK: - Services
     var apiService = KingdomAPIService.shared
     let contractAPI = ContractAPI()
@@ -74,6 +77,37 @@ class MapViewModel: ObservableObject {
         // This prevents the "local UUID vs backend UUID" mismatch bug
         Task {
             await syncPlayerIdWithBackend()
+        }
+    }
+    
+    /// Update active coup in home kingdom from current kingdom data
+    /// Called when kingdoms are loaded or updated
+    func updateActiveCoupFromKingdoms() {
+        print("🔍 updateActiveCoupFromKingdoms called:")
+        print("   - player.hometownKingdomId: \(player.hometownKingdomId ?? "nil")")
+        print("   - kingdoms count: \(kingdoms.count)")
+        for k in kingdoms {
+            print("   - Kingdom: \(k.name) (id=\(k.id)), activeCoup: \(k.activeCoup != nil)")
+        }
+        
+        // Find home kingdom and check for active coup
+        if let homeKingdomId = player.hometownKingdomId,
+           let homeKingdom = kingdoms.first(where: { $0.id == homeKingdomId }),
+           let coup = homeKingdom.activeCoup {
+            activeCoupInHomeKingdom = coup
+            print("⚔️ Active coup in home kingdom: \(coup.kingdom_name)")
+        } else {
+            print("❌ No active coup found in home kingdom")
+            if let homeKingdomId = player.hometownKingdomId {
+                if let homeKingdom = kingdoms.first(where: { $0.id == homeKingdomId }) {
+                    print("   - Found home kingdom \(homeKingdom.name), but activeCoup is nil")
+                } else {
+                    print("   - Home kingdom ID \(homeKingdomId) not in kingdoms list")
+                }
+            } else {
+                print("   - No hometownKingdomId set")
+            }
+            activeCoupInHomeKingdom = nil
         }
     }
     

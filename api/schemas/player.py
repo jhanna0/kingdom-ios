@@ -60,7 +60,6 @@ class PlayerPublicProfile(BaseModel):
     # Stats (public)
     level: int
     reputation: int
-    honor: int
     
     # Combat stats
     attack_power: int

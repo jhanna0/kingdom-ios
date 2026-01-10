@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 import math
 import asyncio
 
-from db import CityBoundary, Kingdom, User, get_db
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS, AllianceInfo
+from db import CityBoundary, Kingdom, User, get_db, CoupEvent
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS, AllianceInfo, ActiveCoupData
 from routers.alliances import are_empires_allied, get_alliance_between
 from osm_service import (
     find_user_city_fast,
@@ -172,6 +172,48 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             kingdom_enemies = set(kingdom.enemies) if kingdom.enemies else set()
             is_enemy = bool(user_kingdom_ids & kingdom_enemies)
         
+        # Coup eligibility check
+        can_stage_coup = False
+        coup_ineligibility_reason = None
+        
+        if current_user and user_current_kingdom_id == kingdom.id:
+            # Must be inside the kingdom to stage a coup
+            if kingdom.ruler_id is None:
+                coup_ineligibility_reason = "Kingdom has no ruler"
+            elif kingdom.ruler_id == current_user.id:
+                coup_ineligibility_reason = "You are the ruler"
+            else:
+                # Check player stats
+                from routers.coups import (
+                    COUP_LEADERSHIP_REQUIREMENT,
+                    COUP_REPUTATION_REQUIREMENT,
+                    _check_player_cooldown,
+                    _check_kingdom_cooldown
+                )
+                
+                player_state_for_coup = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
+                user_kingdom_record = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == current_user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                kingdom_rep = user_kingdom_record.local_reputation if user_kingdom_record else 0
+                
+                if player_state_for_coup.leadership < COUP_LEADERSHIP_REQUIREMENT:
+                    coup_ineligibility_reason = f"Need T{COUP_LEADERSHIP_REQUIREMENT} leadership (you have T{player_state_for_coup.leadership})"
+                elif kingdom_rep < COUP_REPUTATION_REQUIREMENT:
+                    coup_ineligibility_reason = f"Need {COUP_REPUTATION_REQUIREMENT} kingdom rep (you have {kingdom_rep})"
+                else:
+                    # Check cooldowns
+                    can_player, player_msg = _check_player_cooldown(db, current_user.id)
+                    can_kingdom, kingdom_msg = _check_kingdom_cooldown(db, kingdom.id)
+                    
+                    if not can_player:
+                        coup_ineligibility_reason = player_msg
+                    elif not can_kingdom:
+                        coup_ineligibility_reason = kingdom_msg
+                    else:
+                        can_stage_coup = True
+        
         # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
         # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
         # Import cost calculation functions
@@ -232,6 +274,46 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         checked_in_count = current_players.get(kingdom.id, 0)
         citizen_count = active_citizens.get(kingdom.id, 0)
         
+        # Check for active coup in this kingdom
+        active_coup_data = None
+        active_coup = db.query(CoupEvent).filter(
+            CoupEvent.kingdom_id == kingdom.id,
+            CoupEvent.status.in_(['pledge', 'battle'])
+        ).first()
+        
+        if active_coup:
+            attacker_ids = active_coup.get_attacker_ids()
+            defender_ids = active_coup.get_defender_ids()
+            user_side = None
+            can_pledge = False
+            
+            if current_user:
+                if current_user.id in attacker_ids:
+                    user_side = 'attackers'
+                elif current_user.id in defender_ids:
+                    user_side = 'defenders'
+                
+                # Can pledge if in kingdom, not already pledged, and pledge phase is open
+                can_pledge = (
+                    active_coup.status == 'pledge' and
+                    active_coup.is_pledge_open and
+                    current_user.id not in attacker_ids and
+                    current_user.id not in defender_ids
+                )
+            
+            active_coup_data = ActiveCoupData(
+                id=active_coup.id,
+                kingdom_id=kingdom.id,
+                kingdom_name=kingdom.name,
+                initiator_name=active_coup.initiator_name,
+                status=active_coup.status,
+                time_remaining_seconds=active_coup.time_remaining_seconds,
+                attacker_count=len(attacker_ids),
+                defender_count=len(defender_ids),
+                user_side=user_side,
+                can_pledge=can_pledge
+            )
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
@@ -247,7 +329,10 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             can_form_alliance=can_interact and not is_allied,  # Can't form if already allied
             is_allied=is_allied,
             is_enemy=is_enemy,
-            alliance_info=AllianceInfo(**alliance_info) if alliance_info else None
+            alliance_info=AllianceInfo(**alliance_info) if alliance_info else None,
+            can_stage_coup=can_stage_coup,
+            coup_ineligibility_reason=coup_ineligibility_reason,
+            active_coup=active_coup_data
         )
     
     return result

@@ -21,6 +21,13 @@ struct KingdomInfoSheetView: View {
     @State private var showTownPub = false
     @State private var showMarket = false
     
+    // Coup state
+    @State private var showCoupView = false
+    @State private var isInitiatingCoup = false
+    @State private var coupError: String?
+    @State private var showCoupError = false
+    @State private var initiatedCoupId: Int?
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.xLarge) {
@@ -422,22 +429,51 @@ struct KingdomInfoSheetView: View {
                             .disabled(isProposingAlliance)
                         }
                         
-                        Button(action: {
-                            // TODO: Implement stage coup
-                            print("Stage coup in \(kingdom.name)")
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "bolt.fill")
-                                    .font(FontStyles.iconSmall)
-                                    .foregroundColor(.white)
-                                Text("Stage Coup")
-                                    .font(FontStyles.bodyMediumBold)
+                        // Stage Coup button - only show if can stage or has reason
+                        if kingdom.canStageCoup {
+                            Button(action: {
+                                initiateCoup(kingdomId: kingdom.id)
+                            }) {
+                                HStack(spacing: 8) {
+                                    if isInitiatingCoup {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(0.9)
+                                    } else {
+                                        Image(systemName: "bolt.fill")
+                                            .font(FontStyles.iconSmall)
+                                            .foregroundColor(.white)
+                                    }
+                                    Text(isInitiatingCoup ? "Starting Coup..." : "Stage Coup")
+                                        .font(FontStyles.bodyMediumBold)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(KingdomTheme.Spacing.medium)
+                                .foregroundColor(.white)
+                            }
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSpecial, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
+                            .disabled(isInitiatingCoup)
+                        } else if let reason = kingdom.coupIneligibilityReason {
+                            // Show disabled button with reason
+                            VStack(spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "bolt.fill")
+                                        .font(FontStyles.iconSmall)
+                                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                                    Text("Stage Coup")
+                                        .font(FontStyles.bodyMediumBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                                }
+                                Text(reason)
+                                    .font(FontStyles.labelTiny)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(KingdomTheme.Spacing.medium)
-                            .foregroundColor(.white)
+                            .background(KingdomTheme.Colors.parchmentMuted)
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(KingdomTheme.Colors.inkLight, lineWidth: 2))
                         }
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -486,6 +522,16 @@ struct KingdomInfoSheetView: View {
                         }
                     }
             }
+        }
+        .fullScreenCover(isPresented: $showCoupView) {
+            if let coupId = initiatedCoupId {
+                CoupView(coupId: coupId, onDismiss: { showCoupView = false })
+            }
+        }
+        .alert("Coup Failed", isPresented: $showCoupError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(coupError ?? "Unknown error")
         }
     }
     
@@ -667,5 +713,31 @@ struct KingdomInfoSheetView: View {
             content
         }
     }
+    
+    // MARK: - Coup Actions
+    
+    private func initiateCoup(kingdomId: String) {
+        isInitiatingCoup = true
+        Task {
+            do {
+                let request = try APIClient.shared.request(
+                    endpoint: "/coups/initiate",
+                    method: "POST",
+                    body: ["kingdom_id": kingdomId]
+                )
+                let response: CoupInitiateResponse = try await APIClient.shared.execute(request)
+                await MainActor.run {
+                    initiatedCoupId = response.coupId
+                    showCoupView = true
+                    isInitiatingCoup = false
+                }
+            } catch {
+                await MainActor.run {
+                    coupError = error.localizedDescription
+                    showCoupError = true
+                    isInitiatingCoup = false
+                }
+            }
+        }
+    }
 }
-

@@ -4,7 +4,7 @@ HUNTING API ROUTER
 Endpoints for the group hunting activity.
 
 Endpoints:
-- POST /hunts/create - Create a new hunt in current kingdom
+- POST /hunts/create - Create a new hunt in hometown kingdom
 - POST /hunts/{hunt_id}/join - Join an existing hunt
 - POST /hunts/{hunt_id}/ready - Mark yourself as ready
 - POST /hunts/{hunt_id}/start - Start the hunt (creator only)
@@ -232,16 +232,24 @@ def get_hunt_config():
 @router.get("/kingdom/{kingdom_id}")
 def get_kingdom_hunt(
     kingdom_id: str,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
-    """Get active hunt in a kingdom, if any."""
-    session = manager.get_active_hunt_for_kingdom(db, kingdom_id)
+    """
+    Get active hunt for the current user in a kingdom, if any.
     
-    if not session:
-        return {"active_hunt": None}
+    Only returns hunts where the user is a participant - other users' hunts
+    don't block you from hunting.
+    """
+    # Get the user's active hunt (not just any hunt in the kingdom)
+    session = manager.get_active_hunt_for_player(db, user.id)
     
-    return {"active_hunt": session.to_dict()}
+    # Only return if the hunt is in this kingdom
+    if session and session.kingdom_id == kingdom_id:
+        return {"active_hunt": session.to_dict()}
+    
+    return {"active_hunt": None}
 
 
 # --- Dynamic routes (after static routes) ---
@@ -256,7 +264,19 @@ def create_hunt(
     """
     Create a new group hunt in a kingdom.
     Players can only have one active hunt at a time.
+    Players can only create hunts in their hometown kingdom.
     """
+    # Check that user is in the kingdom they're trying to create a hunt in
+    player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
+    user_kingdom = player_state.hometown_kingdom_id if player_state else None
+    
+    if not user_kingdom or user_kingdom != request.kingdom_id:
+        return HuntResponse(
+            success=False,
+            message="You can only create hunts in your hometown kingdom",
+            hunt=None,
+        )
+    
     # Check if player already has an active hunt
     existing = manager.get_active_hunt_for_player(db, user.id)
     if existing:
@@ -301,10 +321,21 @@ def join_hunt(
     db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
-    """Join an existing hunt lobby."""
+    """Join an existing hunt lobby. User must be in the same kingdom as the hunt."""
     session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
+    
+    # Check that user is in the same kingdom as the hunt
+    player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
+    user_kingdom = player_state.current_kingdom_id if player_state else None
+    
+    if not user_kingdom or user_kingdom != session.kingdom_id:
+        return HuntResponse(
+            success=False,
+            message="You can only join hunts in your current kingdom",
+            hunt=None,
+        )
     
     if session.status != HuntStatus.LOBBY:
         return HuntResponse(

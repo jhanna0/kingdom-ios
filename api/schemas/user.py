@@ -65,9 +65,8 @@ class PlayerState(BaseModel):
     attack_debuff: int = 0
     debuff_expires_at: Optional[datetime] = None
     
-    # Reputation & Honor
+    # Reputation
     reputation: int = 0  # Per-kingdom rep is in user_kingdoms, this is for API compatibility
-    honor: int = 100
     
     # Activity (TODO: should be computed from other tables)
     total_checkins: int = 0
@@ -147,9 +146,6 @@ class PlayerStateUpdate(BaseModel):
     # Combat
     attack_debuff: Optional[int] = None
     debuff_expires_at: Optional[datetime] = None
-    
-    # Honor
-    honor: Optional[int] = None
     
     # Legacy resources
     iron: Optional[int] = None

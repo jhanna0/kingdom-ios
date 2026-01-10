@@ -304,7 +304,6 @@ def user_to_private_response(user: User) -> dict:
         "level": player_state.level if player_state else 1,
         "experience": player_state.experience if player_state else 0,
         "reputation": 0,  # TODO: compute from user_kingdoms for current kingdom
-        "honor": 100,  # Deprecated field, defaulting to 100
         "total_checkins": 0,  # TODO: compute from SUM(checkins_count) in user_kingdoms
         "total_conquests": 0,  # TODO: compute from kingdom_history
         "kingdoms_ruled": 0,  # TODO: compute from COUNT(*) kingdoms WHERE ruler_id = user_id

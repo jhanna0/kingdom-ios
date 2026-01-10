@@ -289,7 +289,6 @@ struct UserData: Codable {
     let level: Int
     let experience: Int
     let reputation: Int
-    let honor: Int
     let total_checkins: Int
     let total_conquests: Int
     let kingdoms_ruled: Int

@@ -78,6 +78,11 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var isEnemy: Bool  // True if at war with any of player's kingdoms
     var allianceInfo: KingdomAllianceInfo?  // Details about alliance if isAllied is true
     
+    // Coup eligibility (from backend)
+    var canStageCoup: Bool  // True if current user can initiate a coup
+    var coupIneligibilityReason: String?  // Why user can't stage coup (e.g., "Need T3 leadership")
+    var activeCoup: ActiveCoupData?  // Active coup in this kingdom (if any)
+    
     // Loading state
     var isCurrentCity: Bool  // True if user is currently inside this city (from API)
     var hasBoundaryCached: Bool  // True if full boundary polygon is loaded
@@ -154,7 +159,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false, canStageCoup: Bool = false, coupIneligibilityReason: String? = nil) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -171,6 +176,8 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.canFormAlliance = canFormAlliance
         self.isAllied = isAllied
         self.isEnemy = isEnemy
+        self.canStageCoup = canStageCoup
+        self.coupIneligibilityReason = coupIneligibilityReason
         self.isCurrentCity = false  // Set by CityAPI after fetch
         self.hasBoundaryCached = true  // Assume true, CityAPI sets false if needed
         
@@ -183,6 +190,9 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.buildingUpgradeCosts = [:]  // Will be populated from API
         self.taxRate = 10
         self.travelFee = 10
+        
+        // Coup data (populated from API)
+        self.activeCoup = nil
         
         // Local-only defaults (not game-critical)
         self.lastIncomeCollection = Date().addingTimeInterval(-86400)

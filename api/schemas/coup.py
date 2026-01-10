@@ -1,5 +1,7 @@
 """
-Coup event schemas for API requests/responses
+Coup event schemas for API requests/responses (V2)
+
+Two-phase coup system with full character sheet display.
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -12,33 +14,49 @@ class CoupInitiateRequest(BaseModel):
 
 
 class CoupJoinRequest(BaseModel):
-    """Request to join a coup side"""
+    """Request to join a coup side (pledge)"""
     side: str = Field(..., description="Side to join: 'attackers' or 'defenders'")
 
 
 class CoupParticipant(BaseModel):
-    """A player participating in a coup"""
+    """A player participating in a coup - includes stats for display"""
     player_id: int
     player_name: str
-    attack_power: Optional[int] = None
-    defense_power: Optional[int] = None
+    kingdom_reputation: int = 0  # For sorting
+    attack_power: int = 0
+    defense_power: int = 0
+    leadership: int = 0
+    level: int = 1
     
     class Config:
         from_attributes = True
 
 
 class InitiatorStats(BaseModel):
-    """Stats about the coup initiator"""
-    reputation: int
-    kingdom_reputation: int
+    """
+    Full character sheet for the coup initiator.
+    Displayed so voters can evaluate who they're supporting.
+    """
+    # Identity
+    level: int
+    
+    # Reputation
+    kingdom_reputation: int  # In this specific kingdom
+    
+    # Combat stats
     attack_power: int
     defense_power: int
     leadership: int
+    
+    # Other skills
     building_skill: int
     intelligence: int
+    
+    # Track record
     contracts_completed: int
     total_work_contributed: int
-    level: int
+    coups_won: int
+    coups_failed: int
     
     class Config:
         from_attributes = True
@@ -51,30 +69,28 @@ class CoupEventResponse(BaseModel):
     kingdom_name: Optional[str] = None
     initiator_id: int
     initiator_name: str
-    initiator_stats: Optional[InitiatorStats] = None  # Stats of the coup initiator
-    status: str
+    initiator_stats: Optional[InitiatorStats] = None  # Full character sheet
+    status: str  # 'pledge', 'battle', 'resolved'
     
     # Timing
     start_time: datetime
-    end_time: datetime
-    time_remaining_seconds: int
+    pledge_end_time: datetime
+    battle_end_time: Optional[datetime] = None
+    time_remaining_seconds: int  # For current phase
     
-    # Participants
-    attacker_ids: List[int]
-    defender_ids: List[int]
+    # Participants - full details, sorted by kingdom_reputation descending
+    attackers: List[CoupParticipant] = []
+    defenders: List[CoupParticipant] = []
     attacker_count: int
     defender_count: int
     
     # User participation
     user_side: Optional[str] = None  # 'attackers', 'defenders', or None
-    can_join: bool
+    can_pledge: bool  # Can the user still pledge?
     
     # Resolution (if resolved)
     is_resolved: bool
     attacker_victory: Optional[bool] = None
-    attacker_strength: Optional[int] = None
-    defender_strength: Optional[int] = None
-    total_defense_with_walls: Optional[int] = None
     resolved_at: Optional[datetime] = None
     
     class Config:
@@ -86,8 +102,7 @@ class CoupInitiateResponse(BaseModel):
     success: bool
     message: str
     coup_id: int
-    cost_paid: int
-    end_time: datetime
+    pledge_end_time: datetime  # When pledge phase ends
 
 
 class CoupJoinResponse(BaseModel):

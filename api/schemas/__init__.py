@@ -36,6 +36,7 @@ from .common import (
     BuildingTierInfo,
     BUILDING_COLORS,
     AllianceInfo,
+    ActiveCoupData,
 )
 from .coup import (
     CoupInitiateRequest,

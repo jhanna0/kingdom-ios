@@ -33,6 +33,11 @@ struct ActionsView: View {
     @State private var isInEnemyKingdom: Bool = false
     @State private var cachedKingdomId: String?
     
+    // Coup state
+    @State private var showCoupView = false
+    @State private var isInitiatingCoup = false
+    @State private var initiatedCoupId: Int?
+    
     var currentKingdom: Kingdom? {
         guard let currentKingdomId = viewModel.player.currentKingdom else {
             return nil
@@ -99,6 +104,17 @@ struct ActionsView: View {
                     isShowing: $showActionResult
                 )
                 .transition(.opacity)
+            }
+        }
+        .fullScreenCover(isPresented: $showCoupView) {
+            if let coupId = initiatedCoupId {
+                CoupView(coupId: coupId, onDismiss: {
+                    showCoupView = false
+                    // Refresh action status after coup view closes
+                    Task {
+                        await loadActionStatus(force: true)
+                    }
+                })
             }
         }
     }
@@ -481,20 +497,57 @@ struct ActionsView: View {
     private func renderAction(key: String, action: ActionStatus, status: AllActionStatus) -> some View {
         if action.unlocked == true {
             let actionCooldown = getSlotCooldown(for: action, status: status)
-            ActionCard(
-                title: action.title ?? key.capitalized,
-                icon: action.icon ?? "circle.fill",
-                description: action.description ?? "",
-                status: action,
-                fetchedAt: statusFetchedAt ?? Date(),
-                currentTime: currentTime,
-                isEnabled: true,
-                activeCount: action.activePatrollers,
-                globalCooldownActive: actionCooldown.active,
-                blockingAction: actionCooldown.blockingAction,
-                globalCooldownSecondsRemaining: actionCooldown.seconds,
-                onAction: { performGenericAction(action: action) }
-            )
+            
+            // Special handling for stage_coup - needs to open CoupView after initiating
+            if action.actionType == "stage_coup" {
+                ActionCard(
+                    title: action.title ?? key.capitalized,
+                    icon: action.icon ?? "bolt.fill",
+                    description: action.description ?? "",
+                    status: action,
+                    fetchedAt: statusFetchedAt ?? Date(),
+                    currentTime: currentTime,
+                    isEnabled: !isInitiatingCoup,
+                    activeCount: nil,
+                    globalCooldownActive: false,
+                    blockingAction: nil,
+                    globalCooldownSecondsRemaining: 0,
+                    onAction: { initiateCoup(action: action) }
+                )
+            }
+            // Special handling for view_coup - opens existing coup directly
+            else if action.actionType == "view_coup" {
+                ActionCard(
+                    title: action.title ?? "View Coup",
+                    icon: action.icon ?? "bolt.fill",
+                    description: action.description ?? "",
+                    status: action,
+                    fetchedAt: statusFetchedAt ?? Date(),
+                    currentTime: currentTime,
+                    isEnabled: true,
+                    activeCount: nil,
+                    globalCooldownActive: false,
+                    blockingAction: nil,
+                    globalCooldownSecondsRemaining: 0,
+                    onAction: { openExistingCoup(coupId: action.coupId) }
+                )
+            }
+            else {
+                ActionCard(
+                    title: action.title ?? key.capitalized,
+                    icon: action.icon ?? "circle.fill",
+                    description: action.description ?? "",
+                    status: action,
+                    fetchedAt: statusFetchedAt ?? Date(),
+                    currentTime: currentTime,
+                    isEnabled: true,
+                    activeCount: action.activePatrollers,
+                    globalCooldownActive: actionCooldown.active,
+                    blockingAction: actionCooldown.blockingAction,
+                    globalCooldownSecondsRemaining: actionCooldown.seconds,
+                    onAction: { performGenericAction(action: action) }
+                )
+            }
         } else {
             LockedActionCard(
                 title: action.title ?? key.capitalized,
@@ -502,6 +555,51 @@ struct ActionsView: View {
                 description: action.description ?? "",
                 requirementText: action.requirementDescription ?? "Locked"
             )
+        }
+    }
+    
+    private func openExistingCoup(coupId: Int?) {
+        guard let id = coupId else {
+            errorMessage = "Coup not found"
+            showError = true
+            return
+        }
+        initiatedCoupId = id
+        showCoupView = true
+    }
+    
+    // MARK: - Coup Actions
+    
+    private func initiateCoup(action: ActionStatus) {
+        guard let kingdomId = currentKingdom?.id else {
+            errorMessage = "No kingdom selected"
+            showError = true
+            return
+        }
+        
+        isInitiatingCoup = true
+        
+        Task {
+            do {
+                let request = try APIClient.shared.request(
+                    endpoint: "/coups/initiate",
+                    method: "POST",
+                    body: ["kingdom_id": kingdomId]
+                )
+                let response: CoupInitiateResponse = try await APIClient.shared.execute(request)
+                
+                await MainActor.run {
+                    initiatedCoupId = response.coupId
+                    showCoupView = true
+                    isInitiatingCoup = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    isInitiatingCoup = false
+                }
+            }
         }
     }
     

@@ -62,7 +62,6 @@ struct CoupVotingSheet: View {
                                 VStack(spacing: 8) {
                                     StatRow(label: "Level", value: "\(stats.level)", icon: "star.fill", color: .blue)
                                     StatRow(label: "Kingdom Rep", value: "\(stats.kingdomReputation)", icon: "heart.fill", color: .purple)
-                                    StatRow(label: "Global Rep", value: "\(stats.reputation)", icon: "globe", color: .cyan)
                                     
                                     Divider().background(Color.gray.opacity(0.3))
                                     
@@ -76,6 +75,8 @@ struct CoupVotingSheet: View {
                                     
                                     StatRow(label: "Contracts Done", value: "\(stats.contractsCompleted)", icon: "checkmark.circle.fill", color: .green)
                                     StatRow(label: "Work Done", value: "\(stats.totalWorkContributed)", icon: "hammer.circle.fill", color: .orange)
+                                    StatRow(label: "Coups Won", value: "\(stats.coupsWon)", icon: "flag.fill", color: .green)
+                                    StatRow(label: "Coups Failed", value: "\(stats.coupsFailed)", icon: "xmark.circle.fill", color: .red)
                                 }
                             }
                             .padding()
@@ -118,7 +119,7 @@ struct CoupVotingSheet: View {
                         }
                         
                         // Voting Options (if can join)
-                        if coupData.canJoin {
+                        if coupData.canPledge {
                             VStack(spacing: 16) {
                                 Text("Choose Your Side")
                                     .font(.headline)
@@ -184,7 +185,7 @@ struct CoupVotingSheet: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if coupData.canJoin && selectedSide != nil {
+                    if coupData.canPledge && selectedSide != nil {
                         Button("Confirm") {
                             if let side = selectedSide {
                                 onVote(side)
@@ -323,7 +324,7 @@ struct StatRow: View {
             kingdomName: "Test Kingdom",
             initiatorName: "John Doe",
             initiatorStats: InitiatorStats(
-                reputation: 500,
+                level: 12,
                 kingdomReputation: 350,
                 attackPower: 15,
                 defensePower: 12,
@@ -332,13 +333,15 @@ struct StatRow: View {
                 intelligence: 6,
                 contractsCompleted: 25,
                 totalWorkContributed: 150,
-                level: 12
+                coupsWon: 1,
+                coupsFailed: 0
             ),
+            status: "pledge",
             timeRemainingSeconds: 3600,
             attackerCount: 5,
             defenderCount: 3,
             userSide: nil,
-            canJoin: true,
+            canPledge: true,
             attackerVictory: nil,
             userWon: nil
         ),

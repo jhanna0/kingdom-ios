@@ -345,7 +345,6 @@ def get_my_activities(
     all_activities.extend(_get_invasion_activities(db, user_id, limit))
     all_activities.extend(_get_property_activities(db, user_id, limit))
     all_activities.extend(_get_training_activities(db, user_id, state, limit))
-    all_activities.extend(_get_kingdom_visit_activities(db, user_id, limit))
     all_activities.extend(_get_action_log_activities(db, user_id, limit))
     
     # Filter by date if specified
@@ -428,7 +427,6 @@ def get_friend_activities(
         friend_activities.extend(_get_invasion_activities(db, friend_id, 20))
         friend_activities.extend(_get_property_activities(db, friend_id, 20))
         friend_activities.extend(_get_training_activities(db, friend_id, friend_state, 10))
-        friend_activities.extend(_get_kingdom_visit_activities(db, friend_id, 20))
         friend_activities.extend(_get_action_log_activities(db, friend_id, 20))
         
         # Add user info to activities
