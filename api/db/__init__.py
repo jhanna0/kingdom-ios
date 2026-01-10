@@ -28,6 +28,7 @@ from .models import (
     ActionCooldown,
     PlayerInventory,
     Item,
+    HuntSession,
 )
 
 __all__ = [
@@ -61,5 +62,6 @@ __all__ = [
     "ActionCooldown",
     "PlayerInventory",
     "Item",
+    "HuntSession",
 ]
 

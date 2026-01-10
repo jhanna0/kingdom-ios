@@ -428,27 +428,23 @@ class HuntManager:
     """
     Manages hunt sessions and phase execution.
     
+    NOW WITH POSTGRESQL PERSISTENCE!
+    Hunts are stored in the database so they survive Lambda instance restarts.
+    
     Usage:
         manager = HuntManager()
         
-        # Create a hunt
-        session = manager.create_hunt("kingdom_123", creator_id=1)
-        
-        # Add participants
-        session.add_participant(1, "Alice", {"intelligence": 5, "attack_power": 3, ...})
-        session.add_participant(2, "Bob", {"intelligence": 3, "attack_power": 5, ...})
+        # Create a hunt (pass db session for persistence)
+        session = manager.create_hunt(db, "kingdom_123", creator_id=1, ...)
         
         # Start the hunt
-        manager.start_hunt(session)
+        manager.start_hunt(db, session)
         
         # Execute phases
-        track_result = manager.execute_phase(session, HuntPhase.TRACK)
-        approach_result = manager.execute_phase(session, HuntPhase.APPROACH)
-        strike_result = manager.execute_phase(session, HuntPhase.STRIKE)
-        blessing_result = manager.execute_phase(session, HuntPhase.BLESSING)
+        result = manager.execute_roll(db, session, player_id)
         
-        # Get final results
-        final = manager.finalize_hunt(session)
+        # Get hunt by ID
+        session = manager.get_hunt(db, hunt_id)
     """
     
     def __init__(self, seed: Optional[int] = None):
@@ -460,19 +456,22 @@ class HuntManager:
         """
         self.roll_engine = RollEngine(seed)
         self.rng = random.Random(seed)
-        self._hunts: Dict[str, HuntSession] = {}
+        # NOTE: Hunts are now stored in PostgreSQL, not in memory!
+        # The old self._hunts dict is gone.
     
     def create_hunt(
         self,
+        db,  # SQLAlchemy Session
         kingdom_id: str,
         creator_id: int,
         creator_name: str,
         creator_stats: Dict[str, int],
     ) -> HuntSession:
         """
-        Create a new hunt session.
+        Create a new hunt session and save to database.
         
         Args:
+            db: SQLAlchemy database session
             kingdom_id: The kingdom where the hunt takes place
             creator_id: Player ID of the hunt creator
             creator_name: Display name of creator
@@ -481,6 +480,8 @@ class HuntManager:
         Returns:
             New HuntSession in lobby status
         """
+        from .persistence import save_hunt
+        
         hunt_id = f"hunt_{kingdom_id}_{int(time.time() * 1000)}"
         
         session = HuntSession(
@@ -493,25 +494,37 @@ class HuntManager:
         session.add_participant(creator_id, creator_name, creator_stats)
         session.set_ready(creator_id, True)  # Creator is auto-ready
         
-        self._hunts[hunt_id] = session
+        # Save to database
+        save_hunt(db, session)
+        
         return session
     
-    def get_hunt(self, hunt_id: str) -> Optional[HuntSession]:
-        """Get a hunt session by ID."""
-        return self._hunts.get(hunt_id)
+    def get_hunt(self, db, hunt_id: str) -> Optional[HuntSession]:
+        """Get a hunt session by ID from database."""
+        from .persistence import load_hunt
+        return load_hunt(db, hunt_id)
     
-    def get_active_hunt_for_kingdom(self, kingdom_id: str) -> Optional[HuntSession]:
+    def get_active_hunt_for_kingdom(self, db, kingdom_id: str) -> Optional[HuntSession]:
         """Get the active hunt in a kingdom, if any."""
-        for hunt in self._hunts.values():
-            if hunt.kingdom_id == kingdom_id and hunt.status in (HuntStatus.LOBBY, HuntStatus.IN_PROGRESS):
-                return hunt
-        return None
+        from .persistence import get_active_hunt_for_kingdom
+        return get_active_hunt_for_kingdom(db, kingdom_id)
     
-    def start_hunt(self, session: HuntSession) -> bool:
+    def get_active_hunt_for_player(self, db, player_id: int) -> Optional[HuntSession]:
+        """Get the active hunt for a player (as creator or participant)."""
+        from .persistence import get_active_hunt_for_player
+        return get_active_hunt_for_player(db, player_id)
+    
+    def save_hunt(self, db, session: HuntSession) -> None:
+        """Save hunt session to database after modifications."""
+        from .persistence import save_hunt
+        save_hunt(db, session)
+    
+    def start_hunt(self, db, session: HuntSession) -> bool:
         """
         Start a hunt session (transition from lobby to tracking).
         
         Args:
+            db: SQLAlchemy database session
             session: The hunt session to start
             
         Returns:
@@ -528,6 +541,9 @@ class HuntManager:
         
         # Initialize first phase
         self._init_phase_state(session, HuntPhase.TRACK)
+        
+        # Save to database
+        self.save_hunt(db, session)
         
         return True
     
@@ -581,12 +597,17 @@ class HuntManager:
         session.current_phase_state = state
         session.current_phase = phase
     
-    def execute_roll(self, session: HuntSession, player_id: int) -> dict:
+    def execute_roll(self, db, session: HuntSession, player_id: int) -> dict:
         """
         Execute a single roll within the current phase.
         
         NEW SYSTEM: Flat hit chance (15%), stat level = number of rolls!
         This creates exciting variance - each roll is hard but you get many attempts.
+        
+        Args:
+            db: SQLAlchemy database session
+            session: The hunt session
+            player_id: ID of the player rolling
         
         Returns:
             Roll result dict with updated phase state
@@ -642,6 +663,9 @@ class HuntManager:
         state.round_results.append(round_result)
         state.rounds_completed += 1
         state.total_score += contribution
+        
+        # Save to database
+        self.save_hunt(db, session)
         
         return {
             "success": True,
@@ -744,13 +768,17 @@ class HuntManager:
         # Update probabilities for UI
         state.creature_probabilities = state.get_probabilities()
     
-    def resolve_phase(self, session: HuntSession) -> dict:
+    def resolve_phase(self, db, session: HuntSession) -> dict:
         """
         Resolve/finalize the current phase.
         
         For TRACK: Performs the "master roll" to select creature
         For STRIKE: Already resolves per-roll (HP-based), this finalizes
         For BLESSING: Finalizes loot calculation
+        
+        Args:
+            db: SQLAlchemy database session
+            session: The hunt session
         
         Returns:
             Resolution result with outcome
@@ -823,6 +851,9 @@ class HuntManager:
             effects=result.get("effects", {}),
         )
         session.phase_results.append(phase_result)
+        
+        # Save to database
+        self.save_hunt(db, session)
         
         result["phase_result"] = phase_result.to_dict()
         result["hunt"] = session.to_dict()
@@ -1012,10 +1043,16 @@ class HuntManager:
         
         return (list(slots.keys())[-1], 100)  # Fallback to last
     
-    def advance_to_next_phase(self, session: HuntSession) -> Optional[HuntPhase]:
+    def advance_to_next_phase(self, db, session: HuntSession) -> Optional[HuntPhase]:
         """
         Advance to the next phase after resolving current one.
-        Returns the new phase, or None if hunt is complete.
+        
+        Args:
+            db: SQLAlchemy database session
+            session: The hunt session
+            
+        Returns:
+            The new phase, or None if hunt is complete.
         """
         phase_order = [HuntPhase.TRACK, HuntPhase.STRIKE, HuntPhase.BLESSING]
         current = session.current_phase
@@ -1033,17 +1070,20 @@ class HuntManager:
             if current_idx < len(phase_order) - 1:
                 next_phase = phase_order[current_idx + 1]
                 self._init_phase_state(session, next_phase)
+                # Save to database
+                self.save_hunt(db, session)
                 return next_phase
         except ValueError:
             pass
         
         return None  # Hunt complete
     
-    def execute_phase(self, session: HuntSession, phase: HuntPhase) -> PhaseResult:
+    def execute_phase(self, db, session: HuntSession, phase: HuntPhase) -> PhaseResult:
         """
-        Execute a hunt phase and record results.
+        Execute a hunt phase and record results (LEGACY - single roll system).
         
         Args:
+            db: SQLAlchemy database session
             session: The active hunt session
             phase: Which phase to execute
             
@@ -1173,6 +1213,9 @@ class HuntManager:
         session.phase_results.append(result)
         session.current_phase = phase
         
+        # Save to database
+        self.save_hunt(db, session)
+        
         return result
     
     def _select_animal(self, session: HuntSession, force_tier: Optional[int] = None) -> None:
@@ -1237,11 +1280,12 @@ class HuntManager:
             p.meat_earned = meat_per_player + bonus
             p.items_earned = session.items_dropped.copy()  # Everyone gets all drops (for now)
     
-    def finalize_hunt(self, session: HuntSession) -> dict:
+    def finalize_hunt(self, db, session: HuntSession) -> dict:
         """
         Finalize the hunt and return complete results.
 
         Args:
+            db: SQLAlchemy database session
             session: The hunt session to finalize
 
         Returns:
@@ -1261,20 +1305,15 @@ class HuntManager:
 
         session.current_phase = HuntPhase.RESULTS
 
+        # Save to database
+        self.save_hunt(db, session)
+
         return session.to_dict()
     
-    def cleanup_old_hunts(self, max_age_hours: int = 24) -> int:
-        """Remove old completed hunts from memory."""
-        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
-        removed = 0
-        
-        for hunt_id in list(self._hunts.keys()):
-            hunt = self._hunts[hunt_id]
-            if hunt.completed_at and hunt.completed_at < cutoff:
-                del self._hunts[hunt_id]
-                removed += 1
-        
-        return removed
+    def cleanup_old_hunts(self, db) -> int:
+        """Remove expired hunts from database."""
+        from .persistence import cleanup_expired_hunts
+        return cleanup_expired_hunts(db)
 
 
 # ============================================================

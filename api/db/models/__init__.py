@@ -25,6 +25,7 @@ from .player_item import PlayerItem
 from .action_cooldown import ActionCooldown
 from .inventory import PlayerInventory
 from .item import Item
+from .hunt_session import HuntSession
 
 __all__ = [
     "User",
@@ -55,5 +56,6 @@ __all__ = [
     "ActionCooldown",
     "PlayerInventory",
     "Item",
+    "HuntSession",
 ]
 

@@ -232,10 +232,11 @@ def get_hunt_config():
 @router.get("/kingdom/{kingdom_id}")
 def get_kingdom_hunt(
     kingdom_id: str,
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Get active hunt in a kingdom, if any."""
-    session = manager.get_active_hunt_for_kingdom(kingdom_id)
+    session = manager.get_active_hunt_for_kingdom(db, kingdom_id)
     
     if not session:
         return {"active_hunt": None}
@@ -254,14 +255,14 @@ def create_hunt(
 ):
     """
     Create a new group hunt in a kingdom.
-    Only one active hunt per kingdom allowed.
+    Players can only have one active hunt at a time.
     """
-    # Check for existing active hunt
-    existing = manager.get_active_hunt_for_kingdom(request.kingdom_id)
+    # Check if player already has an active hunt
+    existing = manager.get_active_hunt_for_player(db, user.id)
     if existing:
         return HuntResponse(
             success=False,
-            message="A hunt is already active in this kingdom",
+            message="You already have an active hunt",
             hunt=existing.to_dict(),
         )
     
@@ -270,6 +271,7 @@ def create_hunt(
     
     # Create the hunt
     session = manager.create_hunt(
+        db=db,
         kingdom_id=request.kingdom_id,
         creator_id=user.id,
         creator_name=user.display_name or f"Player {user.id}",
@@ -300,7 +302,7 @@ def join_hunt(
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Join an existing hunt lobby."""
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -331,6 +333,9 @@ def join_hunt(
             hunt=session.to_dict(),
         )
     
+    # Save to database
+    manager.save_hunt(db, session)
+    
     hunt_dict = session.to_dict()
     
     # Notify other participants
@@ -354,10 +359,11 @@ def join_hunt(
 def leave_hunt(
     hunt_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Leave or abandon a hunt."""
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -375,6 +381,9 @@ def leave_hunt(
     if len(session.participants) == 0 or session.created_by == user.id:
         session.status = HuntStatus.CANCELLED
     
+    # Save to database
+    manager.save_hunt(db, session)
+    
     return HuntResponse(
         success=True,
         message="Left the hunt",
@@ -386,10 +395,11 @@ def leave_hunt(
 def toggle_ready(
     hunt_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Toggle ready status in hunt lobby."""
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -401,6 +411,9 @@ def toggle_ready(
     
     current = session.participants[user.id].is_ready
     session.set_ready(user.id, not current)
+    
+    # Save to database
+    manager.save_hunt(db, session)
     
     hunt_dict = session.to_dict()
     
@@ -425,10 +438,11 @@ def toggle_ready(
 def start_hunt(
     hunt_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Start the hunt (creator only, all must be ready)."""
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -446,7 +460,7 @@ def start_hunt(
             hunt=session.to_dict(),
         )
     
-    if not manager.start_hunt(session):
+    if not manager.start_hunt(db, session):
         return HuntResponse(
             success=False,
             message="Cannot start hunt",
@@ -487,6 +501,7 @@ class RollResponse(BaseModel):
 def execute_roll(
     hunt_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """
@@ -496,7 +511,7 @@ def execute_roll(
     STRIKE phase: Each roll deals damage or risks escape
     BLESSING phase: Each roll adds to loot bonus
     """
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -521,7 +536,7 @@ def execute_roll(
         )
     
     # Execute the roll
-    result = manager.execute_roll(session, user.id)
+    result = manager.execute_roll(db, session, user.id)
     
     if not result.get("success"):
         return RollResponse(
@@ -565,7 +580,7 @@ def resolve_phase(
     STRIKE phase: Finalizes the combat (kill or escape)
     BLESSING phase: Calculates final loot with accumulated bonus
     """
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -583,7 +598,7 @@ def resolve_phase(
         )
     
     # Resolve the phase
-    result = manager.resolve_phase(session)
+    result = manager.resolve_phase(db, session)
     
     if not result.get("success"):
         return PhaseResultResponse(
@@ -621,7 +636,7 @@ def advance_phase(
     Advance to the next phase after resolving current one.
     If no more phases, finalizes the hunt.
     """
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -647,7 +662,7 @@ def advance_phase(
         )
     
     # Advance to next phase
-    next_phase = manager.advance_to_next_phase(session)
+    next_phase = manager.advance_to_next_phase(db, session)
     
     if next_phase:
         notify_hunt_participants(
@@ -663,7 +678,7 @@ def advance_phase(
         )
     else:
         # Hunt is complete
-        final_result = manager.finalize_hunt(session)
+        final_result = manager.finalize_hunt(db, session)
         apply_hunt_rewards(db, final_result)
         
         notify_hunt_participants(
@@ -697,7 +712,7 @@ def execute_phase(
     
     Phases must be executed in order: track -> strike -> blessing
     """
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
@@ -748,7 +763,7 @@ def execute_phase(
             )
     
     # Execute the phase
-    result = manager.execute_phase(session, phase)
+    result = manager.execute_phase(db, session, phase)
     
     # Check for early termination conditions
     hunt_ended = False
@@ -756,15 +771,15 @@ def execute_phase(
     
     if phase == HuntPhase.TRACK and session.track_score <= 0:
         # No trail found - hunt ends
-        final_result = manager.finalize_hunt(session)
+        final_result = manager.finalize_hunt(db, session)
         hunt_ended = True
     elif phase == HuntPhase.STRIKE and session.animal_escaped:
         # Animal escaped - hunt ends
-        final_result = manager.finalize_hunt(session)
+        final_result = manager.finalize_hunt(db, session)
         hunt_ended = True
     elif phase == HuntPhase.BLESSING:
         # Hunt complete!
-        final_result = manager.finalize_hunt(session)
+        final_result = manager.finalize_hunt(db, session)
         hunt_ended = True
         
         # Apply rewards to database
@@ -792,10 +807,11 @@ def execute_phase(
 @router.get("/{hunt_id}")
 def get_hunt_status(
     hunt_id: str,
+    db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
 ):
     """Get current hunt status."""
-    session = manager.get_hunt(hunt_id)
+    session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
