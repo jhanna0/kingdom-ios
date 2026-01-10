@@ -85,10 +85,8 @@ struct NotificationsSheet: View {
                 try? await NotificationsAPI(client: APIClient.shared).markRead()
             }
             .sheet(item: $viewModel.selectedCoup) { coupData in
-                CoupVotingSheet(coupData: coupData, onVote: { side in
-                    Task {
-                        await viewModel.voteCoup(coupData.id, side: side)
-                    }
+                CoupView(coupId: coupData.id, onDismiss: {
+                    viewModel.selectedCoup = nil
                 })
             }
         }

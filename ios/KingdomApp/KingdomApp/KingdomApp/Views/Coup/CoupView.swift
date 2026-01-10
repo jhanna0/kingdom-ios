@@ -56,7 +56,7 @@ struct CoupView: View {
                 viewModel.pledge(side: side)
             }
         case "battle":
-            battlePlaceholder(coup: coup)
+            battleView(coup: coup)
         case "resolved":
             resolvedView(coup: coup)
         default:
@@ -65,114 +65,156 @@ struct CoupView: View {
         }
     }
     
-    // MARK: - Battle Placeholder
+    // MARK: - Battle View
     
-    private func battlePlaceholder(coup: CoupEventResponse) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.large) {
-            Image(systemName: "sword.fill")
-                .font(.system(size: 60))
-                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-            
-            Text("Battle Phase")
-                .font(KingdomTheme.Typography.title())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Text("The battle is underway!")
-                .font(KingdomTheme.Typography.subheadline())
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            // Timer
-            VStack(spacing: 4) {
-                Text("Time Remaining")
-                    .font(KingdomTheme.Typography.caption())
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+    private func battleView(coup: CoupEventResponse) -> some View {
+        let rulerName = coup.defenders.first?.playerName ?? "Current Ruler"
+        let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
+        let rulerStats = coup.defenders.first.map { FighterStats(from: $0) } ?? .empty
+        
+        return ScrollView {
+            VStack(spacing: KingdomTheme.Spacing.large) {
+                // VS Poster with stats
+                CoupVsPosterView(
+                    kingdomName: coup.kingdomName ?? "Kingdom",
+                    challengerName: coup.initiatorName,
+                    rulerName: rulerName,
+                    attackerCount: coup.attackerCount,
+                    defenderCount: coup.defenderCount,
+                    timeRemaining: coup.timeRemainingFormatted,
+                    status: coup.status,
+                    userSide: coup.userSide,
+                    challengerStats: challengerStats,
+                    rulerStats: rulerStats
+                )
                 
-                Text(coup.timeRemainingFormatted)
-                    .font(KingdomTheme.Typography.title2())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                // Battle status card
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bolt.horizontal.fill")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        
+                        Text("BATTLE IN PROGRESS")
+                            .font(.system(size: 14, weight: .black, design: .serif))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                    }
+                    
+                    Text("The battle is underway! Wait for the outcome...")
+                        .font(.system(size: 12, weight: .medium, design: .serif))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(16)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.black)
+                            .offset(x: 3, y: 3)
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
+                    }
+                )
             }
-            .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            
-            // Placeholder message
-            Text("Battle mechanics coming soon...")
-                .font(KingdomTheme.Typography.caption())
-                .foregroundColor(KingdomTheme.Colors.inkLight)
-                .italic()
-                .padding(.top)
+            .padding(.horizontal, KingdomTheme.Spacing.medium)
+            .padding(.vertical, KingdomTheme.Spacing.medium)
         }
-        .padding()
     }
     
     // MARK: - Resolved View
     
     private func resolvedView(coup: CoupEventResponse) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.large) {
-            // Result icon
-            Image(systemName: coup.attackerVictory == true ? "crown.fill" : "shield.fill")
-                .font(.system(size: 60))
-                .foregroundColor(coup.attackerVictory == true ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.royalBlue)
-            
-            // Result text
-            Text(coup.attackerVictory == true ? "Coup Succeeded!" : "Coup Failed!")
-                .font(KingdomTheme.Typography.title())
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            if coup.attackerVictory == true {
-                Text("\(coup.initiatorName) has seized the throne!")
-                    .font(KingdomTheme.Typography.subheadline())
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text("The crown has defended its rule.")
-                    .font(KingdomTheme.Typography.subheadline())
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .multilineTextAlignment(.center)
-            }
-            
-            // User result
-            if let userSide = coup.userSide {
-                let userWon = (userSide == "attackers" && coup.attackerVictory == true) ||
-                              (userSide == "defenders" && coup.attackerVictory == false)
+        let rulerName = coup.defenders.first?.playerName ?? "Current Ruler"
+        let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
+        let rulerStats = coup.defenders.first.map { FighterStats(from: $0) } ?? .empty
+        let attackerWon = coup.attackerVictory == true
+        let userWon: Bool? = {
+            guard let side = coup.userSide else { return nil }
+            if side == "attackers" { return attackerWon }
+            return !attackerWon
+        }()
+        
+        return ScrollView {
+            VStack(spacing: KingdomTheme.Spacing.large) {
+                // VS Poster with stats (shows final state)
+                CoupVsPosterView(
+                    kingdomName: coup.kingdomName ?? "Kingdom",
+                    challengerName: coup.initiatorName,
+                    rulerName: rulerName,
+                    attackerCount: coup.attackerCount,
+                    defenderCount: coup.defenderCount,
+                    timeRemaining: "FINISHED",
+                    status: coup.status,
+                    userSide: coup.userSide,
+                    challengerStats: challengerStats,
+                    rulerStats: rulerStats
+                )
                 
-                HStack {
-                    Image(systemName: userWon ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(userWon ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                    Text(userWon ? "Victory! You were on the winning side." : "Defeat. You were on the losing side.")
-                        .font(KingdomTheme.Typography.subheadline())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                // Result card
+                VStack(spacing: 16) {
+                    // Victory/defeat indicator
+                    HStack(spacing: 12) {
+                        Image(systemName: attackerWon ? "crown.fill" : "shield.lefthalf.filled")
+                            .font(.system(size: 32, weight: .black))
+                            .foregroundColor(attackerWon ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.royalBlue)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(attackerWon ? "COUP SUCCEEDED" : "COUP FAILED")
+                                .font(.system(size: 14, weight: .black, design: .serif))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Text(attackerWon ? "\(coup.initiatorName) seized the throne!" : "The crown defended its rule.")
+                                .font(.system(size: 11, weight: .medium, design: .serif))
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    // User result (if participated)
+                    if let won = userWon {
+                        HStack(spacing: 10) {
+                            Image(systemName: won ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(won ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                            
+                            Text(won ? "Victory! You were on the winning side." : "Defeat. You were on the losing side.")
+                                .font(.system(size: 12, weight: .medium, design: .serif))
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(won ? KingdomTheme.Colors.buttonSuccess.opacity(0.1) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(won ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger, lineWidth: 2)
+                        )
+                    }
                 }
-                .padding()
-                .brutalistCard(backgroundColor: userWon ? KingdomTheme.Colors.buttonSuccess.opacity(0.1) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                .padding(16)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.black)
+                            .offset(x: 3, y: 3)
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.black, lineWidth: 2)
+                    }
+                )
             }
-            
-            // Final counts
-            HStack(spacing: KingdomTheme.Spacing.xxLarge) {
-                VStack {
-                    Text("\(coup.attackerCount)")
-                        .font(KingdomTheme.Typography.title())
-                        .fontWeight(.bold)
-                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                    Text("Attackers")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-                VStack {
-                    Text("\(coup.defenderCount)")
-                        .font(KingdomTheme.Typography.title())
-                        .fontWeight(.bold)
-                        .foregroundColor(KingdomTheme.Colors.royalBlue)
-                    Text("Defenders")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-            }
-            .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            .padding(.horizontal, KingdomTheme.Spacing.medium)
+            .padding(.vertical, KingdomTheme.Spacing.medium)
         }
-        .padding()
     }
     
     // MARK: - Loading & Error

@@ -258,36 +258,13 @@ struct AuthenticatedView: View {
                         Spacer().frame(height: 130) // Below MapHUD
                         
                         HStack {
-                            Button(action: { showCoupView = true }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "shield.lefthalf.filled.badge.checkmark")
-                                        .font(.system(size: 16, weight: .bold))
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("COUP!")
-                                            .font(.system(size: 12, weight: .black))
-                                        Text(coup.timeRemainingFormatted)
-                                            .font(.system(size: 10, weight: .medium))
-                                    }
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.black)
-                                            .offset(x: 3, y: 3)
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(KingdomTheme.Colors.buttonDanger)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(Color.black, lineWidth: 2)
-                                            )
-                                    }
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                            CoupMapBadgeView(
+                                status: coup.status,
+                                timeRemaining: coup.timeRemainingFormatted,
+                                attackerCount: coup.attacker_count,
+                                defenderCount: coup.defender_count,
+                                onTap: { showCoupView = true }
+                            )
                             .padding(.leading, 16)
                             
                             Spacer()

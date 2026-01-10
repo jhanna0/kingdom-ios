@@ -83,10 +83,8 @@ struct ActivityView: View {
                 await viewModel.loadActivity()
             }
             .sheet(item: $viewModel.selectedCoup) { coupData in
-                CoupVotingSheet(coupData: coupData, onVote: { side in
-                    Task {
-                        await viewModel.voteCoup(coupData.id, side: side)
-                    }
+                CoupView(coupId: coupData.id, onDismiss: {
+                    viewModel.selectedCoup = nil
                 })
             }
         }
