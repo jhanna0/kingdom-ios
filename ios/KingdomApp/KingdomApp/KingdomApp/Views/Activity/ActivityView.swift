@@ -125,8 +125,10 @@ struct NotificationCard: View {
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
                 
-                // Coup-specific info
-                if let coupData = notification.coupData {
+                // Coup-specific info (only show for active coups with participant data)
+                if let coupData = notification.coupData,
+                   let attackerCount = coupData.attackerCount,
+                   let defenderCount = coupData.defenderCount {
                     Rectangle()
                         .fill(Color.black)
                         .frame(height: 1)
@@ -136,7 +138,7 @@ struct NotificationCard: View {
                             Image(systemName: "bolt.fill")
                                 .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                            Text("\(coupData.attackerCount)")
+                            Text("\(attackerCount)")
                                 .font(FontStyles.labelBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
@@ -145,20 +147,22 @@ struct NotificationCard: View {
                             Image(systemName: "shield.fill")
                                 .font(FontStyles.iconMini)
                                 .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            Text("\(coupData.defenderCount)")
+                            Text("\(defenderCount)")
                                 .font(FontStyles.labelBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
                         Spacer()
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock.fill")
-                                .font(FontStyles.iconMini)
-                            Text(coupData.timeRemainingFormatted)
-                                .font(FontStyles.labelBold)
+                        if coupData.timeRemainingSeconds != nil {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.fill")
+                                    .font(FontStyles.iconMini)
+                                Text(coupData.timeRemainingFormatted)
+                                    .font(FontStyles.labelBold)
+                            }
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 

@@ -135,7 +135,12 @@ struct NotificationOverlay: View {
             action: "complete_contract",
             action_id: "123",
             created_at: ISO8601DateFormatter().string(from: Date()),
-            coup_data: nil
+            show_popup: nil,
+            coup_data: nil,
+            icon: "checkmark.circle.fill",
+            icon_color: "buttonSuccess",
+            priority_color: "buttonWarning",
+            border_color: "buttonWarning"
         ),
         onDismiss: {},
         onTap: {}

@@ -10,7 +10,10 @@ class AppInitService: ObservableObject {
     @Published var playerSummary: PlayerSummary?
     @Published var errorMessage: String?
     
-    /// Set when user becomes ruler via coup - triggers celebration popup
+    /// Generic popup notification - backend tells us when to show via show_popup field
+    @Published var popupNotification: AppNotification?
+    
+    /// Legacy: Set when user becomes ruler via coup - triggers celebration popup
     @Published var coupCelebrationKingdom: String?
     
     private let apiClient = APIClient.shared
@@ -93,15 +96,12 @@ class AppInitService: ObservableObject {
     
     @MainActor
     private func showImportantNotifications(_ notifications: [AppNotification]) async {
-        // Check for new ruler coup notifications - trigger celebration!
+        // Check for any notification that needs a popup (backend tells us via show_popup)
         for notification in notifications {
-            if notification.type == "coup_resolved",
-               let coupData = notification.coup_data,
-               coupData.show_celebration == true,
-               let kingdomName = coupData.kingdom_name {
-                print("👑 NEW RULER! Triggering celebration for \(kingdomName)")
-                coupCelebrationKingdom = kingdomName
-                break  // Only show one celebration at a time
+            if notification.show_popup == true {
+                print("🎉 POPUP: \(notification.title) - \(notification.message)")
+                popupNotification = notification
+                break  // Only show one popup at a time
             }
         }
         
@@ -158,14 +158,21 @@ struct PlayerSummary: Codable {
 struct AppNotification: Codable, Identifiable, Equatable {
     var id: String { "\(type)_\(action_id ?? "none")_\(created_at)" }
     
-    let type: String  // contract_ready, level_up, skill_points, coup_resolved, etc.
+    let type: String  // contract_ready, level_up, skill_points, coup_new_ruler, etc.
     let priority: String  // high, medium, low, critical
     let title: String
     let message: String
     let action: String  // complete_contract, level_up, view_character, etc.
     let action_id: String?
     let created_at: String
+    let show_popup: Bool?  // Backend tells us when to show popup!
     let coup_data: AppCoupData?  // Present for coup notifications
+    
+    // Display info from backend
+    let icon: String?
+    let icon_color: String?
+    let priority_color: String?
+    let border_color: String?
     
     static func == (lhs: AppNotification, rhs: AppNotification) -> Bool {
         lhs.id == rhs.id
@@ -180,7 +187,20 @@ struct AppCoupData: Codable, Equatable {
     let user_won: Bool?
     let gold_per_winner: Int?
     let is_new_ruler: Bool?
-    let show_celebration: Bool?  // True if should show HAIL popup (new notification)
+    let show_celebration: Bool?  // Legacy - for backwards compat
+    
+    // Winner rewards
+    let rep_gained: Int?
+    
+    // Loser penalties
+    let gold_lost_percent: Int?
+    let rep_lost: Int?
+    let attack_lost: Int?
+    let defense_lost: Int?
+    let leadership_lost: Int?
+    
+    // For lost throne
+    let new_ruler_name: String?
 }
 
 struct ContractUpdates: Codable {

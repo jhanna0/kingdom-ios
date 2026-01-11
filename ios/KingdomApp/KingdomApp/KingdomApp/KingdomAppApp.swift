@@ -293,16 +293,17 @@ struct AuthenticatedView: View {
                 .zIndex(1000)
             }
             
-            // Coup victory celebration popup (when user becomes ruler via coup)
-            if let kingdomName = appInit.coupCelebrationKingdom {
-                KingdomClaimCelebration(
+            // Backend-triggered popup notification (show_popup = true)
+            // Handles: coup_new_ruler, coup_lost_throne, coup_side_won, coup_side_lost
+            if let popup = appInit.popupNotification {
+                NotificationPopup(
+                    notification: popup,
                     playerName: viewModel.player.name,
-                    kingdomName: kingdomName,
                     onDismiss: {
-                        appInit.coupCelebrationKingdom = nil
+                        appInit.popupNotification = nil
                     }
                 )
-                .zIndex(1000)
+                .zIndex(1001)
             }
             
             // Travel notification toast

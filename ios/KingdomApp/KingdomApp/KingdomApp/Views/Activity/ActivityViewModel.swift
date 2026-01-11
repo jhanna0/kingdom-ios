@@ -35,81 +35,48 @@ class ActivityViewModel: ObservableObject {
     func handleNotificationTap(_ notification: ActivityNotification) {
         print("📱 Tapped notification: \(notification.type)")
         
-        switch notification.type {
-        case .coupVoteNeeded, .coupInProgress, .coupAgainstYou,
-             .coupPledgeNeeded, .coupPledgeWaiting, .coupBattleActive, .coupBattleAgainstYou:
-            // Show coup view/sheet
+        // Use string prefix matching instead of enum switch - backend controls types!
+        let type = notification.type
+        
+        // Coup notifications - show coup view
+        if type.hasPrefix("coup_") {
             if let coupData = notification.coupData {
+                // For active coups, show the coup view
+                // For resolved coups, the notification already has all the info
                 selectedCoup = coupData
             }
-            
-        case .coupResolved:
-            // Show coup results
-            if let coupData = notification.coupData {
-                // TODO: Show results modal
-                print("Coup resolved: \(coupData)")
-            }
-            
-        case .invasionAgainstYou, .allyUnderAttack, .invasionDefenseNeeded, .invasionInProgress:
-            // Show invasion details
+            return
+        }
+        
+        // Invasion notifications
+        if type.hasPrefix("invasion_") {
             if let invasionData = notification.invasionData {
-                // TODO: Show invasion join sheet
                 print("Invasion notification: \(invasionData)")
             }
-            
-        case .invasionResolved:
-            // Show invasion results
-            if let invasionData = notification.invasionData {
-                // TODO: Show results modal
-                print("Invasion resolved: \(invasionData)")
+            return
+        }
+        
+        // Alliance notifications
+        if type.hasPrefix("alliance_") {
+            if let allianceData = notification.allianceData {
+                print("Alliance notification: \(allianceData)")
             }
-            
-        case .contractReady:
-            // TODO: Navigate to contract completion
+            return
+        }
+        
+        // Other specific types (legacy support)
+        if type == "contract_ready" {
             print("Navigate to contract: \(notification.actionId ?? "unknown")")
-            
-        case .levelUp:
-            // TODO: Navigate to character sheet
+        } else if type == "level_up" || type == "skill_points" {
             print("Navigate to character sheet")
-            
-        case .skillPoints:
-            // TODO: Navigate to character sheet
-            print("Navigate to character sheet")
-            
-        case .checkinReady:
-            // TODO: Navigate to map/kingdom
+        } else if type == "checkin_ready" {
             print("Navigate to check-in")
-            
-        case .treasuryFull:
-            // TODO: Navigate to kingdom management
+        } else if type == "treasury_full" {
             print("Navigate to kingdom: \(notification.actionId ?? "unknown")")
-            
-        case .kingdomEvent:
-            break  // Just informational, no action needed
-            
-        case .allianceRequestReceived:
-            // Navigate to actions view to accept/decline
-            if let allianceData = notification.allianceData {
-                print("Alliance request from: \(allianceData.initiatorRulerName ?? "unknown")")
-            }
-            
-        case .allianceRequestSent:
-            // Just informational - awaiting response
-            if let allianceData = notification.allianceData {
-                print("Alliance pending with: \(allianceData.targetEmpireName ?? "unknown")")
-            }
-            
-        case .allianceAccepted:
-            // Show alliance formed
-            if let allianceData = notification.allianceData {
-                print("Alliance formed with: \(allianceData.otherEmpireName ?? "unknown")")
-            }
-            
-        case .allianceDeclined:
-            // Just informational
-            if let allianceData = notification.allianceData {
-                print("Alliance declined by: \(allianceData.targetEmpireName ?? "unknown")")
-            }
+        } else if type == "kingdom_event" {
+            // Just informational, no action
+        } else {
+            print("Unknown notification type: \(type)")
         }
     }
     

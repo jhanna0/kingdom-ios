@@ -4,19 +4,26 @@ import Foundation
 
 struct ActivityNotification: Codable, Identifiable {
     let id = UUID()
-    let type: NotificationType
-    let priority: NotificationPriority
+    
+    // Just a raw string - NO ENUM! Backend controls all notification types.
+    let type: String
+    let priority: String  // "critical", "high", "medium", "low"
     let title: String
     let message: String
     let action: String
     let actionId: String?
     let createdAt: String
+    
+    // Popup control - backend tells us when to show popup
+    let showPopup: Bool?
+    
+    // Flexible data - can contain anything
     let coupData: CoupNotificationData?
     let invasionData: InvasionNotificationData?
     let eventData: KingdomEventData?
     let allianceData: AllianceNotificationData?
     
-    // DYNAMIC from backend - no switch statements needed!
+    // ALL DISPLAY INFO FROM BACKEND - no switch statements needed!
     let icon: String?  // SF Symbol name from backend
     let iconColor: String?  // Theme color name from backend
     let priorityColor: String?  // Priority-based color from backend
@@ -26,6 +33,7 @@ struct ActivityNotification: Codable, Identifiable {
         case type, priority, title, message, action
         case actionId = "action_id"
         case createdAt = "created_at"
+        case showPopup = "show_popup"
         case coupData = "coup_data"
         case invasionData = "invasion_data"
         case eventData = "event_data"
@@ -36,54 +44,15 @@ struct ActivityNotification: Codable, Identifiable {
         case borderColor = "border_color"
     }
     
-    enum NotificationType: String, Codable {
-        case contractReady = "contract_ready"
-        case treasuryFull = "treasury_full"
-        case levelUp = "level_up"
-        case skillPoints = "skill_points"
-        case checkinReady = "checkin_ready"
-        // Coup V2 - Pledge phase
-        case coupPledgeNeeded = "coup_pledge_needed"
-        case coupPledgeWaiting = "coup_pledge_waiting"
-        case coupAgainstYou = "coup_against_you"
-        // Coup V2 - Battle phase
-        case coupBattleActive = "coup_battle_active"
-        case coupBattleAgainstYou = "coup_battle_against_you"
-        // Coup - Resolution
-        case coupResolved = "coup_resolved"
-        // Legacy (for backwards compatibility)
-        case coupVoteNeeded = "coup_vote_needed"
-        case coupInProgress = "coup_in_progress"
-        // Invasions
-        case invasionAgainstYou = "invasion_against_you"
-        case allyUnderAttack = "ally_under_attack"
-        case invasionDefenseNeeded = "invasion_defense_needed"
-        case invasionInProgress = "invasion_in_progress"
-        case invasionResolved = "invasion_resolved"
-        // Kingdom events
-        case kingdomEvent = "kingdom_event"
-        // Alliance events
-        case allianceRequestReceived = "alliance_request_received"
-        case allianceRequestSent = "alliance_request_sent"
-        case allianceAccepted = "alliance_accepted"
-        case allianceDeclined = "alliance_declined"
-    }
+    // Helper computed properties
+    var isCritical: Bool { priority == "critical" }
+    var isHigh: Bool { priority == "high" }
+    var shouldShowPopup: Bool { showPopup == true }
     
-    enum NotificationPriority: String, Codable {
-        case critical
-        case high
-        case medium
-        case low
-        
-        var color: String {
-            switch self {
-            case .critical: return "red"
-            case .high: return "orange"
-            case .medium: return "yellow"
-            case .low: return "gray"
-            }
-        }
-    }
+    // Type checks (just string comparison - no enum needed)
+    var isCoupNotification: Bool { type.hasPrefix("coup_") }
+    var isInvasionNotification: Bool { type.hasPrefix("invasion_") }
+    var isAllianceNotification: Bool { type.hasPrefix("alliance_") }
 }
 
 // MARK: - Coup V2 Models
@@ -143,19 +112,32 @@ struct CoupParticipant: Codable, Identifiable {
 struct CoupNotificationData: Codable, Identifiable {
     let id: Int
     let kingdomId: String
-    let kingdomName: String
-    let initiatorName: String
+    let kingdomName: String?
+    
+    // Active coup data (optional for resolved notifications)
+    let initiatorName: String?
     let initiatorStats: InitiatorStats?
-    let status: String  // 'pledge', 'battle', 'resolved'
-    let timeRemainingSeconds: Int
-    let attackerCount: Int
-    let defenderCount: Int
+    let status: String?  // 'pledge', 'battle', 'resolved'
+    let timeRemainingSeconds: Int?
+    let attackerCount: Int?
+    let defenderCount: Int?
     let userSide: String?
-    let canPledge: Bool
+    let canPledge: Bool?
+    
+    // Resolution data
     let attackerVictory: Bool?
     let userWon: Bool?
     let goldPerWinner: Int?
     let isNewRuler: Bool?  // True if this user just became ruler via coup
+    let repGained: Int?  // Rep gained for winners
+    let newRulerName: String?  // Who took over (for lost throne notification)
+    
+    // Loser penalty data
+    let goldLostPercent: Int?
+    let repLost: Int?
+    let attackLost: Int?
+    let defenseLost: Int?
+    let leadershipLost: Int?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -173,19 +155,27 @@ struct CoupNotificationData: Codable, Identifiable {
         case userWon = "user_won"
         case goldPerWinner = "gold_per_winner"
         case isNewRuler = "is_new_ruler"
+        case repGained = "rep_gained"
+        case newRulerName = "new_ruler_name"
+        case goldLostPercent = "gold_lost_percent"
+        case repLost = "rep_lost"
+        case attackLost = "attack_lost"
+        case defenseLost = "defense_lost"
+        case leadershipLost = "leadership_lost"
     }
     
     /// Formatted time remaining in current phase
     var timeRemainingFormatted: String {
-        let hours = timeRemainingSeconds / 3600
-        let minutes = (timeRemainingSeconds % 3600) / 60
+        guard let seconds = timeRemainingSeconds else { return "0s" }
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
         if hours > 0 {
             return "\(hours)h \(minutes)m"
         } else if minutes > 0 {
-            let seconds = timeRemainingSeconds % 60
-            return "\(minutes)m \(seconds)s"
+            let secs = seconds % 60
+            return "\(minutes)m \(secs)s"
         } else {
-            return "\(timeRemainingSeconds)s"
+            return "\(seconds)s"
         }
     }
     
@@ -201,7 +191,7 @@ struct CoupNotificationData: Codable, Identifiable {
     
     /// Is this coup resolved?
     var isResolved: Bool {
-        status == "resolved"
+        status == "resolved" || status == nil
     }
 }
 
