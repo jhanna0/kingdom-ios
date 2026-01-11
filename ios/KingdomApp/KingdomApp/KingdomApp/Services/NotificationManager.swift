@@ -201,7 +201,8 @@ class NotificationManager {
             "cooldown_economy",
             "cooldown_security",
             "cooldown_personal",
-            "cooldown_intelligence"
+            "cooldown_intelligence",
+            "cooldown_coup_battle"
         ])
         print("🗑️ Cancelled all action cooldown notifications")
     }

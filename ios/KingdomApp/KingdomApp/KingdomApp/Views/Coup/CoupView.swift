@@ -9,13 +9,17 @@ struct CoupView: View {
     
     @StateObject private var viewModel = CoupViewModel()
     
+    // Fight navigation state
+    @State private var showFightView = false
+    @State private var selectedTerritory: CoupTerritory?
+    
     var body: some View {
         ZStack {
             KingdomTheme.Colors.parchment.ignoresSafeArea()
             
-            if viewModel.isLoading {
+            if viewModel.isLoading && viewModel.coup == nil {
                 loadingView
-            } else if let error = viewModel.error {
+            } else if let error = viewModel.error, viewModel.coup == nil {
                 errorView(error: error)
             } else if let coup = viewModel.coup {
                 phaseContent(coup: coup)
@@ -23,6 +27,26 @@ struct CoupView: View {
         }
         .onAppear {
             viewModel.loadCoup(id: coupId)
+        }
+        .fullScreenCover(isPresented: $showFightView) {
+            if let territory = selectedTerritory, let coup = viewModel.coup {
+                CoupFightView(
+                    territory: territory,
+                    coup: coup,
+                    onComplete: { result in
+                        showFightView = false
+                        selectedTerritory = nil
+                        
+                        // If fight was resolved, schedule cooldown notification and refresh
+                        if let result = result {
+                            viewModel.handleFightResolve(result: result)
+                        } else {
+                            // User cancelled or exited without resolving - still refresh
+                            viewModel.refresh()
+                        }
+                    }
+                )
+            }
         }
     }
     
@@ -36,62 +60,18 @@ struct CoupView: View {
                 viewModel.pledge(side: side)
             }
         case "battle":
-            battleView(coup: coup)
+            CoupBattleView(coup: coup, onDismiss: onDismiss) { territoryName in
+                // Find the territory and navigate to fight view
+                if let territory = coup.territories?.first(where: { $0.name == territoryName }) {
+                    selectedTerritory = territory
+                    showFightView = true
+                }
+            }
         case "resolved":
             resolvedView(coup: coup)
         default:
             Text("Unknown coup status")
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-    }
-    
-    // MARK: - Battle View
-    
-    private func battleView(coup: CoupEventResponse) -> some View {
-        let rulerName = coup.rulerName ?? "The Crown"
-        let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
-        let rulerStats = coup.rulerStats.map { FighterStats(from: $0) } ?? .empty
-        
-        return ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.medium) {
-                CoupVsPosterView(
-                    kingdomName: coup.kingdomName ?? "Kingdom",
-                    challengerName: coup.initiatorName,
-                    rulerName: rulerName,
-                    attackerCount: coup.attackerCount,
-                    defenderCount: coup.defenderCount,
-                    timeRemaining: coup.timeRemainingFormatted,
-                    status: coup.status,
-                    userSide: coup.userSide,
-                    challengerStats: challengerStats,
-                    rulerStats: rulerStats,
-                    onDismiss: onDismiss
-                )
-                
-                // Battle status
-                HStack(spacing: 12) {
-                    Image(systemName: "bolt.horizontal.fill")
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("BATTLE IN PROGRESS")
-                            .font(.system(size: 14, weight: .black, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        Text("Wait for the outcome...")
-                            .font(.system(size: 12, weight: .medium, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(16)
-                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            }
-            .padding(.horizontal, KingdomTheme.Spacing.medium)
-            .padding(.vertical, KingdomTheme.Spacing.medium)
         }
     }
     
@@ -222,6 +202,7 @@ class CoupViewModel: ObservableObject {
     @Published var error: String?
     
     private var coupId: Int?
+    private var refreshTimer: Timer?
     
     func loadCoup(id: Int) {
         self.coupId = id
@@ -237,6 +218,16 @@ class CoupViewModel: ObservableObject {
                 let response: CoupEventResponse = try await APIClient.shared.execute(request)
                 self.coup = response
                 self.isLoading = false
+                
+                // Start auto-refresh during battle phase
+                if response.isBattlePhase {
+                    startAutoRefresh()
+                }
+                
+                // Schedule phase notifications if user has pledged
+                if response.userSide != nil {
+                    schedulePhaseNotifications(coup: response)
+                }
             } catch {
                 self.error = error.localizedDescription
                 self.isLoading = false
@@ -246,7 +237,20 @@ class CoupViewModel: ObservableObject {
     
     func refresh() {
         guard let id = coupId else { return }
-        loadCoup(id: id)
+        
+        Task {
+            do {
+                let request = APIClient.shared.request(
+                    endpoint: "/coups/\(id)",
+                    method: "GET"
+                )
+                let response: CoupEventResponse = try await APIClient.shared.execute(request)
+                self.coup = response
+            } catch {
+                // Silent refresh failure
+                print("Refresh failed: \(error)")
+            }
+        }
     }
     
     func pledge(side: String) {
@@ -267,6 +271,75 @@ class CoupViewModel: ObservableObject {
                 self.isLoading = false
             }
         }
+    }
+    
+    /// Handle fight resolution - schedule cooldown notification and refresh
+    func handleFightResolve(result: FightResolveResponse) {
+        // Schedule notification for when cooldown ends
+        if result.cooldownSeconds > 0 {
+            Task {
+                await NotificationManager.shared.scheduleActionCooldownNotification(
+                    actionName: "Coup Battle",
+                    cooldownSeconds: result.cooldownSeconds,
+                    slot: "coup_battle"
+                )
+            }
+        }
+        
+        // Refresh coup data to get updated territories and cooldown
+        refresh()
+    }
+    
+    // MARK: - Notifications
+    
+    private func schedulePhaseNotifications(coup: CoupEventResponse) {
+        let kingdomName = coup.kingdomName ?? "Kingdom"
+        
+        // Schedule pledge end notification (battle start)
+        if coup.isPledgePhase {
+            let formatter = ISO8601DateFormatter()
+            if let pledgeEnd = formatter.date(from: coup.pledgeEndTime) {
+                Task {
+                    await NotificationManager.shared.scheduleCoupPhaseNotification(
+                        coupId: coup.id,
+                        phase: "pledge",
+                        endDate: pledgeEnd,
+                        kingdomName: kingdomName
+                    )
+                }
+            }
+        }
+        
+        // Schedule battle cooldown notification if user has one
+        if coup.isBattlePhase, let cooldown = coup.battleCooldownSeconds, cooldown > 0 {
+            Task {
+                await NotificationManager.shared.scheduleActionCooldownNotification(
+                    actionName: "Coup Battle",
+                    cooldownSeconds: cooldown,
+                    slot: "coup_battle"
+                )
+            }
+        }
+    }
+    
+    // MARK: - Auto Refresh
+    
+    private func startAutoRefresh() {
+        stopAutoRefresh()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.refresh()
+            }
+        }
+    }
+    
+    private func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+    
+    deinit {
+        refreshTimer?.invalidate()
     }
 }
 

@@ -223,9 +223,9 @@ struct BattleSimulatorView: View {
     private func sideInputs(size: Binding<Int>, attack: Binding<Int>, defense: Binding<Int>, leadership: Binding<Int>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Stepper("Players: \(size.wrappedValue.formatted())", value: size, in: 1...100_000, step: 500)
-            Stepper("Avg Attack: \(attack.wrappedValue)", value: attack, in: 1...5)
-            Stepper("Avg Defense: \(defense.wrappedValue)", value: defense, in: 1...5)
-            Stepper("Avg Leadership: \(leadership.wrappedValue)", value: leadership, in: 1...5)
+            Stepper("Avg Attack: \(attack.wrappedValue)", value: attack, in: 1...20)
+            Stepper("Avg Defense: \(defense.wrappedValue)", value: defense, in: 1...20)
+            Stepper("Avg Leadership: \(leadership.wrappedValue)", value: leadership, in: 1...20)
         }
     }
 }

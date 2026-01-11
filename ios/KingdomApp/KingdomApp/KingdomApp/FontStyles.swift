@@ -63,6 +63,70 @@ struct FontStyles {
     /// Extra tiny label - 11pt, bold (for badges)
     static let labelBadge = Font.system(size: 11, weight: .bold)
     
+    // MARK: - Captions (Very Small Text)
+    /// Caption large - 10pt, medium
+    static let captionLarge = Font.system(size: 10, weight: .medium)
+    
+    /// Caption medium - 9pt, bold, serif (for card headers)
+    static let captionMedium = Font.system(size: 9, weight: .bold, design: .serif)
+    
+    /// Caption small - 8pt, black (for tiny labels)
+    static let captionSmall = Font.system(size: 8, weight: .black)
+    
+    // MARK: - Stats (Monospaced for Numbers)
+    /// Stat large - 18pt, black, monospaced
+    static let statLarge = Font.system(size: 18, weight: .black, design: .monospaced)
+    
+    /// Stat medium - 14pt, black, monospaced
+    static let statMedium = Font.system(size: 14, weight: .black, design: .monospaced)
+    
+    /// Stat small - 10pt, black, monospaced
+    static let statSmall = Font.system(size: 10, weight: .black, design: .monospaced)
+    
+    /// Stat tiny - 9pt, bold, monospaced
+    static let statTiny = Font.system(size: 9, weight: .bold, design: .monospaced)
+    
+    // MARK: - Black Weight Variants (For Emphasis)
+    /// Title black - 16pt, black
+    static let titleBlack = Font.system(size: 16, weight: .black)
+    
+    /// Label black - 14pt, black, serif
+    static let labelBlackSerif = Font.system(size: 14, weight: .black, design: .serif)
+    
+    /// Label black small - 13pt, black, serif
+    static let labelBlackSmall = Font.system(size: 13, weight: .black, design: .serif)
+    
+    /// Label black tiny - 12pt, black, serif
+    static let labelBlackTiny = Font.system(size: 12, weight: .black, design: .serif)
+    
+    /// Label black mini - 11pt, black, serif
+    static let labelBlackMini = Font.system(size: 11, weight: .black, design: .serif)
+    
+    /// Label black nano - 10pt, black, serif
+    static let labelBlackNano = Font.system(size: 10, weight: .black, design: .serif)
+    
+    // MARK: - Giant Display (For Big Numbers/Results)
+    /// Giant display - 60pt, bold
+    static let displayGiant = Font.system(size: 60, weight: .bold)
+    
+    /// Display extra large - 50pt, black
+    static let displayExtraLarge = Font.system(size: 50, weight: .black)
+    
+    /// Display huge - 40pt
+    static let displayHuge = Font.system(size: 40)
+    
+    /// Result large - 36pt, black
+    static let resultLarge = Font.system(size: 36, weight: .black)
+    
+    /// Result medium - 32pt, black
+    static let resultMedium = Font.system(size: 32, weight: .black)
+    
+    /// Result small - 24pt, black, serif
+    static let resultSmall = Font.system(size: 24, weight: .black, design: .serif)
+    
+    /// Result tiny - 20pt, bold
+    static let resultTiny = Font.system(size: 20, weight: .bold)
+    
     // MARK: - Icons
     /// Large icon - 28pt, bold
     static let iconExtraLarge = Font.system(size: 28, weight: .bold)

@@ -10,7 +10,16 @@ from .property import Property
 from .city_boundary import CityBoundary
 from .check_in import CheckInHistory
 from .kingdom_intelligence import KingdomIntelligence
-from .coup import CoupEvent
+from .coup import CoupEvent, CoupTerritory, CoupBattleAction, CoupInjury, CoupFightSession, RollOutcome
+# All coup constants now live in systems/coup/config.py
+from systems.coup.config import (
+    SIZE_EXPONENT_BASE, LEADERSHIP_DAMPENING_PER_TIER,
+    HIT_MULTIPLIER, INJURE_MULTIPLIER, INJURE_PUSH_MULTIPLIER,
+    BATTLE_ACTION_COOLDOWN_MINUTES, INJURY_DURATION_MINUTES,
+    TERRITORY_COUPERS, TERRITORY_CROWNS, TERRITORY_THRONE,
+    TERRITORY_STARTING_BARS, TERRITORY_DISPLAY_NAMES, TERRITORY_ICONS,
+    calculate_roll_chances, calculate_push_per_hit, calculate_max_rolls,
+)
 from .invasion import InvasionEvent
 from .kingdom_history import KingdomHistory
 from .alliance import Alliance
@@ -39,6 +48,27 @@ __all__ = [
     "CheckInHistory",
     "KingdomIntelligence",
     "CoupEvent",
+    "CoupTerritory",
+    "CoupBattleAction",
+    "CoupInjury",
+    "CoupFightSession",
+    "RollOutcome",
+    "SIZE_EXPONENT_BASE",
+    "LEADERSHIP_DAMPENING_PER_TIER",
+    "HIT_MULTIPLIER",
+    "INJURE_MULTIPLIER",
+    "INJURE_PUSH_MULTIPLIER",
+    "BATTLE_ACTION_COOLDOWN_MINUTES",
+    "INJURY_DURATION_MINUTES",
+    "TERRITORY_COUPERS",
+    "TERRITORY_CROWNS",
+    "TERRITORY_THRONE",
+    "TERRITORY_STARTING_BARS",
+    "TERRITORY_DISPLAY_NAMES",
+    "TERRITORY_ICONS",
+    "calculate_roll_chances",
+    "calculate_push_per_hit",
+    "calculate_max_rolls",
     "InvasionEvent",
     "KingdomHistory",
     "Alliance",

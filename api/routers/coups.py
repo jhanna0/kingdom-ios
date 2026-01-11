@@ -1,13 +1,30 @@
 """
 Coup system - Internal power struggles
 Players can initiate coups to overthrow rulers using attack vs defense combat
+
+Battle Phase:
+- 3 territories with tug-of-war bars (0-100)
+- Players fight every 10 minutes (cooldown-based)
+- Win condition: Capture Throne Room + 1 other territory
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
+import random
 
 from db import get_db, User, PlayerState, Kingdom, CoupEvent, ActionCooldown
+from db.models import (
+    CoupTerritory, CoupBattleAction, CoupInjury, CoupFightSession, RollOutcome,
+    TERRITORY_COUPERS, TERRITORY_CROWNS, TERRITORY_THRONE,
+    TERRITORY_STARTING_BARS, TERRITORY_DISPLAY_NAMES, TERRITORY_ICONS,
+)
+from systems.coup.config import (
+    SIZE_EXPONENT_BASE, LEADERSHIP_DAMPENING_PER_TIER,
+    HIT_MULTIPLIER, INJURE_MULTIPLIER, INJURE_PUSH_MULTIPLIER,
+    BATTLE_ACTION_COOLDOWN_MINUTES, INJURY_DURATION_MINUTES,
+    calculate_roll_chances, calculate_push_per_hit, calculate_max_rolls,
+)
 from schemas.coup import (
     CoupInitiateRequest,
     CoupInitiateResponse,
@@ -17,7 +34,14 @@ from schemas.coup import (
     CoupResolveResponse,
     CoupParticipant,
     ActiveCoupsResponse,
-    InitiatorStats
+    InitiatorStats,
+    CoupFightRequest,
+    CoupFightResponse,
+    CoupTerritoryResponse,
+    RollResult,
+    FightSessionResponse,
+    FightRollResponse,
+    FightResolveResponse,
 )
 from routers.auth import get_current_user
 
@@ -39,6 +63,9 @@ KINGDOM_COOLDOWN_DAYS = 7          # 7 days between coups in same kingdom
 
 # Legacy (keeping for resolution logic)
 ATTACKER_ADVANTAGE_REQUIRED = 1.25  # Attackers need 25% more power to win
+
+# Valid territory names
+VALID_TERRITORIES = [TERRITORY_COUPERS, TERRITORY_CROWNS, TERRITORY_THRONE]
 
 
 # ===== Helper Functions =====
@@ -457,6 +484,301 @@ def _resolve_coup_battle(db: Session, coup: CoupEvent) -> CoupResolveResponse:
     )
 
 
+# ===== Battle Phase Helper Functions =====
+
+def _ensure_territories_exist(db: Session, coup: CoupEvent) -> List[CoupTerritory]:
+    """
+    Create territories for a coup if they don't exist (lazy init on first battle action).
+    Returns list of all 3 territories.
+    """
+    territories = db.query(CoupTerritory).filter(
+        CoupTerritory.coup_id == coup.id
+    ).all()
+    
+    if len(territories) == 3:
+        return territories
+    
+    # Create missing territories
+    existing_names = {t.territory_name for t in territories}
+    
+    for territory_name in VALID_TERRITORIES:
+        if territory_name not in existing_names:
+            territory = CoupTerritory(
+                coup_id=coup.id,
+                territory_name=territory_name,
+                control_bar=TERRITORY_STARTING_BARS.get(territory_name, 50.0)
+            )
+            db.add(territory)
+            territories.append(territory)
+    
+    db.commit()
+    
+    # Reload to get fresh objects
+    return db.query(CoupTerritory).filter(
+        CoupTerritory.coup_id == coup.id
+    ).all()
+
+
+def _get_battle_cooldown_seconds(db: Session, user_id: int, coup_id: int) -> int:
+    """Get remaining cooldown seconds for battle action"""
+    cooldown_record = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == user_id,
+        ActionCooldown.action_type == f'coup_battle_{coup_id}'
+    ).first()
+    
+    if not cooldown_record or not cooldown_record.last_performed:
+        return 0
+    
+    cooldown = timedelta(minutes=BATTLE_ACTION_COOLDOWN_MINUTES)
+    time_since = datetime.utcnow() - cooldown_record.last_performed
+    
+    if time_since >= cooldown:
+        return 0
+    
+    return int((cooldown - time_since).total_seconds())
+
+
+def _set_battle_cooldown(db: Session, user_id: int, coup_id: int) -> None:
+    """Set battle action cooldown for user"""
+    action_type = f'coup_battle_{coup_id}'
+    cooldown_record = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == user_id,
+        ActionCooldown.action_type == action_type
+    ).first()
+    
+    if cooldown_record:
+        cooldown_record.last_performed = datetime.utcnow()
+    else:
+        cooldown_record = ActionCooldown(
+            user_id=user_id,
+            action_type=action_type,
+            last_performed=datetime.utcnow()
+        )
+        db.add(cooldown_record)
+
+
+def _get_active_injury(db: Session, user_id: int, coup_id: int) -> Optional[CoupInjury]:
+    """Get active injury for a player in a coup (if any)"""
+    return db.query(CoupInjury).filter(
+        CoupInjury.coup_id == coup_id,
+        CoupInjury.player_id == user_id,
+        CoupInjury.cleared_at.is_(None),
+        CoupInjury.expires_at > datetime.utcnow()
+    ).first()
+
+
+def _get_side_avg_stat(db: Session, player_ids: List[int], stat: str) -> float:
+    """Get average stat value for a side"""
+    if not player_ids:
+        return 1.0
+    
+    total = 0
+    count = 0
+    for player_id in player_ids:
+        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        if state:
+            total += getattr(state, stat, 1)
+            count += 1
+    
+    return total / count if count > 0 else 1.0
+
+
+def _perform_roll(attack: int, enemy_avg_defense: float) -> Tuple[float, str]:
+    """
+    Perform a single roll and return (roll_value, outcome).
+    
+    Returns one of: 'miss', 'hit', 'injure'
+    Uses calculate_roll_chances from systems/coup/config.py
+    """
+    miss_chance, hit_chance, injure_chance = calculate_roll_chances(attack, enemy_avg_defense)
+    
+    roll = random.random()
+    
+    if roll < injure_chance:
+        return roll, RollOutcome.INJURE.value
+    elif roll < injure_chance + hit_chance:
+        return roll, RollOutcome.HIT.value
+    else:
+        return roll, RollOutcome.MISS.value
+
+
+def _get_best_outcome(rolls: List[dict]) -> str:
+    """
+    Get the best outcome from multiple rolls.
+    Priority: injure > hit > miss
+    """
+    outcomes = [r['outcome'] for r in rolls]
+    
+    if RollOutcome.INJURE.value in outcomes:
+        return RollOutcome.INJURE.value
+    elif RollOutcome.HIT.value in outcomes:
+        return RollOutcome.HIT.value
+    else:
+        return RollOutcome.MISS.value
+
+
+def _get_side_average_defense(db: Session, player_ids: List[int]) -> float:
+    """Get average defense power for a list of players"""
+    if not player_ids:
+        return 1.0
+    
+    total_defense = 0
+    count = 0
+    
+    for pid in player_ids:
+        state = db.query(PlayerState).filter(PlayerState.user_id == pid).first()
+        if state:
+            total_defense += state.defense_power or 0
+            count += 1
+    
+    if count == 0:
+        return 1.0
+    
+    return total_defense / count
+
+
+def _get_side_average_leadership(db: Session, player_ids: List[int]) -> float:
+    """Get average leadership for a list of players"""
+    if not player_ids:
+        return 0.0
+    
+    total_leadership = 0
+    count = 0
+    
+    for pid in player_ids:
+        state = db.query(PlayerState).filter(PlayerState.user_id == pid).first()
+        if state:
+            total_leadership += state.leadership or 0
+            count += 1
+    
+    if count == 0:
+        return 0.0
+    
+    return total_leadership / count
+
+
+def _pick_random_injury_target(
+    db: Session, 
+    coup: CoupEvent, 
+    enemy_side: str
+) -> Optional[int]:
+    """
+    Pick a random enemy player to injure.
+    
+    Picks from players who:
+    - Are on the enemy side
+    - Are NOT already injured
+    """
+    if enemy_side == "attackers":
+        enemy_ids = coup.get_attacker_ids()
+    else:
+        enemy_ids = coup.get_defender_ids()
+    
+    if not enemy_ids:
+        return None
+    
+    # Filter out already injured players
+    already_injured = db.query(CoupInjury.player_id).filter(
+        CoupInjury.coup_id == coup.id,
+        CoupInjury.player_id.in_(enemy_ids),
+        CoupInjury.cleared_at.is_(None),
+        CoupInjury.expires_at > datetime.utcnow()
+    ).all()
+    
+    already_injured_ids = {i[0] for i in already_injured}
+    available_targets = [pid for pid in enemy_ids if pid not in already_injured_ids]
+    
+    if not available_targets:
+        return None
+    
+    return random.choice(available_targets)
+
+
+def _apply_injury(
+    db: Session,
+    coup: CoupEvent,
+    injured_player_id: int,
+    injured_by_id: int,
+    action_id: int
+) -> CoupInjury:
+    """Create an injury record for a player"""
+    injury = CoupInjury(
+        coup_id=coup.id,
+        player_id=injured_player_id,
+        injured_by_id=injured_by_id,
+        injury_action_id=action_id,
+        injured_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(minutes=INJURY_DURATION_MINUTES)
+    )
+    db.add(injury)
+    return injury
+
+
+def _check_win_condition(db: Session, coup: CoupEvent) -> Optional[str]:
+    """
+    Check if the battle is won.
+    
+    Win condition: Capture Throne Room + 1 other territory
+    
+    Returns: 'attackers', 'defenders', or None
+    """
+    territories = db.query(CoupTerritory).filter(
+        CoupTerritory.coup_id == coup.id
+    ).all()
+    
+    attacker_captures = []
+    defender_captures = []
+    
+    for t in territories:
+        if t.captured_by == "attackers":
+            attacker_captures.append(t.territory_name)
+        elif t.captured_by == "defenders":
+            defender_captures.append(t.territory_name)
+    
+    # Win condition: Throne Room + 1 other
+    if TERRITORY_THRONE in attacker_captures and len(attacker_captures) >= 2:
+        return "attackers"
+    if TERRITORY_THRONE in defender_captures and len(defender_captures) >= 2:
+        return "defenders"
+    
+    return None
+
+
+def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> None:
+    """
+    Resolve the battle when a side wins via territory capture.
+    Uses existing victory/failure reward logic.
+    """
+    kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+    if not kingdom:
+        return
+    
+    # Calculate combat strength for record keeping
+    attacker_attack, _, attackers = _calculate_combat_strength(
+        db, coup.get_attacker_ids(), coup.kingdom_id
+    )
+    _, defender_defense, defenders = _calculate_combat_strength(
+        db, coup.get_defender_ids(), coup.kingdom_id
+    )
+    
+    attacker_victory = (winner_side == "attackers")
+    
+    # Update coup record
+    coup.attacker_victory = attacker_victory
+    coup.attacker_strength = attacker_attack
+    coup.defender_strength = defender_defense
+    coup.total_defense_with_walls = defender_defense
+    coup.resolved_at = datetime.utcnow()
+    
+    # Apply rewards/penalties
+    if attacker_victory:
+        _apply_coup_victory_rewards(db, coup, kingdom, attackers, defenders)
+    else:
+        _apply_coup_failure_penalties(db, coup, kingdom, attackers, defenders)
+    
+    db.commit()
+
+
 # ===== API Endpoints =====
 
 @router.post("/initiate", response_model=CoupInitiateResponse)
@@ -642,6 +964,237 @@ def join_coup(
     )
 
 
+@router.post("/{coup_id}/fight", response_model=CoupFightResponse)
+def fight_in_territory(
+    coup_id: int,
+    request: CoupFightRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fight in a territory during battle phase.
+    
+    Mechanics:
+    - Player gets (1 + attack_level) rolls, takes best outcome
+    - Outcomes: miss, hit, injure
+    - Hit: Push territory bar toward your side
+    - Injure: Push bar AND injure random enemy (they sit out 20 min)
+    
+    Requirements:
+    - Coup must be in battle phase
+    - Player must have pledged to a side
+    - 10 minute cooldown between actions
+    - Cannot fight if injured (sitting out)
+    """
+    # Get coup
+    coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
+    
+    if not coup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Coup not found"
+        )
+    
+    # Check battle phase
+    if not coup.is_battle_phase:
+        if coup.is_pledge_phase:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Battle hasn't started yet - still in pledge phase"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This coup has already been resolved"
+            )
+    
+    # Check player has pledged
+    attacker_ids = coup.get_attacker_ids()
+    defender_ids = coup.get_defender_ids()
+    
+    if current_user.id in attacker_ids:
+        user_side = "attackers"
+        enemy_side = "defenders"
+        enemy_ids = defender_ids
+    elif current_user.id in defender_ids:
+        user_side = "defenders"
+        enemy_side = "attackers"
+        enemy_ids = attacker_ids
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must pledge to a side before fighting"
+        )
+    
+    # Check territory is valid
+    if request.territory not in VALID_TERRITORIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid territory. Must be one of: {', '.join(VALID_TERRITORIES)}"
+        )
+    
+    # Check for injury (sitting out)
+    injury = _get_active_injury(db, current_user.id, coup_id)
+    if injury:
+        seconds_remaining = int((injury.expires_at - datetime.utcnow()).total_seconds())
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You are injured and must sit out. {seconds_remaining} seconds remaining."
+        )
+    
+    # Check cooldown
+    cooldown_remaining = _get_battle_cooldown_seconds(db, current_user.id, coup_id)
+    if cooldown_remaining > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Action on cooldown. {cooldown_remaining} seconds remaining."
+        )
+    
+    # Ensure territories exist
+    territories = _ensure_territories_exist(db, coup)
+    
+    # Get the target territory
+    territory = next((t for t in territories if t.territory_name == request.territory), None)
+    if not territory:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Territory not found"
+        )
+    
+    # Check territory not already captured
+    if territory.is_captured:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{territory.display_name} has already been captured by {territory.captured_by}"
+        )
+    
+    # Get player stats
+    state = _get_player_state(db, current_user)
+    player_attack = state.attack_power
+    
+    # Get enemy average defense
+    enemy_avg_defense = _get_side_avg_stat(db, enemy_ids, 'defense_power')
+    
+    # Calculate number of rolls: 1 + attack_level
+    roll_count = 1 + player_attack
+    
+    # Perform rolls
+    rolls = []
+    for _ in range(roll_count):
+        roll_value, outcome = _perform_roll(player_attack, enemy_avg_defense)
+        rolls.append({"value": round(roll_value, 4), "outcome": outcome})
+    
+    # Get best outcome
+    best_outcome = _get_best_outcome(rolls)
+    
+    # Calculate push amount (only if hit or injure)
+    bar_before = territory.control_bar
+    push_amount = 0.0
+    injured_player_id = None
+    injured_player_name = None
+    
+    if best_outcome in [RollOutcome.HIT.value, RollOutcome.INJURE.value]:
+        # Get side stats for push calculation
+        if user_side == "attackers":
+            side_size = len(attacker_ids)
+            side_avg_leadership = _get_side_avg_stat(db, attacker_ids, 'leadership')
+        else:
+            side_size = len(defender_ids)
+            side_avg_leadership = _get_side_avg_stat(db, defender_ids, 'leadership')
+        
+        push_amount = calculate_push_per_hit(side_size, side_avg_leadership)
+        
+        # Apply push to territory
+        territory.apply_push(user_side, push_amount)
+    
+    bar_after = territory.control_bar
+    
+    # Record the action
+    action = CoupBattleAction(
+        coup_id=coup_id,
+        player_id=current_user.id,
+        territory_name=request.territory,
+        side=user_side,
+        roll_count=roll_count,
+        rolls=rolls,
+        best_outcome=best_outcome,
+        push_amount=push_amount,
+        bar_before=bar_before,
+        bar_after=bar_after
+    )
+    db.add(action)
+    db.flush()  # Get action ID for injury reference
+    
+    # Handle injury
+    if best_outcome == RollOutcome.INJURE.value:
+        target_id = _pick_random_injury_target(db, coup, enemy_side)
+        if target_id:
+            _apply_injury(db, coup, target_id, current_user.id, action.id)
+            action.injured_player_id = target_id
+            
+            # Get injured player name
+            injured_user = db.query(User).filter(User.id == target_id).first()
+            if injured_user:
+                injured_player_name = injured_user.display_name
+    
+    # Set cooldown
+    _set_battle_cooldown(db, current_user.id, coup_id)
+    
+    # Check win condition
+    battle_won = False
+    winner_side = None
+    
+    winner_side = _check_win_condition(db, coup)
+    if winner_side:
+        battle_won = True
+        _resolve_battle_victory(db, coup, winner_side)
+    
+    db.commit()
+    
+    # Build message
+    if best_outcome == RollOutcome.MISS.value:
+        message = f"Your attack missed! No progress on {territory.display_name}."
+    elif best_outcome == RollOutcome.HIT.value:
+        message = f"Direct hit! Pushed {territory.display_name} by {push_amount:.2f} points."
+    else:  # injure
+        if injured_player_name:
+            message = f"Critical strike! Pushed {territory.display_name} and injured {injured_player_name}!"
+        else:
+            message = f"Critical strike! Pushed {territory.display_name} (no enemy to injure)."
+    
+    if territory.is_captured:
+        message += f" 🏴 {territory.display_name} captured by {territory.captured_by}!"
+    
+    if battle_won:
+        message = f"🎉 VICTORY! {winner_side.upper()} have won the coup!"
+    
+    # Get new cooldown
+    new_cooldown = BATTLE_ACTION_COOLDOWN_MINUTES * 60
+    
+    return CoupFightResponse(
+        success=True,
+        message=message,
+        roll_count=roll_count,
+        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in rolls],
+        best_outcome=best_outcome,
+        push_amount=round(push_amount, 4),
+        bar_before=round(bar_before, 2),
+        bar_after=round(bar_after, 2),
+        territory=CoupTerritoryResponse(
+            name=territory.territory_name,
+            display_name=territory.display_name,
+            icon=territory.icon,
+            control_bar=round(territory.control_bar, 2),
+            captured_by=territory.captured_by,
+            captured_at=territory.captured_at
+        ),
+        injured_player_name=injured_player_name,
+        battle_won=battle_won,
+        winner_side=winner_side,
+        cooldown_seconds=new_cooldown
+    )
+
+
 def _build_coup_response(
     db: Session,
     coup: CoupEvent,
@@ -687,6 +1240,51 @@ def _build_coup_response(
     # Get initiator character sheet
     initiator_stats = _get_initiator_stats(db, coup.initiator_id, coup.kingdom_id)
     
+    # Battle phase data
+    territories = []
+    battle_cooldown_seconds = 0
+    is_injured = False
+    injury_expires_seconds = 0
+    winner_side = None
+    
+    if coup.is_battle_phase or coup.is_resolved:
+        # Get territories (create if needed during battle phase)
+        territory_records = db.query(CoupTerritory).filter(
+            CoupTerritory.coup_id == coup.id
+        ).all()
+        
+        # If in battle phase and territories don't exist, create them
+        if coup.is_battle_phase and len(territory_records) < 3:
+            territory_records = _ensure_territories_exist(db, coup)
+        
+        territories = [
+            CoupTerritoryResponse(
+                name=t.territory_name,
+                display_name=t.display_name,
+                icon=t.icon,
+                control_bar=round(t.control_bar, 2),
+                captured_by=t.captured_by,
+                captured_at=t.captured_at
+            )
+            for t in territory_records
+        ]
+        
+        # Get user's battle cooldown
+        battle_cooldown_seconds = _get_battle_cooldown_seconds(db, current_user.id, coup.id)
+        
+        # Check if user is injured
+        injury = _get_active_injury(db, current_user.id, coup.id)
+        if injury:
+            is_injured = True
+            injury_expires_seconds = max(0, int((injury.expires_at - datetime.utcnow()).total_seconds()))
+        
+        # Determine winner from territory captures
+        winner_side = _check_win_condition(db, coup)
+    
+    # If resolved, get winner from attacker_victory
+    if coup.is_resolved:
+        winner_side = "attackers" if coup.attacker_victory else "defenders"
+    
     return CoupEventResponse(
         id=coup.id,
         kingdom_id=coup.kingdom_id,
@@ -708,9 +1306,16 @@ def _build_coup_response(
         defender_count=len(defender_ids),
         user_side=user_side,
         can_pledge=can_pledge,
+        # Battle phase data
+        territories=territories,
+        battle_cooldown_seconds=battle_cooldown_seconds,
+        is_injured=is_injured,
+        injury_expires_seconds=injury_expires_seconds,
+        # Resolution
         is_resolved=coup.is_resolved,
         attacker_victory=coup.attacker_victory,
-        resolved_at=coup.resolved_at
+        resolved_at=coup.resolved_at,
+        winner_side=winner_side
     )
 
 
@@ -914,4 +1519,445 @@ def process_expired_coups(db: Session = Depends(get_db)):
         "active_count": len(results),
         "active_coups": results
     }
+
+
+# ============================================================
+# FIGHT SESSION ENDPOINTS (roll-by-roll like hunting)
+# ============================================================
+
+@router.post("/{coup_id}/fight/start", response_model=FightSessionResponse)
+def start_fight_session(
+    coup_id: int,
+    request: CoupFightRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Start a fight session on a territory.
+    
+    Creates a fight session that persists until the player resolves it.
+    If player already has an active session for this coup, returns it.
+    
+    This does NOT set cooldown - cooldown is set on resolve.
+    """
+    # Get coup
+    coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
+    if not coup:
+        raise HTTPException(status_code=404, detail="Coup not found")
+    
+    # Check battle phase
+    if not coup.is_battle_phase:
+        raise HTTPException(status_code=400, detail="Not in battle phase")
+    
+    # Check player has pledged
+    attacker_ids = coup.get_attacker_ids()
+    defender_ids = coup.get_defender_ids()
+    
+    if current_user.id in attacker_ids:
+        user_side = "attackers"
+        enemy_ids = defender_ids
+    elif current_user.id in defender_ids:
+        user_side = "defenders"
+        enemy_ids = attacker_ids
+    else:
+        raise HTTPException(status_code=400, detail="You haven't pledged to a side")
+    
+    # Check for existing session
+    existing_session = db.query(CoupFightSession).filter(
+        CoupFightSession.coup_id == coup_id,
+        CoupFightSession.player_id == current_user.id
+    ).first()
+    
+    if existing_session:
+        # Return existing session (player can resume)
+        territory = db.query(CoupTerritory).filter(
+            CoupTerritory.coup_id == coup_id,
+            CoupTerritory.territory_name == existing_session.territory_name
+        ).first()
+        
+        # Recalculate percentages for display
+        state = _get_player_state(db, current_user)
+        attack_power = state.attack_power or 0
+        miss_pct, hit_pct, injure_pct = calculate_roll_chances(attack_power, existing_session.enemy_avg_defense)
+        
+        return FightSessionResponse(
+            success=True,
+            message="Resuming existing fight",
+            territory_name=existing_session.territory_name,
+            territory_display_name=TERRITORY_DISPLAY_NAMES.get(existing_session.territory_name, existing_session.territory_name),
+            territory_icon=TERRITORY_ICONS.get(existing_session.territory_name, "mappin"),
+            side=existing_session.side,
+            max_rolls=existing_session.max_rolls,
+            rolls_completed=existing_session.rolls_completed,
+            rolls_remaining=existing_session.rolls_remaining,
+            rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (existing_session.rolls or [])],
+            miss_chance=int(miss_pct * 100),
+            hit_chance=int(hit_pct * 100),
+            injure_chance=int(injure_pct * 100),
+            best_outcome=existing_session.best_outcome,
+            can_roll=existing_session.can_roll,
+            bar_before=existing_session.bar_before
+        )
+    
+    # Check injury
+    injury = _get_active_injury(db, current_user.id, coup_id)
+    if injury:
+        seconds_remaining = max(0, int((injury.expires_at - datetime.utcnow()).total_seconds()))
+        raise HTTPException(status_code=400, detail=f"You are injured. {seconds_remaining}s remaining.")
+    
+    # Check cooldown
+    cooldown_remaining = _get_battle_cooldown_seconds(db, current_user.id, coup_id)
+    if cooldown_remaining > 0:
+        raise HTTPException(status_code=400, detail=f"On cooldown. {cooldown_remaining}s remaining.")
+    
+    # Validate territory
+    territory_name = request.territory
+    if territory_name not in [TERRITORY_COUPERS, TERRITORY_CROWNS, TERRITORY_THRONE]:
+        raise HTTPException(status_code=400, detail="Invalid territory")
+    
+    # Get territory
+    _ensure_territories_exist(db, coup)
+    territory = db.query(CoupTerritory).filter(
+        CoupTerritory.coup_id == coup_id,
+        CoupTerritory.territory_name == territory_name
+    ).first()
+    
+    if territory.is_captured:
+        raise HTTPException(status_code=400, detail="Territory already captured")
+    
+    # Get player's attack power for roll count
+    state = _get_player_state(db, current_user)
+    attack_power = state.attack_power or 0
+    max_rolls = calculate_max_rolls(attack_power)
+    
+    # Calculate roll bar percentages using centralized config
+    enemy_defense = _get_side_average_defense(db, enemy_ids)
+    miss_pct, hit_pct, injure_pct = calculate_roll_chances(attack_power, enemy_defense)
+    miss_chance = int(miss_pct * 100)
+    hit_chance = int(hit_pct * 100)
+    injure_chance = int(injure_pct * 100)
+    
+    # Create fight session (store combined success for roll logic)
+    session = CoupFightSession(
+        coup_id=coup_id,
+        player_id=current_user.id,
+        territory_name=territory_name,
+        side=user_side,
+        max_rolls=max_rolls,
+        rolls=[],
+        hit_chance=hit_chance + injure_chance,  # Combined for roll threshold
+        enemy_avg_defense=enemy_defense,
+        bar_before=territory.control_bar
+    )
+    db.add(session)
+    db.commit()
+    
+    return FightSessionResponse(
+        success=True,
+        message="Fight started! Roll to attack.",
+        territory_name=territory_name,
+        territory_display_name=TERRITORY_DISPLAY_NAMES.get(territory_name, territory_name),
+        territory_icon=TERRITORY_ICONS.get(territory_name, "mappin"),
+        side=user_side,
+        max_rolls=max_rolls,
+        rolls_completed=0,
+        rolls_remaining=max_rolls,
+        rolls=[],
+        miss_chance=miss_chance,
+        hit_chance=hit_chance,
+        injure_chance=injure_chance,
+        best_outcome="miss",
+        can_roll=True,
+        bar_before=territory.control_bar
+    )
+
+
+@router.post("/{coup_id}/fight/roll", response_model=FightRollResponse)
+def execute_fight_roll(
+    coup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Execute a single roll in the fight session.
+    
+    Each call does ONE roll and persists it.
+    Player can exit and resume - their progress is saved.
+    """
+    # Get existing session
+    session = db.query(CoupFightSession).filter(
+        CoupFightSession.coup_id == coup_id,
+        CoupFightSession.player_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=400, detail="No active fight. Start a fight first.")
+    
+    if not session.can_roll:
+        raise HTTPException(status_code=400, detail="No rolls remaining. Resolve the fight.")
+    
+    # Get player's attack to calculate roll chances
+    state = _get_player_state(db, current_user)
+    attack_power = state.attack_power or 0
+    
+    # Use centralized config for roll calculation
+    miss_pct, hit_pct, injure_pct = calculate_roll_chances(attack_power, session.enemy_avg_defense)
+    
+    # Do one roll (0-1 range to match percentages)
+    roll = random.random()
+    
+    # Layout: [0, injure] = INJURE, [injure, injure+hit] = HIT, [injure+hit, 1] = MISS
+    if roll < injure_pct:
+        outcome = "injure"
+        roll_value = roll * 100  # Convert to 0-100 for display
+    elif roll < injure_pct + hit_pct:
+        outcome = "hit"
+        roll_value = roll * 100
+    else:
+        outcome = "miss"
+        roll_value = roll * 100
+    
+    # Add roll to session
+    session.add_roll(roll_value, outcome)
+    db.commit()
+    db.refresh(session)
+    
+    return FightRollResponse(
+        success=True,
+        message=_get_roll_message(outcome),
+        roll=RollResult(value=roll_value, outcome=outcome),
+        roll_number=session.rolls_completed,
+        rolls_completed=session.rolls_completed,
+        rolls_remaining=session.rolls_remaining,
+        best_outcome=session.best_outcome,
+        can_roll=session.can_roll
+    )
+
+
+def _get_roll_message(outcome: str) -> str:
+    """Get a message for a roll outcome"""
+    if outcome == "injure":
+        return "CRITICAL HIT! Enemy injured!"
+    elif outcome == "hit":
+        return "Direct hit!"
+    else:
+        return "Miss..."
+
+
+@router.post("/{coup_id}/fight/resolve", response_model=FightResolveResponse)
+def resolve_fight_session(
+    coup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Resolve the fight session - apply push and set cooldown.
+    
+    This is when the actual damage is applied to the territory bar.
+    Cooldown is set ONLY when this is called.
+    """
+    # Get session
+    session = db.query(CoupFightSession).filter(
+        CoupFightSession.coup_id == coup_id,
+        CoupFightSession.player_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=400, detail="No active fight to resolve")
+    
+    # Get coup and territory
+    coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
+    territory = db.query(CoupTerritory).filter(
+        CoupTerritory.coup_id == coup_id,
+        CoupTerritory.territory_name == session.territory_name
+    ).first()
+    
+    if not coup or not territory:
+        raise HTTPException(status_code=404, detail="Coup or territory not found")
+    
+    # Calculate push amount based on best outcome
+    best_outcome = session.best_outcome
+    push_amount = 0.0
+    
+    if best_outcome != "miss":
+        # Get player's side count for push calculation
+        attacker_ids = coup.get_attacker_ids()
+        defender_ids = coup.get_defender_ids()
+        
+        if session.side == "attackers":
+            side_ids = attacker_ids
+        else:
+            side_ids = defender_ids
+        
+        side_size = len(side_ids)
+        avg_leadership = _get_side_average_leadership(db, side_ids)
+        
+        # Use centralized formula from systems/coup/config.py
+        base_push = calculate_push_per_hit(side_size, avg_leadership)
+        
+        if best_outcome == "injure":
+            push_amount = base_push * INJURE_PUSH_MULTIPLIER
+        else:
+            push_amount = base_push
+    
+    # Apply push to territory
+    bar_before = territory.control_bar
+    winner = territory.apply_push(session.side, push_amount)
+    bar_after = territory.control_bar
+    
+    # Handle injury if critical hit
+    injured_player_name = None
+    if best_outcome == "injure":
+        if session.side == "attackers":
+            enemy_ids = coup.get_defender_ids()
+        else:
+            enemy_ids = coup.get_attacker_ids()
+        
+        if enemy_ids:
+            injured_id = random.choice(enemy_ids)
+            injured_user = db.query(User).filter(User.id == injured_id).first()
+            if injured_user:
+                injured_player_name = injured_user.display_name
+                
+                # Create injury record
+                injury = CoupInjury(
+                    coup_id=coup_id,
+                    player_id=injured_id,
+                    injured_by_id=current_user.id,
+                    expires_at=datetime.utcnow() + timedelta(minutes=INJURY_DURATION_MINUTES)
+                )
+                db.add(injury)
+    
+    # Log the battle action
+    action = CoupBattleAction(
+        coup_id=coup_id,
+        player_id=current_user.id,
+        territory_name=session.territory_name,
+        side=session.side,
+        roll_count=session.rolls_completed,
+        rolls=session.rolls,
+        best_outcome=best_outcome,
+        push_amount=push_amount,
+        bar_before=bar_before,
+        bar_after=bar_after,
+        injured_player_id=None  # TODO: track injured player ID
+    )
+    db.add(action)
+    
+    # Set cooldown NOW (not before)
+    _set_battle_cooldown(db, current_user.id, coup_id)
+    
+    # Check win condition
+    battle_won = False
+    winner_side = None
+    
+    if winner:
+        # Check if this capture wins the battle
+        winner_side = _check_win_condition(db, coup)
+        if winner_side:
+            battle_won = True
+            coup.resolve(attacker_won=(winner_side == "attackers"))
+    
+    # Delete the session (fight is complete)
+    db.delete(session)
+    db.commit()
+    
+    # Build territory response
+    territory_response = CoupTerritoryResponse(
+        name=territory.territory_name,
+        display_name=territory.display_name,
+        icon=territory.icon,
+        control_bar=round(territory.control_bar, 2),
+        captured_by=territory.captured_by,
+        captured_at=territory.captured_at
+    )
+    
+    # Build message
+    if battle_won:
+        message = f"🎉 VICTORY! {winner_side.upper()} have won the coup!"
+    elif winner:
+        message = f"Territory captured by {winner}!"
+    elif best_outcome == "miss":
+        message = "All attacks missed. No progress."
+    else:
+        message = f"Pushed the bar by {push_amount:.2f}!"
+    
+    return FightResolveResponse(
+        success=True,
+        message=message,
+        roll_count=session.rolls_completed if session else 0,
+        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (session.rolls if session else [])],
+        best_outcome=best_outcome,
+        push_amount=push_amount,
+        bar_before=bar_before,
+        bar_after=bar_after,
+        territory=territory_response,
+        injured_player_name=injured_player_name,
+        battle_won=battle_won,
+        winner_side=winner_side,
+        cooldown_seconds=BATTLE_ACTION_COOLDOWN_MINUTES * 60
+    )
+
+
+@router.get("/{coup_id}/fight/session", response_model=FightSessionResponse)
+def get_fight_session(
+    coup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current fight session if one exists.
+    
+    Returns the session state so player can resume a fight.
+    """
+    session = db.query(CoupFightSession).filter(
+        CoupFightSession.coup_id == coup_id,
+        CoupFightSession.player_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="No active fight session")
+    
+    return FightSessionResponse(
+        success=True,
+        message="Active fight session",
+        territory_name=session.territory_name,
+        territory_display_name=TERRITORY_DISPLAY_NAMES.get(session.territory_name, session.territory_name),
+        territory_icon=TERRITORY_ICONS.get(session.territory_name, "mappin"),
+        side=session.side,
+        max_rolls=session.max_rolls,
+        rolls_completed=session.rolls_completed,
+        rolls_remaining=session.rolls_remaining,
+        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (session.rolls or [])],
+        hit_chance=session.hit_chance,
+        best_outcome=session.best_outcome,
+        can_roll=session.can_roll,
+        bar_before=session.bar_before
+    )
+
+
+@router.delete("/{coup_id}/fight/session")
+def cancel_fight_session(
+    coup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel a fight session without resolving.
+    
+    Use this if player wants to abandon a fight without applying damage.
+    No cooldown is set.
+    """
+    session = db.query(CoupFightSession).filter(
+        CoupFightSession.coup_id == coup_id,
+        CoupFightSession.player_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="No active fight session")
+    
+    db.delete(session)
+    db.commit()
+    
+    return {"success": True, "message": "Fight cancelled"}
 

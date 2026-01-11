@@ -415,9 +415,14 @@ struct CoupPledgeView: View {
             defenderCount: 1,
             userSide: nil,
             canPledge: true,
+            territories: nil,
+            battleCooldownSeconds: nil,
+            isInjured: nil,
+            injuryExpiresSeconds: nil,
             isResolved: false,
             attackerVictory: nil,
-            resolvedAt: nil
+            resolvedAt: nil,
+            winnerSide: nil
         ),
         onDismiss: {},
         onPledge: { _ in }
