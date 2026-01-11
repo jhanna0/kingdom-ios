@@ -130,6 +130,67 @@ class NotificationManager {
         return "You can \(lowercased) again"
     }
     
+    // MARK: - Coup Phase Notifications
+    
+    /// Schedule a notification for when a coup phase ends
+    /// - Parameters:
+    ///   - coupId: The coup ID
+    ///   - phase: Current phase ('pledge' or 'battle')
+    ///   - endDate: When this phase ends
+    ///   - kingdomName: Name of the kingdom for the notification
+    func scheduleCoupPhaseNotification(coupId: Int, phase: String, endDate: Date, kingdomName: String) async {
+        let now = Date()
+        let secondsUntilEnd = endDate.timeIntervalSince(now)
+        
+        // Don't schedule if already passed or too short
+        guard secondsUntilEnd > 5 else {
+            print("⏭️ Skipping coup notification - phase already ended")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule coup notification - permission not granted")
+            return
+        }
+        
+        let identifier = "coup_\(coupId)_\(phase)"
+        
+        let content = UNMutableNotificationContent()
+        if phase == "pledge" {
+            content.title = "⚔️ Coup Battle Starting!"
+            content.body = "The battle for \(kingdomName) has begun!"
+        } else {
+            content.title = "🏰 Coup Ending Soon"
+            content.body = "The battle for \(kingdomName) is about to conclude"
+        }
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "COUP_PHASE"
+        content.userInfo = ["coup_id": coupId, "phase": phase, "kingdom": kingdomName]
+        
+        // Cancel any existing notification for this coup phase
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secondsUntilEnd, repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let minutesUntil = Int(secondsUntilEnd / 60)
+            print("✅ Scheduled coup \(phase) notification for \(kingdomName) in \(minutesUntil)m (ID: \(identifier))")
+        } catch {
+            print("❌ Error scheduling coup notification: \(error)")
+        }
+    }
+    
+    /// Cancel coup notifications for a specific coup
+    func cancelCoupNotifications(coupId: Int) {
+        let identifiers = ["coup_\(coupId)_pledge", "coup_\(coupId)_battle"]
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        print("🗑️ Cancelled coup \(coupId) notifications")
+    }
+    
     // MARK: - Cancel Notifications
     
     /// Cancel all action cooldown notifications

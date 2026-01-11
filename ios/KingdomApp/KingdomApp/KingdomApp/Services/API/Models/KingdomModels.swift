@@ -131,6 +131,7 @@ struct ActiveCoupData: Codable, Identifiable {
     let defender_count: Int
     let user_side: String?  // 'attackers', 'defenders', or nil
     let can_pledge: Bool
+    let pledge_end_time: String?  // ISO timestamp - when pledge phase ends
     
     /// Formatted time remaining
     var timeRemainingFormatted: String {
@@ -144,6 +145,17 @@ struct ActiveCoupData: Codable, Identifiable {
         } else {
             return "\(time_remaining_seconds)s"
         }
+    }
+    
+    /// Parse pledge_end_time to Date for scheduling notifications
+    var pledgeEndDate: Date? {
+        guard let timeString = pledge_end_time else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: timeString) { return date }
+        // Try without fractional seconds
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: timeString)
     }
 }
 

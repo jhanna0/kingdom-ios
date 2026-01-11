@@ -85,8 +85,8 @@ def _get_coup_activities(db: Session, user_id: int, limit: int = 50) -> List[Act
                 "coup_id": coup.id,
                 "side": side,
                 "initiator": coup.initiator_name,
-                "status": coup.status,
-                "victory": coup.attacker_victory if coup.status == 'resolved' else None
+                "status": coup.current_phase,
+                "victory": coup.attacker_victory if coup.is_resolved else None
             },
             created_at=coup.start_time
         ))

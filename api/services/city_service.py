@@ -278,7 +278,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         active_coup_data = None
         active_coup = db.query(CoupEvent).filter(
             CoupEvent.kingdom_id == kingdom.id,
-            CoupEvent.status.in_(['pledge', 'battle'])
+            CoupEvent.resolved_at.is_(None)
         ).first()
         
         if active_coup:
@@ -293,10 +293,9 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 elif current_user.id in defender_ids:
                     user_side = 'defenders'
                 
-                # Can pledge if in kingdom, not already pledged, and pledge phase is open
+                # Can pledge if pledge phase is open and user hasn't pledged
                 can_pledge = (
-                    active_coup.status == 'pledge' and
-                    active_coup.is_pledge_open and
+                    active_coup.is_pledge_phase and
                     current_user.id not in attacker_ids and
                     current_user.id not in defender_ids
                 )
@@ -306,12 +305,13 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 kingdom_id=kingdom.id,
                 kingdom_name=kingdom.name,
                 initiator_name=active_coup.initiator_name,
-                status=active_coup.status,
+                status=active_coup.current_phase,
                 time_remaining_seconds=active_coup.time_remaining_seconds,
                 attacker_count=len(attacker_ids),
                 defender_count=len(defender_ids),
                 user_side=user_side,
-                can_pledge=can_pledge
+                can_pledge=can_pledge,
+                pledge_end_time=active_coup.pledge_end_time.isoformat() if active_coup.pledge_end_time else None
             )
         
         result[kingdom.id] = KingdomData(

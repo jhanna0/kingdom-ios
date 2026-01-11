@@ -30,8 +30,8 @@ COUP_REPUTATION_REQUIREMENT = 500  # Kingdom reputation needed
 COUP_LEADERSHIP_REQUIREMENT = 3    # T3 leadership needed
 
 # Timing
-PLEDGE_DURATION_HOURS = 12         # Phase 1: citizens pick sides
-BATTLE_DURATION_HOURS = 12         # Phase 2: active combat (TBD)
+PLEDGE_DURATION_HOURS = 12         # Phase 1: citizens pick sides (fixed 12h)
+# Battle phase has no fixed duration - continues until resolution
 
 # Cooldowns
 PLAYER_COOLDOWN_DAYS = 30          # 30 days between coup attempts per player
@@ -72,10 +72,10 @@ def _check_player_cooldown(db: Session, user_id: int) -> Tuple[bool, str]:
 
 def _check_kingdom_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, str]:
     """Check if kingdom has had a recent coup (7 day cooldown, no overlapping)"""
-    # Check for active coup (pledge or battle phase)
+    # Check for active coup (not resolved)
     active_coup = db.query(CoupEvent).filter(
         CoupEvent.kingdom_id == kingdom_id,
-        CoupEvent.status.in_(['pledge', 'battle'])
+        CoupEvent.resolved_at.is_(None)
     ).first()
     
     if active_coup:
@@ -84,7 +84,7 @@ def _check_kingdom_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, str]:
     # Check for recent resolved coup
     recent_coup = db.query(CoupEvent).filter(
         CoupEvent.kingdom_id == kingdom_id,
-        CoupEvent.status == 'resolved',
+        CoupEvent.resolved_at.isnot(None),
         CoupEvent.resolved_at >= datetime.utcnow() - timedelta(days=KINGDOM_COOLDOWN_DAYS)
     ).first()
     
@@ -415,8 +415,7 @@ def _resolve_coup_battle(db: Session, coup: CoupEvent) -> CoupResolveResponse:
     required_attack = int(total_defense * ATTACKER_ADVANTAGE_REQUIRED)
     attacker_victory = attacker_attack > required_attack
     
-    # Update coup record
-    coup.status = 'resolved'
+    # Update coup record - resolved_at is the source of truth
     coup.attacker_victory = attacker_victory
     coup.attacker_strength = attacker_attack
     coup.defender_strength = defender_defense
@@ -546,17 +545,15 @@ def initiate_coup(
         )
         db.add(cooldown_record)
     
-    # Create coup event - starts in pledge phase
-    pledge_end_time = datetime.utcnow() + timedelta(hours=PLEDGE_DURATION_HOURS)
+    # Create coup - phase is computed from pledge_end_time, not stored
+    now = datetime.utcnow()
     coup = CoupEvent(
         kingdom_id=kingdom.id,
         initiator_id=current_user.id,
         initiator_name=current_user.display_name,
-        status='pledge',
-        start_time=datetime.utcnow(),
-        pledge_end_time=pledge_end_time,
-        battle_end_time=None,  # Set when battle phase starts
-        attackers=[current_user.id],  # Initiator automatically joins attackers
+        start_time=now,
+        pledge_end_time=now + timedelta(hours=PLEDGE_DURATION_HOURS),
+        attackers=[current_user.id],
         defenders=[]
     )
     
@@ -700,10 +697,10 @@ def _build_coup_response(
         ruler_id=ruler_id,
         ruler_name=ruler_name,
         ruler_stats=ruler_stats,
-        status=coup.status,
+        status=coup.current_phase,  # Computed from time, not stored
         start_time=coup.start_time,
         pledge_end_time=coup.pledge_end_time,
-        battle_end_time=coup.battle_end_time,
+        battle_end_time=None,  # Battle has no fixed end time
         time_remaining_seconds=coup.time_remaining_seconds,
         attackers=attackers,
         defenders=defenders,
@@ -724,10 +721,11 @@ def get_active_coups(
     db: Session = Depends(get_db)
 ):
     """
-    Get all active coups (pledge or battle phase), optionally filtered by kingdom
+    Get all active coups (not yet resolved), optionally filtered by kingdom.
+    Phase (pledge/battle) is computed from time, not stored.
     """
     query = db.query(CoupEvent).filter(
-        CoupEvent.status.in_(['pledge', 'battle'])
+        CoupEvent.resolved_at.is_(None)
     )
     
     if kingdom_id:
@@ -774,8 +772,12 @@ def resolve_coup(
     db: Session = Depends(get_db)
 ):
     """
-    Manually resolve a coup (or auto-resolve after timer expires)
-    Anyone can call this after the voting period ends
+    Resolve a coup - can be called by anyone after the pledge phase ends.
+    Idempotent - safe to call multiple times.
+    
+    Phase is computed from time:
+    - During pledge phase (first 12h): cannot resolve
+    - During battle phase (after 12h): can resolve anytime
     """
     coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
     
@@ -786,18 +788,70 @@ def resolve_coup(
         )
     
     if coup.is_resolved:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Coup has already been resolved"
+        # Idempotent - return the existing result
+        kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+        _, _, attackers = _calculate_combat_strength(db, coup.get_attacker_ids(), coup.kingdom_id)
+        _, _, defenders = _calculate_combat_strength(db, coup.get_defender_ids(), coup.kingdom_id)
+        return CoupResolveResponse(
+            success=True,
+            coup_id=coup.id,
+            attacker_victory=coup.attacker_victory,
+            attacker_strength=coup.attacker_strength,
+            defender_strength=coup.defender_strength,
+            total_defense_with_walls=coup.total_defense_with_walls,
+            required_attack_strength=int(coup.total_defense_with_walls * ATTACKER_ADVANTAGE_REQUIRED) if coup.total_defense_with_walls else 0,
+            attackers=attackers,
+            defenders=defenders,
+            old_ruler_id=None,
+            old_ruler_name=None,
+            new_ruler_id=kingdom.ruler_id if kingdom else None,
+            new_ruler_name=None,
+            message="Coup was already resolved"
         )
     
-    if not coup.should_resolve:
+    if not coup.can_resolve:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Coup cannot be resolved yet. {coup.time_remaining_seconds} seconds remaining."
+            detail=f"Coup cannot be resolved yet - still in pledge phase. {coup.time_remaining_seconds} seconds remaining."
         )
     
     return _resolve_coup_battle(db, coup)
+
+
+@router.get("/{coup_id}/phase")
+def get_coup_phase(
+    coup_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current phase of a coup (computed from time).
+    
+    Phase is determined automatically:
+    - First 12h after creation: 'pledge' phase
+    - After 12h until resolved: 'battle' phase
+    - After resolution: 'resolved'
+    
+    No cronjob or manual advancement needed - phase is always computed fresh.
+    """
+    coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
+    
+    if not coup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Coup not found"
+        )
+    
+    return {
+        "coup_id": coup.id,
+        "phase": coup.current_phase,
+        "is_pledge_phase": coup.is_pledge_phase,
+        "is_battle_phase": coup.is_battle_phase,
+        "is_resolved": coup.is_resolved,
+        "can_resolve": coup.can_resolve,
+        "time_remaining_seconds": coup.time_remaining_seconds,
+        "pledge_end_time": coup.pledge_end_time.isoformat(),
+        "resolved_at": coup.resolved_at.isoformat() if coup.resolved_at else None
+    }
 
 
 @router.post("/{coup_id}/advance-phase")
@@ -806,11 +860,10 @@ def advance_coup_phase(
     db: Session = Depends(get_db)
 ):
     """
-    Advance a coup to the next phase if timer has expired.
-    - Pledge -> Battle (when pledge_end_time passes)
-    - Battle -> Resolved (when battle_end_time passes)
+    DEPRECATED: Phase is now computed from time, no advancement needed.
     
-    Can be called by anyone; typically triggered by cron or client polling.
+    This endpoint is kept for backward compatibility.
+    It returns the current computed phase without modifying anything.
     """
     coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
     
@@ -820,96 +873,45 @@ def advance_coup_phase(
             detail="Coup not found"
         )
     
-    if coup.is_resolved:
-        return {"success": True, "message": "Coup already resolved", "status": coup.status}
-    
-    # Advance pledge -> battle
-    if coup.should_advance_to_battle:
-        coup.advance_to_battle(battle_duration_hours=BATTLE_DURATION_HOURS)
-        db.commit()
-        return {
-            "success": True,
-            "message": "Coup advanced to battle phase",
-            "status": coup.status,
-            "battle_end_time": coup.battle_end_time.isoformat()
-        }
-    
-    # Resolve battle
-    if coup.should_resolve:
-        result = _resolve_coup_battle(db, coup)
-        return {
-            "success": True,
-            "message": "Coup resolved",
-            "status": "resolved",
-            "attacker_victory": result.attacker_victory
-        }
-    
+    # Just return the current computed phase - no state change needed
     return {
-        "success": False,
-        "message": f"Coup not ready to advance. {coup.time_remaining_seconds} seconds remaining in {coup.status} phase.",
-        "status": coup.status
+        "success": True,
+        "message": f"Phase is computed from time, currently in {coup.current_phase} phase",
+        "phase": coup.current_phase,
+        "can_resolve": coup.can_resolve,
+        "time_remaining_seconds": coup.time_remaining_seconds
     }
 
 
 @router.post("/process-expired")
 def process_expired_coups(db: Session = Depends(get_db)):
     """
-    Background task endpoint to process all expired coup phases.
-    - Advances pledge -> battle for expired pledge phases
-    - Resolves expired battle phases
+    DEPRECATED: Phase advancement is no longer needed - phase is computed from time.
     
-    Should be called periodically (e.g., every minute by a cron job).
+    This endpoint now just returns the status of all active coups.
+    Resolution must be triggered explicitly via POST /{coup_id}/resolve.
+    
+    Battle phase continues indefinitely until someone calls resolve.
     """
+    # Find all active coups
+    active_coups = db.query(CoupEvent).filter(
+        CoupEvent.resolved_at.is_(None)
+    ).all()
+    
     results = []
-    
-    # Find coups that need to advance from pledge to battle
-    pledge_expired = db.query(CoupEvent).filter(
-        CoupEvent.status == 'pledge',
-        CoupEvent.pledge_end_time <= datetime.utcnow()
-    ).all()
-    
-    for coup in pledge_expired:
-        try:
-            coup.advance_to_battle(battle_duration_hours=BATTLE_DURATION_HOURS)
-            db.commit()
-            results.append({
-                "coup_id": coup.id,
-                "kingdom_id": coup.kingdom_id,
-                "action": "advanced_to_battle",
-                "battle_end_time": coup.battle_end_time.isoformat()
-            })
-        except Exception as e:
-            results.append({
-                "coup_id": coup.id,
-                "action": "advance_failed",
-                "error": str(e)
-            })
-    
-    # Find coups that need to be resolved
-    battle_expired = db.query(CoupEvent).filter(
-        CoupEvent.status == 'battle',
-        CoupEvent.battle_end_time <= datetime.utcnow()
-    ).all()
-    
-    for coup in battle_expired:
-        try:
-            result = _resolve_coup_battle(db, coup)
-            results.append({
-                "coup_id": coup.id,
-                "kingdom_id": coup.kingdom_id,
-                "action": "resolved",
-                "attacker_victory": result.attacker_victory
-            })
-        except Exception as e:
-            results.append({
-                "coup_id": coup.id,
-                "action": "resolve_failed",
-                "error": str(e)
-            })
+    for coup in active_coups:
+        results.append({
+            "coup_id": coup.id,
+            "kingdom_id": coup.kingdom_id,
+            "phase": coup.current_phase,
+            "can_resolve": coup.can_resolve,
+            "time_remaining_seconds": coup.time_remaining_seconds
+        })
     
     return {
         "success": True,
-        "processed_count": len(results),
-        "results": results
+        "message": "Phase is computed from time, no processing needed. Call /{coup_id}/resolve to end a battle.",
+        "active_count": len(results),
+        "active_coups": results
     }
 

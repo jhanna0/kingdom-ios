@@ -121,12 +121,13 @@ class ActiveCoupData(BaseModel):
     kingdom_id: str
     kingdom_name: str
     initiator_name: str
-    status: str  # 'pledge' or 'battle'
+    status: str  # 'pledge' or 'battle' (computed from time)
     time_remaining_seconds: int
     attacker_count: int
     defender_count: int
     user_side: Optional[str] = None  # 'attackers', 'defenders', or None
     can_pledge: bool = False
+    pledge_end_time: Optional[str] = None  # ISO timestamp for scheduling notifications
 
 
 class CityBoundaryResponse(BaseModel):

@@ -131,6 +131,18 @@ class MapViewModel: ObservableObject {
            let coup = homeKingdom.activeCoup {
             activeCoupInHomeKingdom = coup
             print("⚔️ Active coup in home kingdom: \(coup.kingdom_name)")
+            
+            // Schedule notification for when pledge phase ends
+            if coup.status == "pledge", let pledgeEnd = coup.pledgeEndDate {
+                Task {
+                    await NotificationManager.shared.scheduleCoupPhaseNotification(
+                        coupId: coup.id,
+                        phase: "pledge",
+                        endDate: pledgeEnd,
+                        kingdomName: coup.kingdom_name
+                    )
+                }
+            }
         } else {
             print("❌ No active coup found in home kingdom")
             if let homeKingdomId = player.hometownKingdomId {

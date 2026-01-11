@@ -44,9 +44,9 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
     """Get all coup-related notifications for the user"""
     notifications = []
     
-    # ===== Active coups (pledge or battle phase) =====
+    # ===== Active coups (not resolved) - phase is computed from time =====
     active_coups = db.query(CoupEvent).filter(
-        CoupEvent.status.in_(['pledge', 'battle'])
+        CoupEvent.resolved_at.is_(None)
     ).all()
     
     for coup in active_coups:
@@ -66,13 +66,14 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
             user_side = 'defenders'
         
         # Base coup data for all notifications
+        # Phase is computed from time, not stored
         coup_data = {
             "id": coup.id,
             "kingdom_id": coup.kingdom_id,
             "kingdom_name": kingdom.name,
             "initiator_name": coup.initiator_name,
             "initiator_stats": initiator_stats,
-            "status": coup.status,
+            "status": coup.current_phase,  # Computed from time
             "time_remaining_seconds": coup.time_remaining_seconds,
             "attacker_count": len(attacker_ids),
             "defender_count": len(defender_ids),
@@ -133,22 +134,20 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                         "coup_data": coup_data
                     })
         
-        # === BATTLE PHASE ===
+        # === BATTLE PHASE (continues until someone resolves) ===
         elif coup.is_battle_phase:
             is_citizen = state.hometown_kingdom_id == coup.kingdom_id
             is_ruler = kingdom.ruler_id == user.id
             
             # Notify all citizens and ruler
             if is_citizen or is_ruler or user_has_pledged:
-                hours_remaining = coup.battle_time_remaining_seconds // 3600
-                
                 if user_has_pledged:
                     # User is in the battle - HIGH priority
                     notifications.append({
                         "type": "coup_battle_active",
                         "priority": "high",
                         "title": f"⚔️ Battle in {kingdom.name}!",
-                        "message": f"The coup battle is underway. {hours_remaining}h remaining.",
+                        "message": f"The coup battle is underway. Awaiting resolution.",
                         "action": "view_coup_battle",
                         "action_id": str(coup.id),
                         "created_at": format_datetime_iso(coup.start_time),
@@ -172,7 +171,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
                         "type": "coup_battle_ongoing",
                         "priority": "medium",
                         "title": f"⚔️ Battle in {kingdom.name}",
-                        "message": f"A coup battle is underway in your kingdom. {hours_remaining}h remaining.",
+                        "message": f"A coup battle is underway in your kingdom.",
                         "action": "view_coup_battle",
                         "action_id": str(coup.id),
                         "created_at": format_datetime_iso(coup.start_time),
@@ -181,7 +180,7 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
     
     # ===== Recently resolved coups =====
     recently_resolved_coups = db.query(CoupEvent).filter(
-        CoupEvent.status == 'resolved',
+        CoupEvent.resolved_at.isnot(None),
         CoupEvent.resolved_at >= datetime.utcnow() - timedelta(hours=24)
     ).all()
     

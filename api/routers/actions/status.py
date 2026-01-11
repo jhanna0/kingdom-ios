@@ -445,7 +445,7 @@ def get_action_status(
             from db.models import CoupEvent
             active_coup = db.query(CoupEvent).filter(
                 CoupEvent.kingdom_id == kingdom.id,
-                CoupEvent.status.in_(['pledge', 'battle'])
+                CoupEvent.resolved_at.is_(None)
             ).first()
             
             if active_coup:
@@ -512,7 +512,7 @@ def get_action_status(
         from db.models import CoupEvent
         active_coup = db.query(CoupEvent).filter(
             CoupEvent.kingdom_id == state.current_kingdom_id,
-            CoupEvent.status.in_(['pledge', 'battle'])
+            CoupEvent.resolved_at.is_(None)
         ).first()
         
         if active_coup:
@@ -527,13 +527,10 @@ def get_action_status(
                 user_side = "defenders"
             
             # Can pledge if: pledge phase, not already pledged
-            can_pledge = (
-                active_coup.status == 'pledge' and
-                not user_pledged
-            )
+            can_pledge = active_coup.is_pledge_phase and not user_pledged
             
             # Determine display text based on phase and user status
-            if active_coup.status == 'pledge':
+            if active_coup.is_pledge_phase:
                 if user_pledged:
                     title = "View Coup"
                     description = f"You've pledged as {user_side} - waiting for battle"
@@ -561,7 +558,7 @@ def get_action_status(
                 "coup_id": active_coup.id,
                 "can_pledge": can_pledge,
                 "user_side": user_side,
-                "coup_status": active_coup.status,
+                "coup_status": active_coup.current_phase,
                 "attacker_count": len(attacker_ids),
                 "defender_count": len(defender_ids),
             }

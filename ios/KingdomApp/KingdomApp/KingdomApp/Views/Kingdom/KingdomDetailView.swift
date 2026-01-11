@@ -73,7 +73,7 @@ struct KingdomDetailView: View {
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
-                    Text("Used for contracts & defenses")
+                    Text("Funded by income tax and fees. Rulers exempt.")
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 }

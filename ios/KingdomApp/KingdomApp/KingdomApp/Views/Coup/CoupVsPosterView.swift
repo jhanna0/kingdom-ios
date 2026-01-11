@@ -243,20 +243,38 @@ struct CoupVsPosterView: View {
     
     private var footerRow: some View {
         HStack(spacing: 12) {
-            // Timer
+            // Timer / Status
             HStack(spacing: 8) {
-                Image(systemName: "hourglass")
+                Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "hourglass")
                     .font(FontStyles.iconTiny)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .foregroundColor(status == "battle" ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkMedium)
                 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(status == "pledge" ? "PLEDGE ENDS" : (status == "resolved" ? "FINISHED" : "BATTLE ENDS"))
-                        .font(FontStyles.labelBadge)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .tracking(1)
-                    Text(timeRemaining)
-                        .font(.system(size: 18, weight: .black, design: .monospaced))
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    if status == "pledge" {
+                        Text("PLEDGE ENDS")
+                            .font(FontStyles.labelBadge)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .tracking(1)
+                        Text(timeRemaining)
+                            .font(.system(size: 18, weight: .black, design: .monospaced))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    } else if status == "battle" {
+                        Text("BATTLE IN PROGRESS")
+                            .font(FontStyles.labelBadge)
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            .tracking(1)
+                        Text("Awaiting resolution...")
+                            .font(.system(size: 14, weight: .bold, design: .serif))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    } else {
+                        Text("FINISHED")
+                            .font(FontStyles.labelBadge)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .tracking(1)
+                        Text(timeRemaining)
+                            .font(.system(size: 18, weight: .black, design: .monospaced))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
                 }
             }
             
@@ -375,6 +393,16 @@ struct CoupMapBadgeView: View {
     
     private let size: CGFloat = 70
     
+    private var isBattle: Bool { status == "battle" }
+    
+    /// Display text: time remaining in pledge phase, "BATTLE" in battle phase
+    private var displayText: String {
+        if isBattle {
+            return "BATTLE"
+        }
+        return timeRemaining
+    }
+    
     var body: some View {
         Button(action: onTap) {
             ZStack {
@@ -414,12 +442,12 @@ struct CoupMapBadgeView: View {
                         .foregroundColor(.white.opacity(0.85))
                         .tracking(1)
                     
-                    Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
+                    Image(systemName: isBattle ? "bolt.horizontal.fill" : "bolt.fill")
                         .font(.system(size: 20, weight: .black))
                         .foregroundColor(.white)
                     
-                    Text(timeRemaining)
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    Text(displayText)
+                        .font(.system(size: 10, weight: .bold, design: isBattle ? .serif : .monospaced))
                         .foregroundColor(.white)
                 }
             }
@@ -433,7 +461,7 @@ struct CoupMapBadgeView: View {
     }
     
     private var statusTint: Color {
-        status == "battle" ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonSpecial
+        isBattle ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonSpecial
     }
 }
 
