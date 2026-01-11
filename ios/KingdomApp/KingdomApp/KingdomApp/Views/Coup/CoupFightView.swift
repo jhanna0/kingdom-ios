@@ -753,7 +753,7 @@ struct CoupFightView: View {
     
     private func victoryOverlay(capturedBy: String) -> some View {
         let isOurCapture = (capturedBy == "attackers" && isUserAttacker) || (capturedBy == "defenders" && !isUserAttacker)
-        let color = isOurCapture ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+        let sideColor = capturedBy == "attackers" ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
         let icon = isOurCapture ? "flag.fill" : "xmark.shield.fill"
         let title = isOurCapture ? "TERRITORY CAPTURED!" : "TERRITORY LOST!"
         let subtitle = isOurCapture ? "Your side has taken control!" : "The enemy has captured this territory!"
@@ -766,7 +766,7 @@ struct CoupFightView: View {
                     .font(FontStyles.displayLarge)
                     .foregroundColor(.white)
                     .frame(width: 100, height: 100)
-                    .brutalistBadge(backgroundColor: color, cornerRadius: 25, shadowOffset: 4, borderWidth: 3)
+                    .brutalistBadge(backgroundColor: sideColor, cornerRadius: 25, shadowOffset: 4, borderWidth: 3)
                 
                 Text(title).font(FontStyles.displaySmall).foregroundColor(.white)
                 Text(subtitle).font(FontStyles.labelMedium).foregroundColor(.white.opacity(0.8)).multilineTextAlignment(.center)
@@ -774,7 +774,7 @@ struct CoupFightView: View {
                 Button(action: { onComplete(resolveResult) }) {
                     Text("Continue").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.brutalist(backgroundColor: color, foregroundColor: .white, fullWidth: true))
+                .buttonStyle(.brutalist(backgroundColor: sideColor, foregroundColor: .white, fullWidth: true))
                 .padding(.horizontal, 40)
                 .padding(.top, 20)
             }

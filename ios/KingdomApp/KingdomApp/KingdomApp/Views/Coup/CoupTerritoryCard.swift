@@ -106,13 +106,22 @@ struct TugOfWarBar: View {
             let enemyColor = userIsAttacker ? KingdomTheme.Colors.royalBlue : KingdomTheme.Colors.buttonDanger
             
             ZStack(alignment: .leading) {
-                // Background (enemy side)
+                // Background (enemy side) with animated stripes
                 RoundedRectangle(cornerRadius: 8)
                     .fill(enemyColor.opacity(0.3))
+                    .overlay(
+                        AnimatedStripes()
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    )
                 
-                // User progress (from left)
+                // User progress (from left) with animated stripes
                 RoundedRectangle(cornerRadius: 8)
                     .fill(userColor.opacity(0.7))
+                    .frame(width: userWidth)
+                    .overlay(
+                        AnimatedStripes()
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    )
                     .frame(width: userWidth)
                 
                 // Center marker (50% line)

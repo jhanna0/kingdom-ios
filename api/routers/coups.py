@@ -453,7 +453,7 @@ def _resolve_coup_battle(db: Session, coup: CoupEvent) -> CoupResolveResponse:
     ruler_change = {}
     if attacker_victory:
         ruler_change = _apply_coup_victory_rewards(db, coup, kingdom, attackers, defenders)
-        message = f"🎉 COUP SUCCEEDED! {coup.initiator_name} has seized power in {kingdom.name}!"
+        message = f"COUP SUCCEEDED! {coup.initiator_name} has seized power in {kingdom.name}!"
     else:
         _apply_coup_failure_penalties(db, coup, kingdom, attackers, defenders)
         message = f"💀 COUP FAILED! The rebellion in {kingdom.name} has been crushed!"
@@ -1166,7 +1166,7 @@ def fight_in_territory(
         message += f" 🏴 {territory.display_name} captured by {territory.captured_by}!"
     
     if battle_won:
-        message = f"🎉 VICTORY! {winner_side.upper()} have won the coup!"
+        message = f"VICTORY! {winner_side.upper()} have won the coup!"
     
     # Get new cooldown
     new_cooldown = BATTLE_ACTION_COOLDOWN_MINUTES * 60
@@ -1775,6 +1775,48 @@ def resolve_fight_session(
     if not coup or not territory:
         raise HTTPException(status_code=404, detail="Coup or territory not found")
     
+    # If territory was already captured (race condition - someone else captured it 
+    # while this player was fighting), just clean up and return same response shape
+    if territory.is_captured:
+        # Check if battle was won
+        winner_side = _check_win_condition(db, coup)
+        battle_won = winner_side is not None
+        
+        # Delete the session and set cooldown
+        db.delete(session)
+        _set_battle_cooldown(db, current_user.id, coup_id)
+        db.commit()
+        
+        territory_response = CoupTerritoryResponse(
+            name=territory.territory_name,
+            display_name=territory.display_name,
+            icon=territory.icon,
+            control_bar=round(territory.control_bar, 2),
+            captured_by=territory.captured_by,
+            captured_at=territory.captured_at
+        )
+        
+        if battle_won:
+            message = f"VICTORY! {winner_side.upper()} have won the coup!"
+        else:
+            message = f"Territory captured by {territory.captured_by}!"
+        
+        return FightResolveResponse(
+            success=True,
+            message=message,
+            roll_count=session.rolls_completed,
+            rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (session.rolls or [])],
+            best_outcome=session.best_outcome,
+            push_amount=0.0,
+            bar_before=session.bar_before,
+            bar_after=territory.control_bar,
+            territory=territory_response,
+            injured_player_name=None,
+            battle_won=battle_won,
+            winner_side=winner_side,
+            cooldown_seconds=BATTLE_ACTION_COOLDOWN_MINUTES * 60
+        )
+    
     # Calculate push amount based on best outcome
     best_outcome = session.best_outcome
     push_amount = 0.0
@@ -1874,7 +1916,7 @@ def resolve_fight_session(
     
     # Build message
     if battle_won:
-        message = f"🎉 VICTORY! {winner_side.upper()} have won the coup!"
+        message = f"VICTORY! {winner_side.upper()} have won the coup!"
     elif winner:
         message = f"Territory captured by {winner}!"
     elif best_outcome == "miss":
