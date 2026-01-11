@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Full-screen fight experience for Coup battles
+/// Full-screen fight experience for Battles (Coups & Invasions)
 /// Uses server-side roll-by-roll system (like hunting)
-struct CoupFightView: View {
-    let territory: CoupTerritory
-    let coup: CoupEventResponse
+struct BattleFightView: View {
+    let territory: BattleTerritory
+    let battle: BattleEventResponse
     let onComplete: (FightResolveResponse?) -> Void
     
     // Session state (from server)
@@ -26,8 +26,12 @@ struct CoupFightView: View {
     @State private var showVictory = false
     
     private var isUserAttacker: Bool {
-        coup.userSide == "attackers"
+        battle.userSide == "attackers"
     }
+    
+    // Battle-type aware labels
+    private var attackerLabel: String { battle.attackerLabel }
+    private var defenderLabel: String { battle.defenderLabel }
     
     private var sideColor: Color {
         isUserAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
@@ -242,9 +246,9 @@ struct CoupFightView: View {
             
             VStack {
                 HStack {
-                    nameplate(title: "YOU", subtitle: isUserAttacker ? "Coupers" : "Crown")
+                    nameplate(title: "YOU", subtitle: isUserAttacker ? attackerLabel : defenderLabel)
                     Spacer()
-                    nameplate(title: "ENEMY", subtitle: isUserAttacker ? "Crown" : "Coupers")
+                    nameplate(title: "ENEMY", subtitle: isUserAttacker ? defenderLabel : attackerLabel)
                 }
                 .padding(12)
                 
@@ -822,7 +826,7 @@ struct CoupFightView: View {
         Task {
             do {
                 let request = try APIClient.shared.request(
-                    endpoint: "/battles/\(coup.id)/fight/start",
+                    endpoint: "/battles/\(battle.id)/fight/start",
                     method: "POST",
                     body: ["territory": territory.name]
                 )
@@ -853,7 +857,7 @@ struct CoupFightView: View {
         Task {
             do {
                 let request = APIClient.shared.request(
-                    endpoint: "/battles/\(coup.id)/fight/roll",
+                    endpoint: "/battles/\(battle.id)/fight/roll",
                     method: "POST"
                 )
                 let response: FightRollResponse = try await APIClient.shared.execute(request)
@@ -927,7 +931,7 @@ struct CoupFightView: View {
         Task {
             do {
                 let request = APIClient.shared.request(
-                    endpoint: "/battles/\(coup.id)/fight/resolve",
+                    endpoint: "/battles/\(battle.id)/fight/resolve",
                     method: "POST"
                 )
                 let response: FightResolveResponse = try await APIClient.shared.execute(request)
@@ -960,3 +964,6 @@ struct CoupFightView: View {
         }
     }
 }
+
+// Backwards compatible alias
+typealias CoupFightView = BattleFightView

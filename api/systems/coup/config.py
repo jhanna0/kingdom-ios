@@ -105,11 +105,14 @@ def calculate_roll_chances(attack: int, enemy_defense: float) -> tuple[float, fl
     """
     Calculate hit/miss/injure probabilities.
     
+    +1 is added to both attack and defense to ensure everyone has a baseline chance.
+    This prevents 0 attack from having 0% hit chance and 0 defense from being useless.
+    
     Returns: (miss_chance, hit_chance, injure_chance) - all 0.0 to 1.0
     """
-    miss_slots = max(1.0, enemy_defense) * 2.0
-    hit_slots = attack * HIT_MULTIPLIER
-    injure_slots = attack * INJURE_MULTIPLIER
+    miss_slots = (enemy_defense + 1) * 2.0
+    hit_slots = (attack + 1) * HIT_MULTIPLIER
+    injure_slots = (attack + 1) * INJURE_MULTIPLIER
     total = miss_slots + hit_slots + injure_slots
     
     return (

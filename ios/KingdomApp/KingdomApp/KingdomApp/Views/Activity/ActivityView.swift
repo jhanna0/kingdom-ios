@@ -82,9 +82,9 @@ struct ActivityView: View {
             .task {
                 await viewModel.loadActivity()
             }
-            .sheet(item: $viewModel.selectedCoup) { coupData in
-                CoupView(coupId: coupData.id, onDismiss: {
-                    viewModel.selectedCoup = nil
+            .sheet(item: $viewModel.selectedBattle) { battle in
+                BattleView(battleId: battle.id, onDismiss: {
+                    viewModel.selectedBattle = nil
                 })
             }
         }

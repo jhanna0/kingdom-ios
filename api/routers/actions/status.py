@@ -441,16 +441,17 @@ def get_action_status(
         elif kingdom.ruler_id == current_user.id:
             coup_ineligibility_reason = "You are the ruler"
         else:
-            # Check for active coup first
-            from db.models import CoupEvent
-            active_coup = db.query(CoupEvent).filter(
-                CoupEvent.kingdom_id == kingdom.id,
-                CoupEvent.resolved_at.is_(None)
+            # Check for active battle (coup or invasion) first
+            from db.models import Battle
+            active_battle = db.query(Battle).filter(
+                Battle.kingdom_id == kingdom.id,
+                Battle.resolved_at.is_(None)
             ).first()
             
-            if active_coup:
-                coup_ineligibility_reason = "Coup already in progress"
-                active_coup_id = active_coup.id
+            if active_battle:
+                battle_type = "Coup" if active_battle.is_coup else "Invasion"
+                coup_ineligibility_reason = f"{battle_type} already in progress"
+                active_coup_id = active_battle.id
             else:
                 # Check player stats
                 kingdom_rep = _get_kingdom_reputation(db, current_user.id, kingdom.id)
@@ -486,7 +487,7 @@ def get_action_status(
                 "category": "political",
                 "theme_color": "buttonSpecial",
                 "display_order": 1,
-                "endpoint": "/coups/initiate",
+                "endpoint": "/battles/coup/initiate",
                 "kingdom_id": kingdom.id,
             }
         else:
@@ -507,18 +508,18 @@ def get_action_status(
                 "active_coup_id": active_coup_id,  # If there's an active coup, frontend can show it
             }
     
-    # VIEW COUP - Show when there's an active coup in the user's current kingdom
-    if state.current_kingdom_id:
-        from db.models import CoupEvent
-        active_coup = db.query(CoupEvent).filter(
-            CoupEvent.kingdom_id == state.current_kingdom_id,
-            CoupEvent.resolved_at.is_(None)
+    # VIEW BATTLE - Show when there's an active battle in the user's hometown kingdom
+    if state.hometown_kingdom_id:
+        from db.models import Battle
+        active_home_battle = db.query(Battle).filter(
+            Battle.kingdom_id == state.hometown_kingdom_id,
+            Battle.resolved_at.is_(None)
         ).first()
         
-        if active_coup:
+        if active_home_battle:
             # Check if user already pledged
-            attacker_ids = active_coup.get_attacker_ids()
-            defender_ids = active_coup.get_defender_ids()
+            attacker_ids = active_home_battle.get_attacker_ids()
+            defender_ids = active_home_battle.get_defender_ids()
             user_pledged = current_user.id in attacker_ids or current_user.id in defender_ids
             user_side = None
             if current_user.id in attacker_ids:
@@ -526,41 +527,61 @@ def get_action_status(
             elif current_user.id in defender_ids:
                 user_side = "defenders"
             
-            # Can pledge if: pledge phase, not already pledged
-            can_pledge = active_coup.is_pledge_phase and not user_pledged
+            # Check if user is in the correct kingdom
+            is_in_correct_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
             
-            # Determine display text based on phase and user status
-            if active_coup.is_pledge_phase:
+            # Can pledge if: in correct kingdom, pledge phase, not already pledged
+            can_pledge = is_in_correct_kingdom and active_home_battle.is_pledge_phase and not user_pledged
+            
+            # Battle-type aware text
+            battle_type_name = "Coup" if active_home_battle.is_coup else "Invasion"
+            battle_type_lower = battle_type_name.lower()
+            
+            # Determine display text based on phase, user status, and location
+            if not is_in_correct_kingdom:
+                # User needs to travel home to participate
+                title = "Travel Home to Vote"
+                description = f"Return to your home kingdom to pledge in the {battle_type_lower}"
+            elif active_home_battle.is_pledge_phase:
                 if user_pledged:
-                    title = "View Coup"
+                    title = f"View {battle_type_name}"
                     description = f"You've pledged as {user_side} - waiting for battle"
                 else:
-                    minutes_left = active_coup.time_remaining_seconds // 60
-                    title = "Join Coup"
-                    description = f"A coup is underway! {minutes_left}m to pledge"
+                    minutes_left = active_home_battle.time_remaining_seconds // 60
+                    title = f"Vote in {battle_type_name}"
+                    description = f"A {battle_type_lower} is underway! {minutes_left}m to pledge"
             else:  # battle phase
-                title = "View Battle"
-                description = "The battle for the throne is underway"
+                if user_pledged:
+                    title = "View Battle"
+                    description = f"The {battle_type_lower} battle is underway"
+                else:
+                    title = "View Battle"
+                    description = "Battle phase - you didn't pledge"
             
+            # Rename key to view_battle for unified system, but keep view_coup for backwards compat
             actions["view_coup"] = {
                 "ready": True,
                 "seconds_remaining": 0,
                 "unlocked": True,
-                "action_type": "view_coup",
+                "action_type": "view_coup",  # Keep for backwards compat in iOS
                 "requirements_met": True,
                 "title": title,
-                "icon": "bolt.fill",
+                "icon": "bolt.fill" if active_home_battle.is_coup else "flag.2.crossed.fill",
                 "description": description,
                 "category": "political",
                 "theme_color": "buttonDanger",
                 "display_order": 0,  # Show first in political slot
-                "endpoint": None,  # No endpoint - frontend handles opening CoupView
-                "coup_id": active_coup.id,
+                "endpoint": None,  # No endpoint - frontend handles opening BattleView
+                "coup_id": active_home_battle.id,  # Keep coup_id for backwards compat
+                "battle_id": active_home_battle.id,  # New field
+                "battle_type": active_home_battle.type,  # "coup" or "invasion"
                 "can_pledge": can_pledge,
                 "user_side": user_side,
-                "coup_status": active_coup.current_phase,
+                "coup_status": active_home_battle.current_phase,  # Keep for backwards compat
+                "battle_status": active_home_battle.current_phase,  # New field
                 "attacker_count": len(attacker_ids),
                 "defender_count": len(defender_ids),
+                "is_in_correct_kingdom": is_in_correct_kingdom,
             }
     
     # Add slot information to each action

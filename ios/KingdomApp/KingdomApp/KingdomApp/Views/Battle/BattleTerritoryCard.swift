@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Territory card for coup battles
+/// Territory card for battles (Coups & Invasions)
 /// Shows tug-of-war bar and fight button
-struct CoupTerritoryCard: View {
-    let territory: CoupTerritory
+struct BattleTerritoryCard: View {
+    let territory: BattleTerritory
     let userSide: String?
     let canFight: Bool
     let onFight: () -> Void
@@ -175,12 +175,15 @@ struct TugOfWarBar: View {
     }
 }
 
+// Backwards compatible alias
+typealias CoupTerritoryCard = BattleTerritoryCard
+
 // MARK: - Preview
 
 #Preview {
     VStack(spacing: 16) {
-        CoupTerritoryCard(
-            territory: CoupTerritory(
+        BattleTerritoryCard(
+            territory: BattleTerritory(
                 name: "throne_room",
                 displayName: "Throne Room",
                 icon: "building.columns.fill",
@@ -193,11 +196,11 @@ struct TugOfWarBar: View {
             onFight: {}
         )
         
-        CoupTerritoryCard(
-            territory: CoupTerritory(
-                name: "coupers_territory",
-                displayName: "Coupers Territory",
-                icon: "figure.fencing",
+        BattleTerritoryCard(
+            territory: BattleTerritory(
+                name: "north",
+                displayName: "Northern Territory",
+                icon: "arrow.up.circle.fill",
                 controlBar: 15.0,
                 capturedBy: nil,
                 capturedAt: nil
@@ -207,11 +210,11 @@ struct TugOfWarBar: View {
             onFight: {}
         )
         
-        CoupTerritoryCard(
-            territory: CoupTerritory(
-                name: "crowns_territory",
-                displayName: "Crowns Territory",
-                icon: "crown.fill",
+        BattleTerritoryCard(
+            territory: BattleTerritory(
+                name: "capitol",
+                displayName: "Capitol",
+                icon: "building.columns.fill",
                 controlBar: 100.0,
                 capturedBy: "defenders",
                 capturedAt: "2024-01-01T00:00:00Z"

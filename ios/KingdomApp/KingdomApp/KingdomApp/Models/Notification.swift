@@ -86,28 +86,7 @@ struct InitiatorStats: Codable {
     }
 }
 
-/// A player participating in a coup, with stats for display
-struct CoupParticipant: Codable, Identifiable {
-    let playerId: Int
-    let playerName: String
-    let kingdomReputation: Int
-    let attackPower: Int
-    let defensePower: Int
-    let leadership: Int
-    let level: Int
-    
-    var id: Int { playerId }
-    
-    enum CodingKeys: String, CodingKey {
-        case playerId = "player_id"
-        case playerName = "player_name"
-        case kingdomReputation = "kingdom_reputation"
-        case attackPower = "attack_power"
-        case defensePower = "defense_power"
-        case leadership
-        case level
-    }
-}
+// NOTE: CoupParticipant is now a typealias to BattleParticipant in BattleModels.swift
 
 struct CoupNotificationData: Codable, Identifiable {
     let id: Int

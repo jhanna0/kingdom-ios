@@ -259,7 +259,8 @@ struct AuthenticatedView: View {
                         
                         HStack {
                             Spacer()
-                            CoupMapBadgeView(
+                            BattleMapBadgeView(
+                                battleType: .coup,
                                 status: coup.status,
                                 timeRemaining: coup.timeRemainingFormatted,
                                 attackerCount: coup.attacker_count,
@@ -430,7 +431,7 @@ struct AuthenticatedView: View {
         }
         .fullScreenCover(isPresented: $showCoupView) {
             if let coup = viewModel.activeCoupInHomeKingdom {
-                CoupView(coupId: coup.id, onDismiss: { showCoupView = false })
+                BattleView(battleId: coup.id, onDismiss: { showCoupView = false })
             }
         }
         .onChange(of: showNotifications) { _, isShowing in

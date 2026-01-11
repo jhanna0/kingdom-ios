@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -126,8 +126,9 @@ async def startup_event():
         print("👤 Player state: /player/state, /player/sync")
         print("📜 Contracts: /contracts")
         print("🏠 Properties: /properties")
-        print("⚔️  Coups: /coups")
-        print("🏴 Invasions: /invasions")
+        print("⚔️  Coups: /coups (legacy)")
+        print("🏴 Invasions: /invasions (legacy)")
+        print("🗡️  Battles: /battles (unified coups + invasions)")
         print("🤝 Alliances: /alliances")
         print("👥 Players: /players")
         print("👫 Friends: /friends")
@@ -180,6 +181,7 @@ app.include_router(weather.router)
 app.include_router(market.router)
 app.include_router(hunts.router)
 app.include_router(incidents.router)
+app.include_router(battles.router)  # Unified battle system (coups + invasions)
 
 
 # ===== WebSocket Endpoint (Local Development) =====

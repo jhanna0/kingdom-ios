@@ -27,7 +27,7 @@ struct FighterStats {
         self.leadership = stats.leadership
     }
     
-    init(from participant: CoupParticipant) {
+    init(from participant: BattleParticipant) {
         self.level = participant.level
         self.reputation = participant.kingdomReputation
         self.attack = participant.attackPower
@@ -36,26 +36,38 @@ struct FighterStats {
     }
 }
 
-// MARK: - Coup VS Poster View
-/// Clean, cohesive VS poster for coup events
+// MARK: - Battle VS Poster View
+/// Clean, cohesive VS poster for battle events (Coups & Invasions)
 /// One unified card - no fragmented strips
 
-struct CoupVsPosterView: View {
-    let kingdomName: String
-    let challengerName: String
-    let rulerName: String
-    let attackerCount: Int
-    let defenderCount: Int
+struct BattleVsPosterView: View {
+    // New unified initializer from BattleEventResponse
+    let battle: BattleEventResponse
     let timeRemaining: String
-    let status: String
-    let userSide: String?
-    
-    // Fighter stats
-    var challengerStats: FighterStats = .empty
-    var rulerStats: FighterStats = .empty
-    
-    // Optional dismiss action
     var onDismiss: (() -> Void)?
+    
+    // Computed properties from battle
+    private var kingdomName: String { battle.kingdomName ?? "Kingdom" }
+    private var challengerName: String { battle.initiatorName }
+    private var rulerName: String { battle.rulerName ?? "The Crown" }
+    private var attackerCount: Int { battle.attackerCount }
+    private var defenderCount: Int { battle.defenderCount }
+    private var status: String { battle.status }
+    private var userSide: String? { battle.userSide }
+    private var battleType: BattleType { battle.battleType }
+    
+    private var challengerStats: FighterStats {
+        battle.initiatorStats.map { FighterStats(from: $0) } ?? .empty
+    }
+    
+    private var rulerStats: FighterStats {
+        battle.rulerStats.map { FighterStats(from: $0) } ?? .empty
+    }
+    
+    // Battle-type aware labels
+    private var battleTypeLabel: String { battleType.displayName.uppercased() }
+    private var attackerLabel: String { battle.attackerLabel }
+    private var defenderLabel: String { battle.defenderLabel }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -91,8 +103,8 @@ struct CoupVsPosterView: View {
     
     private var headerRow: some View {
         HStack(spacing: 12) {
-            // Coup icon badge
-            Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
+            // Battle type icon badge
+            Image(systemName: status == "battle" ? "bolt.horizontal.fill" : battleType.icon)
                 .font(FontStyles.iconTiny)
                 .foregroundColor(.white)
                 .frame(width: 36, height: 36)
@@ -100,7 +112,7 @@ struct CoupVsPosterView: View {
             
             // Title
             VStack(alignment: .leading, spacing: 2) {
-                Text("COUP")
+                Text(battleTypeLabel)
                     .font(FontStyles.labelBadge)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .tracking(2)
@@ -323,7 +335,7 @@ struct CoupVsPosterView: View {
 
 // MARK: - Pledge Choice Card
 
-struct CoupPledgeChoiceCard: View {
+struct BattlePledgeChoiceCard: View {
     let title: String
     let subtitle: String
     let icon: String
@@ -382,7 +394,8 @@ struct CoupPledgeChoiceCard: View {
 
 // MARK: - Compact Map Badge View
 
-struct CoupMapBadgeView: View {
+struct BattleMapBadgeView: View {
+    let battleType: BattleType
     let status: String
     let timeRemaining: String
     let attackerCount: Int
@@ -437,12 +450,12 @@ struct CoupMapBadgeView: View {
                 
                 // Content
                 VStack(spacing: 3) {
-                    Text("COUP")
+                    Text(battleType.displayName.uppercased())
                         .font(FontStyles.labelBadge)
                         .foregroundColor(.white.opacity(0.85))
                         .tracking(1)
                     
-                    Image(systemName: isBattle ? "bolt.horizontal.fill" : "bolt.fill")
+                    Image(systemName: isBattle ? "bolt.horizontal.fill" : battleType.icon)
                         .font(.system(size: 20, weight: .black))
                         .foregroundColor(.white)
                     
@@ -461,9 +474,18 @@ struct CoupMapBadgeView: View {
     }
     
     private var statusTint: Color {
-        isBattle ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonSpecial
+        if battleType == .invasion {
+            return isBattle ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
+        }
+        return isBattle ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.buttonSpecial
     }
 }
+
+// Backwards compatible alias
+typealias CoupMapBadgeView = BattleMapBadgeView
+
+// Backwards compatible alias
+typealias CoupVsPosterView = BattleVsPosterView
 
 // MARK: - Preview
 
@@ -473,24 +495,25 @@ struct CoupMapBadgeView: View {
         
         ScrollView {
             VStack(spacing: 20) {
-                CoupVsPosterView(
-                    kingdomName: "San Francisco",
-                    challengerName: "John the Bold",
-                    rulerName: "King Marcus",
+                // Preview would need a mock BattleEventResponse
+                Text("BattleVsPosterView Preview")
+                    .font(FontStyles.headingMedium)
+                
+                BattleMapBadgeView(
+                    battleType: .coup,
+                    status: "pledge",
+                    timeRemaining: "2h 45m",
                     attackerCount: 5,
                     defenderCount: 3,
-                    timeRemaining: "2h 45m",
-                    status: "pledge",
-                    userSide: nil,
-                    challengerStats: FighterStats(level: 15, reputation: 650, attack: 12, defense: 10, leadership: 4),
-                    rulerStats: FighterStats(level: 20, reputation: 800, attack: 5, defense: 15, leadership: 5)
+                    onTap: {}
                 )
                 
-                CoupMapBadgeView(
-                    status: "pledge",
-                    timeRemaining: "2h 45m",
-                    attackerCount: 5,
-                    defenderCount: 3,
+                BattleMapBadgeView(
+                    battleType: .invasion,
+                    status: "battle",
+                    timeRemaining: "",
+                    attackerCount: 12,
+                    defenderCount: 8,
                     onTap: {}
                 )
             }
@@ -504,7 +527,7 @@ struct CoupMapBadgeView: View {
         KingdomTheme.Colors.parchment.ignoresSafeArea()
         
         VStack(spacing: 12) {
-            CoupPledgeChoiceCard(
+            BattlePledgeChoiceCard(
                 title: "ATTACKERS",
                 subtitle: "Join the revolt",
                 icon: "figure.fencing",
@@ -513,7 +536,7 @@ struct CoupMapBadgeView: View {
                 onTap: {}
             )
             
-            CoupPledgeChoiceCard(
+            BattlePledgeChoiceCard(
                 title: "DEFENDERS",
                 subtitle: "Protect the crown",
                 icon: "shield.fill",

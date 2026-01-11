@@ -107,10 +107,10 @@ struct ActionsView: View {
             }
         }
         .fullScreenCover(isPresented: $showCoupView) {
-            if let coupId = initiatedCoupId {
-                CoupView(coupId: coupId, onDismiss: {
+            if let battleId = initiatedCoupId {
+                BattleView(battleId: battleId, onDismiss: {
                     showCoupView = false
-                    // Refresh action status after coup view closes
+                    // Refresh action status after battle view closes
                     Task {
                         await loadActionStatus(force: true)
                     }
@@ -582,7 +582,7 @@ struct ActionsView: View {
         Task {
             do {
                 let request = try APIClient.shared.request(
-                    endpoint: "/coups/initiate",
+                    endpoint: "/battles/coup/initiate",
                     method: "POST",
                     body: ["kingdom_id": kingdomId]
                 )

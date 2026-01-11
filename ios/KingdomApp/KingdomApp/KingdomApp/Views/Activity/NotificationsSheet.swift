@@ -84,9 +84,9 @@ struct NotificationsSheet: View {
                 // Mark notifications as read when user views them
                 try? await NotificationsAPI(client: APIClient.shared).markRead()
             }
-            .sheet(item: $viewModel.selectedCoup) { coupData in
-                CoupView(coupId: coupData.id, onDismiss: {
-                    viewModel.selectedCoup = nil
+            .sheet(item: $viewModel.selectedBattle) { battle in
+                BattleView(battleId: battle.id, onDismiss: {
+                    viewModel.selectedBattle = nil
                 })
             }
         }

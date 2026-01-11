@@ -21,12 +21,13 @@ struct KingdomInfoSheetView: View {
     @State private var showTownPub = false
     @State private var showMarket = false
     
-    // Coup state
-    @State private var showCoupView = false
+    // Battle state (Coups & Invasions)
+    @State private var showBattleView = false
     @State private var isInitiatingCoup = false
-    @State private var coupError: String?
-    @State private var showCoupError = false
-    @State private var initiatedCoupId: Int?
+    @State private var isDeclaringInvasion = false
+    @State private var battleError: String?
+    @State private var showBattleError = false
+    @State private var initiatedBattleId: Int?
     
     var body: some View {
         ScrollView {
@@ -474,6 +475,32 @@ struct KingdomInfoSheetView: View {
                             .cornerRadius(10)
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(KingdomTheme.Colors.inkLight, lineWidth: 2))
                         }
+                        
+                        // Declare Invasion button - only for rulers at enemy kingdoms
+                        if kingdom.canDeclareWar && kingdom.rulerId != nil && kingdom.rulerId != player.playerId {
+                            Button(action: {
+                                declareInvasion(kingdomId: kingdom.id)
+                            }) {
+                                HStack(spacing: 8) {
+                                    if isDeclaringInvasion {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(0.9)
+                                    } else {
+                                        Image(systemName: "flag.2.crossed.fill")
+                                            .font(FontStyles.iconSmall)
+                                            .foregroundColor(.white)
+                                    }
+                                    Text(isDeclaringInvasion ? "Declaring..." : "Declare Invasion")
+                                        .font(FontStyles.bodyMediumBold)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(KingdomTheme.Spacing.medium)
+                                .foregroundColor(.white)
+                            }
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 10, shadowOffset: 3, borderWidth: 2)
+                            .disabled(isDeclaringInvasion)
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -523,15 +550,15 @@ struct KingdomInfoSheetView: View {
                     }
             }
         }
-        .fullScreenCover(isPresented: $showCoupView) {
-            if let coupId = initiatedCoupId {
-                CoupView(coupId: coupId, onDismiss: { showCoupView = false })
+        .fullScreenCover(isPresented: $showBattleView) {
+            if let battleId = initiatedBattleId {
+                BattleView(battleId: battleId, onDismiss: { showBattleView = false })
             }
         }
-        .alert("Coup Failed", isPresented: $showCoupError) {
+        .alert("Battle Failed", isPresented: $showBattleError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(coupError ?? "Unknown error")
+            Text(battleError ?? "Unknown error")
         }
     }
     
@@ -714,28 +741,53 @@ struct KingdomInfoSheetView: View {
         }
     }
     
-    // MARK: - Coup Actions
+    // MARK: - Battle Actions
     
     private func initiateCoup(kingdomId: String) {
         isInitiatingCoup = true
         Task {
             do {
                 let request = try APIClient.shared.request(
-                    endpoint: "/coups/initiate",
+                    endpoint: "/battles/coup/initiate",
                     method: "POST",
                     body: ["kingdom_id": kingdomId]
                 )
-                let response: CoupInitiateResponse = try await APIClient.shared.execute(request)
+                let response: BattleInitiateResponse = try await APIClient.shared.execute(request)
                 await MainActor.run {
-                    initiatedCoupId = response.coupId
-                    showCoupView = true
+                    initiatedBattleId = response.battleId
+                    showBattleView = true
                     isInitiatingCoup = false
                 }
             } catch {
                 await MainActor.run {
-                    coupError = error.localizedDescription
-                    showCoupError = true
+                    battleError = error.localizedDescription
+                    showBattleError = true
                     isInitiatingCoup = false
+                }
+            }
+        }
+    }
+    
+    private func declareInvasion(kingdomId: String) {
+        isDeclaringInvasion = true
+        Task {
+            do {
+                let request = try APIClient.shared.request(
+                    endpoint: "/battles/invasion/declare",
+                    method: "POST",
+                    body: ["target_kingdom_id": kingdomId]
+                )
+                let response: BattleInitiateResponse = try await APIClient.shared.execute(request)
+                await MainActor.run {
+                    initiatedBattleId = response.battleId
+                    showBattleView = true
+                    isDeclaringInvasion = false
+                }
+            } catch {
+                await MainActor.run {
+                    battleError = error.localizedDescription
+                    showBattleError = true
+                    isDeclaringInvasion = false
                 }
             }
         }

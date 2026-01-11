@@ -1,38 +1,38 @@
 import SwiftUI
 import Combine
 
-/// Main container view for Coup V2
+/// Main container view for Battles (Coups & Invasions)
 /// Full-screen game modal - no nav bar
-struct CoupView: View {
-    let coupId: Int
+struct BattleView: View {
+    let battleId: Int
     let onDismiss: () -> Void
     
-    @StateObject private var viewModel = CoupViewModel()
+    @StateObject private var viewModel = BattleViewModel()
     
     // Fight navigation state
     @State private var showFightView = false
-    @State private var selectedTerritory: CoupTerritory?
+    @State private var selectedTerritory: BattleTerritory?
     
     var body: some View {
         ZStack {
             KingdomTheme.Colors.parchment.ignoresSafeArea()
             
-            if viewModel.isLoading && viewModel.coup == nil {
+            if viewModel.isLoading && viewModel.battle == nil {
                 loadingView
-            } else if let error = viewModel.error, viewModel.coup == nil {
+            } else if let error = viewModel.error, viewModel.battle == nil {
                 errorView(error: error)
-            } else if let coup = viewModel.coup {
-                phaseContent(coup: coup)
+            } else if let battle = viewModel.battle {
+                phaseContent(battle: battle)
             }
         }
         .onAppear {
-            viewModel.loadCoup(id: coupId)
+            viewModel.loadBattle(id: battleId)
         }
         .fullScreenCover(isPresented: $showFightView) {
-            if let territory = selectedTerritory, let coup = viewModel.coup {
-                CoupFightView(
+            if let territory = selectedTerritory, let battle = viewModel.battle {
+                BattleFightView(
                     territory: territory,
-                    coup: coup,
+                    battle: battle,
                     onComplete: { result in
                         showFightView = false
                         selectedTerritory = nil
@@ -53,54 +53,55 @@ struct CoupView: View {
     // MARK: - Phase Content
     
     @ViewBuilder
-    private func phaseContent(coup: CoupEventResponse) -> some View {
-        switch coup.status {
+    private func phaseContent(battle: BattleEventResponse) -> some View {
+        switch battle.status {
         case "pledge":
-            CoupPledgeView(coup: coup, onDismiss: onDismiss) { side in
+            BattlePledgeView(battle: battle, onDismiss: onDismiss) { side in
                 viewModel.pledge(side: side)
             }
         case "battle":
-            CoupBattleView(coup: coup, onDismiss: onDismiss) { territoryName in
+            BattlePhaseView(battle: battle, onDismiss: onDismiss) { territoryName in
                 // Find the territory and navigate to fight view
-                if let territory = coup.territories?.first(where: { $0.name == territoryName }) {
+                if let territory = battle.territories?.first(where: { $0.name == territoryName }) {
                     selectedTerritory = territory
                     showFightView = true
                 }
             }
         case "resolved":
-            resolvedView(coup: coup)
+            resolvedView(battle: battle)
         default:
-            Text("Unknown coup status")
+            Text("Unknown battle status")
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
     }
     
     // MARK: - Resolved View
     
-    private func resolvedView(coup: CoupEventResponse) -> some View {
-        let rulerName = coup.rulerName ?? "The Crown"
-        let challengerStats = coup.initiatorStats.map { FighterStats(from: $0) } ?? .empty
-        let rulerStats = coup.rulerStats.map { FighterStats(from: $0) } ?? .empty
-        let attackerWon = coup.attackerVictory == true
+    private func resolvedView(battle: BattleEventResponse) -> some View {
+        let rulerName = battle.rulerName ?? "The Crown"
+        let challengerStats = battle.initiatorStats.map { FighterStats(from: $0) } ?? .empty
+        let rulerStats = battle.rulerStats.map { FighterStats(from: $0) } ?? .empty
+        let attackerWon = battle.attackerVictory == true
         let userWon: Bool? = {
-            guard let side = coup.userSide else { return nil }
+            guard let side = battle.userSide else { return nil }
             if side == "attackers" { return attackerWon }
             return !attackerWon
         }()
         
+        // Battle-type aware text
+        let battleTypeName = battle.isCoup ? "COUP" : "INVASION"
+        let successMessage = battle.isCoup
+            ? "\(battle.initiatorName) seized the throne!"
+            : "\(battle.initiatorName) conquered \(battle.kingdomName ?? "the kingdom")!"
+        let failureMessage = battle.isCoup
+            ? "The crown defended its rule."
+            : "The defenders repelled the invasion."
+        
         return ScrollView {
             VStack(spacing: KingdomTheme.Spacing.medium) {
-                CoupVsPosterView(
-                    kingdomName: coup.kingdomName ?? "Kingdom",
-                    challengerName: coup.initiatorName,
-                    rulerName: rulerName,
-                    attackerCount: coup.attackerCount,
-                    defenderCount: coup.defenderCount,
+                BattleVsPosterView(
+                    battle: battle,
                     timeRemaining: "FINISHED",
-                    status: coup.status,
-                    userSide: coup.userSide,
-                    challengerStats: challengerStats,
-                    rulerStats: rulerStats,
                     onDismiss: onDismiss
                 )
                 
@@ -119,10 +120,10 @@ struct CoupView: View {
                             )
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(attackerWon ? "COUP SUCCEEDED" : "COUP FAILED")
+                            Text(attackerWon ? "\(battleTypeName) SUCCEEDED" : "\(battleTypeName) FAILED")
                                 .font(.system(size: 16, weight: .black, design: .serif))
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
-                            Text(attackerWon ? "\(coup.initiatorName) seized the throne!" : "The crown defended its rule.")
+                            Text(attackerWon ? successMessage : failureMessage)
                                 .font(.system(size: 12, weight: .medium, design: .serif))
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
@@ -145,6 +146,17 @@ struct CoupView: View {
                         }
                         .padding(12)
                         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+                    }
+                    
+                    // Show wall damage for invasions
+                    if battle.isInvasion, let wallDefense = battle.wallDefenseApplied, wallDefense > 0 {
+                        HStack(spacing: 8) {
+                            Image(systemName: "shield.fill")
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("Wall defense contributed +\(wallDefense) to defenders")
+                                .font(FontStyles.labelTiny)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
                     }
                 }
                 .padding(16)
@@ -184,7 +196,7 @@ struct CoupView: View {
                 .multilineTextAlignment(.center)
             
             Button("Retry") {
-                viewModel.loadCoup(id: coupId)
+                viewModel.loadBattle(id: battleId)
             }
             .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
         }
@@ -193,19 +205,22 @@ struct CoupView: View {
     }
 }
 
+// MARK: - Backwards Compatible Alias
+typealias CoupView = BattleView
+
 // MARK: - ViewModel
 
 @MainActor
-class CoupViewModel: ObservableObject {
-    @Published var coup: CoupEventResponse?
+class BattleViewModel: ObservableObject {
+    @Published var battle: BattleEventResponse?
     @Published var isLoading = false
     @Published var error: String?
     
-    private var coupId: Int?
+    private var battleId: Int?
     private var refreshTimer: Timer?
     
-    func loadCoup(id: Int) {
-        self.coupId = id
+    func loadBattle(id: Int) {
+        self.battleId = id
         isLoading = true
         error = nil
         
@@ -215,8 +230,8 @@ class CoupViewModel: ObservableObject {
                     endpoint: "/battles/\(id)",
                     method: "GET"
                 )
-                let response: CoupEventResponse = try await APIClient.shared.execute(request)
-                self.coup = response
+                let response: BattleEventResponse = try await APIClient.shared.execute(request)
+                self.battle = response
                 self.isLoading = false
                 
                 // Start auto-refresh during battle phase
@@ -226,7 +241,7 @@ class CoupViewModel: ObservableObject {
                 
                 // Schedule phase notifications if user has pledged
                 if response.userSide != nil {
-                    schedulePhaseNotifications(coup: response)
+                    schedulePhaseNotifications(battle: response)
                 }
             } catch {
                 self.error = error.localizedDescription
@@ -236,7 +251,7 @@ class CoupViewModel: ObservableObject {
     }
     
     func refresh() {
-        guard let id = coupId else { return }
+        guard let id = battleId else { return }
         
         Task {
             do {
@@ -244,8 +259,8 @@ class CoupViewModel: ObservableObject {
                     endpoint: "/battles/\(id)",
                     method: "GET"
                 )
-                let response: CoupEventResponse = try await APIClient.shared.execute(request)
-                self.coup = response
+                let response: BattleEventResponse = try await APIClient.shared.execute(request)
+                self.battle = response
             } catch {
                 // Silent refresh failure
                 print("Refresh failed: \(error)")
@@ -254,7 +269,7 @@ class CoupViewModel: ObservableObject {
     }
     
     func pledge(side: String) {
-        guard let id = coupId else { return }
+        guard let id = battleId else { return }
         isLoading = true
         
         Task {
@@ -264,8 +279,8 @@ class CoupViewModel: ObservableObject {
                     method: "POST",
                     body: ["side": side]
                 )
-                let _: CoupJoinResponse = try await APIClient.shared.execute(request)
-                loadCoup(id: id)
+                let _: BattleJoinResponse = try await APIClient.shared.execute(request)
+                loadBattle(id: id)
             } catch {
                 self.error = error.localizedDescription
                 self.isLoading = false
@@ -275,48 +290,51 @@ class CoupViewModel: ObservableObject {
     
     /// Handle fight resolution - schedule cooldown notification and refresh
     func handleFightResolve(result: FightResolveResponse) {
+        let battleTypeName = battle?.isCoup == true ? "Coup" : "Invasion"
+        
         // Schedule notification for when cooldown ends
         if result.cooldownSeconds > 0 {
             Task {
                 await NotificationManager.shared.scheduleActionCooldownNotification(
-                    actionName: "Coup Battle",
+                    actionName: "\(battleTypeName) Battle",
                     cooldownSeconds: result.cooldownSeconds,
-                    slot: "coup_battle"
+                    slot: "battle"
                 )
             }
         }
         
-        // Refresh coup data to get updated territories and cooldown
+        // Refresh battle data to get updated territories and cooldown
         refresh()
     }
     
     // MARK: - Notifications
     
-    private func schedulePhaseNotifications(coup: CoupEventResponse) {
-        let kingdomName = coup.kingdomName ?? "Kingdom"
+    private func schedulePhaseNotifications(battle: BattleEventResponse) {
+        let kingdomName = battle.kingdomName ?? "Kingdom"
+        let battleTypeName = battle.isCoup ? "Coup" : "Invasion"
         
         // Schedule pledge end notification (battle start)
-        if coup.isPledgePhase {
+        if battle.isPledgePhase {
             let formatter = ISO8601DateFormatter()
-            if let pledgeEnd = formatter.date(from: coup.pledgeEndTime) {
+            if let pledgeEnd = formatter.date(from: battle.pledgeEndTime) {
                 Task {
                     await NotificationManager.shared.scheduleCoupPhaseNotification(
-                        coupId: coup.id,
+                        coupId: battle.id,
                         phase: "pledge",
                         endDate: pledgeEnd,
-                        kingdomName: kingdomName
+                        kingdomName: "\(battleTypeName) in \(kingdomName)"
                     )
                 }
             }
         }
         
         // Schedule battle cooldown notification if user has one
-        if coup.isBattlePhase, let cooldown = coup.battleCooldownSeconds, cooldown > 0 {
+        if battle.isBattlePhase, let cooldown = battle.battleCooldownSeconds, cooldown > 0 {
             Task {
                 await NotificationManager.shared.scheduleActionCooldownNotification(
-                    actionName: "Coup Battle",
+                    actionName: "\(battleTypeName) Battle",
                     cooldownSeconds: cooldown,
-                    slot: "coup_battle"
+                    slot: "battle"
                 )
             }
         }
@@ -343,6 +361,9 @@ class CoupViewModel: ObservableObject {
     }
 }
 
+// Backwards compatible alias
+typealias CoupViewModel = BattleViewModel
+
 #Preview {
-    CoupView(coupId: 1, onDismiss: {})
+    BattleView(battleId: 1, onDismiss: {})
 }

@@ -10,8 +10,8 @@ from .property import Property
 from .city_boundary import CityBoundary
 from .check_in import CheckInHistory
 from .kingdom_intelligence import KingdomIntelligence
+# Legacy coup imports - keeping for backward compat during migration
 from .coup import CoupEvent, CoupTerritory, CoupBattleAction, CoupInjury, CoupFightSession, CoupParticipant, RollOutcome
-# All coup constants now live in systems/coup/config.py
 from systems.coup.config import (
     SIZE_EXPONENT_BASE, LEADERSHIP_DAMPENING_PER_TIER,
     HIT_MULTIPLIER, INJURE_MULTIPLIER, INJURE_PUSH_MULTIPLIER,
@@ -21,6 +21,13 @@ from systems.coup.config import (
     calculate_roll_chances, calculate_push_per_hit, calculate_max_rolls,
 )
 from .invasion import InvasionEvent
+
+# NEW: Unified Battle system (replaces CoupEvent + InvasionEvent)
+from .battle import (
+    Battle, BattleType, BattleParticipant, BattleTerritory,
+    BattleAction, BattleInjury, FightSession,
+    RollOutcome as BattleRollOutcome,
+)
 from .kingdom_history import KingdomHistory
 from .alliance import Alliance
 from .friend import Friend
@@ -47,6 +54,7 @@ __all__ = [
     "CityBoundary",
     "CheckInHistory",
     "KingdomIntelligence",
+    # Legacy coup (keeping for backward compat)
     "CoupEvent",
     "CoupTerritory",
     "CoupBattleAction",
@@ -71,6 +79,16 @@ __all__ = [
     "calculate_push_per_hit",
     "calculate_max_rolls",
     "InvasionEvent",
+    # NEW: Unified Battle system
+    "Battle",
+    "BattleType",
+    "BattleParticipant",
+    "BattleTerritory",
+    "BattleAction",
+    "BattleInjury",
+    "FightSession",
+    "BattleRollOutcome",
+    # Other models
     "KingdomHistory",
     "Alliance",
     "Friend",

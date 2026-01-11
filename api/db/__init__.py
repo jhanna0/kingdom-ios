@@ -12,8 +12,18 @@ from .models import (
     CityBoundary,
     CheckInHistory,
     KingdomIntelligence,
+    # Legacy (keeping for backward compat)
     CoupEvent,
     InvasionEvent,
+    # NEW: Unified Battle system
+    Battle,
+    BattleType,
+    BattleParticipant,
+    BattleTerritory,
+    BattleAction,
+    BattleInjury,
+    FightSession,
+    # Other models
     KingdomHistory,
     Alliance,
     PlayerActivityLog,
@@ -46,8 +56,18 @@ __all__ = [
     "CityBoundary",
     "CheckInHistory",
     "KingdomIntelligence",
+    # Legacy (keeping for backward compat)
     "CoupEvent",
     "InvasionEvent",
+    # NEW: Unified Battle system
+    "Battle",
+    "BattleType",
+    "BattleParticipant",
+    "BattleTerritory",
+    "BattleAction",
+    "BattleInjury",
+    "FightSession",
+    # Other models
     "KingdomHistory",
     "Alliance",
     "PlayerActivityLog",

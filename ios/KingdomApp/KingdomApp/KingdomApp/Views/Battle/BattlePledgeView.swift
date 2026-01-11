@@ -1,29 +1,35 @@
 import SwiftUI
 
-/// Pledge phase view for Coup V2
+/// Pledge phase view for Battles (Coups & Invasions)
 /// Shows VS poster as hero, pledge buttons below - ONE cohesive screen
 
-struct CoupPledgeView: View {
-    let coup: CoupEventResponse
+struct BattlePledgeView: View {
+    let battle: BattleEventResponse
     let onDismiss: () -> Void
     let onPledge: (String) -> Void
+    
+    // Battle-type aware labels
+    private var attackerTitle: String { battle.isCoup ? "ATTACKERS" : "INVADERS" }
+    private var attackerSubtitle: String { battle.isCoup ? "Join the revolt" : "Join the invasion" }
+    private var defenderTitle: String { battle.isCoup ? "DEFENDERS" : "DEFENDERS" }
+    private var defenderSubtitle: String { battle.isCoup ? "Protect the crown" : "Defend the realm" }
     
     @State private var selectedSide: String?
     @State private var showParticipants = false
     
     private var rulerName: String {
-        coup.rulerName ?? "The Crown"
+        battle.rulerName ?? "The Crown"
     }
     
     private var challengerStats: FighterStats {
-        if let stats = coup.initiatorStats {
+        if let stats = battle.initiatorStats {
             return FighterStats(from: stats)
         }
         return .empty
     }
     
     private var rulerStats: FighterStats {
-        if let stats = coup.rulerStats {
+        if let stats = battle.rulerStats {
             return FighterStats(from: stats)
         }
         return .empty
@@ -33,24 +39,16 @@ struct CoupPledgeView: View {
         ScrollView {
             VStack(spacing: KingdomTheme.Spacing.medium) {
                 // Hero VS Poster
-                CoupVsPosterView(
-                    kingdomName: coup.kingdomName ?? "Kingdom",
-                    challengerName: coup.initiatorName,
-                    rulerName: rulerName,
-                    attackerCount: coup.attackerCount,
-                    defenderCount: coup.defenderCount,
-                    timeRemaining: coup.timeRemainingFormatted,
-                    status: coup.status,
-                    userSide: coup.userSide,
-                    challengerStats: challengerStats,
-                    rulerStats: rulerStats,
+                BattleVsPosterView(
+                    battle: battle,
+                    timeRemaining: battle.timeRemainingFormatted,
                     onDismiss: onDismiss
                 )
                 
                 // Pledge buttons OR pledged status - NO card wrapper
-                if coup.canPledge {
+                if battle.canJoin {
                     pledgeButtons
-                } else if let userSide = coup.userSide {
+                } else if let userSide = battle.userSide {
                     pledgedStatus(side: userSide)
                 }
 
@@ -119,18 +117,18 @@ struct CoupPledgeView: View {
     private var pledgeButtons: some View {
         VStack(spacing: 10) {
             // Two big choice buttons
-            CoupPledgeChoiceCard(
-                title: "ATTACKERS",
-                subtitle: "Join the revolt",
+            BattlePledgeChoiceCard(
+                title: attackerTitle,
+                subtitle: attackerSubtitle,
                 icon: "figure.fencing",
                 tint: KingdomTheme.Colors.buttonDanger,
                 isSelected: selectedSide == "attackers",
                 onTap: { selectedSide = "attackers" }
             )
             
-            CoupPledgeChoiceCard(
-                title: "DEFENDERS",
-                subtitle: "Protect the crown",
+            BattlePledgeChoiceCard(
+                title: defenderTitle,
+                subtitle: defenderSubtitle,
                 icon: "shield.fill",
                 tint: KingdomTheme.Colors.royalBlue,
                 isSelected: selectedSide == "defenders",
@@ -232,17 +230,17 @@ struct CoupPledgeView: View {
             ScrollView {
                 VStack(spacing: KingdomTheme.Spacing.large) {
                     participantList(
-                        title: "Attackers",
+                        title: battle.attackerLabel,
                         icon: "figure.fencing",
                         color: KingdomTheme.Colors.buttonDanger,
-                        participants: coup.attackers
+                        participants: battle.attackers
                     )
                     
                     participantList(
-                        title: "Defenders",
+                        title: battle.defenderLabel,
                         icon: "shield.fill",
                         color: KingdomTheme.Colors.royalBlue,
-                        participants: coup.defenders
+                        participants: battle.defenders
                     )
                 }
                 .padding(KingdomTheme.Spacing.large)
@@ -261,7 +259,7 @@ struct CoupPledgeView: View {
         }
     }
     
-    private func participantList(title: String, icon: String, color: Color, participants: [CoupParticipant]) -> some View {
+    private func participantList(title: String, icon: String, color: Color, participants: [BattleParticipant]) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -312,7 +310,7 @@ struct CoupPledgeView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func participantRow(participant: CoupParticipant, sideColor: Color) -> some View {
+    private func participantRow(participant: BattleParticipant, sideColor: Color) -> some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(sideColor.opacity(0.15))
@@ -361,70 +359,13 @@ struct CoupPledgeView: View {
     }
 }
 
+// Backwards compatible alias
+typealias CoupPledgeView = BattlePledgeView
+
 // MARK: - Preview
 
 #Preview {
-    CoupPledgeView(
-        coup: CoupEventResponse(
-            id: 1,
-            kingdomId: "test",
-            kingdomName: "San Francisco",
-            initiatorId: 123,
-            initiatorName: "John the Bold",
-            initiatorStats: InitiatorStats(
-                level: 15,
-                kingdomReputation: 650,
-                attackPower: 12,
-                defensePower: 10,
-                leadership: 4,
-                buildingSkill: 8,
-                intelligence: 6,
-                contractsCompleted: 45,
-                totalWorkContributed: 320,
-                coupsWon: 2,
-                coupsFailed: 1
-            ),
-            rulerId: 200,
-            rulerName: "King Marcus",
-            rulerStats: InitiatorStats(
-                level: 20,
-                kingdomReputation: 800,
-                attackPower: 5,
-                defensePower: 15,
-                leadership: 5,
-                buildingSkill: 12,
-                intelligence: 10,
-                contractsCompleted: 120,
-                totalWorkContributed: 850,
-                coupsWon: 0,
-                coupsFailed: 0
-            ),
-            status: "pledge",
-            startTime: "2024-01-01T00:00:00Z",
-            pledgeEndTime: "2024-01-01T12:00:00Z",
-            battleEndTime: nil,
-            timeRemainingSeconds: 32400,
-            attackers: [
-                CoupParticipant(playerId: 123, playerName: "John the Bold", kingdomReputation: 650, attackPower: 12, defensePower: 10, leadership: 4, level: 15),
-                CoupParticipant(playerId: 124, playerName: "Alice the Brave", kingdomReputation: 400, attackPower: 8, defensePower: 6, leadership: 2, level: 10)
-            ],
-            defenders: [
-                CoupParticipant(playerId: 200, playerName: "King Marcus", kingdomReputation: 800, attackPower: 5, defensePower: 15, leadership: 5, level: 20)
-            ],
-            attackerCount: 2,
-            defenderCount: 1,
-            userSide: nil,
-            canPledge: true,
-            territories: nil,
-            battleCooldownSeconds: nil,
-            isInjured: nil,
-            injuryExpiresSeconds: nil,
-            isResolved: false,
-            attackerVictory: nil,
-            resolvedAt: nil,
-            winnerSide: nil
-        ),
-        onDismiss: {},
-        onPledge: { _ in }
-    )
+    // Preview would need a mock BattleEventResponse
+    Text("BattlePledgeView Preview")
+        .font(FontStyles.headingMedium)
 }

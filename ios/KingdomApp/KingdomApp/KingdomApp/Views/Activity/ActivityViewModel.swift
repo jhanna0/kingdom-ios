@@ -2,13 +2,35 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Wrapper for opening a battle view from notifications
+/// Works for both coups and invasions
+struct SelectedBattle: Identifiable {
+    let id: Int
+    let type: String  // "coup" or "invasion"
+    
+    var isCoup: Bool { type == "coup" }
+    var isInvasion: Bool { type == "invasion" }
+}
+
 @MainActor
 class ActivityViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var notifications: [ActivityNotification] = []
-    @Published var selectedCoup: CoupNotificationData?
+    @Published var selectedBattle: SelectedBattle?
     @Published var errorMessage: String?
     @Published var unreadKingdomEvents: Int = 0
+    
+    // Backwards compat - maps to selectedBattle for coup notifications
+    var selectedCoup: CoupNotificationData? {
+        get { nil }  // Not used for reading anymore
+        set {
+            if let data = newValue {
+                selectedBattle = SelectedBattle(id: data.id, type: "coup")
+            } else {
+                selectedBattle = nil
+            }
+        }
+    }
     
     private let api = KingdomAPIService.shared
     
@@ -38,20 +60,31 @@ class ActivityViewModel: ObservableObject {
         // Use string prefix matching instead of enum switch - backend controls types!
         let type = notification.type
         
-        // Coup notifications - show coup view
+        // Coup notifications - show battle view
         if type.hasPrefix("coup_") {
             if let coupData = notification.coupData {
-                // For active coups, show the coup view
-                // For resolved coups, the notification already has all the info
-                selectedCoup = coupData
+                // Open battle view for the coup
+                selectedBattle = SelectedBattle(id: coupData.id, type: "coup")
             }
             return
         }
         
-        // Invasion notifications
+        // Invasion notifications - show battle view
         if type.hasPrefix("invasion_") {
             if let invasionData = notification.invasionData {
-                print("Invasion notification: \(invasionData)")
+                // Open battle view for the invasion
+                selectedBattle = SelectedBattle(id: invasionData.id, type: "invasion")
+            }
+            return
+        }
+        
+        // Battle notifications (unified) - show battle view
+        if type.hasPrefix("battle_") {
+            // Try coup data first, then invasion data
+            if let coupData = notification.coupData {
+                selectedBattle = SelectedBattle(id: coupData.id, type: "coup")
+            } else if let invasionData = notification.invasionData {
+                selectedBattle = SelectedBattle(id: invasionData.id, type: "invasion")
             }
             return
         }
@@ -80,26 +113,31 @@ class ActivityViewModel: ObservableObject {
         }
     }
     
-    func voteCoup(_ coupId: Int, side: String) async {
+    func voteBattle(_ battleId: Int, side: String) async {
         isLoading = true
         defer { isLoading = false }
         
         do {
-            // Call coup join API
-            let response = try await api.actions.joinCoup(coupId: coupId, side: side)
+            // Call battle join API (unified for coups and invasions)
+            let response = try await api.actions.joinCoup(coupId: battleId, side: side)
             
-            print("✅ Voted in coup: \(response.message)")
+            print("✅ Voted in battle: \(response.message)")
             
             // Dismiss sheet
-            selectedCoup = nil
+            selectedBattle = nil
             
             // Refresh activity to update notifications
             await loadActivity()
             
         } catch {
-            print("❌ Failed to vote in coup: \(error)")
-            errorMessage = "Failed to vote in coup"
+            print("❌ Failed to vote in battle: \(error)")
+            errorMessage = "Failed to vote in battle"
         }
+    }
+    
+    // Backwards compat alias
+    func voteCoup(_ coupId: Int, side: String) async {
+        await voteBattle(coupId, side: side)
     }
 }
 

@@ -115,7 +115,7 @@ class ActionsAPI {
         }
         
         let body = JoinRequest(side: side)
-        let request = try client.request(endpoint: "/coups/\(coupId)/join", method: "POST", body: body)
+        let request = try client.request(endpoint: "/battles/\(coupId)/join", method: "POST", body: body)
         return try await client.execute(request)
     }
 }

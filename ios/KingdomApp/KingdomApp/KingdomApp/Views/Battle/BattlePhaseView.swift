@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Battle phase view for Coup V2
-/// Shows 3 territories with tug-of-war bars and fight buttons
-struct CoupBattleView: View {
-    let coup: CoupEventResponse
+/// Battle phase view for Battles (Coups & Invasions)
+/// Shows territories (3 for coups, 5 for invasions) with tug-of-war bars and fight buttons
+struct BattlePhaseView: View {
+    let battle: BattleEventResponse
     let onDismiss: () -> Void
     let onFight: (String) -> Void  // territory name
     
@@ -12,8 +12,14 @@ struct CoupBattleView: View {
     @State private var timerActive = false
     
     private var rulerName: String {
-        coup.rulerName ?? "The Crown"
+        battle.rulerName ?? "The Crown"
     }
+    
+    // Battle-type aware labels
+    private var attackerLabel: String { battle.attackerLabel }
+    private var defenderLabel: String { battle.defenderLabel }
+    private var winThreshold: Int { battle.winThreshold }
+    private var territoryCount: Int { battle.battleType.territoryCount }
     
     /// Locally-tracked cooldown that ticks down
     private var displayCooldownSeconds: Int {
@@ -27,29 +33,29 @@ struct CoupBattleView: View {
     
     /// Can user fight based on local timers?
     private var localCanFight: Bool {
-        guard coup.isBattlePhase else { return false }
-        guard coup.userSide != nil else { return false }
+        guard battle.isBattlePhase else { return false }
+        guard battle.userSide != nil else { return false }
         guard displayInjurySeconds <= 0 else { return false }
         guard displayCooldownSeconds <= 0 else { return false }
         return true
     }
     
     private var challengerStats: FighterStats {
-        if let stats = coup.initiatorStats {
+        if let stats = battle.initiatorStats {
             return FighterStats(from: stats)
         }
         return .empty
     }
     
     private var rulerStats: FighterStats {
-        if let stats = coup.rulerStats {
+        if let stats = battle.rulerStats {
             return FighterStats(from: stats)
         }
         return .empty
     }
     
-    private var territories: [CoupTerritory] {
-        coup.territories ?? []
+    private var territories: [BattleTerritory] {
+        battle.territories ?? []
     }
     
     private var canFight: Bool {
@@ -80,25 +86,22 @@ struct CoupBattleView: View {
         ScrollView {
             VStack(spacing: KingdomTheme.Spacing.medium) {
                 // Hero VS Poster
-                CoupVsPosterView(
-                    kingdomName: coup.kingdomName ?? "Kingdom",
-                    challengerName: coup.initiatorName,
-                    rulerName: rulerName,
-                    attackerCount: coup.attackerCount,
-                    defenderCount: coup.defenderCount,
+                BattleVsPosterView(
+                    battle: battle,
                     timeRemaining: "BATTLE",
-                    status: coup.status,
-                    userSide: coup.userSide,
-                    challengerStats: challengerStats,
-                    rulerStats: rulerStats,
                     onDismiss: onDismiss
                 )
                 
                 // Battle status card
                 battleStatusCard
                 
+                // Wall defense info (invasions only)
+                if battle.isInvasion, let wallDefense = battle.wallDefenseApplied, wallDefense > 0 {
+                    wallDefenseCard(wallDefense: wallDefense)
+                }
+                
                 // User status (cooldown / injury)
-                if coup.userSide != nil {
+                if battle.userSide != nil {
                     userStatusCard
                 }
                 
@@ -116,16 +119,39 @@ struct CoupBattleView: View {
             syncTimersFromServer()
             startTimer()
         }
-        .onChange(of: coup.battleCooldownSeconds) { _, newValue in
+        .onChange(of: battle.battleCooldownSeconds) { _, newValue in
             if let newValue = newValue, newValue > localCooldownSeconds {
                 localCooldownSeconds = newValue
             }
         }
-        .onChange(of: coup.injuryExpiresSeconds) { _, newValue in
+        .onChange(of: battle.injuryExpiresSeconds) { _, newValue in
             if let newValue = newValue, newValue > localInjurySeconds {
                 localInjurySeconds = newValue
             }
         }
+    }
+    
+    // MARK: - Wall Defense Card (Invasions only)
+    
+    private func wallDefenseCard(wallDefense: Int) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shield.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(KingdomTheme.Colors.royalBlue)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("WALL DEFENSE ACTIVE")
+                    .font(FontStyles.labelBadge)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text("+\(wallDefense) defense for defenders")
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Spacer()
+        }
+        .padding(12)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.royalBlue.opacity(0.1))
     }
     
     // MARK: - Battle Status Card
@@ -153,7 +179,7 @@ struct CoupBattleView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "flag.fill")
                             .font(.system(size: 10))
-                        Text("Coupers: \(capturedByAttackers)/3")
+                        Text("\(attackerLabel): \(capturedByAttackers)/\(territoryCount)")
                             .font(FontStyles.labelBadge)
                     }
                     .foregroundColor(KingdomTheme.Colors.buttonDanger)
@@ -162,7 +188,7 @@ struct CoupBattleView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "flag.fill")
                             .font(.system(size: 10))
-                        Text("Crown: \(capturedByDefenders)/3")
+                        Text("\(defenderLabel): \(capturedByDefenders)/\(territoryCount)")
                             .font(FontStyles.labelBadge)
                     }
                     .foregroundColor(KingdomTheme.Colors.royalBlue)
@@ -178,10 +204,10 @@ struct CoupBattleView: View {
     // MARK: - User Status Card
     
     private var userStatusCard: some View {
-        let isAttacker = coup.userSide == "attackers"
+        let isAttacker = battle.userSide == "attackers"
         let sideColor = isAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
         let sideIcon = isAttacker ? "figure.fencing" : "shield.fill"
-        let sideName = isAttacker ? "COUPERS" : "CROWN"
+        let sideName = isAttacker ? attackerLabel.uppercased() : defenderLabel.uppercased()
         
         return VStack(spacing: 10) {
             // Your side
@@ -271,17 +297,19 @@ struct CoupBattleView: View {
             }
             .padding(.top, 4)
             
-            // Sort: Throne Room first, then others
+            // Sort: Capitol/Throne Room first, then others
             let sortedTerritories = territories.sorted { t1, t2 in
-                if t1.name == "throne_room" { return true }
-                if t2.name == "throne_room" { return false }
+                // For coups: throne_room first
+                // For invasions: capitol first
+                if t1.name == "throne_room" || t1.name == "capitol" { return true }
+                if t2.name == "throne_room" || t2.name == "capitol" { return false }
                 return t1.name < t2.name
             }
             
             ForEach(sortedTerritories) { territory in
-                CoupTerritoryCard(
+                BattleTerritoryCard(
                     territory: territory,
-                    userSide: coup.userSide,
+                    userSide: battle.userSide,
                     canFight: canFight && !territory.isCaptured,
                     onFight: { onFight(territory.name) }
                 )
@@ -292,7 +320,9 @@ struct CoupBattleView: View {
     // MARK: - Win Condition Card
     
     private var winConditionCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let battleTypeName = battle.isCoup ? "coup" : "invasion"
+        
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "trophy.fill")
                     .font(FontStyles.iconMini)
@@ -303,7 +333,7 @@ struct CoupBattleView: View {
                     .tracking(1)
             }
             
-            Text("Capture 2 of 3 territories to win the coup!")
+            Text("Capture \(winThreshold) of \(territoryCount) territories to win the \(battleTypeName)!")
                 .font(FontStyles.labelTiny)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
@@ -315,8 +345,8 @@ struct CoupBattleView: View {
     // MARK: - Timer
     
     private func syncTimersFromServer() {
-        localCooldownSeconds = coup.battleCooldownSeconds ?? 0
-        localInjurySeconds = coup.injuryExpiresSeconds ?? 0
+        localCooldownSeconds = battle.battleCooldownSeconds ?? 0
+        localInjurySeconds = battle.injuryExpiresSeconds ?? 0
     }
     
     private func startTimer() {
@@ -335,10 +365,13 @@ struct CoupBattleView: View {
     }
 }
 
+// Backwards compatible alias
+typealias CoupBattleView = BattlePhaseView
+
 // MARK: - Fight Result Sheet
 
 struct FightResultSheet: View {
-    let result: CoupFightResponse
+    let result: FightResolveResponse
     let userIsAttacker: Bool
     let onDismiss: () -> Void
     
@@ -539,42 +572,7 @@ struct FightResultSheet: View {
 // MARK: - Preview
 
 #Preview {
-    CoupBattleView(
-        coup: CoupEventResponse(
-            id: 1,
-            kingdomId: "test",
-            kingdomName: "San Francisco",
-            initiatorId: 123,
-            initiatorName: "John the Bold",
-            initiatorStats: nil,
-            rulerId: 200,
-            rulerName: "King Marcus",
-            rulerStats: nil,
-            status: "battle",
-            startTime: "2024-01-01T00:00:00Z",
-            pledgeEndTime: "2024-01-01T12:00:00Z",
-            battleEndTime: nil,
-            timeRemainingSeconds: 0,
-            attackers: [],
-            defenders: [],
-            attackerCount: 5,
-            defenderCount: 3,
-            userSide: "attackers",
-            canPledge: false,
-            territories: [
-                CoupTerritory(name: "throne_room", displayName: "Throne Room", icon: "building.columns.fill", controlBar: 50.0, capturedBy: nil, capturedAt: nil),
-                CoupTerritory(name: "coupers_territory", displayName: "Coupers Territory", icon: "figure.fencing", controlBar: 25.0, capturedBy: nil, capturedAt: nil),
-                CoupTerritory(name: "crowns_territory", displayName: "Crowns Territory", icon: "crown.fill", controlBar: 75.0, capturedBy: nil, capturedAt: nil),
-            ],
-            battleCooldownSeconds: 0,
-            isInjured: false,
-            injuryExpiresSeconds: 0,
-            isResolved: false,
-            attackerVictory: nil,
-            resolvedAt: nil,
-            winnerSide: nil
-        ),
-        onDismiss: {},
-        onFight: { _ in }
-    )
+    // Preview would need a mock BattleEventResponse
+    Text("BattlePhaseView Preview")
+        .font(FontStyles.headingMedium)
 }
