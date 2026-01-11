@@ -19,7 +19,8 @@ struct KingdomMarker: View {
             kingdomId: kingdom.id,
             isPlayer: isHomeKingdom,
             isEnemy: kingdom.isEnemy,
-            isAllied: kingdom.isAllied
+            isAllied: kingdom.isAllied,
+            isAtWar: isHomeKingdom && kingdom.activeCoup != nil
         )
     }
     

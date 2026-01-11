@@ -106,6 +106,8 @@ class KingdomData(BaseModel):
     is_allied: bool = False  # True if this kingdom is allied with any of user's kingdoms
     is_enemy: bool = False  # True if this kingdom is at war with any of user's kingdoms
     alliance_info: Optional[AllianceInfo] = None  # Details about alliance if is_allied is True
+    allies: List[str] = []  # Kingdom IDs of allied kingdoms
+    enemies: List[str] = []  # Kingdom IDs of enemy kingdoms
     
     # Coup eligibility
     can_stage_coup: bool = False  # Backend determines if current user can initiate a coup

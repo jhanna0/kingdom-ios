@@ -5,7 +5,7 @@ Players can initiate coups to overthrow rulers using attack vs defense combat
 Battle Phase:
 - 3 territories with tug-of-war bars (0-100)
 - Players fight every 10 minutes (cooldown-based)
-- Win condition: Capture Throne Room + 1 other territory
+- Win condition: First to capture 2 of 3 territories
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -44,6 +44,7 @@ from schemas.coup import (
     FightResolveResponse,
 )
 from routers.auth import get_current_user
+from routers.actions.utils import format_datetime_iso
 
 router = APIRouter(prefix="/coups", tags=["Coups"])
 
@@ -62,7 +63,6 @@ PLAYER_COOLDOWN_DAYS = 30          # 30 days between coup attempts per player
 KINGDOM_COOLDOWN_DAYS = 7          # 7 days between coups in same kingdom
 
 # Legacy (keeping for resolution logic)
-ATTACKER_ADVANTAGE_REQUIRED = 1.25  # Attackers need 25% more power to win
 
 # Valid territory names
 VALID_TERRITORIES = [TERRITORY_COUPERS, TERRITORY_CROWNS, TERRITORY_THRONE]
@@ -234,254 +234,152 @@ def _calculate_combat_strength(
     return total_attack, total_defense, participants
 
 
-def _apply_coup_victory_rewards(
+def _apply_coup_outcome(
     db: Session,
     coup: CoupEvent,
     kingdom: Kingdom,
     attackers: List[CoupParticipant],
-    defenders: List[CoupParticipant]
+    defenders: List[CoupParticipant],
+    attacker_victory: bool
 ) -> Dict:
     """
-    Apply rewards and penalties when attackers win
+    Apply rewards and penalties based on coup outcome.
     
-    Attackers win:
-    - Initiator becomes ruler, +1000g, +50 rep
-    - Old ruler loses kingdom
+    Losers:
+    - Lose 50% gold (pooled and given to winners)
+    - Lose 100 reputation
+    - Lose 1 attack, 1 defense, 1 leadership
     
-    Defenders lose:
-    - No rewards (they lost)
+    Winners:
+    - Split loser gold pool evenly
+    - Gain 100 reputation
+    
+    If attackers win:
+    - Initiator becomes ruler
+    - KingdomHistory updated (old ruler ended, new ruler started)
     """
-    initiator = db.query(User).filter(User.id == coup.initiator_id).first()
-    initiator_state = _get_player_state(db, initiator)
+    from db.models import UserKingdom, KingdomHistory
+    from systems.coup.config import (
+        LOSER_GOLD_PERCENT,
+        WINNER_REP_GAIN,
+        LOSER_REP_LOSS,
+        LOSER_ATTACK_LOSS,
+        LOSER_DEFENSE_LOSS,
+        LOSER_LEADERSHIP_LOSS,
+    )
     
+    winners = attackers if attacker_victory else defenders
+    losers = defenders if attacker_victory else attackers
+    
+    # Collect gold from losers
+    gold_pool = 0
+    for loser in losers:
+        user = db.query(User).filter(User.id == loser.player_id).first()
+        if not user:
+            continue
+        
+        state = _get_player_state(db, user)
+        
+        # Take 50% gold
+        gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
+        state.gold -= gold_taken
+        gold_pool += gold_taken
+        
+        # Lose reputation
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
+        if user_kingdom:
+            user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+        
+        # Lose skills
+        state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
+        state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
+        state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
+    
+    # Distribute gold to winners
+    gold_per_winner = gold_pool // len(winners) if winners else 0
+    coup.gold_per_winner = gold_per_winner  # Store for notifications
+    for winner in winners:
+        user = db.query(User).filter(User.id == winner.player_id).first()
+        if not user:
+            continue
+        
+        state = _get_player_state(db, user)
+        
+        # Get share of loser gold
+        state.gold += gold_per_winner
+        
+        # Gain reputation
+        user_kingdom = db.query(UserKingdom).filter(
+            UserKingdom.user_id == user.id,
+            UserKingdom.kingdom_id == kingdom.id
+        ).first()
+        if not user_kingdom:
+            user_kingdom = UserKingdom(
+                user_id=user.id,
+                kingdom_id=kingdom.id,
+                local_reputation=WINNER_REP_GAIN
+            )
+            db.add(user_kingdom)
+        else:
+            user_kingdom.local_reputation += WINNER_REP_GAIN
+    
+    # Handle ruler change if attackers won
     old_ruler_id = kingdom.ruler_id
     old_ruler_name = None
+    new_ruler_id = None
+    new_ruler_name = None
+    now = datetime.utcnow()
     
-    if old_ruler_id:
-        old_ruler = db.query(User).filter(User.id == old_ruler_id).first()
-        if old_ruler:
-            old_ruler_name = old_ruler.display_name
-            old_ruler_state = _get_player_state(db, old_ruler)
+    # Store old ruler on coup for notifications (before we change it)
+    coup.old_ruler_id = old_ruler_id
+    
+    if attacker_victory:
+        initiator = db.query(User).filter(User.id == coup.initiator_id).first()
+        if initiator:
+            if old_ruler_id:
+                old_ruler = db.query(User).filter(User.id == old_ruler_id).first()
+                if old_ruler:
+                    old_ruler_name = old_ruler.display_name
+                
+                # Close old ruler's KingdomHistory entry
+                old_history = db.query(KingdomHistory).filter(
+                    KingdomHistory.kingdom_id == kingdom.id,
+                    KingdomHistory.ruler_id == old_ruler_id,
+                    KingdomHistory.ended_at.is_(None)
+                ).first()
+                if old_history:
+                    old_history.ended_at = now
             
-            # Old ruler loses rulership
-            old_ruler_state.kingdoms_ruled = max(0, old_ruler_state.kingdoms_ruled - 1)
-    
-    # Initiator becomes ruler
-    kingdom.ruler_id = initiator.id
-    kingdom.last_activity = datetime.utcnow()
-    
-    # Coup rewards are NOT taxed (you're taking over the kingdom!)
-    initiator_state.gold += 1000
-    
-    # Update per-kingdom reputation in user_kingdoms table
-    from db.models import UserKingdom
-    user_kingdom = db.query(UserKingdom).filter(
-        UserKingdom.user_id == initiator.id,
-        UserKingdom.kingdom_id == kingdom.id
-    ).first()
-    
-    if not user_kingdom:
-        user_kingdom = UserKingdom(
-            user_id=initiator.id,
-            kingdom_id=kingdom.id,
-            local_reputation=50
-        )
-        db.add(user_kingdom)
-    else:
-        user_kingdom.local_reputation += 50
-    
-    # NOTE: coups_won and kingdoms_ruled are now computed from other tables:
-    # - coups_won: COUNT from coup_events WHERE initiator_id = ? AND attacker_victory = true
-    # - kingdoms_ruled: COUNT from kingdoms WHERE ruler_id = ?
+            # Set new ruler on kingdom
+            kingdom.ruler_id = initiator.id
+            kingdom.ruler_started_at = now
+            kingdom.last_activity = now
+            new_ruler_id = initiator.id
+            new_ruler_name = initiator.display_name
+            
+            # Create new KingdomHistory entry for the new ruler
+            new_history = KingdomHistory(
+                kingdom_id=kingdom.id,
+                ruler_id=initiator.id,
+                ruler_name=initiator.display_name,
+                empire_id=kingdom.empire_id or kingdom.id,  # Use kingdom's empire or itself
+                event_type='coup',
+                started_at=now,
+                coup_id=coup.id
+            )
+            db.add(new_history)
     
     db.commit()
     
     return {
         "old_ruler_id": old_ruler_id,
         "old_ruler_name": old_ruler_name,
-        "new_ruler_id": initiator.id,
-        "new_ruler_name": initiator.display_name
+        "new_ruler_id": new_ruler_id,
+        "new_ruler_name": new_ruler_name
     }
-
-
-def _apply_coup_failure_penalties(
-    db: Session,
-    coup: CoupEvent,
-    kingdom: Kingdom,
-    attackers: List[CoupParticipant],
-    defenders: List[CoupParticipant]
-) -> None:
-    """
-    Apply harsh penalties when attackers lose
-    
-    Attackers lose (HARSH):
-    - Lose 100% gold (ruler takes it)
-    - Lose 100 reputation (traitor!)
-    - Lose ALL attack + defense stats (executed)
-    - Get "Traitor" badge
-    
-    Defenders win:
-    - Each gets +200g, +30 rep
-    """
-    ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
-    ruler_state = _get_player_state(db, ruler) if ruler else None
-    
-    total_gold_seized = 0
-    
-    # Punish attackers harshly
-    for attacker in attackers:
-        user = db.query(User).filter(User.id == attacker.player_id).first()
-        if not user:
-            continue
-        
-        state = _get_player_state(db, user)
-        
-        # Seize ALL gold
-        gold_lost = state.gold
-        total_gold_seized += gold_lost
-        state.gold = 0
-        
-        # MAJOR reputation loss in this kingdom
-        from db.models import UserKingdom
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        
-        if user_kingdom:
-            user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - 100)
-        
-        # Lose ALL combat stats (executed)
-        state.attack_power = 1
-        state.defense_power = 1
-        
-        # NOTE: coups_failed and times_executed are now tracked in coup_events table
-    
-    # Ruler gets all seized gold
-    if ruler_state:
-        ruler_state.gold += total_gold_seized
-        
-        # Increase ruler's reputation in this kingdom
-        from db.models import UserKingdom
-        ruler_user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == ruler.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        
-        if not ruler_user_kingdom:
-            ruler_user_kingdom = UserKingdom(
-                user_id=ruler.id,
-                kingdom_id=kingdom.id,
-                local_reputation=50
-            )
-            db.add(ruler_user_kingdom)
-        else:
-            ruler_user_kingdom.local_reputation += 50
-    
-    # Reward defenders
-    for defender in defenders:
-        user = db.query(User).filter(User.id == defender.player_id).first()
-        if not user:
-            continue
-        
-        state = _get_player_state(db, user)
-        state.gold += 200
-        
-        # Boost kingdom reputation
-        from db.models import UserKingdom
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        
-        if not user_kingdom:
-            user_kingdom = UserKingdom(
-                user_id=user.id,
-                kingdom_id=kingdom.id,
-                local_reputation=30
-            )
-            db.add(user_kingdom)
-        else:
-            user_kingdom.local_reputation += 30
-    
-    db.commit()
-
-
-def _resolve_coup_battle(db: Session, coup: CoupEvent) -> CoupResolveResponse:
-    """
-    Resolve a coup battle using attack vs defense
-    
-    Formula:
-    - Attacker strength = sum of all attacker attack_power
-    - Defender strength = sum of all defender defense_power
-    - NO WALLS for coups (internal rebellion)
-    - Attackers need 25% advantage to win
-    """
-    kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
-    
-    if not kingdom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kingdom not found"
-        )
-    
-    # Calculate attacker strength
-    attacker_attack, _, attackers = _calculate_combat_strength(
-        db, coup.get_attacker_ids(), coup.kingdom_id
-    )
-    
-    # Calculate defender strength
-    _, defender_defense, defenders = _calculate_combat_strength(
-        db, coup.get_defender_ids(), coup.kingdom_id
-    )
-    
-    # NO WALLS for coups (internal rebellion)
-    total_defense = defender_defense
-    
-    # Determine victory (attackers need 25% advantage)
-    required_attack = int(total_defense * ATTACKER_ADVANTAGE_REQUIRED)
-    attacker_victory = attacker_attack > required_attack
-    
-    # Update coup record - resolved_at is the source of truth
-    coup.attacker_victory = attacker_victory
-    coup.attacker_strength = attacker_attack
-    coup.defender_strength = defender_defense
-    coup.total_defense_with_walls = total_defense
-    coup.resolved_at = datetime.utcnow()
-    
-    # Apply rewards/penalties
-    ruler_change = {}
-    if attacker_victory:
-        ruler_change = _apply_coup_victory_rewards(db, coup, kingdom, attackers, defenders)
-        message = f"COUP SUCCEEDED! {coup.initiator_name} has seized power in {kingdom.name}!"
-    else:
-        _apply_coup_failure_penalties(db, coup, kingdom, attackers, defenders)
-        message = f"💀 COUP FAILED! The rebellion in {kingdom.name} has been crushed!"
-        ruler_change = {
-            "old_ruler_id": None,
-            "old_ruler_name": None,
-            "new_ruler_id": None,
-            "new_ruler_name": None
-        }
-    
-    db.commit()
-    
-    return CoupResolveResponse(
-        success=True,
-        coup_id=coup.id,
-        attacker_victory=attacker_victory,
-        attacker_strength=attacker_attack,
-        defender_strength=defender_defense,
-        total_defense_with_walls=total_defense,
-        required_attack_strength=required_attack,
-        attackers=attackers,
-        defenders=defenders,
-        old_ruler_id=ruler_change.get("old_ruler_id"),
-        old_ruler_name=ruler_change.get("old_ruler_name"),
-        new_ruler_id=ruler_change.get("new_ruler_id"),
-        new_ruler_name=ruler_change.get("new_ruler_name"),
-        message=message
-    )
 
 
 # ===== Battle Phase Helper Functions =====
@@ -718,7 +616,7 @@ def _check_win_condition(db: Session, coup: CoupEvent) -> Optional[str]:
     """
     Check if the battle is won.
     
-    Win condition: Capture Throne Room + 1 other territory
+    Win condition: First to capture 2 of 3 territories
     
     Returns: 'attackers', 'defenders', or None
     """
@@ -726,19 +624,19 @@ def _check_win_condition(db: Session, coup: CoupEvent) -> Optional[str]:
         CoupTerritory.coup_id == coup.id
     ).all()
     
-    attacker_captures = []
-    defender_captures = []
+    attacker_captures = 0
+    defender_captures = 0
     
     for t in territories:
         if t.captured_by == "attackers":
-            attacker_captures.append(t.territory_name)
+            attacker_captures += 1
         elif t.captured_by == "defenders":
-            defender_captures.append(t.territory_name)
+            defender_captures += 1
     
-    # Win condition: Throne Room + 1 other
-    if TERRITORY_THRONE in attacker_captures and len(attacker_captures) >= 2:
+    # Win condition: First to 2 territories
+    if attacker_captures >= 2:
         return "attackers"
-    if TERRITORY_THRONE in defender_captures and len(defender_captures) >= 2:
+    if defender_captures >= 2:
         return "defenders"
     
     return None
@@ -749,6 +647,8 @@ def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> N
     Resolve the battle when a side wins via territory capture.
     Uses existing victory/failure reward logic.
     """
+    from db.models.kingdom_event import KingdomEvent
+    
     kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
     if not kingdom:
         return
@@ -770,11 +670,23 @@ def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> N
     coup.total_defense_with_walls = defender_defense
     coup.resolved_at = datetime.utcnow()
     
-    # Apply rewards/penalties
+    # Apply rewards/penalties (also updates ruler if attackers won)
+    outcome = _apply_coup_outcome(db, coup, kingdom, attackers, defenders, attacker_victory)
+    
+    # Create KingdomEvent for the activity feed
     if attacker_victory:
-        _apply_coup_victory_rewards(db, coup, kingdom, attackers, defenders)
+        title = f"⚔️ Coup Successful!"
+        description = f"{coup.initiator_name} has overthrown the ruler and now controls {kingdom.name}!"
     else:
-        _apply_coup_failure_penalties(db, coup, kingdom, attackers, defenders)
+        title = f"🛡️ Coup Defeated!"
+        description = f"The defenders have crushed {coup.initiator_name}'s rebellion in {kingdom.name}!"
+    
+    event = KingdomEvent(
+        kingdom_id=kingdom.id,
+        title=title,
+        description=description
+    )
+    db.add(event)
     
     db.commit()
 
@@ -1377,12 +1289,10 @@ def resolve_coup(
     db: Session = Depends(get_db)
 ):
     """
-    Resolve a coup - can be called by anyone after the pledge phase ends.
-    Idempotent - safe to call multiple times.
+    Check if coup is resolved (by territory capture).
     
-    Phase is computed from time:
-    - During pledge phase (first 12h): cannot resolve
-    - During battle phase (after 12h): can resolve anytime
+    Coups are resolved when one side captures 2 of 3 territories.
+    This endpoint just returns current status - it doesn't force resolution.
     """
     coup = db.query(CoupEvent).filter(CoupEvent.id == coup_id).first()
     
@@ -1392,11 +1302,12 @@ def resolve_coup(
             detail="Coup not found"
         )
     
+    kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+    _, _, attackers = _calculate_combat_strength(db, coup.get_attacker_ids(), coup.kingdom_id)
+    _, _, defenders = _calculate_combat_strength(db, coup.get_defender_ids(), coup.kingdom_id)
+    
     if coup.is_resolved:
-        # Idempotent - return the existing result
-        kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
-        _, _, attackers = _calculate_combat_strength(db, coup.get_attacker_ids(), coup.kingdom_id)
-        _, _, defenders = _calculate_combat_strength(db, coup.get_defender_ids(), coup.kingdom_id)
+        # Already resolved - return result
         return CoupResolveResponse(
             success=True,
             coup_id=coup.id,
@@ -1404,7 +1315,7 @@ def resolve_coup(
             attacker_strength=coup.attacker_strength,
             defender_strength=coup.defender_strength,
             total_defense_with_walls=coup.total_defense_with_walls,
-            required_attack_strength=int(coup.total_defense_with_walls * ATTACKER_ADVANTAGE_REQUIRED) if coup.total_defense_with_walls else 0,
+            required_attack_strength=0,
             attackers=attackers,
             defenders=defenders,
             old_ruler_id=None,
@@ -1420,7 +1331,32 @@ def resolve_coup(
             detail=f"Coup cannot be resolved yet - still in pledge phase. {coup.time_remaining_seconds} seconds remaining."
         )
     
-    return _resolve_coup_battle(db, coup)
+    # Check if someone has won via territory capture
+    winner_side = _check_win_condition(db, coup)
+    if winner_side:
+        _resolve_battle_victory(db, coup, winner_side)
+        return CoupResolveResponse(
+            success=True,
+            coup_id=coup.id,
+            attacker_victory=coup.attacker_victory,
+            attacker_strength=coup.attacker_strength,
+            defender_strength=coup.defender_strength,
+            total_defense_with_walls=coup.total_defense_with_walls,
+            required_attack_strength=0,
+            attackers=attackers,
+            defenders=defenders,
+            old_ruler_id=None,
+            old_ruler_name=None,
+            new_ruler_id=kingdom.ruler_id if kingdom else None,
+            new_ruler_name=None,
+            message=f"VICTORY! {winner_side.upper()} have won the coup!"
+        )
+    
+    # Not resolved yet - battle still in progress
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Coup not yet resolved. Capture 2 of 3 territories to win."
+    )
 
 
 @router.get("/{coup_id}/phase")
@@ -1454,8 +1390,8 @@ def get_coup_phase(
         "is_resolved": coup.is_resolved,
         "can_resolve": coup.can_resolve,
         "time_remaining_seconds": coup.time_remaining_seconds,
-        "pledge_end_time": coup.pledge_end_time.isoformat(),
-        "resolved_at": coup.resolved_at.isoformat() if coup.resolved_at else None
+        "pledge_end_time": format_datetime_iso(coup.pledge_end_time),
+        "resolved_at": format_datetime_iso(coup.resolved_at) if coup.resolved_at else None
     }
 
 
@@ -1898,7 +1834,9 @@ def resolve_fight_session(
         winner_side = _check_win_condition(db, coup)
         if winner_side:
             battle_won = True
-            coup.resolve(attacker_won=(winner_side == "attackers"))
+            # CRITICAL: Must call _resolve_battle_victory to actually update ruler and apply rewards!
+            # coup.resolve() only sets the resolved flag - it doesn't change the kingdom ruler
+            _resolve_battle_victory(db, coup, winner_side)
     
     # Delete the session (fight is complete)
     db.delete(session)

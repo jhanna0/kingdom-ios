@@ -154,6 +154,8 @@ struct CoupNotificationData: Codable, Identifiable {
     let canPledge: Bool
     let attackerVictory: Bool?
     let userWon: Bool?
+    let goldPerWinner: Int?
+    let isNewRuler: Bool?  // True if this user just became ruler via coup
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -169,6 +171,8 @@ struct CoupNotificationData: Codable, Identifiable {
         case canPledge = "can_pledge"
         case attackerVictory = "attacker_victory"
         case userWon = "user_won"
+        case goldPerWinner = "gold_per_winner"
+        case isNewRuler = "is_new_ruler"
     }
     
     /// Formatted time remaining in current phase

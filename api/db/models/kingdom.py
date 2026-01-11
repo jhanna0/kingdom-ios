@@ -18,6 +18,7 @@ class Kingdom(Base):
     
     # Current ruler (nullable - kingdoms can be unclaimed)
     ruler_id = Column(BigInteger, ForeignKey("users.id"), nullable=True, index=True)
+    ruler_started_at = Column(DateTime, nullable=True)  # When current ruler took power
     
     # Empire/faction system
     empire_id = Column(String, nullable=True, index=True)  # Which empire controls this city

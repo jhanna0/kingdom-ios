@@ -303,7 +303,7 @@ struct CoupBattleView: View {
                     .tracking(1)
             }
             
-            Text("Capture the Throne Room + 1 other territory to win the coup!")
+            Text("Capture 2 of 3 territories to win the coup!")
                 .font(FontStyles.labelTiny)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }

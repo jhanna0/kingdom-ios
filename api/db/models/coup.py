@@ -13,7 +13,7 @@ Phase is COMPUTED from time, not stored:
 Battle phase:
 - 3 territories: Coupers Territory, Crowns Territory, Throne Room
 - Players fight every 10 minutes (cooldown-based)
-- Win condition: Capture Throne Room + 1 other territory
+- Win condition: First to capture 2 of 3 territories
 
 No cronjob needed. Fully idempotent.
 """
@@ -26,6 +26,19 @@ from typing import List, Optional
 from enum import Enum
 
 from ..base import Base
+
+
+def _format_datetime_iso(dt: datetime) -> str:
+    """Format datetime for iOS compatibility - strips microseconds, adds Z suffix"""
+    if dt is None:
+        return None
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        return iso_str + 'Z'
+    return iso_str
 
 
 # ============================================================
@@ -80,9 +93,12 @@ class CoupEvent(Base):
     start_time = Column(DateTime, nullable=False, default=datetime.utcnow)
     pledge_end_time = Column(DateTime, nullable=False, index=True)  # start_time + 12h
     
-    # Participants
-    attackers = Column(JSONB, default=list)
-    defenders = Column(JSONB, default=list)
+    # Participants (DEPRECATED - use coup_participants table via relationship)
+    attackers = Column(JSONB, default=list)  # Legacy, kept for backward compat
+    defenders = Column(JSONB, default=list)  # Legacy, kept for backward compat
+    
+    # Relationship to participants table
+    participants = relationship("CoupParticipant", backref="coup", lazy="joined", cascade="all, delete-orphan")
     
     # Resolution - resolved_at being set = coup is done
     resolved_at = Column(DateTime, nullable=True, index=True)
@@ -90,6 +106,8 @@ class CoupEvent(Base):
     attacker_strength = Column(Integer, nullable=True)
     defender_strength = Column(Integer, nullable=True)
     total_defense_with_walls = Column(Integer, nullable=True)
+    gold_per_winner = Column(Integer, nullable=True)  # Spoils split among winners
+    old_ruler_id = Column(BigInteger, nullable=True)  # Who was ruler before coup (for notifications)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -141,22 +159,52 @@ class CoupEvent(Base):
     # === Participants ===
     
     def get_attacker_ids(self) -> List[int]:
+        """Get attacker user IDs from participants table."""
+        if self.participants:
+            return [p.user_id for p in self.participants if p.side == "attackers"]
+        # Fallback to legacy JSONB
         return self.attackers if self.attackers else []
     
     def get_defender_ids(self) -> List[int]:
+        """Get defender user IDs from participants table."""
+        if self.participants:
+            return [p.user_id for p in self.participants if p.side == "defenders"]
+        # Fallback to legacy JSONB
         return self.defenders if self.defenders else []
     
+    def add_participant(self, player_id: int, side: str) -> None:
+        """Add a participant to the coup. Use this instead of add_attacker/add_defender."""
+        # Check if already participating
+        for p in self.participants:
+            if p.user_id == player_id:
+                return  # Already in coup
+        
+        participant = CoupParticipant(
+            coup_id=self.id,
+            user_id=player_id,
+            side=side
+        )
+        self.participants.append(participant)
+        
+        # Also update legacy JSONB for backward compat
+        if side == "attackers":
+            if not self.attackers:
+                self.attackers = []
+            if player_id not in self.attackers:
+                self.attackers = self.attackers + [player_id]
+        else:
+            if not self.defenders:
+                self.defenders = []
+            if player_id not in self.defenders:
+                self.defenders = self.defenders + [player_id]
+    
     def add_attacker(self, player_id: int) -> None:
-        attackers = self.get_attacker_ids()
-        if player_id not in attackers:
-            attackers.append(player_id)
-            self.attackers = attackers
+        """Add attacker. Deprecated - use add_participant instead."""
+        self.add_participant(player_id, "attackers")
     
     def add_defender(self, player_id: int) -> None:
-        defenders = self.get_defender_ids()
-        if player_id not in defenders:
-            defenders.append(player_id)
-            self.defenders = defenders
+        """Add defender. Deprecated - use add_participant instead."""
+        self.add_participant(player_id, "defenders")
     
     def resolve(self, attacker_won: bool) -> None:
         """Mark resolved. Idempotent."""
@@ -193,6 +241,24 @@ class CoupEvent(Base):
     
     def advance_to_battle(self, battle_duration_hours: int = 12) -> None:
         pass  # No-op, phase is computed
+
+
+class CoupParticipant(Base):
+    """
+    Tracks which players are on which side in a coup.
+    
+    Proper relational table instead of JSONB arrays.
+    """
+    __tablename__ = "coup_participants"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    coup_id = Column(Integer, ForeignKey("coup_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    side = Column(String(20), nullable=False)  # 'attackers' or 'defenders'
+    pledged_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    def __repr__(self):
+        return f"<CoupParticipant(coup={self.coup_id}, user={self.user_id}, side='{self.side}')>"
 
 
 class CoupTerritory(Base):
@@ -279,7 +345,7 @@ class CoupTerritory(Base):
             "icon": self.icon,
             "control_bar": round(self.control_bar, 2),
             "captured_by": self.captured_by,
-            "captured_at": self.captured_at.isoformat() if self.captured_at else None,
+            "captured_at": _format_datetime_iso(self.captured_at) if self.captured_at else None,
         }
 
 
@@ -329,7 +395,7 @@ class CoupBattleAction(Base):
             "bar_before": round(self.bar_before, 2),
             "bar_after": round(self.bar_after, 2),
             "injured_player_id": self.injured_player_id,
-            "performed_at": self.performed_at.isoformat(),
+            "performed_at": _format_datetime_iso(self.performed_at),
         }
 
 

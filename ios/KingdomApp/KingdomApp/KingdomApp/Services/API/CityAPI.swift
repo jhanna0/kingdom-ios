@@ -118,6 +118,10 @@ class CityAPI {
             kingdom.isAllied = kingdomData.is_allied
             kingdom.isEnemy = kingdomData.is_enemy
             
+            // Parse allies and enemies arrays into Sets
+            kingdom.allies = Set(kingdomData.allies ?? [])
+            kingdom.enemies = Set(kingdomData.enemies ?? [])
+            
             // Alliance info if allied
             if let allianceData = kingdomData.alliance_info {
                 let expiresAt = allianceData.expires_at.flatMap { ISO8601DateFormatter().date(from: $0) }

@@ -40,9 +40,11 @@ struct OnboardingView: View {
                         displayName: $displayName,
                         selectedCity: selectedCity ?? "your city",
                         onContinue: {
-                            finishOnboarding()
+                            currentStep = 3
                         }
                     )
+                } else if currentStep == 3 {
+                    BalanceStep(onContinue: { finishOnboarding() })
                 }
             }
         }
@@ -56,6 +58,11 @@ struct OnboardingView: View {
                 let hasHometown = user.hometown_kingdom_id != nil && !(user.hometown_kingdom_id?.isEmpty ?? true)
                 let trimmedName = user.display_name.trimmingCharacters(in: .whitespacesAndNewlines)
                 let hasValidName = !trimmedName.isEmpty && trimmedName != "User"
+                
+                // Pre-fill display name when available (reduces friction for partial onboarding)
+                if hasValidName {
+                    displayName = trimmedName
+                }
                 
                 if hasHometown && !hasValidName {
                     // Has hometown but needs display name - skip to step 2
@@ -205,6 +212,94 @@ struct FeatureRow: View {
                     .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
+        }
+    }
+}
+
+// MARK: - Step 3: Live Balance
+
+struct BalanceStep: View {
+    let onContinue: () -> Void
+    
+    var body: some View {
+        VStack(spacing: KingdomTheme.Spacing.xxLarge) {
+            // Header with brutalist icon
+            VStack(spacing: KingdomTheme.Spacing.large) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 48))
+                    .foregroundColor(.white)
+                    .frame(width: 100, height: 100)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.inkMedium,
+                        cornerRadius: 20,
+                        shadowOffset: 4,
+                        borderWidth: 3
+                    )
+                
+                Text("Live Balance")
+                    .font(FontStyles.displayMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("This game has many moving parts. We constantly monitor and tune it for fairness.")
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 60)
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            
+            // Info Card
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                Text("What to expect")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
+                
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    InfoBullet(text: "Rewards and drop rates may change over time")
+                    InfoBullet(text: "Overpowered strategies may be adjusted")
+                    InfoBullet(text: "Updates focus on stability and a fair economy")
+                }
+            }
+            .padding(KingdomTheme.Spacing.large)
+            .brutalistCard(
+                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                cornerRadius: 20
+            )
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            
+            Spacer()
+            
+            // Continue Button
+            Button(action: onContinue) {
+                HStack {
+                    Text("Enter the Kingdom")
+                        .font(FontStyles.bodyLargeBold)
+                    Image(systemName: "arrow.right")
+                        .font(FontStyles.iconSmall)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KingdomTheme.Spacing.large)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(Color.black)
+                            .offset(x: 4, y: 4)
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .fill(KingdomTheme.Colors.inkMedium)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                    .stroke(Color.black, lineWidth: 3)
+                            )
+                    }
+                )
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.bottom, KingdomTheme.Spacing.xxLarge)
         }
     }
 }

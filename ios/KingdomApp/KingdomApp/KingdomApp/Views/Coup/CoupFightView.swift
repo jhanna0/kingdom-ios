@@ -471,21 +471,28 @@ struct CoupFightView: View {
                     
                     RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2)
                     
-                    // Labels
-                    HStack {
-                        Text("MISS")
+                    // Labels centered in each section
+                    HStack(spacing: 0) {
+                        let missWidth = CGFloat(missChance) / 100.0 * geo.size.width
+                        let hitWidth = CGFloat(hitChance) / 100.0 * geo.size.width
+                        
+                        Text("BLOCK")
                             .font(FontStyles.labelBadge)
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.leading, 6)
-                        Spacer()
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .frame(width: missWidth)
+                        
                         Text("HIT")
                             .font(FontStyles.labelBadge)
                             .foregroundColor(.white)
-                        Spacer()
-                        Text("CRIT")
+                            .lineLimit(1)
+                            .frame(width: hitWidth)
+                        
+                        Text("INJURE")
                             .font(FontStyles.labelBadge)
-                            .foregroundColor(.black.opacity(0.7))
-                            .padding(.trailing, 6)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity)
                     }
                     
                     if showRollMarker {
@@ -534,11 +541,12 @@ struct CoupFightView: View {
                 outcomeRow(result: result)
             } else if let rolls = session?.rolls, !rolls.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         ForEach(Array(rolls.enumerated()), id: \.offset) { index, roll in
                             rollHistoryBadge(roll: roll, index: index + 1)
                         }
                     }
+                    .padding(.horizontal, 4)
                 }
             } else {
                 Text("No rolls yet - tap Swing! to begin")
@@ -587,20 +595,42 @@ struct CoupFightView: View {
     }
     
     private func rollHistoryBadge(roll: CoupRollResult, index: Int) -> some View {
-        let (icon, color, _) = outcomeDisplay(roll.outcome)
+        let (icon, _, _) = outcomeDisplay(roll.outcome)
+        let badgeColor = rollBadgeColor(roll.outcome)
         
         return VStack(spacing: 4) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(color).frame(width: 44, height: 44)
+                // Shadow
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.black)
+                    .frame(width: 44, height: 44)
+                    .offset(x: 2, y: 2)
+                
+                // Main badge - use opaque color
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(badgeColor)
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
                 
                 VStack(spacing: 2) {
                     Image(systemName: icon).font(FontStyles.iconTiny).foregroundColor(.white)
                     Text("\(Int(roll.value))").font(FontStyles.labelBadge).foregroundColor(.white)
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+            .frame(width: 48, height: 48)
             
             Text("#\(index)").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+    }
+    
+    private func rollBadgeColor(_ outcome: String) -> Color {
+        switch outcome {
+        case "injure": return sideColor
+        case "hit": return sideColor
+        default: return Color.gray
         }
     }
     

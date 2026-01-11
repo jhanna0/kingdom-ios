@@ -82,7 +82,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var canStageCoup: Bool  // True if current user can initiate a coup
     var coupIneligibilityReason: String?  // Why user can't stage coup (e.g., "Need T3 leadership")
     var activeCoup: ActiveCoupData?  // Active coup in this kingdom (if any)
-    
+
     // Loading state
     var isCurrentCity: Bool  // True if user is currently inside this city (from API)
     var hasBoundaryCached: Bool  // True if full boundary polygon is loaded

@@ -158,10 +158,10 @@ class NotificationManager {
         
         let content = UNMutableNotificationContent()
         if phase == "pledge" {
-            content.title = "⚔️ Coup Battle Starting!"
+            content.title = "Coup Battle Starting!"
             content.body = "The battle for \(kingdomName) has begun!"
         } else {
-            content.title = "🏰 Coup Ending Soon"
+            content.title = "Coup Ending Soon"
             content.body = "The battle for \(kingdomName) is about to conclude"
         }
         content.sound = UNNotificationSound.default

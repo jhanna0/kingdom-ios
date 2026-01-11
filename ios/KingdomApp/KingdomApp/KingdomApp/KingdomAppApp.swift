@@ -293,6 +293,18 @@ struct AuthenticatedView: View {
                 .zIndex(1000)
             }
             
+            // Coup victory celebration popup (when user becomes ruler via coup)
+            if let kingdomName = appInit.coupCelebrationKingdom {
+                KingdomClaimCelebration(
+                    playerName: viewModel.player.name,
+                    kingdomName: kingdomName,
+                    onDismiss: {
+                        appInit.coupCelebrationKingdom = nil
+                    }
+                )
+                .zIndex(1000)
+            }
+            
             // Travel notification toast
             if showTravelNotification, let travelEvent = displayedTravelEvent {
                 VStack {

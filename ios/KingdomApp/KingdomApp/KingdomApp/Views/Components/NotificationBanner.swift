@@ -134,7 +134,8 @@ struct NotificationOverlay: View {
             message: "Market construction complete",
             action: "complete_contract",
             action_id: "123",
-            created_at: ISO8601DateFormatter().string(from: Date())
+            created_at: ISO8601DateFormatter().string(from: Date()),
+            coup_data: nil
         ),
         onDismiss: {},
         onTap: {}

@@ -187,27 +187,158 @@ def get_coup_notifications(db: Session, user: User, state: PlayerState) -> List[
     for coup in recently_resolved_coups:
         attacker_ids = coup.get_attacker_ids()
         defender_ids = coup.get_defender_ids()
+        kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else "Kingdom"
         
-        if user.id in attacker_ids or user.id in defender_ids:
-            kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
-            
-            user_was_attacker = user.id in attacker_ids
-            user_won = (user_was_attacker and coup.attacker_victory) or (not user_was_attacker and not coup.attacker_victory)
-            
+        from systems.coup.config import (
+            WINNER_REP_GAIN, LOSER_REP_LOSS,
+            LOSER_ATTACK_LOSS, LOSER_DEFENSE_LOSS, LOSER_LEADERSHIP_LOSS
+        )
+        
+        # Check if notification is unread
+        last_read = state.last_notifications_viewed
+        is_unread = last_read is None or coup.resolved_at > last_read
+        
+        gold_won = coup.gold_per_winner or 0
+        
+        # === Case 1: User is the NEW RULER (initiator who won) ===
+        if coup.attacker_victory and user.id == coup.initiator_id:
             notifications.append({
-                "type": "coup_resolved",
-                "priority": "high",
-                "title": f"Coup Resolved in {kingdom.name if kingdom else 'Kingdom'}",
-                "message": "You won!" if user_won else "You lost.",
-                "action": "view_coup_results",
-                "action_id": str(coup.id),
+                "type": "coup_new_ruler",
+                "priority": "critical",
+                "title": f"👑 You Are Now Ruler!",
+                "message": f"Your coup succeeded! You now rule {kingdom_name}!",
+                "action": "view_kingdom",
+                "action_id": coup.kingdom_id,
                 "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
                 "coup_data": {
                     "id": coup.id,
                     "kingdom_id": coup.kingdom_id,
-                    "kingdom_name": kingdom.name if kingdom else None,
+                    "kingdom_name": kingdom_name,
+                    "gold_per_winner": gold_won,
+                    "rep_gained": WINNER_REP_GAIN
+                }
+            })
+        
+        # === Case 2: User WAS the ruler and LOST their throne ===
+        elif coup.attacker_victory and user.id == coup.old_ruler_id:
+            # User was the ruler who got overthrown!
+            notifications.append({
+                "type": "coup_lost_throne",
+                "priority": "critical",
+                "title": "👑 You Lost Your Throne!",
+                "message": f"{coup.initiator_name} has overthrown you in {kingdom_name}!",
+                "action": "view_coup_results",
+                "action_id": str(coup.id),
+                "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom_name,
+                    "attacker_victory": True,
+                    "user_won": False,
+                    "new_ruler_name": coup.initiator_name,
+                    "gold_lost_percent": 50,
+                    "rep_lost": LOSER_REP_LOSS,
+                    "attack_lost": LOSER_ATTACK_LOSS,
+                    "defense_lost": LOSER_DEFENSE_LOSS,
+                    "leadership_lost": LOSER_LEADERSHIP_LOSS
+                }
+            })
+        
+        # === Case 2b: User was defender and lost (but not the ruler) ===
+        elif user.id in defender_ids and coup.attacker_victory:
+            notifications.append({
+                "type": "coup_side_lost",
+                "priority": "high",
+                "title": f"⚔️ Defeat in {kingdom_name}",
+                "message": f"Your side was defeated. Lost 50% gold, -{LOSER_REP_LOSS} rep, -{LOSER_ATTACK_LOSS} atk, -{LOSER_DEFENSE_LOSS} def, -{LOSER_LEADERSHIP_LOSS} leadership",
+                "action": "view_coup_results",
+                "action_id": str(coup.id),
+                "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom_name,
                     "attacker_victory": coup.attacker_victory,
-                    "user_won": user_won
+                    "user_won": False,
+                    "gold_lost_percent": 50,
+                    "rep_lost": LOSER_REP_LOSS,
+                    "attack_lost": LOSER_ATTACK_LOSS,
+                    "defense_lost": LOSER_DEFENSE_LOSS,
+                    "leadership_lost": LOSER_LEADERSHIP_LOSS
+                }
+            })
+        
+        # === Case 3: User was on WINNING side (but not the new ruler) ===
+        elif user.id in attacker_ids and coup.attacker_victory and user.id != coup.initiator_id:
+            notifications.append({
+                "type": "coup_side_won",
+                "priority": "high",
+                "title": f"⚔️ Victory in {kingdom_name}!",
+                "message": f"Your side won! Spoils: {gold_won} gold, +{WINNER_REP_GAIN} rep",
+                "action": "view_coup_results",
+                "action_id": str(coup.id),
+                "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom_name,
+                    "attacker_victory": True,
+                    "user_won": True,
+                    "gold_per_winner": gold_won,
+                    "rep_gained": WINNER_REP_GAIN
+                }
+            })
+        
+        # === Case 4: Defenders WON (coup failed) ===
+        elif user.id in defender_ids and not coup.attacker_victory:
+            notifications.append({
+                "type": "coup_side_won",
+                "priority": "high",
+                "title": f"🛡️ Coup Defeated in {kingdom_name}!",
+                "message": f"You defended the kingdom! Spoils: {gold_won} gold, +{WINNER_REP_GAIN} rep",
+                "action": "view_coup_results",
+                "action_id": str(coup.id),
+                "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom_name,
+                    "attacker_victory": False,
+                    "user_won": True,
+                    "gold_per_winner": gold_won,
+                    "rep_gained": WINNER_REP_GAIN
+                }
+            })
+        
+        # === Case 5: Attackers LOST (coup failed) ===
+        elif user.id in attacker_ids and not coup.attacker_victory:
+            notifications.append({
+                "type": "coup_side_lost",
+                "priority": "high",
+                "title": f"⚔️ Coup Failed in {kingdom_name}",
+                "message": f"Your rebellion was crushed. Lost 50% gold, -{LOSER_REP_LOSS} rep, -{LOSER_ATTACK_LOSS} atk, -{LOSER_DEFENSE_LOSS} def, -{LOSER_LEADERSHIP_LOSS} leadership",
+                "action": "view_coup_results",
+                "action_id": str(coup.id),
+                "created_at": format_datetime_iso(coup.resolved_at),
+                "show_popup": is_unread,
+                "coup_data": {
+                    "id": coup.id,
+                    "kingdom_id": coup.kingdom_id,
+                    "kingdom_name": kingdom_name,
+                    "attacker_victory": False,
+                    "user_won": False,
+                    "gold_lost_percent": 50,
+                    "rep_lost": LOSER_REP_LOSS,
+                    "attack_lost": LOSER_ATTACK_LOSS,
+                    "defense_lost": LOSER_DEFENSE_LOSS,
+                    "leadership_lost": LOSER_LEADERSHIP_LOSS
                 }
             })
     

@@ -110,6 +110,8 @@ struct CityKingdomData: Codable {
     let is_allied: Bool  // True if allied with any of player's kingdoms
     let is_enemy: Bool  // True if at war with any of player's kingdoms
     let alliance_info: AllianceInfo?  // Details about alliance if is_allied is true
+    let allies: [String]?  // Kingdom IDs of allied kingdoms
+    let enemies: [String]?  // Kingdom IDs of enemy kingdoms
     
     // Coup eligibility
     let can_stage_coup: Bool?  // Backend determines if current user can stage coup

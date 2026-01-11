@@ -82,6 +82,22 @@ TERRITORY_ICONS = {
 }
 
 # ============================================================
+# COUP OUTCOME - Rewards and penalties
+# ============================================================
+
+# Gold redistribution - take from losers, give to winners
+LOSER_GOLD_PERCENT = 0.50  # Losers lose 50% of their gold
+
+# Reputation changes
+WINNER_REP_GAIN = 100
+LOSER_REP_LOSS = 100
+
+# Skill penalties for losers
+LOSER_ATTACK_LOSS = 1
+LOSER_DEFENSE_LOSS = 1
+LOSER_LEADERSHIP_LOSS = 1
+
+# ============================================================
 # HELPER FUNCTIONS
 # ============================================================
 

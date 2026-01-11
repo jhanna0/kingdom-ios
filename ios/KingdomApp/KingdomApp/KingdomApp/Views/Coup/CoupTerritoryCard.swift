@@ -66,12 +66,11 @@ struct CoupTerritoryCard: View {
                             .font(FontStyles.labelBold)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
                 }
                 .buttonStyle(.brutalist(
                     backgroundColor: canFight 
                         ? (isUserAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue)
-                        : KingdomTheme.Colors.disabled,
+                        : Color.gray,
                     foregroundColor: .white,
                     fullWidth: true
                 ))

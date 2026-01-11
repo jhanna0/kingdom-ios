@@ -10,7 +10,7 @@ from .property import Property
 from .city_boundary import CityBoundary
 from .check_in import CheckInHistory
 from .kingdom_intelligence import KingdomIntelligence
-from .coup import CoupEvent, CoupTerritory, CoupBattleAction, CoupInjury, CoupFightSession, RollOutcome
+from .coup import CoupEvent, CoupTerritory, CoupBattleAction, CoupInjury, CoupFightSession, CoupParticipant, RollOutcome
 # All coup constants now live in systems/coup/config.py
 from systems.coup.config import (
     SIZE_EXPONENT_BASE, LEADERSHIP_DAMPENING_PER_TIER,
@@ -52,6 +52,7 @@ __all__ = [
     "CoupBattleAction",
     "CoupInjury",
     "CoupFightSession",
+    "CoupParticipant",
     "RollOutcome",
     "SIZE_EXPONENT_BASE",
     "LEADERSHIP_DAMPENING_PER_TIER",

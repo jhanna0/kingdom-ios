@@ -7,10 +7,18 @@ Frontend just renders what backend sends - no switch statements!
 # icon: SF Symbol name
 # color: Theme color name that frontend maps to KingdomTheme.Colors
 NOTIFICATION_TYPES = {
-    # Coup notifications
+    # Coup notifications - Active
     "coup_vote_needed": {
         "icon": "crown.fill",
         "color": "buttonWarning"
+    },
+    "coup_pledge_needed": {
+        "icon": "crown.fill",
+        "color": "buttonWarning"
+    },
+    "coup_pledge_waiting": {
+        "icon": "clock.fill",
+        "color": "inkMedium"
     },
     "coup_in_progress": {
         "icon": "crown.fill",
@@ -20,9 +28,39 @@ NOTIFICATION_TYPES = {
         "icon": "crown.fill",
         "color": "buttonDanger"
     },
+    "coup_battle_active": {
+        "icon": "flame.fill",
+        "color": "buttonWarning"
+    },
+    "coup_battle_against_you": {
+        "icon": "flame.fill",
+        "color": "buttonDanger"
+    },
+    "coup_battle_ongoing": {
+        "icon": "flame.fill",
+        "color": "buttonWarning"
+    },
+    
+    # Coup notifications - Resolved
     "coup_resolved": {
         "icon": "flag.checkered",
         "color": "inkMedium"
+    },
+    "coup_new_ruler": {
+        "icon": "crown.fill",
+        "color": "imperialGold"
+    },
+    "coup_lost_throne": {
+        "icon": "crown.fill",
+        "color": "buttonDanger"
+    },
+    "coup_side_won": {
+        "icon": "flag.checkered",
+        "color": "buttonSuccess"
+    },
+    "coup_side_lost": {
+        "icon": "flag.checkered",
+        "color": "buttonDanger"
     },
     
     # Invasion notifications

@@ -121,11 +121,13 @@ struct DrawnMapView: View {
     }
     
     private func kingdomFillColor(for kingdom: Kingdom) -> Color {
+        let isHomeKingdom = kingdom.id == viewModel.player.hometownKingdomId
         return KingdomTheme.Colors.territoryColor(
             kingdomId: kingdom.id,
-            isPlayer: kingdom.id == viewModel.player.hometownKingdomId,
+            isPlayer: isHomeKingdom,
             isEnemy: kingdom.isEnemy,
-            isAllied: kingdom.isAllied
+            isAllied: kingdom.isAllied,
+            isAtWar: isHomeKingdom && kingdom.activeCoup != nil
         )
     }
     

@@ -107,8 +107,10 @@ struct KingdomTheme {
         static let textMuted = Color(red: 0.45, green: 0.35, blue: 0.25)
         
         // MARK: Kingdom Territory Colors (Map Polygons & Markers)
-        /// Player's kingdom - ROYAL RED (crimson)
-        static let territoryPlayer = Color(red: 0.70, green: 0.15, blue: 0.15)
+        /// Player's kingdom - uses royalBlue (peaceful) or buttonDanger (at war)
+        static let territoryPlayer = royalBlue
+        /// Player's kingdom during war - same red as coup/danger buttons
+        static let territoryPlayerAtWar = buttonDanger
         /// Enemy kingdom - deep muted red (medieval vermillion)
         static let territoryEnemy = Color(red: 0.75, green: 0.30, blue: 0.25)
         /// Allied kingdom - map blue-green (like cartographer's seas)
@@ -129,9 +131,10 @@ struct KingdomTheme {
         static let territoryNeutral11 = Color(red: 0.62, green: 0.55, blue: 0.48) // Warm gray
         
         /// Get territory color for a kingdom based on relationship and hash
-        static func territoryColor(kingdomId: String, isPlayer: Bool, isEnemy: Bool, isAllied: Bool) -> Color {
+        /// - isAtWar: true if the player's kingdom has an active coup or invasion
+        static func territoryColor(kingdomId: String, isPlayer: Bool, isEnemy: Bool, isAllied: Bool, isAtWar: Bool = false) -> Color {
             if isPlayer {
-                return territoryPlayer
+                return isAtWar ? territoryPlayerAtWar : territoryPlayer
             } else if isEnemy {
                 return territoryEnemy
             } else if isAllied {
