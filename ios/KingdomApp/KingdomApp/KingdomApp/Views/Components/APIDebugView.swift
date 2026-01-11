@@ -107,6 +107,12 @@ struct APIDebugView: View {
                     }
                 }
                 
+                Section("Simulators") {
+                    NavigationLink("Battle Simulator") {
+                        BattleSimulatorView()
+                    }
+                }
+                
                 // Status Message
                 Section("Last Result") {
                     Text(statusMessage)

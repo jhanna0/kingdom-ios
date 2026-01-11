@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Weather toast - white text with icon, top right under HUD
+/// Weather toast - white text with icon, top left under HUD
 struct WeatherToast: View {
     let weather: WeatherData
     let onDismiss: () -> Void
@@ -8,7 +8,7 @@ struct WeatherToast: View {
     @State private var opacity: Double = 1.0
     
     var body: some View {
-        VStack(alignment: .trailing, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: weatherIcon)
                     .font(.system(size: 16, weight: .bold))
@@ -35,8 +35,8 @@ struct WeatherToast: View {
                 .shadow(color: .black, radius: 0, x: -1, y: 1)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
                 .italic()
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 200, alignment: .trailing)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: 200, alignment: .leading)
         }
         .opacity(opacity)
         .onAppear {
