@@ -1,7 +1,11 @@
 import SwiftUI
 
 /// Beautiful aged parchment background with visible texture
+/// Supports war/charred mode for coup/invasion states
 struct ParchmentBackground: View {
+    /// When true, displays charred/on-fire appearance for coup/invasion
+    var isWarMode: Bool = false
+    
     // Texture configuration - Subtle texture
     private enum Texture {
         static let horizontalLineSpacing: CGFloat = 8
@@ -17,18 +21,32 @@ struct ParchmentBackground: View {
         static let speckleOpacity: Double = 0.2
     }
     
-    // Color configuration - Muted blue-grey parchment (blend of ocean and tan)
-    private enum Colors {
-        static let base = Color(red: 0.68, green: 0.69, blue: 0.66)
-        static let gradientLight = Color(red: 0.72, green: 0.73, blue: 0.70)
-        static let gradientDark = Color(red: 0.62, green: 0.63, blue: 0.59)
-        static let textureColor = Color(red: 0.45, green: 0.48, blue: 0.50)
+    // Dynamic colors based on war mode
+    private var baseColor: Color {
+        isWarMode ? KingdomTheme.Colors.mapWarBase : KingdomTheme.Colors.mapPeaceBase
+    }
+    
+    private var gradientLightColor: Color {
+        isWarMode ? KingdomTheme.Colors.mapWarGradientLight : KingdomTheme.Colors.mapPeaceGradientLight
+    }
+    
+    private var gradientDarkColor: Color {
+        isWarMode ? KingdomTheme.Colors.mapWarGradientDark : KingdomTheme.Colors.mapPeaceGradientDark
+    }
+    
+    private var textureColor: Color {
+        isWarMode ? KingdomTheme.Colors.mapWarTexture : KingdomTheme.Colors.mapPeaceTexture
+    }
+    
+    // War mode has a stronger vignette for more ominous feel
+    private var vignetteOpacity: Double {
+        isWarMode ? 0.4 : 0.2
     }
     
     var body: some View {
         ZStack {
-            // Base tan color
-            Colors.base
+            // Base color
+            baseColor
             
             // Paper texture overlay
             textureCanvas
@@ -40,6 +58,7 @@ struct ParchmentBackground: View {
             vignetteOverlay
         }
         .ignoresSafeArea()
+        .animation(.easeInOut(duration: 1.0), value: isWarMode)
     }
     
     private var textureCanvas: some View {
@@ -60,7 +79,7 @@ struct ParchmentBackground: View {
             path.addLine(to: CGPoint(x: size.width, y: y))
             context.stroke(
                 path,
-                with: .color(Colors.textureColor.opacity(Texture.horizontalLineOpacity)),
+                with: .color(textureColor.opacity(Texture.horizontalLineOpacity)),
                 lineWidth: Texture.horizontalLineWidth
             )
             y += Texture.horizontalLineSpacing
@@ -75,7 +94,7 @@ struct ParchmentBackground: View {
             path.addLine(to: CGPoint(x: x, y: size.height))
             context.stroke(
                 path,
-                with: .color(Colors.textureColor.opacity(Texture.verticalLineOpacity)),
+                with: .color(textureColor.opacity(Texture.verticalLineOpacity)),
                 lineWidth: Texture.verticalLineWidth
             )
             x += Texture.verticalLineSpacing
@@ -93,7 +112,7 @@ struct ParchmentBackground: View {
                 )
                 context.fill(
                     Path(ellipseIn: rect),
-                    with: .color(Colors.textureColor.opacity(Texture.speckleOpacity))
+                    with: .color(textureColor.opacity(Texture.speckleOpacity))
                 )
             }
         }
@@ -102,8 +121,8 @@ struct ParchmentBackground: View {
     private var colorGradient: some View {
         LinearGradient(
             colors: [
-                Colors.gradientLight.opacity(0.2),
-                Colors.gradientDark.opacity(0.2)
+                gradientLightColor.opacity(0.2),
+                gradientDarkColor.opacity(0.2)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -116,7 +135,7 @@ struct ParchmentBackground: View {
                 RadialGradient(
                     colors: [
                         Color.clear,
-                        Color.black.opacity(0.2)
+                        Color.black.opacity(vignetteOpacity)
                     ],
                     center: .center,
                     startRadius: 150,
@@ -126,7 +145,11 @@ struct ParchmentBackground: View {
     }
 }
 
-#Preview {
-    ParchmentBackground()
+#Preview("Peaceful") {
+    ParchmentBackground(isWarMode: false)
+}
+
+#Preview("War Mode") {
+    ParchmentBackground(isWarMode: true)
 }
 

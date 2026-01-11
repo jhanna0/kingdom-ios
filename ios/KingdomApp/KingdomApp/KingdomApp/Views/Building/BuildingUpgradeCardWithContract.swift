@@ -22,14 +22,6 @@ struct BuildingUpgradeCardWithContract: View {
         return upgradeCost?.actionsRequired ?? 0
     }
     
-    private var constructionCost: Int {
-        return upgradeCost?.constructionCost ?? 0
-    }
-    
-    private var canAfford: Bool {
-        return upgradeCost?.canAfford ?? false
-    }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Header with icon, name, and level
@@ -61,7 +53,7 @@ struct BuildingUpgradeCardWithContract: View {
                             currentLevel: currentLevel,
                             maxLevel: maxLevel,
                             benefitForLevel: { level in getBenefitForLevel(level) },
-                            costForLevel: { level in constructionCost },
+                            actionsForNextLevel: actionsRequired,
                             detailedBenefits: getDetailedBenefitsForBuilding(),
                             accentColor: iconColor
                         )) {

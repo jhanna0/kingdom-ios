@@ -7,7 +7,7 @@ struct BuildingLevelsView: View {
     let currentLevel: Int
     let maxLevel: Int
     let benefitForLevel: (Int) -> String
-    let costForLevel: (Int) -> Int
+    let actionsForNextLevel: Int?  // Actions required for next upgrade (only available for currentLevel + 1)
     let detailedBenefits: ((Int) -> [String])?
     let accentColor: Color?
     @Environment(\.dismiss) var dismiss
@@ -129,25 +129,42 @@ struct BuildingLevelsView: View {
                 .fill((accentColor ?? KingdomTheme.Colors.royalPurple).opacity(0.3))
                 .frame(height: 2)
             
-            // Cost
-            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                sectionHeader(icon: "dollarsign.circle.fill", title: "Upgrade Cost")
-                
-                HStack {
-                    Image(systemName: "g.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(KingdomTheme.Colors.goldLight)
-                        .frame(width: 20)
+            // Upgrade Requirements - only show for next available level
+            if level == currentLevel + 1, let actions = actionsForNextLevel {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    sectionHeader(icon: "hammer.fill", title: "Upgrade Requirements")
                     
-                    Text("\(costForLevel(level)) Gold")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack {
+                        Image(systemName: "hammer.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .frame(width: 20)
+                        
+                        Text("\(actions) Actions Required")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        Text("Via Contract")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+            } else if level > currentLevel + 1 {
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    sectionHeader(icon: "hammer.fill", title: "Upgrade Requirements")
                     
-                    Spacer()
-                    
-                    Text("From Treasury")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    HStack {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                            .frame(width: 20)
+                        
+                        Text("Build previous levels first")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                 }
             }
             

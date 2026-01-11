@@ -53,6 +53,9 @@ struct CoupPledgeView: View {
                 } else if let userSide = coup.userSide {
                     pledgedStatus(side: userSide)
                 }
+
+                // How it works - brief description
+                howItWorksSection
                 
                 // View participants - subtle link
                 viewParticipantsButton
@@ -63,6 +66,51 @@ struct CoupPledgeView: View {
         .parchmentBackground()
         .sheet(isPresented: $showParticipants) {
             participantsSheet
+        }
+    }
+    
+    // MARK: - How It Works
+    
+    private var howItWorksSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack(spacing: 6) {
+                Image(systemName: "scroll.fill")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text("HOW IT WORKS")
+                    .font(FontStyles.labelBadge)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .tracking(1)
+            }
+            
+            // Steps
+            VStack(alignment: .leading, spacing: 6) {
+                howItWorksStep(number: "1", text: "Pledge your allegiance (12h)")
+                howItWorksStep(number: "2", text: "Sides fight each other for contorl (12h)")
+                howItWorksStep(number: "3", text: "Winning side claims the throne- and the spoils of war")
+                // TODO: Add consequences section (losers lose gold/skills)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    private func howItWorksStep(number: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(number)
+                .font(FontStyles.labelBadge)
+                .foregroundColor(.white)
+                .frame(width: 18, height: 18)
+                .background(
+                    Circle()
+                        .fill(KingdomTheme.Colors.inkMedium)
+                )
+            
+            Text(text)
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
         }
     }
     
@@ -94,9 +142,9 @@ struct CoupPledgeView: View {
                 Button(action: { onPledge(side) }) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(FontStyles.headingSmall)
                         Text("CONFIRM PLEDGE")
-                            .font(.system(size: 14, weight: .black))
+                            .font(FontStyles.labelBold)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -120,19 +168,19 @@ struct CoupPledgeView: View {
         
         return HStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 24, weight: .bold))
+                .font(FontStyles.displaySmall)
                 .foregroundColor(KingdomTheme.Colors.buttonSuccess)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("YOU PLEDGED")
-                    .font(.system(size: 10, weight: .bold, design: .serif))
+                    .font(FontStyles.labelBadge)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 HStack(spacing: 6) {
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(FontStyles.iconTiny)
                     Text(label)
-                        .font(.system(size: 16, weight: .black, design: .serif))
+                        .font(FontStyles.headingSmall)
                 }
                 .foregroundColor(tint)
             }
@@ -159,15 +207,15 @@ struct CoupPledgeView: View {
         Button(action: { showParticipants = true }) {
             HStack(spacing: 8) {
                 Image(systemName: "person.3.fill")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(FontStyles.iconMini)
                 
                 Text("View All Participants")
-                    .font(.system(size: 12, weight: .bold, design: .serif))
+                    .font(FontStyles.labelTiny)
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(FontStyles.iconMini)
             }
             .foregroundColor(KingdomTheme.Colors.inkMedium)
             .padding(.horizontal, 14)
@@ -217,7 +265,7 @@ struct CoupPledgeView: View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(FontStyles.iconTiny)
                     .foregroundColor(.white)
                     .frame(width: 30, height: 30)
                     .background(
@@ -233,13 +281,13 @@ struct CoupPledgeView: View {
                     )
                 
                 Text(title)
-                    .font(.system(size: 14, weight: .black, design: .serif))
+                    .font(FontStyles.labelBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
                 
                 Text("\(participants.count)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(FontStyles.labelTiny)
                     .foregroundColor(color)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -249,7 +297,7 @@ struct CoupPledgeView: View {
             
             if participants.isEmpty {
                 Text("No one yet...")
-                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .font(FontStyles.labelTiny)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                     .italic()
                     .frame(maxWidth: .infinity)
@@ -271,17 +319,17 @@ struct CoupPledgeView: View {
                 .frame(width: 36, height: 36)
                 .overlay(
                     Text(String(participant.playerName.prefix(1)).uppercased())
-                        .font(.system(size: 14, weight: .bold, design: .serif))
+                        .font(FontStyles.labelBold)
                         .foregroundColor(sideColor)
                 )
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(participant.playerName)
-                    .font(.system(size: 13, weight: .bold, design: .serif))
+                    .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text("Lv.\(participant.level) • \(participant.kingdomReputation) rep")
-                    .font(.system(size: 10, weight: .medium, design: .serif))
+                    .font(FontStyles.labelBadge)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
             }
             
@@ -290,19 +338,19 @@ struct CoupPledgeView: View {
             HStack(spacing: 8) {
                 HStack(spacing: 3) {
                     Image(systemName: "sword.fill")
-                        .font(.system(size: 9))
+                        .font(FontStyles.iconMini)
                     Text("\(participant.attackPower)")
                 }
                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                 
                 HStack(spacing: 3) {
                     Image(systemName: "shield.fill")
-                        .font(.system(size: 9))
+                        .font(FontStyles.iconMini)
                     Text("\(participant.defensePower)")
                 }
                 .foregroundColor(KingdomTheme.Colors.royalBlue)
             }
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .font(FontStyles.labelBadge)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)

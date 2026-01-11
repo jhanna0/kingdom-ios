@@ -19,7 +19,7 @@ struct DrawnMapView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                ParchmentBackground()
+                ParchmentBackground(isWarMode: viewModel.isInWarState)
                 
                 ZStack {
                     mapCanvas

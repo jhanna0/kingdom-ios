@@ -15,7 +15,6 @@ struct CharacterSheetView: View {
     @State private var isLoadingActivities = true
     @State private var relocationStatus: RelocationStatusResponse?
     @State private var isLoadingRelocationStatus = false
-    @State private var showLogoutConfirmation = false
     
     var body: some View {
         ScrollView {
@@ -68,14 +67,12 @@ struct CharacterSheetView: View {
                     )
                 }
                 
-                // Logout button
-                Button {
-                    showLogoutConfirmation = true
-                } label: {
+                // Settings button
+                NavigationLink(destination: SettingsView()) {
                     HStack {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "gearshape.fill")
                             .font(FontStyles.iconSmall)
-                        Text("Logout")
+                        Text("Settings")
                     }
                     .font(FontStyles.bodyMediumBold)
                     .foregroundColor(.white)
@@ -83,7 +80,7 @@ struct CharacterSheetView: View {
                     .padding(.vertical, 12)
                 }
                 .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.buttonDanger,
+                    backgroundColor: KingdomTheme.Colors.buttonPrimary,
                     cornerRadius: 8,
                     shadowOffset: 2,
                     borderWidth: 2
@@ -116,15 +113,6 @@ struct CharacterSheetView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
-        }
-        .alert("Logout", isPresented: $showLogoutConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Logout", role: .destructive) {
-                authManager.logout()
-                dismiss()
-            }
-        } message: {
-            Text("Are you sure you want to logout?")
         }
     }
     

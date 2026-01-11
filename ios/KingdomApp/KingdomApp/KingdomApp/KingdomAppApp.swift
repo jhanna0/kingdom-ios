@@ -252,12 +252,13 @@ struct AuthenticatedView: View {
                     showActivity: $showActivity
                 )
                 
-                // Active Coup Badge - below MapHUD
+                // Active Coup Badge - below MapHUD, RIGHT side
                 if let coup = viewModel.activeCoupInHomeKingdom {
                     VStack {
                         Spacer().frame(height: 152)
                         
                         HStack {
+                            Spacer()
                             CoupMapBadgeView(
                                 status: coup.status,
                                 timeRemaining: coup.timeRemainingFormatted,
@@ -265,7 +266,6 @@ struct AuthenticatedView: View {
                                 defenderCount: coup.defender_count,
                                 onTap: { showCoupView = true }
                             )
-                            Spacer()
                         }
                         .padding(.horizontal, 12)
                         
@@ -315,11 +315,10 @@ struct AuthenticatedView: View {
                 .zIndex(999)
             }
             
-            // Weather toast - white text with icon, top right under HUD
+            // Weather toast - white text with icon, top LEFT under HUD
             if showWeatherToast, let weather = currentWeather {
                 VStack {
                     HStack {
-                        Spacer()
                         WeatherToast(
                             weather: weather,
                             onDismiss: {
@@ -327,7 +326,8 @@ struct AuthenticatedView: View {
                                 currentWeather = nil
                             }
                         )
-                        .padding(.trailing, 16)
+                        .padding(.leading, 16)
+                        Spacer()
                     }
                     .padding(.top, 155) // Further down under HUD
                     

@@ -69,10 +69,31 @@ struct KingdomMarker: View {
                 }
                 .offset(x: 22, y: 22)
                 
-                // Crown for claimed kingdoms
-                if !isUnclaimed {
+                // Status badge: Coup icon if active coup, Crown if claimed
+                if kingdom.activeCoup != nil {
+                    // Active coup - show crossed swords
                     ZStack {
-                        // Crown badge shadow
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 22, height: 22)
+                            .offset(x: 1, y: 1)
+                        
+                        Circle()
+                            .fill(KingdomTheme.Colors.buttonSpecial)
+                            .frame(width: 22, height: 22)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                        
+                        Image(systemName: "bolt.horizontal.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .offset(x: -22, y: -22)
+                } else if !isUnclaimed {
+                    // Crown for claimed kingdoms (no active coup)
+                    ZStack {
                         Circle()
                             .fill(Color.black)
                             .frame(width: 20, height: 20)

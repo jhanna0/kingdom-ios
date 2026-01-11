@@ -93,7 +93,7 @@ struct CoupVsPosterView: View {
         HStack(spacing: 12) {
             // Coup icon badge
             Image(systemName: status == "battle" ? "bolt.horizontal.fill" : "bolt.fill")
-                .font(.system(size: 14, weight: .black))
+                .font(FontStyles.iconTiny)
                 .foregroundColor(.white)
                 .frame(width: 36, height: 36)
                 .brutalistBadge(backgroundColor: statusTint, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
@@ -101,11 +101,11 @@ struct CoupVsPosterView: View {
             // Title
             VStack(alignment: .leading, spacing: 2) {
                 Text("COUP")
-                    .font(.system(size: 10, weight: .black, design: .serif))
+                    .font(FontStyles.labelBadge)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .tracking(2)
                 Text(kingdomName)
-                    .font(.system(size: 18, weight: .black, design: .serif))
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .lineLimit(1)
             }
@@ -114,7 +114,7 @@ struct CoupVsPosterView: View {
             
             // Status badge
             Text(status.uppercased())
-                .font(.system(size: 10, weight: .black, design: .serif))
+                .font(FontStyles.labelBadge)
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -124,7 +124,7 @@ struct CoupVsPosterView: View {
             if let dismiss = onDismiss {
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(FontStyles.iconTiny)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .frame(width: 32, height: 32)
                         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 16, shadowOffset: 2, borderWidth: 2)
@@ -140,29 +140,28 @@ struct CoupVsPosterView: View {
         VStack(spacing: 6) {
             // Role label
             Text("CHALLENGER")
-                .font(.system(size: 12, weight: .bold, design: .serif))
+                .font(FontStyles.labelTiny)
                 .foregroundColor(KingdomTheme.Colors.buttonDanger)
                 .tracking(2)
             
             // Name - BIG
             Text(challengerName)
-                .font(.system(size: 26, weight: .black, design: .serif))
+                .font(FontStyles.displaySmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             
             // Stats row
-            if challengerStats.level > 0 || challengerStats.reputation > 0 {
-                HStack(spacing: 12) {
-                    if challengerStats.level > 0 {
-                        statLabel(icon: "star.fill", value: "Lv.\(challengerStats.level)", color: KingdomTheme.Colors.gold)
-                    }
-                    if challengerStats.reputation > 0 {
-                        statLabel(icon: "crown.fill", value: "\(challengerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
-                    }
+            HStack(spacing: 12) {
+                if challengerStats.level > 0 {
+                    statLabel(icon: "star.fill", value: "Lv.\(challengerStats.level)", color: KingdomTheme.Colors.gold)
                 }
-                .padding(.top, 2)
+                if challengerStats.reputation > 0 {
+                    statLabel(icon: "crown.fill", value: "\(challengerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
+                }
+                statLabel(icon: "person.2.fill", value: "\(attackerCount)", color: KingdomTheme.Colors.buttonDanger)
             }
+            .padding(.top, 2)
             
             // Icon
             Image(systemName: "figure.fencing")
@@ -185,28 +184,27 @@ struct CoupVsPosterView: View {
                 .padding(.bottom, 4)
             
             // Stats row
-            if rulerStats.level > 0 || rulerStats.reputation > 0 {
-                HStack(spacing: 12) {
-                    if rulerStats.level > 0 {
-                        statLabel(icon: "star.fill", value: "Lv.\(rulerStats.level)", color: KingdomTheme.Colors.gold)
-                    }
-                    if rulerStats.reputation > 0 {
-                        statLabel(icon: "crown.fill", value: "\(rulerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
-                    }
+            HStack(spacing: 12) {
+                if rulerStats.level > 0 {
+                    statLabel(icon: "star.fill", value: "Lv.\(rulerStats.level)", color: KingdomTheme.Colors.gold)
                 }
-                .padding(.bottom, 2)
+                if rulerStats.reputation > 0 {
+                    statLabel(icon: "crown.fill", value: "\(rulerStats.reputation) rep", color: KingdomTheme.Colors.buttonSpecial)
+                }
+                statLabel(icon: "person.2.fill", value: "\(defenderCount)", color: KingdomTheme.Colors.royalBlue)
             }
+            .padding(.bottom, 2)
             
             // Name - BIG
             Text(rulerName)
-                .font(.system(size: 26, weight: .black, design: .serif))
+                .font(FontStyles.displaySmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             
             // Role label
             Text("THE CROWN")
-                .font(.system(size: 12, weight: .bold, design: .serif))
+                .font(FontStyles.labelTiny)
                 .foregroundColor(KingdomTheme.Colors.royalBlue)
                 .tracking(2)
         }
@@ -217,9 +215,9 @@ struct CoupVsPosterView: View {
     private func statLabel(icon: String, value: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
+                .font(FontStyles.iconMini)
             Text(value)
-                .font(.system(size: 12, weight: .bold, design: .serif))
+                .font(FontStyles.labelTiny)
         }
         .foregroundColor(color)
     }
@@ -233,7 +231,7 @@ struct CoupVsPosterView: View {
                 .frame(height: 1)
             
             Text("VS")
-                .font(.system(size: 22, weight: .black, design: .serif))
+                .font(FontStyles.headingLarge)
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
@@ -248,12 +246,12 @@ struct CoupVsPosterView: View {
             // Timer
             HStack(spacing: 8) {
                 Image(systemName: "hourglass")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(FontStyles.iconTiny)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(status == "pledge" ? "PLEDGE ENDS" : (status == "resolved" ? "FINISHED" : "BATTLE ENDS"))
-                        .font(.system(size: 9, weight: .bold, design: .serif))
+                        .font(FontStyles.labelBadge)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .tracking(1)
                     Text(timeRemaining)
@@ -280,13 +278,13 @@ struct CoupVsPosterView: View {
         
         return HStack(spacing: 6) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 12, weight: .bold))
+                .font(FontStyles.iconMini)
                 .foregroundColor(KingdomTheme.Colors.buttonSuccess)
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
+                .font(FontStyles.iconMini)
                 .foregroundColor(tint)
             Text(label)
-                .font(.system(size: 11, weight: .black, design: .serif))
+                .font(FontStyles.labelBadge)
                 .foregroundColor(tint)
         }
         .padding(.horizontal, 12)
@@ -333,11 +331,11 @@ struct CoupPledgeChoiceCard: View {
                 // Text
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 16, weight: .black, design: .serif))
+                        .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .serif))
+                        .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
@@ -346,8 +344,8 @@ struct CoupPledgeChoiceCard: View {
                 // Selection indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        .font(FontStyles.iconExtraLarge)
+                        .foregroundColor(tint)
                 } else {
                     Circle()
                         .stroke(KingdomTheme.Colors.border, lineWidth: 3)
@@ -357,7 +355,7 @@ struct CoupPledgeChoiceCard: View {
             .padding(16)
             .frame(maxWidth: .infinity)
             .brutalistCard(
-                backgroundColor: isSelected ? tint.opacity(0.1) : KingdomTheme.Colors.parchmentLight
+                backgroundColor: KingdomTheme.Colors.parchmentLight
             )
         }
         .buttonStyle(.plain)
@@ -412,7 +410,7 @@ struct CoupMapBadgeView: View {
                 // Content
                 VStack(spacing: 3) {
                     Text("COUP")
-                        .font(.system(size: 10, weight: .black, design: .serif))
+                        .font(FontStyles.labelBadge)
                         .foregroundColor(.white.opacity(0.85))
                         .tracking(1)
                     

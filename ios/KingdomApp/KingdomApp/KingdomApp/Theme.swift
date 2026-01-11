@@ -22,6 +22,26 @@ struct KingdomTheme {
         /// Neutral parchment for de-emphasized areas
         static let parchmentMuted = Color(red: 0.9, green: 0.85, blue: 0.7)
         
+        // MARK: War/Charred Map Background Colors (for coup/invasion state)
+        /// Base charred color - dark smoky brown
+        static let mapWarBase = Color(red: 0.28, green: 0.22, blue: 0.20)
+        /// Lighter gradient - ember glow
+        static let mapWarGradientLight = Color(red: 0.45, green: 0.25, blue: 0.15)
+        /// Darker gradient - deep charcoal
+        static let mapWarGradientDark = Color(red: 0.18, green: 0.12, blue: 0.10)
+        /// Texture color - ashen embers
+        static let mapWarTexture = Color(red: 0.55, green: 0.30, blue: 0.20)
+        
+        // MARK: Peaceful Map Background Colors (normal state)
+        /// Base map color - muted blue-grey
+        static let mapPeaceBase = Color(red: 0.68, green: 0.69, blue: 0.66)
+        /// Lighter gradient
+        static let mapPeaceGradientLight = Color(red: 0.72, green: 0.73, blue: 0.70)
+        /// Darker gradient
+        static let mapPeaceGradientDark = Color(red: 0.62, green: 0.63, blue: 0.59)
+        /// Texture color
+        static let mapPeaceTexture = Color(red: 0.45, green: 0.48, blue: 0.50)
+        
         // MARK: Text Colors (Ink)
         /// Primary text - dark brown ink
         static let inkDark = Color(red: 0.2, green: 0.1, blue: 0.05)
@@ -51,8 +71,8 @@ struct KingdomTheme {
         static let buttonDanger = Color(red: 0.7, green: 0.15, blue: 0.1)
         /// Warning orange - alerts, warnings
         static let buttonWarning = Color(red: 0.7, green: 0.3, blue: 0.1)
-        /// Special purple - coup, special actions
-        static let buttonSpecial = Color(red: 0.3, green: 0.15, blue: 0.4)
+        /// Coup crimson - intense red for coup actions
+        static let buttonSpecial = Color(red: 0.75, green: 0.12, blue: 0.12)
         
         // MARK: Royal Kingdom Management Colors
         /// ROYAL PURPLE - Building & construction management
@@ -87,8 +107,8 @@ struct KingdomTheme {
         static let textMuted = Color(red: 0.45, green: 0.35, blue: 0.25)
         
         // MARK: Kingdom Territory Colors (Map Polygons & Markers)
-        /// Player's kingdom - ROYAL BLUE (darker)
-        static let territoryPlayer = Color(red: 0.15, green: 0.25, blue: 0.65)
+        /// Player's kingdom - ROYAL RED (crimson)
+        static let territoryPlayer = Color(red: 0.70, green: 0.15, blue: 0.15)
         /// Enemy kingdom - deep muted red (medieval vermillion)
         static let territoryEnemy = Color(red: 0.75, green: 0.30, blue: 0.25)
         /// Allied kingdom - map blue-green (like cartographer's seas)
