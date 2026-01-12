@@ -10,6 +10,10 @@ class AppInitService: ObservableObject {
     @Published var playerSummary: PlayerSummary?
     @Published var errorMessage: String?
     
+    /// Kingdoms the player rules - SOURCE OF TRUTH from backend
+    /// This comes from /notifications/updates kingdoms array
+    @Published var ruledKingdoms: [KingdomUpdate] = []
+    
     /// Generic popup notification - backend tells us when to show via show_popup field
     @Published var popupNotification: AppNotification?
     
@@ -57,12 +61,16 @@ class AppInitService: ObservableObject {
             notifications = updates.notifications
             unreadCount = updates.notifications.filter { $0.priority == "high" }.count
             
+            // Store ruled kingdoms from backend (SOURCE OF TRUTH)
+            ruledKingdoms = updates.kingdoms
+            
             // Log what we found
             print("✅ AppInitService: Loaded user data")
             print("   - Level: \(updates.summary.level)")
             print("   - Gold: \(updates.summary.gold)")
             print("   - Ready contracts: \(updates.summary.ready_contracts)")
             print("   - Notifications: \(notifications.count)")
+            print("   - Ruled Kingdoms: \(ruledKingdoms.map { $0.name })")
             
             // Show important notifications
             await showImportantNotifications(updates.notifications)
@@ -226,7 +234,7 @@ struct ProgressContract: Codable, Identifiable {
     let total_actions_required: Int
 }
 
-struct KingdomUpdate: Codable, Identifiable {
+struct KingdomUpdate: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let level: Int

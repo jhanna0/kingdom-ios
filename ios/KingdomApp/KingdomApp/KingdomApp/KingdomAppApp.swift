@@ -229,279 +229,196 @@ struct AuthenticatedView: View {
     @State private var showCoupView = false
     
     var body: some View {
-        ZStack {
-            DrawnMapView(viewModel: viewModel, kingdomForInfoSheet: $kingdomForInfoSheet)
-                .ignoresSafeArea()
-                .opacity(hasLoadedInitially ? 1 : 0)
-            
-            // Show loading screen until initial load completes
-            if !hasLoadedInitially {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    MedievalLoadingView(status: "Loading your kingdom...")
+        mainContent
+            .onReceive(locationManager.$currentLocation) { location in
+                if let location = location {
+                    viewModel.updateUserLocation(location)
                 }
             }
-            
-            // HUD and UI overlays
-            if hasLoadedInitially {
-                MapHUD(
-                    viewModel: viewModel,
-                    showCharacterSheet: $showCharacterSheet,
-                    showActions: $showActions,
-                    showProperties: $showProperties,
-                    showActivity: $showActivity
-                )
-                
-                // Active Coup Badge - below MapHUD, RIGHT side
-                if let coup = viewModel.activeCoupInHomeKingdom {
-                    VStack {
-                        Spacer().frame(height: 152)
-                        
-                        HStack {
-                            Spacer()
-                            BattleMapBadgeView(
-                                battleType: .coup,
-                                status: coup.status,
-                                timeRemaining: coup.timeRemainingFormatted,
-                                attackerCount: coup.attacker_count,
-                                defenderCount: coup.defender_count,
-                                onTap: { showCoupView = true }
-                            )
-                        }
-                        .padding(.horizontal, 12)
-                        
-                        Spacer()
-                    }
-                }
-                
-                FloatingNotificationsButton(
-                    showNotifications: $showNotifications,
-                    hasUnread: hasUnreadNotifications
-                )
-            }
-            
-            // Kingdom claim celebration popup
-            if viewModel.showClaimCelebration,
-               let kingdomName = viewModel.claimCelebrationKingdom {
-                KingdomClaimCelebration(
-                    playerName: viewModel.player.name,
-                    kingdomName: kingdomName,
-                    onDismiss: {
-                        viewModel.showClaimCelebration = false
-                        viewModel.claimCelebrationKingdom = nil
-                    }
-                )
-                .zIndex(1000)
-            }
-            
-            // Backend-triggered popup notification (show_popup = true)
-            // Handles: coup_new_ruler, coup_lost_throne, coup_side_won, coup_side_lost
-            if let popup = appInit.popupNotification {
-                NotificationPopup(
-                    notification: popup,
-                    playerName: viewModel.player.name,
-                    onDismiss: {
-                        appInit.popupNotification = nil
-                    }
-                )
-                .zIndex(1001)
-            }
-            
-            // Travel notification toast
-            if showTravelNotification, let travelEvent = displayedTravelEvent {
-                VStack {
-                    TravelNotificationToast(
-                        travelEvent: travelEvent,
-                        onDismiss: {
-                            withAnimation {
-                                showTravelNotification = false
-                                displayedTravelEvent = nil
-                            }
-                            // Clear the event from viewModel to avoid re-showing
-                            viewModel.latestTravelEvent = nil
-                        }
-                    )
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.top, 60)
-                    
-                    Spacer()
-                }
-                .zIndex(999)
-            }
-            
-            // Weather toast - white text with icon, top LEFT under HUD
-            if showWeatherToast, let weather = currentWeather {
-                VStack {
-                    HStack {
-                        WeatherToast(
-                            weather: weather,
-                            onDismiss: {
-                                showWeatherToast = false
-                                currentWeather = nil
-                            }
-                        )
-                        .padding(.leading, 16)
-                        Spacer()
-                    }
-                    .padding(.top, 155) // Further down under HUD
-                    
-                    Spacer()
-                }
-                .transition(.opacity)
-                .zIndex(998)
-            }
-        }
-        .onReceive(locationManager.$currentLocation) { location in
-            if let location = location {
-                viewModel.updateUserLocation(location)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            Task {
-                await appInit.refresh()
-                await loadNotificationBadge()
-                
-                // Clear delivered notifications when app comes to foreground
-                NotificationManager.shared.clearDeliveredNotifications()
-            }
-        }
-        .sheet(isPresented: $showMyKingdoms) {
-            MyKingdomsSheet(
-                player: viewModel.player,
-                viewModel: viewModel,
-                onDismiss: { showMyKingdoms = false }
-            )
-        }
-        .sheet(isPresented: $showActions) {
-            NavigationStack {
-                ActionsView(viewModel: viewModel)
-            }
-        }
-        .sheet(isPresented: $showProperties) {
-            MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
-        }
-        .sheet(isPresented: $showCharacterSheet) {
-            NavigationStack {
-                CharacterSheetView(player: viewModel.player)
-            }
-        }
-        .sheet(item: $kingdomForInfoSheet) { kingdom in
-            KingdomInfoSheetView(
-                kingdom: kingdom,
-                player: viewModel.player,
-                viewModel: viewModel,
-                isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
-                onViewKingdom: {
-                    kingdomForInfoSheet = nil
-                    kingdomToShow = kingdom
-                },
-                onViewAllKingdoms: {
-                    kingdomForInfoSheet = nil
-                    showMyKingdoms = true
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $kingdomToShow) { kingdom in
-            NavigationStack {
-                KingdomDetailView(
-                    kingdomId: kingdom.id,
-                    player: viewModel.player,
-                    viewModel: viewModel
-                )
-                .navigationTitle(kingdom.name)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") {
-                            kingdomToShow = nil
-                        }
-                        .font(KingdomTheme.Typography.headline())
-                        .fontWeight(.semibold)
-                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showActivity) {
-            FriendsView()
-        }
-        .sheet(isPresented: $showNotifications) {
-            NotificationsSheet()
-        }
-        .fullScreenCover(isPresented: $showCoupView) {
-            if let coup = viewModel.activeCoupInHomeKingdom {
-                BattleView(battleId: coup.id, onDismiss: { showCoupView = false })
-            }
-        }
-        .onChange(of: showNotifications) { _, isShowing in
-            if isShowing {
-                // Clear badge when user opens notifications
-                hasUnreadNotifications = false
-            }
-        }
-        .task {
-            // Clear notification badge when app opens
-            NotificationManager.shared.clearDeliveredNotifications()
-            
-            await appInit.initialize()
-            await loadNotificationBadge()
-            viewModel.loadInitialCooldown()
-        }
-        .onChange(of: viewModel.isLoading) { _, isLoading in
-            if !isLoading {
-                withAnimation(.easeIn(duration: 0.3)) {
-                    hasLoadedInitially = true
-                }
-                
-                // When loading completes, show kingdom sheet if player is inside one
-                if !hasShownInitialKingdom, let kingdom = viewModel.currentKingdomInside {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        kingdomForInfoSheet = kingdom
-                        hasShownInitialKingdom = true
-                    }
-                }
-            }
-        }
-        .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
-            // Automatically show kingdom info sheet on initial map load if player is inside a kingdom
-            if !hasShownInitialKingdom && !viewModel.isLoading && newValue != nil {
-                // Delay slightly to ensure map has fully loaded and animated in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    if let kingdom = viewModel.currentKingdomInside {
-                        kingdomForInfoSheet = kingdom
-                        hasShownInitialKingdom = true
-                    }
-                }
-            }
-            
-            // Load and show weather when entering a kingdom
-            if let kingdom = newValue, oldValue?.id != newValue?.id {
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                 Task {
-                    await loadWeatherForKingdom(kingdom.id)
+                    await appInit.refresh()
+                    await loadNotificationBadge()
+                    NotificationManager.shared.clearDeliveredNotifications()
                 }
             }
+            .modifier(SheetModifiers(
+                showMyKingdoms: $showMyKingdoms,
+                showActions: $showActions,
+                showProperties: $showProperties,
+                showCharacterSheet: $showCharacterSheet,
+                showActivity: $showActivity,
+                showNotifications: $showNotifications,
+                kingdomForInfoSheet: $kingdomForInfoSheet,
+                kingdomToShow: $kingdomToShow,
+                showCoupView: $showCoupView,
+                viewModel: viewModel
+            ))
+            .modifier(EventHandlers(
+                appInit: appInit,
+                viewModel: viewModel,
+                hasLoadedInitially: $hasLoadedInitially,
+                hasShownInitialKingdom: $hasShownInitialKingdom,
+                kingdomForInfoSheet: $kingdomForInfoSheet,
+                hasUnreadNotifications: $hasUnreadNotifications,
+                showTravelNotification: $showTravelNotification,
+                displayedTravelEvent: $displayedTravelEvent,
+                showWeatherToast: $showWeatherToast,
+                currentWeather: $currentWeather,
+                syncRuledKingdomsToPlayer: syncRuledKingdomsToPlayer,
+                loadNotificationBadge: loadNotificationBadge,
+                loadWeatherForKingdom: loadWeatherForKingdom
+            ))
+    }
+    
+    // MARK: - Main Content
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        ZStack {
+            mapLayer
+            loadingLayer
+            hudLayer
+            overlaysLayer
         }
-        .onChange(of: viewModel.latestTravelEvent) { oldValue, newValue in
-            // Show travel notification when travel event occurs
-            if let travelEvent = newValue {
-                displayedTravelEvent = travelEvent
-                withAnimation {
-                    showTravelNotification = true
+    }
+    
+    @ViewBuilder
+    private var mapLayer: some View {
+        DrawnMapView(viewModel: viewModel, kingdomForInfoSheet: $kingdomForInfoSheet)
+            .ignoresSafeArea()
+            .opacity(hasLoadedInitially ? 1 : 0)
+    }
+    
+    @ViewBuilder
+    private var loadingLayer: some View {
+        if !hasLoadedInitially {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                MedievalLoadingView(status: "Loading your kingdom...")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var hudLayer: some View {
+        if hasLoadedInitially {
+            MapHUD(
+                viewModel: viewModel,
+                showCharacterSheet: $showCharacterSheet,
+                showActions: $showActions,
+                showProperties: $showProperties,
+                showActivity: $showActivity
+            )
+            
+            coupBadgeOverlay
+            
+            FloatingNotificationsButton(
+                showNotifications: $showNotifications,
+                hasUnread: hasUnreadNotifications
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var coupBadgeOverlay: some View {
+        if let coup = viewModel.activeCoupInHomeKingdom {
+            VStack {
+                Spacer().frame(height: 152)
+                HStack {
+                    Spacer()
+                    BattleMapBadgeView(
+                        battleType: .coup,
+                        status: coup.status,
+                        timeRemaining: coup.timeRemainingFormatted,
+                        attackerCount: coup.attacker_count,
+                        defenderCount: coup.defender_count,
+                        onTap: { showCoupView = true }
+                    )
                 }
-                
-                // Auto-dismiss after 4 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                    withAnimation {
-                        showTravelNotification = false
-                    }
-                    // Clear after animation completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        displayedTravelEvent = nil
+                .padding(.horizontal, 12)
+                Spacer()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var overlaysLayer: some View {
+        claimCelebrationOverlay
+        popupNotificationOverlay
+        travelNotificationOverlay
+        weatherToastOverlay
+    }
+    
+    @ViewBuilder
+    private var claimCelebrationOverlay: some View {
+        if viewModel.showClaimCelebration, let kingdomName = viewModel.claimCelebrationKingdom {
+            KingdomClaimCelebration(
+                playerName: viewModel.player.name,
+                kingdomName: kingdomName,
+                onDismiss: {
+                    viewModel.showClaimCelebration = false
+                    viewModel.claimCelebrationKingdom = nil
+                }
+            )
+            .zIndex(1000)
+        }
+    }
+    
+    @ViewBuilder
+    private var popupNotificationOverlay: some View {
+        if let popup = appInit.popupNotification {
+            NotificationPopup(
+                notification: popup,
+                playerName: viewModel.player.name,
+                onDismiss: { appInit.popupNotification = nil }
+            )
+            .zIndex(1001)
+        }
+    }
+    
+    @ViewBuilder
+    private var travelNotificationOverlay: some View {
+        if showTravelNotification, let travelEvent = displayedTravelEvent {
+            VStack {
+                TravelNotificationToast(
+                    travelEvent: travelEvent,
+                    onDismiss: {
+                        withAnimation {
+                            showTravelNotification = false
+                            displayedTravelEvent = nil
+                        }
                         viewModel.latestTravelEvent = nil
                     }
-                }
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .padding(.top, 60)
+                Spacer()
             }
+            .zIndex(999)
+        }
+    }
+    
+    @ViewBuilder
+    private var weatherToastOverlay: some View {
+        if showWeatherToast, let weather = currentWeather {
+            VStack {
+                HStack {
+                    WeatherToast(
+                        weather: weather,
+                        onDismiss: {
+                            showWeatherToast = false
+                            currentWeather = nil
+                        }
+                    )
+                    .padding(.leading, 16)
+                    Spacer()
+                }
+                .padding(.top, 155)
+                Spacer()
+            }
+            .transition(.opacity)
+            .zIndex(998)
         }
     }
     
@@ -513,6 +430,18 @@ struct AuthenticatedView: View {
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")
+        }
+    }
+    
+    /// Sync ruled kingdoms from AppInitService to player (backend is SOURCE OF TRUTH)
+    private func syncRuledKingdomsToPlayer() {
+        let kingdoms = appInit.ruledKingdoms.map { (id: $0.id, name: $0.name) }
+        viewModel.player.updateRuledKingdoms(kingdoms: kingdoms)
+        
+        // Also update isRuler based on whether there are any ruled kingdoms
+        // Note: is_ruler from /player/state is the primary source, but this ensures consistency
+        if !kingdoms.isEmpty && !viewModel.player.isRuler {
+            print("⚠️ Ruled kingdoms found but isRuler is false - backend should have set is_ruler=true")
         }
     }
     
@@ -528,5 +457,165 @@ struct AuthenticatedView: View {
         } catch {
             print("⚠️ Weather error: \(error)")
         }
+    }
+}
+
+// MARK: - Sheet Modifiers (broken out to help compiler)
+
+private struct SheetModifiers: ViewModifier {
+    @Binding var showMyKingdoms: Bool
+    @Binding var showActions: Bool
+    @Binding var showProperties: Bool
+    @Binding var showCharacterSheet: Bool
+    @Binding var showActivity: Bool
+    @Binding var showNotifications: Bool
+    @Binding var kingdomForInfoSheet: Kingdom?
+    @Binding var kingdomToShow: Kingdom?
+    @Binding var showCoupView: Bool
+    @ObservedObject var viewModel: MapViewModel
+    
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $showMyKingdoms) {
+                MyKingdomsSheet(
+                    player: viewModel.player,
+                    viewModel: viewModel,
+                    onDismiss: { showMyKingdoms = false }
+                )
+            }
+            .sheet(isPresented: $showActions) {
+                NavigationStack {
+                    ActionsView(viewModel: viewModel)
+                }
+            }
+            .sheet(isPresented: $showProperties) {
+                MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
+            }
+            .sheet(isPresented: $showCharacterSheet) {
+                NavigationStack {
+                    CharacterSheetView(player: viewModel.player)
+                }
+            }
+            .sheet(item: $kingdomForInfoSheet) { kingdom in
+                KingdomInfoSheetView(
+                    kingdom: kingdom,
+                    player: viewModel.player,
+                    viewModel: viewModel,
+                    isPlayerInside: viewModel.currentKingdomInside?.id == kingdom.id,
+                    onViewKingdom: {
+                        kingdomForInfoSheet = nil
+                        kingdomToShow = kingdom
+                    },
+                    onViewAllKingdoms: {
+                        kingdomForInfoSheet = nil
+                        showMyKingdoms = true
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $kingdomToShow) { kingdom in
+                NavigationStack {
+                    KingdomDetailView(
+                        kingdomId: kingdom.id,
+                        player: viewModel.player,
+                        viewModel: viewModel
+                    )
+                    .navigationTitle(kingdom.name)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { kingdomToShow = nil }
+                                .font(KingdomTheme.Typography.headline())
+                                .fontWeight(.semibold)
+                                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showActivity) {
+                FriendsView()
+            }
+            .sheet(isPresented: $showNotifications) {
+                NotificationsSheet()
+            }
+            .fullScreenCover(isPresented: $showCoupView) {
+                if let coup = viewModel.activeCoupInHomeKingdom {
+                    BattleView(battleId: coup.id, onDismiss: { showCoupView = false })
+                }
+            }
+    }
+}
+
+// MARK: - Event Handlers (broken out to help compiler)
+
+private struct EventHandlers: ViewModifier {
+    @ObservedObject var appInit: AppInitService
+    @ObservedObject var viewModel: MapViewModel
+    @Binding var hasLoadedInitially: Bool
+    @Binding var hasShownInitialKingdom: Bool
+    @Binding var kingdomForInfoSheet: Kingdom?
+    @Binding var hasUnreadNotifications: Bool
+    @Binding var showTravelNotification: Bool
+    @Binding var displayedTravelEvent: TravelEvent?
+    @Binding var showWeatherToast: Bool
+    @Binding var currentWeather: WeatherData?
+    
+    let syncRuledKingdomsToPlayer: () -> Void
+    let loadNotificationBadge: () async -> Void
+    let loadWeatherForKingdom: (String) async -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: showTravelNotification) { _, _ in }  // Placeholder for type inference
+            .task {
+                NotificationManager.shared.clearDeliveredNotifications()
+                await appInit.initialize()
+                syncRuledKingdomsToPlayer()
+                await loadNotificationBadge()
+                viewModel.loadInitialCooldown()
+            }
+            .onChange(of: appInit.ruledKingdoms) { _, _ in
+                syncRuledKingdomsToPlayer()
+            }
+            .onChange(of: viewModel.isLoading) { _, isLoading in
+                if !isLoading {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        hasLoadedInitially = true
+                    }
+                    if !hasShownInitialKingdom, let kingdom = viewModel.currentKingdomInside {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            kingdomForInfoSheet = kingdom
+                            hasShownInitialKingdom = true
+                        }
+                    }
+                }
+            }
+            .onChange(of: viewModel.currentKingdomInside) { oldValue, newValue in
+                if !hasShownInitialKingdom && !viewModel.isLoading && newValue != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        if let kingdom = viewModel.currentKingdomInside {
+                            kingdomForInfoSheet = kingdom
+                            hasShownInitialKingdom = true
+                        }
+                    }
+                }
+                if let kingdom = newValue, oldValue?.id != newValue?.id {
+                    Task { await loadWeatherForKingdom(kingdom.id) }
+                }
+            }
+            .onChange(of: viewModel.latestTravelEvent) { _, newValue in
+                if let travelEvent = newValue {
+                    displayedTravelEvent = travelEvent
+                    withAnimation { showTravelNotification = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                        withAnimation { showTravelNotification = false }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            displayedTravelEvent = nil
+                            viewModel.latestTravelEvent = nil
+                        }
+                    }
+                }
+            }
+            .onChange(of: hasUnreadNotifications) { _, _ in }  // Keep for notification badge updates
     }
 }

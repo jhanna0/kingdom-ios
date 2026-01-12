@@ -22,9 +22,10 @@ class Player: ObservableObject {
     @Published var hometownKingdomId: String?  // Their hometown (set on first check-in) - used for royal blue territory color
     @Published var checkInHistory: [String: Int] = [:]  // kingdomId -> total check-ins
     
-    // Power & Territory
-    @Published var fiefsRuled: Set<String> = []  // Kingdom names this player rules
-    @Published var isRuler: Bool = false
+    // Power & Territory - ALL VALUES FROM BACKEND ONLY
+    @Published var ruledKingdomIds: Set<String> = []  // Kingdom IDs this player rules (from backend)
+    @Published var ruledKingdomNames: Set<String> = []  // Kingdom names this player rules (from backend)
+    @Published var isRuler: Bool = false  // Whether player rules ANY kingdom (from backend is_ruler)
     
     // Work & Contracts
     @Published var contractsCompleted: Int = 0
@@ -476,23 +477,25 @@ class Player: ObservableObject {
     // These local methods are legacy and should use backend data instead
     
     // MARK: - Territory Management
+    // NOTE: All ruler status is determined by backend only!
+    // Use updateRuledKingdoms() to sync from backend data
     
-    /// Claim a kingdom (become ruler)
-    func claimKingdom(_ kingdom: String) {
-        fiefsRuled.insert(kingdom)
-        isRuler = true
-        currentKingdom = kingdom
-        // Backend is source of truth - no local caching
-        print("👑 Claimed \(kingdom)")
+    /// Update ruled kingdoms from backend data (e.g., from /notifications/updates)
+    func updateRuledKingdoms(kingdoms: [(id: String, name: String)]) {
+        ruledKingdomIds = Set(kingdoms.map { $0.id })
+        ruledKingdomNames = Set(kingdoms.map { $0.name })
+        // Note: isRuler is set separately from /player/state's is_ruler field
+        print("👑 Ruled kingdoms synced from backend: \(ruledKingdomNames)")
     }
     
-    /// Lose control of a kingdom
-    func loseKingdom(_ kingdom: String) {
-        fiefsRuled.remove(kingdom)
-        if fiefsRuled.isEmpty {
-            isRuler = false
-        }
-        // Backend is source of truth - no local caching
+    /// Check if player rules a specific kingdom by ID
+    func rulesKingdom(id: String) -> Bool {
+        return ruledKingdomIds.contains(id)
+    }
+    
+    /// Check if player rules a specific kingdom by name
+    func rulesKingdom(name: String) -> Bool {
+        return ruledKingdomNames.contains(name)
     }
     
     // MARK: - Coup System
@@ -573,6 +576,7 @@ class Player: ObservableObject {
     }
     
     /// Apply catastrophic penalty for overthrown ruler who failed to flee
+    /// NOTE: This is a local preview - actual state comes from backend after sync
     func applyOverthrownRulerPenalty() {
         // LOSE EVERYTHING
         gold = 0
@@ -588,11 +592,8 @@ class Player: ObservableObject {
         defensePower = max(1, defensePower - 5)
         leadership = max(1, leadership - 5)
         
-        // Lose ruler status
-        fiefsRuled.removeAll()
-        isRuler = false
-        
-        // Backend is source of truth - no local caching
+        // NOTE: Do NOT set isRuler locally - backend is source of truth
+        // Ruler status will be updated when we sync from /player/state
     }
     
     // MARK: - Economy
@@ -942,8 +943,9 @@ class Player: ObservableObject {
     /// Reset player data (for testing/debugging)
     func reset() {
         gold = 100
-        fiefsRuled.removeAll()
-        isRuler = false
+        ruledKingdomIds.removeAll()
+        ruledKingdomNames.removeAll()
+        isRuler = false  // Will be set from backend on next sync
         currentKingdom = nil
         lastCheckIn = nil
         lastCheckInLocation = nil

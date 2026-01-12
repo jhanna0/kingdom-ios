@@ -7,8 +7,9 @@ struct MyKingdomsView: View {
     @State private var selectedKingdom: Kingdom?
     
     var ruledKingdoms: [Kingdom] {
+        // Use backend-provided ruledKingdomIds (source of truth)
         viewModel.kingdoms.filter { kingdom in
-            player.fiefsRuled.contains(kingdom.name)
+            player.ruledKingdomIds.contains(kingdom.id)
         }
     }
     

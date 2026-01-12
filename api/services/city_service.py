@@ -70,12 +70,14 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
     existing_ids = {k.id for k in kingdoms}
     
-    # Get user's current location (which kingdom they're in)
+    # Get user's current location and hometown (which kingdom they're in)
     user_current_kingdom_id = None
+    user_hometown_kingdom_id = None
     if current_user:
         player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
         if player_state:
             user_current_kingdom_id = player_state.current_kingdom_id
+            user_hometown_kingdom_id = player_state.hometown_kingdom_id
     
     # Get user's kingdoms for relationship checking
     user_kingdom_ids = set()
@@ -121,11 +123,16 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     result = {}
     for kingdom in kingdoms:
         ruler_name = rulers.get(kingdom.ruler_id) if kingdom.ruler_id else None
-        # Can claim ONLY if: kingdom is unclaimed, user doesn't rule any kingdoms, AND user is INSIDE this kingdom
+        # Can claim ONLY if:
+        # 1. Kingdom is unclaimed (no ruler)
+        # 2. User doesn't already rule any kingdoms
+        # 3. User is INSIDE this kingdom
+        # 4. This is the user's HOMETOWN (you can only claim your hometown as your kingdom)
         can_claim = (
             kingdom.ruler_id is None and 
             len(user_kingdom_ids) == 0 and 
-            user_current_kingdom_id == kingdom.id
+            user_current_kingdom_id == kingdom.id and
+            user_hometown_kingdom_id == kingdom.id
         )
         
         # Can declare war / form alliance ONLY if:

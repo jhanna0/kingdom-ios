@@ -21,8 +21,11 @@ struct KingdomDetailView: View {
         viewModel.kingdoms.first(where: { $0.id == kingdomId }) ?? viewModel.kingdoms.first!
     }
     
+    /// Whether player rules THIS specific kingdom (from backend data)
     var isRuler: Bool {
-        kingdom.rulerId == player.playerId
+        // Primary: use backend-provided ruledKingdomIds (source of truth)
+        // Fallback: compare kingdom.rulerId with player.playerId (from backend Kingdom data)
+        player.rulesKingdom(id: kingdom.id) || kingdom.rulerId == player.playerId
     }
     
     var body: some View {

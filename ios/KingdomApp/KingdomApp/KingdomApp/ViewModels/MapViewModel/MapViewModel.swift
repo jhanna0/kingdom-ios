@@ -235,29 +235,20 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Sync player's fiefsRuled with kingdoms they actually rule
-    /// Fixes bug where UI doesn't show kingdom button even though player is ruler
+    /// Sync ruled kingdoms - now deprecated, use backend data only
+    /// The /notifications/updates endpoint provides the kingdoms array which is source of truth
     func syncPlayerKingdomsPublic() {
-        syncPlayerKingdoms()
+        // No-op - backend is source of truth for ruled kingdoms
+        // Ruled kingdoms are synced via player.updateRuledKingdoms() from /notifications/updates
+        print("ℹ️ syncPlayerKingdomsPublic called - ruled kingdoms come from backend only")
     }
-    
+
     func syncPlayerKingdoms() {
-        var updatedFiefs = Set<String>()
-        
-        for kingdom in kingdoms {
-            if kingdom.rulerId == player.playerId {
-                updatedFiefs.insert(kingdom.name)
-            }
-        }
-        
-        // Update player's fiefsRuled to match reality
-        player.fiefsRuled = updatedFiefs
-        player.isRuler = !updatedFiefs.isEmpty
-        // Backend is source of truth - no local caching
-        
-        if !updatedFiefs.isEmpty {
-            print("🔄 Synced player kingdoms: \(updatedFiefs.joined(separator: ", "))")
-        }
+        // DEPRECATED: Backend is the ONLY source of truth for ruler status
+        // - isRuler comes from /player/state's is_ruler field
+        // - ruledKingdomIds/ruledKingdomNames come from /notifications/updates kingdoms array
+        // Do NOT calculate ruler status locally!
+        print("ℹ️ syncPlayerKingdoms called - ruled kingdoms come from backend only")
     }
     
     // MARK: - Utility

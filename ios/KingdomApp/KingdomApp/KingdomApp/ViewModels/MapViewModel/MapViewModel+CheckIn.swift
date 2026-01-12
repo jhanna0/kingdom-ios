@@ -33,13 +33,15 @@ extension MapViewModel {
                 kingdoms[index].rulerId = apiKingdom.ruler_id
                 kingdoms[index].rulerName = player.name
                 kingdoms[index].canClaim = false  // Can't claim anymore
-                player.claimKingdom(kingdom.name)
+                
+                // Update player's ruled kingdoms (immediate local update for UI)
+                // Backend is source of truth - we'll sync on next /player/state or /notifications/updates
+                player.ruledKingdomIds.insert(kingdom.id)
+                player.ruledKingdomNames.insert(kingdom.name)
+                player.isRuler = true  // Immediate feedback - backend will confirm
                 
                 // Update currentKingdomInside to reflect the change
                 currentKingdomInside = kingdoms[index]
-                
-                // Sync player kingdoms to ensure UI updates everywhere
-                syncPlayerKingdoms()
                 
                 print("👑 Successfully claimed \(kingdom.name)")
                 
@@ -47,6 +49,16 @@ extension MapViewModel {
                 claimCelebrationKingdom = kingdom.name
                 showClaimCelebration = true
             }
+        }
+        
+        // Refresh player state from backend to get official is_ruler and other updates
+        do {
+            let updatedState = try await apiService.loadPlayerState(kingdomId: kingdom.id)
+            await MainActor.run {
+                player.updateFromAPIState(updatedState)
+            }
+        } catch {
+            print("⚠️ Failed to refresh player state after claim: \(error)")
         }
     }
 }

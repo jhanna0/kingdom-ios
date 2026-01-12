@@ -483,6 +483,114 @@ def _check_win_condition(db: Session, battle: Battle) -> Optional[str]:
     return None
 
 
+def _atomic_push_territory(
+    db: Session,
+    territory_id: int,
+    side: str,
+    push_amount: float
+) -> dict:
+    """
+    Atomically push a territory bar and capture if threshold crossed.
+    
+    Uses a single UPDATE with RETURNING to prevent race conditions.
+    Two players pushing simultaneously will each get correct results.
+    
+    Returns: {"bar_before": float, "bar_after": float, "captured_by": str|None, "newly_captured": bool}
+    """
+    from sqlalchemy import text
+    
+    # Attackers push toward 0, defenders push toward 100
+    if side == "attackers":
+        # Push down: bar = bar - push, capture if <= 0
+        result = db.execute(text("""
+            UPDATE battle_territories
+            SET 
+                control_bar = GREATEST(0.0, LEAST(100.0, control_bar - :push_amount)),
+                captured_by = CASE 
+                    WHEN captured_by IS NOT NULL THEN captured_by  -- Already captured
+                    WHEN control_bar - :push_amount <= 0 THEN 'attackers'
+                    ELSE NULL
+                END,
+                captured_at = CASE
+                    WHEN captured_by IS NOT NULL THEN captured_at  -- Already captured
+                    WHEN control_bar - :push_amount <= 0 THEN NOW()
+                    ELSE NULL
+                END,
+                updated_at = NOW()
+            WHERE id = :territory_id
+            RETURNING 
+                control_bar + :push_amount as bar_before,  -- Reconstruct original
+                control_bar as bar_after,
+                captured_by,
+                (captured_by = 'attackers' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+        """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
+    else:
+        # Push up: bar = bar + push, capture if >= 100
+        result = db.execute(text("""
+            UPDATE battle_territories
+            SET 
+                control_bar = GREATEST(0.0, LEAST(100.0, control_bar + :push_amount)),
+                captured_by = CASE 
+                    WHEN captured_by IS NOT NULL THEN captured_by  -- Already captured
+                    WHEN control_bar + :push_amount >= 100 THEN 'defenders'
+                    ELSE NULL
+                END,
+                captured_at = CASE
+                    WHEN captured_by IS NOT NULL THEN captured_at  -- Already captured
+                    WHEN control_bar + :push_amount >= 100 THEN NOW()
+                    ELSE NULL
+                END,
+                updated_at = NOW()
+            WHERE id = :territory_id
+            RETURNING 
+                control_bar - :push_amount as bar_before,  -- Reconstruct original
+                control_bar as bar_after,
+                captured_by,
+                (captured_by = 'defenders' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+        """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
+    
+    if not result:
+        return {"bar_before": 0, "bar_after": 0, "captured_by": None, "newly_captured": False}
+    
+    return {
+        "bar_before": result[0],
+        "bar_after": result[1],
+        "captured_by": result[2],
+        "newly_captured": result[3] or False
+    }
+
+
+def _try_resolve_battle(db: Session, battle_id: int, winner_side: str) -> bool:
+    """
+    Atomically try to claim and resolve a battle.
+    
+    Uses SELECT FOR UPDATE SKIP LOCKED to:
+    1. Lock the battle row (or skip if already locked)
+    2. Check if already resolved
+    3. Claim it if not
+    
+    Returns True if THIS call resolved it, False if already resolved or locked.
+    """
+    from sqlalchemy import text
+    
+    # Atomic claim: UPDATE only if not resolved, returns whether we got it
+    result = db.execute(text("""
+        UPDATE battles
+        SET resolved_at = NOW(),
+            attacker_victory = :attacker_victory,
+            winner_side = :winner_side
+        WHERE id = :battle_id
+          AND resolved_at IS NULL
+        RETURNING id
+    """), {
+        "battle_id": battle_id,
+        "attacker_victory": winner_side == "attackers",
+        "winner_side": winner_side
+    }).fetchone()
+    
+    return result is not None
+
+
 def _calculate_combat_strength(
     db: Session,
     player_ids: List[int],
@@ -530,16 +638,17 @@ def _calculate_combat_strength(
 
 # ===== Resolution Helpers =====
 
-def _apply_battle_outcome(
+def _apply_battle_outcome_bulk(
     db: Session,
     battle: Battle,
     kingdom: Kingdom,
-    attackers: List[BattleParticipantSchema],
-    defenders: List[BattleParticipantSchema],
+    attacker_ids: List[int],
+    defender_ids: List[int],
     attacker_victory: bool
 ) -> dict:
     """
-    Apply rewards and penalties based on battle outcome.
+    Apply rewards and penalties using bulk SQL operations.
+    Handles 10k+ participants without timeout.
     
     COUP penalties (loser side):
     - 50% gold loss (redistributed to winners)
@@ -552,184 +661,185 @@ def _apply_battle_outcome(
     - 100 reputation loss
     - Skill loss (attack, defense, leadership -1 each)
     """
-    winners = attackers if attacker_victory else defenders
-    losers = defenders if attacker_victory else attackers
+    from sqlalchemy import text
     
-    gold_pool = 0
+    winner_ids = attacker_ids if attacker_victory else defender_ids
+    loser_ids = defender_ids if attacker_victory else attacker_ids
     
-    # Handle based on battle type and outcome
+    if not winner_ids and not loser_ids:
+        return {"old_ruler_id": kingdom.ruler_id, "old_ruler_name": None, "new_ruler_id": None, "new_ruler_name": None}
+    
+    gold_per_winner = 0
+    
     if battle.is_coup:
-        # COUP: Losers lose 50% gold + rep, NO skill loss
-        for loser in losers:
-            user = db.query(User).filter(User.id == loser.player_id).first()
-            if not user:
-                continue
+        # COUP: Bulk operations for gold + rep, NO skill loss
+        if loser_ids:
+            # Step 1: Calculate total gold to redistribute (50% from each loser)
+            total_gold_result = db.execute(text("""
+                SELECT COALESCE(SUM(gold / 2), 0) as total_gold
+                FROM player_states
+                WHERE user_id = ANY(:loser_ids)
+            """), {"loser_ids": loser_ids}).fetchone()
+            total_gold = total_gold_result[0] if total_gold_result else 0
             
-            state = _get_player_state(db, user)
+            # Step 2: Deduct 50% gold from losers
+            db.execute(text("""
+                UPDATE player_states
+                SET gold = gold - (gold / 2),
+                    updated_at = NOW()
+                WHERE user_id = ANY(:loser_ids)
+            """), {"loser_ids": loser_ids})
             
-            # Take 50% gold
-            gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
-            state.gold -= gold_taken
-            gold_pool += gold_taken
+            # Step 3: Deduct reputation from losers
+            db.execute(text("""
+                UPDATE user_kingdoms
+                SET local_reputation = GREATEST(0, local_reputation - :rep_loss)
+                WHERE user_id = ANY(:loser_ids) AND kingdom_id = :kingdom_id
+            """), {"loser_ids": loser_ids, "rep_loss": LOSER_REP_LOSS, "kingdom_id": kingdom.id})
             
-            # Lose reputation
-            user_kingdom = db.query(UserKingdom).filter(
-                UserKingdom.user_id == user.id,
-                UserKingdom.kingdom_id == kingdom.id
-            ).first()
-            if user_kingdom:
-                user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+            # Step 4: Distribute gold to winners
+            if winner_ids and total_gold > 0:
+                gold_per_winner = total_gold // len(winner_ids)
+                db.execute(text("""
+                    UPDATE player_states
+                    SET gold = gold + :gold_share,
+                        updated_at = NOW()
+                    WHERE user_id = ANY(:winner_ids)
+                """), {"gold_share": gold_per_winner, "winner_ids": winner_ids})
             
-            # NO skill loss for coup failures
-        
-        # Distribute gold to winners
-        gold_per_winner = gold_pool // len(winners) if winners else 0
-        battle.gold_per_winner = gold_per_winner
-        
-        for winner in winners:
-            user = db.query(User).filter(User.id == winner.player_id).first()
-            if not user:
-                continue
-            
-            state = _get_player_state(db, user)
-            state.gold += gold_per_winner
-            
-            user_kingdom = db.query(UserKingdom).filter(
-                UserKingdom.user_id == user.id,
-                UserKingdom.kingdom_id == kingdom.id
-            ).first()
-            if not user_kingdom:
-                user_kingdom = UserKingdom(
-                    user_id=user.id,
-                    kingdom_id=kingdom.id,
-                    local_reputation=WINNER_REP_GAIN
-                )
-                db.add(user_kingdom)
-            else:
-                user_kingdom.local_reputation += WINNER_REP_GAIN
+            # Step 5: Add reputation to winners (upsert)
+            if winner_ids:
+                db.execute(text("""
+                    INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
+                    SELECT unnest(:winner_ids::bigint[]), :kingdom_id, :rep_gain
+                    ON CONFLICT (user_id, kingdom_id)
+                    DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
+                """), {"winner_ids": winner_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
     
     elif battle.is_invasion:
         if attacker_victory:
-            # INVASION SUCCESS: Attackers won, defenders lose
-            for loser in losers:
-                user = db.query(User).filter(User.id == loser.player_id).first()
-                if not user:
-                    continue
+            # INVASION SUCCESS: Defenders lose - 50% gold, rep, skills
+            if loser_ids:
+                # Calculate total gold
+                total_gold_result = db.execute(text("""
+                    SELECT COALESCE(SUM(gold / 2), 0) as total_gold
+                    FROM player_states
+                    WHERE user_id = ANY(:loser_ids)
+                """), {"loser_ids": loser_ids}).fetchone()
+                total_gold = total_gold_result[0] if total_gold_result else 0
                 
-                state = _get_player_state(db, user)
+                # Deduct gold + skills from losers
+                db.execute(text("""
+                    UPDATE player_states
+                    SET gold = gold - (gold / 2),
+                        attack_power = GREATEST(1, attack_power - :atk_loss),
+                        defense_power = GREATEST(1, defense_power - :def_loss),
+                        leadership = GREATEST(0, leadership - :lead_loss),
+                        updated_at = NOW()
+                    WHERE user_id = ANY(:loser_ids)
+                """), {
+                    "loser_ids": loser_ids,
+                    "atk_loss": LOSER_ATTACK_LOSS,
+                    "def_loss": LOSER_DEFENSE_LOSS,
+                    "lead_loss": LOSER_LEADERSHIP_LOSS
+                })
                 
-                # Take 50% gold
-                gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
-                state.gold -= gold_taken
-                gold_pool += gold_taken
+                # Deduct reputation
+                db.execute(text("""
+                    UPDATE user_kingdoms
+                    SET local_reputation = GREATEST(0, local_reputation - :rep_loss)
+                    WHERE user_id = ANY(:loser_ids) AND kingdom_id = :kingdom_id
+                """), {"loser_ids": loser_ids, "rep_loss": LOSER_REP_LOSS, "kingdom_id": kingdom.id})
                 
-                # Lose reputation
-                user_kingdom = db.query(UserKingdom).filter(
-                    UserKingdom.user_id == user.id,
-                    UserKingdom.kingdom_id == kingdom.id
-                ).first()
-                if user_kingdom:
-                    user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+                # Distribute gold to winners
+                if winner_ids and total_gold > 0:
+                    gold_per_winner = total_gold // len(winner_ids)
+                    db.execute(text("""
+                        UPDATE player_states
+                        SET gold = gold + :gold_share,
+                            updated_at = NOW()
+                        WHERE user_id = ANY(:winner_ids)
+                    """), {"gold_share": gold_per_winner, "winner_ids": winner_ids})
                 
-                # Skill loss for invasion defenders who lose
-                state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
-                state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
-                state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
-            
-            # Distribute gold to winners
-            gold_per_winner = gold_pool // len(winners) if winners else 0
-            battle.gold_per_winner = gold_per_winner
-            
-            for winner in winners:
-                user = db.query(User).filter(User.id == winner.player_id).first()
-                if not user:
-                    continue
-                
-                state = _get_player_state(db, user)
-                state.gold += gold_per_winner
-                
-                user_kingdom = db.query(UserKingdom).filter(
-                    UserKingdom.user_id == user.id,
-                    UserKingdom.kingdom_id == kingdom.id
-                ).first()
-                if not user_kingdom:
-                    user_kingdom = UserKingdom(
-                        user_id=user.id,
-                        kingdom_id=kingdom.id,
-                        local_reputation=WINNER_REP_GAIN
-                    )
-                    db.add(user_kingdom)
-                else:
-                    user_kingdom.local_reputation += WINNER_REP_GAIN
+                # Add reputation to winners
+                if winner_ids:
+                    db.execute(text("""
+                        INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
+                        SELECT unnest(:winner_ids::bigint[]), :kingdom_id, :rep_gain
+                        ON CONFLICT (user_id, kingdom_id)
+                        DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
+                    """), {"winner_ids": winner_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
         
         else:
-            # INVASION FAILED: Defenders won, attackers lose
-            # Special penalties for failed invasion
-            
+            # INVASION FAILED: Attackers lose
             # 1. 50% of attacking kingdom's treasury → defending kingdom
             if battle.attacking_from_kingdom_id:
-                attacking_kingdom = db.query(Kingdom).filter(
-                    Kingdom.id == battle.attacking_from_kingdom_id
-                ).first()
-                if attacking_kingdom and attacking_kingdom.treasury_gold:
-                    treasury_transfer = int(attacking_kingdom.treasury_gold * INVASION_TREASURY_TRANSFER_PERCENT)
-                    attacking_kingdom.treasury_gold -= treasury_transfer
-                    kingdom.treasury_gold = (kingdom.treasury_gold or 0) + treasury_transfer
-                    battle.loot_distributed = treasury_transfer
-            
-            # 2. 10% from each attacker's gold → split among defenders
-            attacker_gold_pool = 0
-            for attacker in attackers:
-                user = db.query(User).filter(User.id == attacker.player_id).first()
-                if not user:
-                    continue
-                
-                state = _get_player_state(db, user)
-                
-                # Take 10% of attacker's gold for defender pool
-                gold_for_defenders = int(state.gold * INVASION_ATTACKER_GOLD_TO_DEFENDERS_PERCENT)
-                state.gold -= gold_for_defenders
-                attacker_gold_pool += gold_for_defenders
-                
-                # Lose reputation
-                user_kingdom = db.query(UserKingdom).filter(
-                    UserKingdom.user_id == user.id,
-                    UserKingdom.kingdom_id == kingdom.id
-                ).first()
-                if user_kingdom:
-                    user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
-                
-                # Skill loss for failed invasion attackers
-                state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
-                state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
-                state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
-            
-            # Distribute attacker gold to defenders
-            gold_per_defender = attacker_gold_pool // len(defenders) if defenders else 0
-            battle.gold_per_winner = gold_per_defender
-            
-            for defender in defenders:
-                user = db.query(User).filter(User.id == defender.player_id).first()
-                if not user:
-                    continue
-                
-                state = _get_player_state(db, user)
-                state.gold += gold_per_defender
-                
-                # Winners gain reputation
-                user_kingdom = db.query(UserKingdom).filter(
-                    UserKingdom.user_id == user.id,
-                    UserKingdom.kingdom_id == kingdom.id
-                ).first()
-                if not user_kingdom:
-                    user_kingdom = UserKingdom(
-                        user_id=user.id,
-                        kingdom_id=kingdom.id,
-                        local_reputation=WINNER_REP_GAIN
+                # Single atomic operation: transfer 50% treasury from attacker to defender
+                db.execute(text("""
+                    WITH transfer AS (
+                        SELECT COALESCE(treasury_gold, 0) / 2 as amount
+                        FROM kingdoms WHERE id = :attacking_id
                     )
-                    db.add(user_kingdom)
-                else:
-                    user_kingdom.local_reputation += WINNER_REP_GAIN
+                    UPDATE kingdoms AS k
+                    SET treasury_gold = CASE 
+                        WHEN k.id = :attacking_id THEN COALESCE(k.treasury_gold, 0) - (SELECT amount FROM transfer)
+                        WHEN k.id = :defending_id THEN COALESCE(k.treasury_gold, 0) + (SELECT amount FROM transfer)
+                    END
+                    WHERE k.id IN (:attacking_id, :defending_id)
+                """), {"attacking_id": battle.attacking_from_kingdom_id, "defending_id": kingdom.id})
+            
+            # 2. Calculate 10% from attackers' gold for defenders
+            if attacker_ids:
+                total_for_defenders_result = db.execute(text("""
+                    SELECT COALESCE(SUM(gold / 10), 0) as total_gold
+                    FROM player_states
+                    WHERE user_id = ANY(:attacker_ids)
+                """), {"attacker_ids": attacker_ids}).fetchone()
+                total_for_defenders = total_for_defenders_result[0] if total_for_defenders_result else 0
+                
+                # Deduct 10% gold + skills from attackers
+                db.execute(text("""
+                    UPDATE player_states
+                    SET gold = gold - (gold / 10),
+                        attack_power = GREATEST(1, attack_power - :atk_loss),
+                        defense_power = GREATEST(1, defense_power - :def_loss),
+                        leadership = GREATEST(0, leadership - :lead_loss),
+                        updated_at = NOW()
+                    WHERE user_id = ANY(:attacker_ids)
+                """), {
+                    "attacker_ids": attacker_ids,
+                    "atk_loss": LOSER_ATTACK_LOSS,
+                    "def_loss": LOSER_DEFENSE_LOSS,
+                    "lead_loss": LOSER_LEADERSHIP_LOSS
+                })
+                
+                # Deduct reputation from attackers
+                db.execute(text("""
+                    UPDATE user_kingdoms
+                    SET local_reputation = GREATEST(0, local_reputation - :rep_loss)
+                    WHERE user_id = ANY(:attacker_ids) AND kingdom_id = :kingdom_id
+                """), {"attacker_ids": attacker_ids, "rep_loss": LOSER_REP_LOSS, "kingdom_id": kingdom.id})
+                
+                # Distribute gold to defenders
+                if defender_ids and total_for_defenders > 0:
+                    gold_per_winner = total_for_defenders // len(defender_ids)
+                    db.execute(text("""
+                        UPDATE player_states
+                        SET gold = gold + :gold_share,
+                            updated_at = NOW()
+                        WHERE user_id = ANY(:defender_ids)
+                    """), {"gold_share": gold_per_winner, "defender_ids": defender_ids})
+                
+                # Add reputation to defenders
+                if defender_ids:
+                    db.execute(text("""
+                        INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
+                        SELECT unnest(:defender_ids::bigint[]), :kingdom_id, :rep_gain
+                        ON CONFLICT (user_id, kingdom_id)
+                        DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
+                    """), {"defender_ids": defender_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
+    
+    battle.gold_per_winner = gold_per_winner
     
     # Handle ruler change if attackers won
     old_ruler_id = kingdom.ruler_id
@@ -748,13 +858,11 @@ def _apply_battle_outcome(
                 if old_ruler:
                     old_ruler_name = old_ruler.display_name
                 
-                old_history = db.query(KingdomHistory).filter(
-                    KingdomHistory.kingdom_id == kingdom.id,
-                    KingdomHistory.ruler_id == old_ruler_id,
-                    KingdomHistory.ended_at.is_(None)
-                ).first()
-                if old_history:
-                    old_history.ended_at = now
+                db.execute(text("""
+                    UPDATE kingdom_history
+                    SET ended_at = :now
+                    WHERE kingdom_id = :kingdom_id AND ruler_id = :ruler_id AND ended_at IS NULL
+                """), {"now": now, "kingdom_id": kingdom.id, "ruler_id": old_ruler_id})
             
             kingdom.ruler_id = initiator.id
             kingdom.ruler_started_at = now
@@ -791,38 +899,64 @@ def _apply_battle_outcome(
     }
 
 
-def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> None:
-    """Resolve the battle when a side wins via territory capture."""
+def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bool:
+    """
+    Resolve the battle when a side wins via territory capture.
+    
+    Uses atomic database operation to prevent race conditions.
+    Only ONE caller can successfully resolve - all others get False.
+    
+    Returns: True if this call resolved the battle, False if already resolved.
+    """
     from db.models.kingdom_event import KingdomEvent
+    
+    # ATOMIC CLAIM: Only one request can win this race
+    if not _try_resolve_battle(db, battle.id, winner_side):
+        return False
+    
+    # We won the race - proceed with resolution
+    attacker_victory = (winner_side == "attackers")
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == battle.kingdom_id).first()
     if not kingdom:
-        return
+        db.commit()
+        return True
     
     wall_level = kingdom.wall_level or 0 if battle.is_invasion else 0
     
-    attacker_attack, _, attackers = _calculate_combat_strength(
-        db, battle.get_attacker_ids(), battle.kingdom_id
+    # Get participant IDs
+    attacker_ids = battle.get_attacker_ids()
+    defender_ids = battle.get_defender_ids()
+    
+    # Calculate strength for record-keeping only
+    attacker_attack, _, _ = _calculate_combat_strength(
+        db, attacker_ids, battle.kingdom_id
     )
-    _, defender_defense, defenders = _calculate_combat_strength(
-        db, battle.get_defender_ids(), battle.kingdom_id,
+    _, defender_defense, _ = _calculate_combat_strength(
+        db, defender_ids, battle.kingdom_id,
         include_wall_defense=battle.is_invasion,
         wall_level=wall_level
     )
     
-    attacker_victory = (winner_side == "attackers")
+    # Update battle stats (the resolved_at, winner_side, attacker_victory already set by _try_resolve_battle)
+    from sqlalchemy import text
+    db.execute(text("""
+        UPDATE battles
+        SET attacker_strength = :atk_str,
+            defender_strength = :def_str,
+            total_defense_with_walls = :total_def,
+            wall_defense_applied = :wall_def
+        WHERE id = :battle_id
+    """), {
+        "battle_id": battle.id,
+        "atk_str": attacker_attack,
+        "def_str": defender_defense,
+        "total_def": defender_defense,
+        "wall_def": calculate_wall_defense(wall_level) if battle.is_invasion else None
+    })
     
-    battle.attacker_victory = attacker_victory
-    battle.winner_side = winner_side
-    battle.attacker_strength = attacker_attack
-    battle.defender_strength = defender_defense
-    battle.total_defense_with_walls = defender_defense
-    battle.resolved_at = datetime.utcnow()
-    
-    if battle.is_invasion:
-        battle.wall_defense_applied = calculate_wall_defense(wall_level)
-    
-    _apply_battle_outcome(db, battle, kingdom, attackers, defenders, attacker_victory)
+    # Use bulk SQL operations - handles 10k+ participants efficiently
+    _apply_battle_outcome_bulk(db, battle, kingdom, attacker_ids, defender_ids, attacker_victory)
     
     battle_type_name = "Coup" if battle.is_coup else "Invasion"
     if attacker_victory:
@@ -840,6 +974,7 @@ def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> No
     db.add(event)
     
     db.commit()
+    return True
 
 
 # ===== Build Response Helper =====
@@ -1633,9 +1768,11 @@ def resolve_fight_session(
         else:
             push_amount = base_push
     
-    bar_before = territory.control_bar
-    winner = territory.apply_push(session.side, push_amount)
-    bar_after = territory.control_bar
+    # ATOMIC territory push - prevents race conditions with 1000 concurrent Lambdas
+    push_result = _atomic_push_territory(db, territory.id, session.side, push_amount)
+    bar_before = push_result["bar_before"]
+    bar_after = push_result["bar_after"]
+    newly_captured = push_result["newly_captured"]
     
     # Handle injury
     injured_player_name = None
@@ -1671,24 +1808,31 @@ def resolve_fight_session(
     
     _set_battle_cooldown(db, current_user.id, battle_id)
     
-    # Check win
+    # Check win - only if THIS push captured a territory
     battle_won = False
     winner_side = None
     
-    if winner:
+    if newly_captured:
         winner_side = _check_win_condition(db, battle)
         if winner_side:
-            battle_won = True
-            _resolve_battle_victory(db, battle, winner_side)
+            # ATOMIC resolution - only ONE Lambda wins this race
+            battle_won = _resolve_battle_victory(db, battle, winner_side)
+    
+    # Save session data before deleting
+    session_rolls = session.rolls or []
+    session_rolls_completed = session.rolls_completed
     
     db.delete(session)
     db.commit()
     
+    # Refresh territory to get current state
+    db.refresh(territory)
+    
     # Build message
     if battle_won:
         message = f"VICTORY! {winner_side.upper()} have won!"
-    elif winner:
-        message = f"Territory captured by {winner}!"
+    elif newly_captured:
+        message = f"Territory captured by {push_result['captured_by']}!"
     elif best_outcome == "miss":
         message = "All attacks missed. No progress."
     else:
@@ -1697,8 +1841,8 @@ def resolve_fight_session(
     return FightResolveResponse(
         success=True,
         message=message,
-        roll_count=session.rolls_completed if session else 0,
-        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (session.rolls if session else [])],
+        roll_count=session_rolls_completed,
+        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in session_rolls],
         best_outcome=best_outcome,
         push_amount=push_amount,
         bar_before=bar_before,

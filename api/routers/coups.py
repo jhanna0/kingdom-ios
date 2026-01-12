@@ -636,16 +636,119 @@ def _check_win_condition(db: Session, coup: CoupEvent) -> Optional[str]:
     return None
 
 
-def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> None:
+def _try_resolve_coup(db: Session, coup_id: int, winner_side: str) -> bool:
+    """
+    Atomically try to claim and resolve a coup.
+    
+    Uses UPDATE WHERE resolved_at IS NULL to prevent race conditions.
+    Only ONE Lambda wins this race - all others get False.
+    """
+    from sqlalchemy import text
+    
+    result = db.execute(text("""
+        UPDATE coup_events
+        SET resolved_at = NOW(),
+            attacker_victory = :attacker_victory
+        WHERE id = :coup_id
+          AND resolved_at IS NULL
+        RETURNING id
+    """), {
+        "coup_id": coup_id,
+        "attacker_victory": winner_side == "attackers"
+    }).fetchone()
+    
+    return result is not None
+
+
+def _atomic_push_coup_territory(
+    db: Session,
+    territory_id: int,
+    side: str,
+    push_amount: float
+) -> dict:
+    """
+    Atomically push a coup territory bar.
+    Prevents race conditions with concurrent Lambda requests.
+    """
+    from sqlalchemy import text
+    
+    if side == "attackers":
+        result = db.execute(text("""
+            UPDATE coup_territories
+            SET 
+                control_bar = GREATEST(0.0, LEAST(100.0, control_bar - :push_amount)),
+                captured_by = CASE 
+                    WHEN captured_by IS NOT NULL THEN captured_by
+                    WHEN control_bar - :push_amount <= 0 THEN 'attackers'
+                    ELSE NULL
+                END,
+                captured_at = CASE
+                    WHEN captured_by IS NOT NULL THEN captured_at
+                    WHEN control_bar - :push_amount <= 0 THEN NOW()
+                    ELSE NULL
+                END,
+                updated_at = NOW()
+            WHERE id = :territory_id
+            RETURNING 
+                control_bar + :push_amount as bar_before,
+                control_bar as bar_after,
+                captured_by,
+                (captured_by = 'attackers' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+        """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
+    else:
+        result = db.execute(text("""
+            UPDATE coup_territories
+            SET 
+                control_bar = GREATEST(0.0, LEAST(100.0, control_bar + :push_amount)),
+                captured_by = CASE 
+                    WHEN captured_by IS NOT NULL THEN captured_by
+                    WHEN control_bar + :push_amount >= 100 THEN 'defenders'
+                    ELSE NULL
+                END,
+                captured_at = CASE
+                    WHEN captured_by IS NOT NULL THEN captured_at
+                    WHEN control_bar + :push_amount >= 100 THEN NOW()
+                    ELSE NULL
+                END,
+                updated_at = NOW()
+            WHERE id = :territory_id
+            RETURNING 
+                control_bar - :push_amount as bar_before,
+                control_bar as bar_after,
+                captured_by,
+                (captured_by = 'defenders' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+        """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
+    
+    if not result:
+        return {"bar_before": 0, "bar_after": 0, "captured_by": None, "newly_captured": False}
+    
+    return {
+        "bar_before": result[0],
+        "bar_after": result[1],
+        "captured_by": result[2],
+        "newly_captured": result[3] or False
+    }
+
+
+def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> bool:
     """
     Resolve the battle when a side wins via territory capture.
-    Uses existing victory/failure reward logic.
+    
+    Uses atomic database operation to prevent race conditions.
+    Only ONE Lambda wins this race - all others get False.
+    
+    Returns: True if this call resolved it, False if already resolved.
     """
     from db.models.kingdom_event import KingdomEvent
     
+    # ATOMIC CLAIM: Only one Lambda wins this race
+    if not _try_resolve_coup(db, coup.id, winner_side):
+        return False
+    
     kingdom = db.query(Kingdom).filter(Kingdom.id == coup.kingdom_id).first()
     if not kingdom:
-        return
+        db.commit()
+        return True
     
     # Calculate combat strength for record keeping
     attacker_attack, _, attackers = _calculate_combat_strength(
@@ -657,12 +760,10 @@ def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> N
     
     attacker_victory = (winner_side == "attackers")
     
-    # Update coup record
-    coup.attacker_victory = attacker_victory
+    # Update coup record stats (resolved_at already set by _try_resolve_coup)
     coup.attacker_strength = attacker_attack
     coup.defender_strength = defender_defense
     coup.total_defense_with_walls = defender_defense
-    coup.resolved_at = datetime.utcnow()
     
     # Apply rewards/penalties (also updates ruler if attackers won)
     outcome = _apply_coup_outcome(db, coup, kingdom, attackers, defenders, attacker_victory)
@@ -683,6 +784,7 @@ def _resolve_battle_victory(db: Session, coup: CoupEvent, winner_side: str) -> N
     db.add(event)
     
     db.commit()
+    return True
 
 
 # ===== API Endpoints =====
@@ -994,10 +1096,10 @@ def fight_in_territory(
     best_outcome = _get_best_outcome(rolls)
     
     # Calculate push amount (only if hit or injure)
-    bar_before = territory.control_bar
     push_amount = 0.0
     injured_player_id = None
     injured_player_name = None
+    newly_captured = False
     
     if best_outcome in [RollOutcome.HIT.value, RollOutcome.INJURE.value]:
         # Get side stats for push calculation
@@ -1010,10 +1112,14 @@ def fight_in_territory(
         
         push_amount = calculate_push_per_hit(side_size, side_avg_leadership)
         
-        # Apply push to territory
-        territory.apply_push(user_side, push_amount)
-    
-    bar_after = territory.control_bar
+        # ATOMIC territory push - prevents race conditions
+        push_result = _atomic_push_coup_territory(db, territory.id, user_side, push_amount)
+        bar_before = push_result["bar_before"]
+        bar_after = push_result["bar_after"]
+        newly_captured = push_result["newly_captured"]
+    else:
+        bar_before = territory.control_bar
+        bar_after = territory.control_bar
     
     # Record the action
     action = CoupBattleAction(
@@ -1046,16 +1152,20 @@ def fight_in_territory(
     # Set cooldown
     _set_battle_cooldown(db, current_user.id, coup_id)
     
-    # Check win condition
+    # Check win condition - only if THIS push captured a territory
     battle_won = False
     winner_side = None
     
-    winner_side = _check_win_condition(db, coup)
-    if winner_side:
-        battle_won = True
-        _resolve_battle_victory(db, coup, winner_side)
+    if newly_captured:
+        winner_side = _check_win_condition(db, coup)
+        if winner_side:
+            # ATOMIC resolution - only ONE Lambda wins this race
+            battle_won = _resolve_battle_victory(db, coup, winner_side)
     
     db.commit()
+    
+    # Refresh territory for response
+    db.refresh(territory)
     
     # Build message
     if best_outcome == RollOutcome.MISS.value:
@@ -1772,10 +1882,11 @@ def resolve_fight_session(
         else:
             push_amount = base_push
     
-    # Apply push to territory
-    bar_before = territory.control_bar
-    winner = territory.apply_push(session.side, push_amount)
-    bar_after = territory.control_bar
+    # ATOMIC territory push - prevents race conditions with 1000 concurrent Lambdas
+    push_result = _atomic_push_coup_territory(db, territory.id, session.side, push_amount)
+    bar_before = push_result["bar_before"]
+    bar_after = push_result["bar_after"]
+    newly_captured = push_result["newly_captured"]
     
     # Handle injury if critical hit
     injured_player_name = None
@@ -1812,29 +1923,33 @@ def resolve_fight_session(
         push_amount=push_amount,
         bar_before=bar_before,
         bar_after=bar_after,
-        injured_player_id=None  # TODO: track injured player ID
+        injured_player_id=None
     )
     db.add(action)
     
     # Set cooldown NOW (not before)
     _set_battle_cooldown(db, current_user.id, coup_id)
     
-    # Check win condition
+    # Check win condition - only if THIS push captured a territory
     battle_won = False
     winner_side = None
     
-    if winner:
-        # Check if this capture wins the battle
+    if newly_captured:
         winner_side = _check_win_condition(db, coup)
         if winner_side:
-            battle_won = True
-            # CRITICAL: Must call _resolve_battle_victory to actually update ruler and apply rewards!
-            # coup.resolve() only sets the resolved flag - it doesn't change the kingdom ruler
-            _resolve_battle_victory(db, coup, winner_side)
+            # ATOMIC resolution - only ONE Lambda wins this race
+            battle_won = _resolve_battle_victory(db, coup, winner_side)
+    
+    # Save session data before deleting
+    session_rolls = session.rolls or []
+    session_rolls_completed = session.rolls_completed
     
     # Delete the session (fight is complete)
     db.delete(session)
     db.commit()
+    
+    # Refresh territory to get current state
+    db.refresh(territory)
     
     # Build territory response
     territory_response = CoupTerritoryResponse(
@@ -1849,8 +1964,8 @@ def resolve_fight_session(
     # Build message
     if battle_won:
         message = f"VICTORY! {winner_side.upper()} have won the coup!"
-    elif winner:
-        message = f"Territory captured by {winner}!"
+    elif newly_captured:
+        message = f"Territory captured by {push_result['captured_by']}!"
     elif best_outcome == "miss":
         message = "All attacks missed. No progress."
     else:
@@ -1859,8 +1974,8 @@ def resolve_fight_session(
     return FightResolveResponse(
         success=True,
         message=message,
-        roll_count=session.rolls_completed if session else 0,
-        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in (session.rolls if session else [])],
+        roll_count=session_rolls_completed,
+        rolls=[RollResult(value=r["value"], outcome=r["outcome"]) for r in session_rolls],
         best_outcome=best_outcome,
         push_amount=push_amount,
         bar_before=bar_before,

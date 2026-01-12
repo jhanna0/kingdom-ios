@@ -263,6 +263,13 @@ def create_kingdom(
             detail="You must be inside the kingdom to claim it. Travel there first."
         )
     
+    # Check if this is the user's hometown - you can only claim your hometown
+    if state.hometown_kingdom_id != city_boundary_osm_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only claim your hometown as your kingdom. This is not your hometown."
+        )
+    
     # Check if user currently rules any kingdoms
     # Can only claim a free kingdom if you don't currently rule any
     current_kingdoms = db.query(Kingdom).filter(
