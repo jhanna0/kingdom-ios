@@ -506,9 +506,15 @@ class HuntViewModel: ObservableObject {
                 // Creator is auto-ready, just start immediately
                 await startHunt()
             } else {
-                error = response.message
-                showError = true
-                uiState = .noHunt
+                // If API returns existing hunt, use it so user can abandon/resume
+                if let existingHunt = response.hunt {
+                    hunt = existingHunt
+                    syncUIState()
+                } else {
+                    error = response.message
+                    showError = true
+                    uiState = .noHunt
+                }
             }
         } catch {
             self.error = error.localizedDescription

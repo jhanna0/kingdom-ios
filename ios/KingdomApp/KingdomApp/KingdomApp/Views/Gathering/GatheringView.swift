@@ -12,7 +12,7 @@ private struct FloatingNumberView: View {
     
     var body: some View {
         Text("+\(amount)")
-            .font(.system(size: 32, weight: .black, design: .rounded))
+            .font(FontStyles.resultMedium)
             .foregroundColor(color)
             .offset(x: 100, y: -120 + offset)
             .opacity(opacity)
@@ -102,39 +102,49 @@ struct GatheringView: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(FontStyles.iconTiny)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
+                    .background(KingdomTheme.Colors.parchmentDark.opacity(0.5))
+                    .clipShape(Circle())
             }
             
             Spacer()
             
             Text("Gather \(viewModel.resourceName)")
-                .font(FontStyles.headingMedium)
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Spacer()
             
             // Invisible spacer for centering
             Color.clear
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
         }
         .padding(.horizontal, KingdomTheme.Spacing.medium)
-        .padding(.vertical, KingdomTheme.Spacing.small)
+        .padding(.vertical, KingdomTheme.Spacing.medium)
     }
     
     // MARK: - Counter Display
     
     private var counterDisplay: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: viewModel.resourceIcon)
-                .font(.system(size: 18, weight: .bold))
+                .font(FontStyles.iconSmall)
                 .foregroundColor(baseResourceColor)
             
             Text("\(viewModel.sessionGathered)")
-                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .font(FontStyles.resultSmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
+        .padding(.horizontal, KingdomTheme.Spacing.large)
+        .padding(.vertical, KingdomTheme.Spacing.small)
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(KingdomTheme.CornerRadius.large)
+        .overlay(
+            RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                .stroke(KingdomTheme.Colors.border.opacity(0.5), lineWidth: KingdomTheme.BorderWidth.thin)
+        )
     }
     
     // MARK: - Gather Button
@@ -143,6 +153,7 @@ struct GatheringView: View {
         Image(systemName: viewModel.resourceIcon)
             .font(.system(size: 180, weight: .bold))
             .foregroundColor(iconColor ?? baseResourceColor)
+            .shadow(color: KingdomTheme.Colors.inkDark.opacity(0.2), radius: 8, x: 4, y: 6)
             .animation(nil, value: iconColor)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -185,8 +196,8 @@ struct GatheringView: View {
     }
     
     private func showCooldownFeedback() {
-        iconColor = KingdomTheme.Colors.disabled
-        spawnFloatingNumber(amount: 0, color: KingdomTheme.Colors.disabled)
+        iconColor = KingdomTheme.Colors.inkDark
+        spawnFloatingNumber(amount: 0, color: KingdomTheme.Colors.inkDark)
     }
     
     private func spawnFloatingNumber(amount: Int, color: Color) {

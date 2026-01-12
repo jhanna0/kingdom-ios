@@ -47,7 +47,7 @@ GATHER_TIERS = {
     "black": {
         "name": "Nothing",
         "amount": 0,
-        "color": "disabled",      # Theme: disabled gray
+        "color": "inkDark",       # Theme: black
         "message": "Nothing found...",
         "haptic": None,
     },
@@ -56,26 +56,19 @@ GATHER_TIERS = {
         "amount": 1,
         "color": "buttonPrimary", # Theme: primary brown
         "message": "Found some!",
-        "haptic": None,
+        "haptic": "medium",
     },
     "green": {
         "name": "Good",
         "amount": 2,
         "color": "buttonSuccess", # Theme: success green
         "message": "Nice find!",
-        "haptic": "medium",
-    },
-    "gold": {
-        "name": "Jackpot",
-        "amount": 3,
-        "color": "imperialGold",  # Theme: imperial gold
-        "message": "Jackpot!",
         "haptic": "heavy",
     },
 }
 
 # Order matters for probability calculation (cumulative)
-TIER_ORDER = ["black", "brown", "green", "gold"]
+TIER_ORDER = ["black", "brown", "green"]
 
 
 # ============================================================
@@ -85,9 +78,8 @@ TIER_ORDER = ["black", "brown", "green", "gold"]
 
 TIER_PROBABILITIES = {
     "black": 0.50,   # 50% chance - nothing
-    "brown": 0.30,   # 30% chance - 1 resource
+    "brown": 0.35,   # 35% chance - 1 resource
     "green": 0.15,   # 15% chance - 2 resources
-    "gold": 0.05,    # 5% chance - 3 resources (rare!)
 }
 
 

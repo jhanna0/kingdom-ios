@@ -2,6 +2,10 @@ import Foundation
 import SwiftUI
 import Combine
 
+// MARK: - Tunable Constants
+
+private let kGatherCooldownSeconds: TimeInterval = 1.0
+
 // MARK: - Gathering View Model
 
 @MainActor
@@ -23,9 +27,8 @@ class GatheringViewModel: ObservableObject {
     @Published var woodTotal: Int = 0
     @Published var ironTotal: Int = 0
     
-    // Cooldown state (0.5s between taps)
+    // Cooldown state
     @Published var isOnCooldown = false
-    private let cooldownDuration: TimeInterval = 0.5
     
     // Animation triggers
     @Published var showResultAnimation = false
@@ -104,7 +107,7 @@ class GatheringViewModel: ObservableObject {
         isOnCooldown = true
         
         Task {
-            try? await Task.sleep(nanoseconds: UInt64(cooldownDuration * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(kGatherCooldownSeconds * 1_000_000_000))
             isOnCooldown = false
         }
     }
