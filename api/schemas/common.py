@@ -53,6 +53,12 @@ class BuildingTierInfo(BaseModel):
     description: str  # e.g. "Basic wooden wall"
 
 
+class BuildingClickAction(BaseModel):
+    """Action triggered when building is clicked - DYNAMIC from backend"""
+    type: str  # e.g. "gathering", "market", "townhall"
+    resource: Optional[str] = None  # For gathering: "wood", "iron"
+
+
 class BuildingData(BaseModel):
     """Building data with metadata - FULLY DYNAMIC from backend"""
     type: str  # e.g. "wall", "vault", "mine"
@@ -64,6 +70,9 @@ class BuildingData(BaseModel):
     level: int  # Current building level
     max_level: int  # Maximum level
     upgrade_cost: Optional['BuildingUpgradeCost'] = None  # Cost to upgrade to next level (None if max)
+    
+    # Click action - what happens when building is tapped (None = not clickable)
+    click_action: Optional['BuildingClickAction'] = None
     
     # Current tier info
     tier_name: str = ""  # Name of current tier (e.g. "Stone Wall")

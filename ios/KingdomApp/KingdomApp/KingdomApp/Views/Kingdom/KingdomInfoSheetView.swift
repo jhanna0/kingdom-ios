@@ -17,9 +17,8 @@ struct KingdomInfoSheetView: View {
     @State private var showAllianceResult = false
     @State private var allianceResultMessage = ""
     @State private var allianceResultSuccess = false
-    @State private var showTownHall = false
-    @State private var showTownPub = false
-    @State private var showMarket = false
+    // DYNAMIC: Single state for any building action - no hardcoded types!
+    @State private var activeBuildingAction: BuildingClickAction?
     
     // Battle state (Coups & Invasions)
     @State private var showBattleView = false
@@ -514,41 +513,14 @@ struct KingdomInfoSheetView: View {
         } message: {
             Text(allianceResultMessage)
         }
-        .fullScreenCover(isPresented: $showTownHall) {
-            NavigationStack {
-                TownHallView(kingdom: kingdom, playerId: player.playerId)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button { showTownHall = false } label: {
-                                Image(systemName: "xmark")
-                            }
-                        }
-                    }
-            }
-        }
-        .fullScreenCover(isPresented: $showTownPub) {
-            NavigationStack {
-                TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button { showTownPub = false } label: {
-                                Image(systemName: "xmark")
-                            }
-                        }
-                    }
-            }
-        }
-        .fullScreenCover(isPresented: $showMarket) {
-            NavigationStack {
-                MarketView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button { showMarket = false } label: {
-                                Image(systemName: "xmark")
-                            }
-                        }
-                    }
-            }
+        // DYNAMIC: Single fullScreenCover for ALL building actions
+        .fullScreenCover(item: $activeBuildingAction) { action in
+            BuildingActionView(
+                action: action,
+                kingdom: kingdom,
+                playerId: player.playerId,
+                onDismiss: { activeBuildingAction = nil }
+            )
         }
         .fullScreenCover(isPresented: $showBattleView) {
             if let battleId = initiatedBattleId {
@@ -671,7 +643,8 @@ struct KingdomInfoSheetView: View {
     private func buildingRow(building: BuildingMetadata) -> some View {
         let isBuilt = building.level > 0
         let color = Color(hex: building.colorHex) ?? KingdomTheme.Colors.inkMedium
-        let isClickable = isPlayerInside && (building.type == "townhall" || building.type == "market")
+        // DYNAMIC: Building is clickable if backend says so AND player is inside
+        let isClickable = isPlayerInside && building.isClickable
         
         let content = HStack(spacing: 10) {
             // Icon with level badge - brutalist style
@@ -723,19 +696,12 @@ struct KingdomInfoSheetView: View {
         .cornerRadius(8)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
         
-        // Make Town Hall and Market tappable
-        if building.type == "townhall" && isPlayerInside {
+        // DYNAMIC: Handle click based on backend-provided click_action
+        if isClickable, let clickAction = building.clickAction {
             Button {
-                if isBuilt {
-                    showTownHall = true
-                } else {
-                    showTownPub = true
-                }
+                activeBuildingAction = clickAction
             } label: { content }
             .buttonStyle(.plain)
-        } else if building.type == "market" && isBuilt && isPlayerInside {
-            Button { showMarket = true } label: { content }
-                .buttonStyle(.plain)
         } else {
             content
         }

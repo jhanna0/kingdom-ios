@@ -118,6 +118,24 @@ class ActionsAPI {
         let request = try client.request(endpoint: "/battles/\(coupId)/join", method: "POST", body: body)
         return try await client.execute(request)
     }
+    
+    // MARK: - Gathering
+    
+    /// Gather a resource (wood or iron)
+    /// No backend cooldown - frontend handles 0.5s tap cooldown
+    func gatherResource(resourceType: String) async throws -> GatherResponse {
+        let request = client.request(
+            endpoint: "/actions/gather?resource_type=\(resourceType)",
+            method: "POST"
+        )
+        return try await client.execute(request)
+    }
+    
+    /// Get gathering configuration (resource types and tier info)
+    func getGatherConfig() async throws -> GatherConfigResponse {
+        let request = client.request(endpoint: "/actions/gather/config", method: "GET")
+        return try await client.execute(request)
+    }
 }
 
 

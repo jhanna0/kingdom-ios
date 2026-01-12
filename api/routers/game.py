@@ -190,6 +190,15 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
                 "description": tier_data.get("description", "")
             })
         
+        # Get click action if defined (only clickable if level > 0)
+        click_action = None
+        click_action_meta = building_meta.get("click_action")
+        if click_action_meta and level > 0:
+            click_action = {
+                "type": click_action_meta.get("type", ""),
+                "resource": click_action_meta.get("resource")
+            }
+        
         buildings.append({
             "type": building_type,
             "display_name": building_meta["display_name"],
@@ -200,6 +209,7 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
             "level": level,
             "max_level": max_level,
             "upgrade_cost": upgrade_cost,
+            "click_action": click_action,
             "tier_name": tier_name,
             "tier_benefit": tier_benefit,
             "all_tiers": all_tiers

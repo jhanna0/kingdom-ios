@@ -17,6 +17,12 @@ struct APIBuildingTierInfo: Codable {
     let description: String  // e.g. "Basic wooden wall"
 }
 
+/// Click action for a building - DYNAMIC from backend
+struct APIBuildingClickAction: Codable {
+    let type: String  // e.g. "gathering", "market", "townhall"
+    let resource: String?  // For gathering: "wood", "iron"
+}
+
 /// DYNAMIC Building data from backend - includes metadata, upgrade costs, and tier info
 /// Frontend iterates this array - NO HARDCODING required!
 struct APIBuildingData: Codable {
@@ -29,6 +35,9 @@ struct APIBuildingData: Codable {
     let level: Int  // Current building level
     let max_level: Int  // Maximum level
     let upgrade_cost: APIBuildingUpgradeCost?  // Cost to upgrade (nil if at max)
+    
+    // Click action - what happens when building is tapped (nil = not clickable)
+    let click_action: APIBuildingClickAction?
     
     // Current tier info
     let tier_name: String  // Name of current tier (e.g. "Stone Wall")

@@ -167,6 +167,7 @@ BUILDING_TYPES = {
         "description": "Produces resources and passive income",
         "max_tier": 5,
         "benefit_formula": "Unlocks resources at each level",
+        "click_action": {"type": "gathering", "resource": "iron"},
         "tiers": {
             1: {"name": "Prospect", "benefit": "Unlocks Stone", "description": "Small mining operation"},
             2: {"name": "Shaft", "benefit": "Unlocks Stone, Iron", "description": "Deeper mining shaft"},
@@ -182,6 +183,7 @@ BUILDING_TYPES = {
         "description": "Enables trading and generates income",
         "max_tier": 5,
         "benefit_formula": "Trading unlocks and citizen income",
+        "click_action": {"type": "market"},
         "tiers": {
             1: {"name": "Stalls", "benefit": "Unlocks intrakingdom trading", "income": 0, "description": "Unlocks intrakingdom trading"},
             2: {"name": "Market Square", "benefit": "1 gold to treasury per citizen per day", "income": 0, "description": "1 gold to treasury per citizen per day"},
@@ -227,6 +229,7 @@ BUILDING_TYPES = {
         "description": "Produces wood resources for construction",
         "max_tier": 5,
         "benefit_formula": "Unlocks wood gathering at each level",
+        "click_action": {"type": "gathering", "resource": "wood"},
         "tiers": {
             1: {"name": "Logging Camp", "benefit": "Gather 10 wood per action", "wood_per_action": 10, "description": "Basic logging operation"},
             2: {"name": "Sawmill", "benefit": "Gather 20 wood per action", "wood_per_action": 20, "description": "Improved wood processing"},
@@ -242,6 +245,7 @@ BUILDING_TYPES = {
         "description": "Community center that unlocks group activities",
         "max_tier": 5,
         "benefit_formula": "Unlocks group hunting and social features",
+        "click_action": {"type": "townhall"},
         "tiers": {
             1: {"name": "Meeting Hall", "benefit": "Unlocks Group Hunting", "description": "Basic gathering place for citizens"},
             2: {"name": "Town Hall", "benefit": "Group Hunting + larger parties", "description": "Organized community center"},

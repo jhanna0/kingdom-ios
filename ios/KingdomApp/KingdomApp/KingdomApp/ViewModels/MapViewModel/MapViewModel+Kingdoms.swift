@@ -257,6 +257,11 @@ extension MapViewModel {
                         )
                     }
                     
+                    // Convert click action if present
+                    let clickAction: BuildingClickAction? = building.click_action.map {
+                        BuildingClickAction(type: $0.type, resource: $0.resource)
+                    }
+                    
                     // Store full metadata
                     kingdom.buildingMetadata[building.type] = BuildingMetadata(
                         type: building.type,
@@ -268,6 +273,7 @@ extension MapViewModel {
                         level: building.level,
                         maxLevel: building.max_level,
                         upgradeCost: upgradeCost,
+                        clickAction: clickAction,
                         tierName: building.tier_name,
                         tierBenefit: building.tier_benefit,
                         allTiers: allTiers
@@ -356,6 +362,11 @@ extension MapViewModel {
                                 )
                             }
                             
+                            // Convert click action if present
+                            let clickAction: BuildingClickAction? = building.click_action.map {
+                                BuildingClickAction(type: $0.type, resource: $0.resource)
+                            }
+                            
                             // Store full metadata
                             kingdoms[index].buildingMetadata[building.type] = BuildingMetadata(
                                 type: building.type,
@@ -367,6 +378,7 @@ extension MapViewModel {
                                 level: building.level,
                                 maxLevel: building.max_level,
                                 upgradeCost: upgradeCost,
+                                clickAction: clickAction,
                                 tierName: building.tier_name,
                                 tierBenefit: building.tier_benefit,
                                 allTiers: allTiers

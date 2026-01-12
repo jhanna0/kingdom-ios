@@ -322,17 +322,19 @@ struct AuthenticatedView: View {
     
     @ViewBuilder
     private var coupBadgeOverlay: some View {
-        if let coup = viewModel.activeCoupInHomeKingdom {
+        // Show badge for battles in CURRENT kingdom (where you're standing) OR home kingdom
+        // Priority: current kingdom first (since you're physically there)
+        if let battle = viewModel.activeBattleInCurrentKingdom ?? viewModel.activeCoupInHomeKingdom {
             VStack {
                 Spacer().frame(height: 152)
                 HStack {
                     Spacer()
                     BattleMapBadgeView(
-                        battleType: .coup,
-                        status: coup.status,
-                        timeRemaining: coup.timeRemainingFormatted,
-                        attackerCount: coup.attacker_count,
-                        defenderCount: coup.defender_count,
+                        battleType: battle.isInvasion ? .invasion : .coup,
+                        status: battle.status,
+                        timeRemaining: battle.timeRemainingFormatted,
+                        attackerCount: battle.attacker_count,
+                        defenderCount: battle.defender_count,
                         onTap: { showCoupView = true }
                     )
                 }
@@ -539,8 +541,9 @@ private struct SheetModifiers: ViewModifier {
                 NotificationsSheet()
             }
             .fullScreenCover(isPresented: $showCoupView) {
-                if let coup = viewModel.activeCoupInHomeKingdom {
-                    BattleView(battleId: coup.id, onDismiss: { showCoupView = false })
+                // Show battle from current kingdom first, then home kingdom
+                if let battle = viewModel.activeBattleInCurrentKingdom ?? viewModel.activeCoupInHomeKingdom {
+                    BattleView(battleId: battle.id, onDismiss: { showCoupView = false })
                 }
             }
     }

@@ -89,6 +89,7 @@ struct CharacterSheetView: View {
             .padding()
         }
         .task {
+            await refreshPlayerState()
             await loadTrainingContracts()
             await loadMyActivities()
             await loadRelocationStatus()
@@ -117,6 +118,17 @@ struct CharacterSheetView: View {
     }
     
     // MARK: - Data Loading
+    
+    private func refreshPlayerState() async {
+        do {
+            let playerState = try await KingdomAPIService.shared.player.loadState()
+            await MainActor.run {
+                player.updateFromAPIState(playerState)
+            }
+        } catch {
+            print("❌ Failed to refresh player state: \(error)")
+        }
+    }
     
     private func loadTrainingContracts() async {
         print("🔍 CharacterSheetView: loadTrainingContracts() CALLED")

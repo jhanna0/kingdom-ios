@@ -14,7 +14,7 @@ import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db, CoupEvent
 from db.models import Battle
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS, AllianceInfo, ActiveCoupData
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BuildingClickAction, BUILDING_COLORS, AllianceInfo, ActiveCoupData
 from routers.alliances import are_empires_allied, get_alliance_between
 from osm_service import (
     find_user_city_fast,
@@ -263,6 +263,15 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                     description=tier_data.get("description", "")
                 ))
             
+            # Get click action if defined (only clickable if level > 0)
+            click_action = None
+            click_action_meta = building_meta.get("click_action")
+            if click_action_meta and level > 0:
+                click_action = BuildingClickAction(
+                    type=click_action_meta.get("type", ""),
+                    resource=click_action_meta.get("resource")
+                )
+            
             buildings.append(BuildingData(
                 type=building_type,
                 display_name=building_meta["display_name"],
@@ -273,6 +282,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 level=level,
                 max_level=max_level,
                 upgrade_cost=upgrade_cost,
+                click_action=click_action,
                 tier_name=tier_name,
                 tier_benefit=tier_benefit,
                 all_tiers=all_tiers

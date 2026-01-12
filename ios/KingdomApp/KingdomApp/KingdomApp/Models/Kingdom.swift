@@ -16,6 +16,15 @@ struct BuildingTierInfo: Hashable {
     let tierDescription: String  // e.g. "Basic wooden wall"
 }
 
+// Click action for a building - DYNAMIC from backend
+struct BuildingClickAction: Hashable, Identifiable {
+    let type: String  // e.g. "gathering", "market", "townhall"
+    let resource: String?  // For gathering: "wood", "iron"
+    
+    // Identifiable for SwiftUI sheet binding
+    var id: String { "\(type)_\(resource ?? "")" }
+}
+
 // DYNAMIC Building metadata from backend - includes upgrade costs and tier info
 // Constructed manually from API response - not decoded directly
 struct BuildingMetadata: Hashable {
@@ -29,12 +38,20 @@ struct BuildingMetadata: Hashable {
     let maxLevel: Int
     let upgradeCost: BuildingUpgradeCost?  // Cost to upgrade (nil if at max)
     
+    // Click action - what happens when building is tapped (nil = not clickable)
+    let clickAction: BuildingClickAction?
+    
     // Current tier info
     let tierName: String  // Name of current tier (e.g. "Stone Wall")
     let tierBenefit: String  // Benefit of current tier (e.g. "+4 defenders")
     
     // All tiers info - for detail view to show all levels
     let allTiers: [BuildingTierInfo]
+    
+    // Computed: is this building clickable?
+    var isClickable: Bool {
+        clickAction != nil && level > 0
+    }
 }
 
 // Income record for tracking city revenue

@@ -34,6 +34,12 @@ class MapViewModel: ObservableObject {
     // Active coup in home kingdom (for map badge)
     @Published var activeCoupInHomeKingdom: ActiveCoupData?
     
+    // Active battle in current kingdom (computed from currentKingdomInside)
+    // This shows invasions/coups in the kingdom you're standing in
+    var activeBattleInCurrentKingdom: ActiveCoupData? {
+        return currentKingdomInside?.activeCoup
+    }
+    
     // War state tracking (for music)
     @Published var isInWarState: Bool = false
     
