@@ -4,14 +4,16 @@ import Foundation
 enum AppConfig {
     /// API Environment
     /// - local: Use Docker on your Mac (http://192.168.1.13:8000)
-    /// - lambda: Use AWS Lambda deployment (https://...)
+    /// - lambda: Use AWS Lambda deployment (AWS-generated endpoints)
+    /// - production: Use custom domains (api.kingdoms.ninja, wss.kingdoms.ninja)
     enum APIEnvironment {
         case local
         case lambda
+        case production
     }
     
-    /// Set this to switch between local and Lambda API
-    static let apiEnvironment: APIEnvironment = .local
+    /// Set this to switch between local, Lambda, and production API
+    static let apiEnvironment: APIEnvironment = .lambda
     
     /// Backend API base URL
     static var apiBaseURL: String {
@@ -20,6 +22,8 @@ enum AppConfig {
             return "http://192.168.1.13:8000"
         case .lambda:
             return "https://eu0qm86e1m.execute-api.us-east-1.amazonaws.com"
+        case .production:
+            return "https://api.kingdoms.ninja"
         }
     }
     
@@ -30,6 +34,8 @@ enum AppConfig {
             return "ws://192.168.1.13:8000/ws"  // Local dev WebSocket
         case .lambda:
             return "wss://02oas6q503.execute-api.us-east-1.amazonaws.com/dev"
+        case .production:
+            return "wss://wss.kingdoms.ninja"
         }
     }
     

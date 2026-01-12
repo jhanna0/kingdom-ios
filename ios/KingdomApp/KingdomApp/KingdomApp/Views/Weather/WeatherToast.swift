@@ -11,7 +11,7 @@ struct WeatherToast: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: weatherIcon)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(FontStyles.headingSmall)
                     .foregroundStyle(.white)
                     .shadow(color: .black, radius: 0, x: -1, y: -1)
                     .shadow(color: .black, radius: 0, x: 1, y: -1)
@@ -19,7 +19,7 @@ struct WeatherToast: View {
                     .shadow(color: .black, radius: 0, x: 1, y: 1)
                 
                 Text("\(weather.display_description) · \(Int(weather.temperature_f))°")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(FontStyles.bodySmallBold)
                     .foregroundStyle(.white)
                     .shadow(color: .black, radius: 0, x: -1, y: -1)
                     .shadow(color: .black, radius: 0, x: 1, y: -1)
@@ -28,7 +28,7 @@ struct WeatherToast: View {
             }
             
             Text(weather.flavor_text)
-                .font(.system(size: 12, weight: .medium))
+                .font(FontStyles.labelTiny)
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: -1, y: -1)
                 .shadow(color: .black, radius: 0, x: 1, y: -1)

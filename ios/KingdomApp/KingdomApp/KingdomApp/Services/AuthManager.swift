@@ -23,16 +23,18 @@ class AuthManager: ObservableObject {
     // MARK: - Apple Sign In
     
     @MainActor
-    func signInWithApple(userID: String, email: String?, name: String?) async {
+    func signInWithApple(userID: String, identityToken: String? = nil, email: String?, name: String?) async {
         do {
             struct AppleSignInRequest: Encodable {
                 let apple_user_id: String
+                let identity_token: String?  // SECURITY: JWT signed by Apple for server verification
                 let email: String?
                 let display_name: String
             }
             
             let body = AppleSignInRequest(
                 apple_user_id: userID,
+                identity_token: identityToken,
                 email: email,
                 display_name: name ?? "User"
             )

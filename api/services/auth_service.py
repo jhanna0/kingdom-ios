@@ -70,15 +70,36 @@ def decode_access_token(token: str) -> dict:
 # ===== User Management =====
 
 def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
-    """Create or get user from Apple Sign In"""
+    """Create or get user from Apple Sign In
+    
+    SECURITY: This function now verifies the Apple identity token before
+    trusting any user identity. The apple_user_id is extracted from the
+    cryptographically verified token, NOT from client-provided data.
+    """
+    from utils.apple_auth import verify_identity_token
     
     print(f"🔐 [SIGNUP] Apple Sign In attempt:")
-    print(f"   - apple_user_id: {apple_data.apple_user_id}")
-    print(f"   - email: {apple_data.email}")
+    print(f"   - identity_token provided: {bool(apple_data.identity_token)}")
+    print(f"   - client apple_user_id: {apple_data.apple_user_id[:20] if apple_data.apple_user_id else 'None'}...")
     print(f"   - display_name: {apple_data.display_name}")
     
+    # SECURITY: Verify the Apple identity token and extract the REAL user ID
+    # This cryptographically verifies the token with Apple's public keys
+    verified_apple_user_id, verified_email, email_verified = verify_identity_token(
+        identity_token=apple_data.identity_token,
+        apple_user_id=apple_data.apple_user_id,
+        email=apple_data.email
+    )
+    
+    print(f"   - verified apple_user_id: {verified_apple_user_id[:20]}...")
+    print(f"   - verified email: {verified_email}")
+    
+    # Use verified values (prefer verified email over client-provided)
+    apple_user_id = verified_apple_user_id
+    email = verified_email or apple_data.email
+    
     # Check if user already exists with this Apple ID
-    existing_user = db.query(User).filter(User.apple_user_id == apple_data.apple_user_id).first()
+    existing_user = db.query(User).filter(User.apple_user_id == apple_user_id).first()
     
     if existing_user:
         print(f"✅ [SIGNUP] Existing user found: user_id={existing_user.id}, display_name={existing_user.display_name}")
@@ -121,9 +142,10 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
         )
     
     # Create new user - PostgreSQL will auto-generate the ID
+    # SECURITY: Use verified apple_user_id and email, not client-provided values
     user = User(
-        email=apple_data.email,
-        apple_user_id=apple_data.apple_user_id,
+        email=email,  # Verified from Apple token (or client fallback in dev)
+        apple_user_id=apple_user_id,  # Verified from Apple token
         display_name=display_name,
     )
     

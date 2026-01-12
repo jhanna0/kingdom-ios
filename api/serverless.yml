@@ -16,8 +16,10 @@ provider:
     RDS_ENDPOINT: kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com
     RDS_PORT: '5432'
     RDS_DATABASE: postgres
-    JWT_SECRET_KEY: temp-secret-change-me
-    DEV_MODE: 'True'
+    JWT_SECRET_KEY: ${ssm:/kingdom/jwt-secret-key}
+    # Apple Sign In verification
+    APPLE_APP_ID: ${ssm:/kingdom/apple-app-id}  # Your iOS app's bundle ID
+    DEV_MODE: 'True'  # Set to 'False' in production!
     # WebSocket config
     CONNECTIONS_TABLE: ${self:service}-connections-${sls:stage}
     WEBSOCKET_API_ENDPOINT:

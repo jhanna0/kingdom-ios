@@ -36,7 +36,9 @@ services:
     environment:
       DATABASE_URL: postgresql://admin:admin@db:5432/kingdom
       PYTHONUNBUFFERED: 1
-      JWT_SECRET_KEY: "CHANGE-THIS-TO-A-STRONG-SECRET-IN-PRODUCTION-USE-openssl-rand-hex-32"
+      JWT_SECRET_KEY: "local-dev-secret-do-not-use-in-production"
+      APPLE_APP_ID: "j.KingdomApp"
+      DEV_MODE: "False"  # Production mode - requires valid Apple/Google identity token
     depends_on:
       db:
         condition: service_healthy

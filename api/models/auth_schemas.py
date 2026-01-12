@@ -9,8 +9,22 @@ from datetime import datetime
 # ===== Registration & Login =====
 
 class AppleSignIn(BaseModel):
-    """Sign in with Apple"""
-    apple_user_id: str
+    """Sign in with Apple
+    
+    SECURITY: The identity_token is a JWT signed by Apple that proves
+    the user actually authenticated with Apple. The backend MUST verify
+    this token before trusting the apple_user_id.
+    
+    In production: identity_token is REQUIRED and cryptographically verified.
+    In dev mode (DEV_MODE=true): identity_token can be omitted for testing.
+    """
+    # The identity token (JWT) from ASAuthorizationAppleIDCredential.identityToken
+    # This is cryptographically signed by Apple and contains the real user ID
+    identity_token: Optional[str] = None
+    
+    # Client-provided fields (only used in dev mode or as fallback display name)
+    # In production, apple_user_id is extracted from the verified identity_token
+    apple_user_id: str  # Required for backwards compatibility / dev mode
     email: Optional[str] = None
     display_name: Optional[str] = None
     

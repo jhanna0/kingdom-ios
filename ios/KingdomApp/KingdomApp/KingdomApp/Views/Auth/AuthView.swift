@@ -129,9 +129,18 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate {
                 .compactMap { $0 }
                 .joined(separator: " ")
             
+            // SECURITY: Extract the identity token - this is a JWT signed by Apple
+            // that proves the user actually authenticated. The backend MUST verify this.
+            var identityTokenString: String? = nil
+            if let identityTokenData = credential.identityToken,
+               let tokenString = String(data: identityTokenData, encoding: .utf8) {
+                identityTokenString = tokenString
+            }
+            
             Task {
                 await authManager.signInWithApple(
                     userID: userID,
+                    identityToken: identityTokenString,
                     email: email,
                     name: name.isEmpty ? nil : name
                 )

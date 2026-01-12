@@ -60,22 +60,62 @@ app = FastAPI(
     default_response_class=ISO8601JSONResponse
 )
 
-# Before request - extract username from JWT
+# Routes that don't require authentication
+PUBLIC_ROUTES = {
+    "/auth/apple-signin",  # Sign in
+    "/auth/health",        # Health check
+    "/app-config",         # App config (version check)
+    "/docs",               # Swagger docs (dev only)
+    "/openapi.json",       # OpenAPI schema
+    "/",                   # Root
+}
+
+# Prefixes that don't require auth (for path params)
+PUBLIC_PREFIXES = [
+    "/docs",
+    "/redoc",
+]
+
 @app.middleware("http")
-async def extract_user_from_token(request: Request, call_next):
-    """Extract username from JWT token before each request (like Flask's @app.before_request)"""
-    request.state.username = "anonymous"
+async def require_auth_middleware(request: Request, call_next):
+    """
+    SECURITY: Require authentication for ALL routes except explicit whitelist.
+    This ensures no route is accidentally left unprotected.
+    """
+    path = request.url.path
+    
+    # Allow public routes
+    if path in PUBLIC_ROUTES:
+        return await call_next(request)
+    
+    # Allow public prefixes
+    for prefix in PUBLIC_PREFIXES:
+        if path.startswith(prefix):
+            return await call_next(request)
+    
+    # All other routes require valid JWT
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authentication required"}
+        )
     
     try:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split()[1]
-            payload = decode_access_token(token)
-            apple_user_id = payload.get("sub")
-            if apple_user_id:
-                request.state.username = apple_user_id
+        token = auth_header.split()[1]
+        payload = decode_access_token(token)
+        apple_user_id = payload.get("sub")
+        if not apple_user_id:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid token"}
+            )
+        request.state.username = apple_user_id
     except:
-        pass
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or expired token"}
+        )
     
     try:
         response = await call_next(request)
