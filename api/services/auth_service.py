@@ -82,6 +82,7 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     print(f"   - identity_token provided: {bool(apple_data.identity_token)}")
     print(f"   - client apple_user_id: {apple_data.apple_user_id[:20] if apple_data.apple_user_id else 'None'}...")
     print(f"   - display_name: {apple_data.display_name}")
+    print(f"   - device_id: {apple_data.device_id}")
     
     # SECURITY: Verify the Apple identity token and extract the REAL user ID
     # This cryptographically verifies the token with Apple's public keys
@@ -103,8 +104,10 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     
     if existing_user:
         print(f"✅ [SIGNUP] Existing user found: user_id={existing_user.id}, display_name={existing_user.display_name}")
-        # Update last login
+        # Update last login and device_id (device may have changed)
         existing_user.last_login = datetime.utcnow()
+        if apple_data.device_id:
+            existing_user.device_id = apple_data.device_id
         db.commit()
         db.refresh(existing_user)
         
@@ -141,12 +144,22 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
             detail=f"Display name '{display_name}' is already taken"
         )
     
+    # Check for existing account on same device (soft warning, not blocking)
+    if apple_data.device_id:
+        existing_device_user = db.query(User).filter(
+            User.device_id == apple_data.device_id,
+            User.is_active == True
+        ).first()
+        if existing_device_user:
+            print(f"⚠️ [SIGNUP] MULTI-ACCOUNT WARNING: Device {apple_data.device_id} already has account user_id={existing_device_user.id} ({existing_device_user.display_name})")
+    
     # Create new user - PostgreSQL will auto-generate the ID
     # SECURITY: Use verified apple_user_id and email, not client-provided values
     user = User(
         email=email,  # Verified from Apple token (or client fallback in dev)
         apple_user_id=apple_user_id,  # Verified from Apple token
         display_name=display_name,
+        device_id=apple_data.device_id,  # For multi-account detection
     )
     
     db.add(user)

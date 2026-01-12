@@ -338,7 +338,8 @@ def create_kingdom(
         original_kingdom_id=city_boundary_osm_id,  # Original city identity
         population=1,
         level=1,
-        treasury_gold=starting_treasury
+        treasury_gold=starting_treasury,
+        townhall_level=1  # All kingdoms start with Town Hall level 1
     )
     
     db.add(kingdom)

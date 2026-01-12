@@ -27,6 +27,7 @@ class AppleSignIn(BaseModel):
     apple_user_id: str  # Required for backwards compatibility / dev mode
     email: Optional[str] = None
     display_name: Optional[str] = None
+    device_id: Optional[str] = None  # iOS identifierForVendor for multi-account detection
     
     @field_validator('display_name')
     @classmethod

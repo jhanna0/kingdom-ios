@@ -391,7 +391,8 @@ def _ensure_kingdom_exists(db: Session, osm_id: str, name: str):
             ruler_id=None,
             population=0,
             level=1,
-            treasury_gold=0
+            treasury_gold=0,
+            townhall_level=1  # All kingdoms start with Town Hall level 1
         )
         db.add(new_kingdom)
         db.commit()

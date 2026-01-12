@@ -2,6 +2,7 @@ import Foundation
 import AuthenticationServices
 import SwiftUI
 import Combine
+import UIKit
 
 class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
@@ -30,13 +31,15 @@ class AuthManager: ObservableObject {
                 let identity_token: String?  // SECURITY: JWT signed by Apple for server verification
                 let email: String?
                 let display_name: String
+                let device_id: String?  // For multi-account detection
             }
             
             let body = AppleSignInRequest(
                 apple_user_id: userID,
                 identity_token: identityToken,
                 email: email,
-                display_name: name ?? "User"
+                display_name: name ?? "User",
+                device_id: UIDevice.current.identifierForVendor?.uuidString
             )
             
             let request = try apiClient.request(endpoint: "/auth/apple-signin", method: "POST", body: body)

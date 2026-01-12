@@ -43,6 +43,7 @@ class Kingdom(Base):
     farm_level = Column(Integer, default=0)  # Speeds up contract completion
     education_level = Column(Integer, default=0)  # Reduces training actions required
     lumbermill_level = Column(Integer, default=0)  # Unlocks wood gathering
+    townhall_level = Column(Integer, default=1)  # Unlocks group hunting - ALL kingdoms start at level 1
     
     # Tax & Income
     tax_rate = Column(Integer, default=10)  # 0-100%
