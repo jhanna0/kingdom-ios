@@ -199,13 +199,16 @@ ACTION_SLOTS = {
     "training": "personal",
     "crafting": "personal",
     
-    # POLITICAL SLOT - Power struggles
+    # POLITICAL SLOT - Power struggles (initiate coups)
     "stage_coup": "political",
-    "view_coup": "political",
     
-    # WARFARE SLOT - External conquest
+    # WARFARE SLOT - External conquest (declare invasions)
     "declare_invasion": "warfare",
-    "view_invasion": "warfare",
+    
+    # ACTIVE BATTLES SLOT - View/participate in battles you've joined (shows ANYWHERE)
+    "view_coup": "active_battles",
+    "view_invasion": "active_battles",
+    "view_battle": "active_battles",
 }
 
 
@@ -282,6 +285,16 @@ SLOT_DEFINITIONS = {
         "display_order": 0,  # Show at top - invasions are important!
         "description": "Declare war and conquer enemy kingdoms",
         "location": "enemy",  # Only shows in enemy territory
+        "content_type": "actions",
+    },
+    "active_battles": {
+        "id": "active_battles",
+        "display_name": "⚔️ Active Battle",
+        "icon": "flame.fill",
+        "color_theme": "buttonDanger",
+        "display_order": -1,  # Show FIRST - battles are urgent!
+        "description": "You have an active battle - fight from anywhere!",
+        "location": "any",  # Shows EVERYWHERE - once joined, fight from anywhere
         "content_type": "actions",
     },
 }

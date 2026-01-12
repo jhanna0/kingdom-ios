@@ -313,9 +313,11 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         # Kingdom is at war if involved in any battle (attacking OR defending)
         is_at_war = (active_battle is not None) or (attacking_battle is not None)
         
-        # For the active_coup_data, prefer showing the battle where this kingdom is the target
-        # (so defenders see the battle in their kingdom, attackers see it in enemy kingdom)
-        battle_to_show = active_battle  # Primary: battles targeting this kingdom
+        # For active_coup_data, show any battle this kingdom is involved in:
+        # - Primary: battles targeting this kingdom (coups or invasions where this is the target)
+        # - Secondary: battles where this kingdom is attacking (invasions launched from here)
+        # This allows players in the attacking kingdom to access the invasion they're participating in
+        battle_to_show = active_battle if active_battle else attacking_battle
         
         if battle_to_show:
             attacker_ids = battle_to_show.get_attacker_ids()

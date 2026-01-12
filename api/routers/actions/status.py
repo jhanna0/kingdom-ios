@@ -600,11 +600,19 @@ def get_action_status(
                     "handler": None,
                 }
     
-    # VIEW BATTLE - Show when there's an active battle in the user's hometown kingdom
+    # VIEW BATTLE - Show when there's an active battle involving the user's hometown kingdom
+    # This includes:
+    # 1. Battles targeting the hometown (coups or invasions where we're defending)
+    # 2. Battles where hometown is attacking (invasions we declared)
     if state.hometown_kingdom_id:
         from db.models import Battle
+        from sqlalchemy import or_
+        
         active_home_battle = db.query(Battle).filter(
-            Battle.kingdom_id == state.hometown_kingdom_id,
+            or_(
+                Battle.kingdom_id == state.hometown_kingdom_id,  # We're being attacked
+                Battle.attacking_from_kingdom_id == state.hometown_kingdom_id  # We're attacking
+            ),
             Battle.resolved_at.is_(None)
         ).first()
         
@@ -619,36 +627,54 @@ def get_action_status(
             elif current_user.id in defender_ids:
                 user_side = "defenders"
             
-            # Check if user is in the correct kingdom
-            is_in_correct_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
+            # Location check for JOINING (not for fighting once joined)
+            # - Coups: must be in the kingdom
+            # - Invasions as attacker: must be at target kingdom to declare, but can fight from home after
+            # - Invasions as defender: must be in home kingdom
+            is_in_home_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
+            is_in_target_kingdom = state.current_kingdom_id == active_home_battle.kingdom_id
+            
+            # For joining: need to be at correct location
+            # For invasions where we're attacking, we join from home (attacking_from)
+            is_our_attack = active_home_battle.attacking_from_kingdom_id == state.hometown_kingdom_id
+            
+            if is_our_attack:
+                # We're the attackers - can join from home kingdom
+                is_in_correct_kingdom_to_join = is_in_home_kingdom
+            else:
+                # We're being attacked (coup or invasion) - join from home kingdom
+                is_in_correct_kingdom_to_join = is_in_home_kingdom
             
             # Can pledge if: in correct kingdom, pledge phase, not already pledged
-            can_pledge = is_in_correct_kingdom and active_home_battle.is_pledge_phase and not user_pledged
+            can_pledge = is_in_correct_kingdom_to_join and active_home_battle.is_pledge_phase and not user_pledged
             
             # Battle-type aware text
             battle_type_name = "Coup" if active_home_battle.is_coup else "Invasion"
             battle_type_lower = battle_type_name.lower()
             
             # Determine display text based on phase, user status, and location
-            if not is_in_correct_kingdom:
-                # User needs to travel home to participate
-                title = "Travel Home to Vote"
-                description = f"Return to your home kingdom to pledge in the {battle_type_lower}"
-            elif active_home_battle.is_pledge_phase:
-                if user_pledged:
+            # KEY: Once pledged, user can fight from ANYWHERE
+            if user_pledged:
+                # Already joined - can participate from anywhere!
+                if active_home_battle.is_pledge_phase:
                     title = f"View {battle_type_name}"
                     description = f"You've pledged as {user_side} - waiting for battle"
                 else:
-                    minutes_left = active_home_battle.time_remaining_seconds // 60
-                    title = f"Vote in {battle_type_name}"
-                    description = f"A {battle_type_lower} is underway! {minutes_left}m to pledge"
-            else:  # battle phase
-                if user_pledged:
-                    title = "View Battle"
-                    description = f"The {battle_type_lower} battle is underway"
-                else:
-                    title = "View Battle"
-                    description = "Battle phase - you didn't pledge"
+                    title = "Fight!"
+                    description = f"The {battle_type_lower} battle is underway - join from anywhere!"
+            elif not is_in_correct_kingdom_to_join:
+                # Not joined and not in correct location
+                title = "Travel Home to Vote"
+                description = f"Return to your home kingdom to pledge in the {battle_type_lower}"
+            elif active_home_battle.is_pledge_phase:
+                # In correct location, can pledge
+                minutes_left = active_home_battle.time_remaining_seconds // 60
+                title = f"Vote in {battle_type_name}"
+                description = f"A {battle_type_lower} is underway! {minutes_left}m to pledge"
+            else:
+                # Battle phase but didn't pledge
+                title = "View Battle"
+                description = "Battle phase - you didn't pledge"
             
             # Rename key to view_battle for unified system, but keep view_coup for backwards compat
             actions["view_coup"] = {
@@ -670,11 +696,12 @@ def get_action_status(
                 "battle_type": active_home_battle.type,  # "coup" or "invasion"
                 "can_pledge": can_pledge,
                 "user_side": user_side,
+                "user_pledged": user_pledged,  # NEW: true if user can fight from anywhere
                 "coup_status": active_home_battle.current_phase,  # Keep for backwards compat
                 "battle_status": active_home_battle.current_phase,  # New field
                 "attacker_count": len(attacker_ids),
                 "defender_count": len(defender_ids),
-                "is_in_correct_kingdom": is_in_correct_kingdom,
+                "is_in_correct_kingdom": is_in_correct_kingdom_to_join or user_pledged,  # Once pledged, always "correct"
             }
     
     # Add slot information to each action
