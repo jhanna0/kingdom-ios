@@ -483,44 +483,42 @@ def resolve_invasion(
         
         message = f"🏴 INVASION SUCCESS! {attacking.name} conquered {target.name}!"
     else:
-        # Attackers lose - HARSH PENALTY (failed military campaign)
-        total_seized_gold = 0
+        # Attackers lose - 50% treasury transfer + 10% gold to defenders
+        
+        # 1. 50% of attacking kingdom's treasury → defending kingdom
+        if attacking and attacking.treasury_gold:
+            treasury_transfer = attacking.treasury_gold // 2
+            attacking.treasury_gold -= treasury_transfer
+            target.treasury_gold = (target.treasury_gold or 0) + treasury_transfer
+        
+        # 2. 10% from each attacker's gold → split among defenders
+        attacker_gold_pool = 0
         for attacker in attackers:
             user = db.query(User).filter(User.id == attacker.player_id).first()
             if user:
                 s = _get_player_state(db, user)
                 
-                # Lose 50% of gold (defeated army, equipment seized)
-                gold_lost = s.gold // 2
-                total_seized_gold += gold_lost
-                s.gold -= gold_lost
+                # Take 10% of gold for defender pool
+                gold_for_defenders = s.gold // 10
+                s.gold -= gold_for_defenders
+                attacker_gold_pool += gold_for_defenders
                 
-                # Major reputation loss (failed invasion)
+                # Reputation loss
                 s.reputation = max(0, s.reputation - 100)
                 
-                # Lose 2 attack power (wounded/defeated)
-                s.attack_power = max(1, s.attack_power - 2)
-                
-                # 48hr attack debuff
-                s.attack_debuff = 2
-                s.debuff_expires_at = datetime.utcnow() + timedelta(hours=48)
+                # Skill loss for failed invasion
+                s.attack_power = max(1, s.attack_power - 1)
+                s.defense_power = max(1, s.defense_power - 1)
+                s.leadership = max(0, s.leadership - 1)
         
-        # Ruler gets all seized gold
-        if target.ruler_id:
-            ruler = db.query(User).filter(User.id == target.ruler_id).first()
-            if ruler:
-                s = _get_player_state(db, ruler)
-                s.gold += total_seized_gold
-                s.reputation += 100
-        
-        # Reward defenders
-        defender_reward = 500  # Flat reward for defending
+        # Distribute attacker gold to defenders
+        gold_per_defender = attacker_gold_pool // len(defenders) if defenders else 0
         for defender in defenders:
             user = db.query(User).filter(User.id == defender.player_id).first()
             if user:
                 s = _get_player_state(db, user)
-                s.gold += defender_reward
-                s.reputation += 50
+                s.gold += gold_per_defender
+                s.reputation += 100
         
         message = f"🛡️ INVASION FAILED! {target.name} defended successfully!"
     

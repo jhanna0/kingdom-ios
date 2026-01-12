@@ -32,6 +32,7 @@ from systems.battle.config import (
     COUP_KINGDOM_COOLDOWN_DAYS,
     INVASION_KINGDOM_COOLDOWN_DAYS,
     INVASION_AFTER_COUP_COOLDOWN_DAYS,
+    BATTLE_BUFFER_DAYS,
     BATTLE_ACTION_COOLDOWN_MINUTES,
     INJURY_DURATION_MINUTES,
     # Territories
@@ -54,6 +55,9 @@ from systems.battle.config import (
     LOSER_ATTACK_LOSS,
     LOSER_DEFENSE_LOSS,
     LOSER_LEADERSHIP_LOSS,
+    # Invasion-specific
+    INVASION_TREASURY_TRANSFER_PERCENT,
+    INVASION_ATTACKER_GOLD_TO_DEFENDERS_PERCENT,
 )
 from schemas.battle import (
     CoupInitiateRequest,
@@ -185,8 +189,8 @@ def _check_coup_player_cooldown(db: Session, user_id: int) -> Tuple[bool, str]:
 
 
 def _check_kingdom_coup_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, str]:
-    """Check if kingdom has had a recent coup"""
-    # Check for active battle (coup or invasion)
+    """Check if kingdom has had a recent coup or is involved in any battle"""
+    # Check for active battle (coup or invasion) targeting this kingdom
     active = db.query(Battle).filter(
         Battle.kingdom_id == kingdom_id,
         Battle.resolved_at.is_(None)
@@ -194,26 +198,60 @@ def _check_kingdom_coup_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, st
     
     if active:
         return False, f"A {'coup' if active.is_coup else 'invasion'} is already in progress in this kingdom."
+    
+    # Check if this kingdom is currently ATTACKING another kingdom
+    active_as_attacker = db.query(Battle).filter(
+        Battle.attacking_from_kingdom_id == kingdom_id,
+        Battle.resolved_at.is_(None)
+    ).first()
+    
+    if active_as_attacker:
+        return False, "This kingdom is currently invading another kingdom."
     
     # Check for recent resolved coup
     recent_coup = db.query(Battle).filter(
         Battle.kingdom_id == kingdom_id,
         Battle.type == BattleType.COUP.value,
         Battle.resolved_at.isnot(None),
-        Battle.resolved_at >= datetime.utcnow() - timedelta(days=COUP_KINGDOM_COOLDOWN_DAYS)
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
     ).first()
     
     if recent_coup:
         days_since = (datetime.utcnow() - recent_coup.resolved_at).days
-        days_remaining = COUP_KINGDOM_COOLDOWN_DAYS - days_since
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
         return False, f"This kingdom had a coup recently. Wait {days_remaining} more days."
+    
+    # Check for recent resolved invasion (as target)
+    recent_invasion = db.query(Battle).filter(
+        Battle.kingdom_id == kingdom_id,
+        Battle.type == BattleType.INVASION.value,
+        Battle.resolved_at.isnot(None),
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
+    ).first()
+    
+    if recent_invasion:
+        days_since = (datetime.utcnow() - recent_invasion.resolved_at).days
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
+        return False, f"This kingdom was invaded recently. Wait {days_remaining} more days."
+    
+    # Check for recent resolved invasion (as attacker)
+    recent_as_attacker = db.query(Battle).filter(
+        Battle.attacking_from_kingdom_id == kingdom_id,
+        Battle.resolved_at.isnot(None),
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
+    ).first()
+    
+    if recent_as_attacker:
+        days_since = (datetime.utcnow() - recent_as_attacker.resolved_at).days
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
+        return False, f"This kingdom recently invaded another kingdom. Wait {days_remaining} more days."
     
     return True, ""
 
 
 def _check_kingdom_invasion_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, str]:
-    """Check if kingdom can be invaded (no active battle, 30 day cooldown, no recent coup)"""
-    # Check for active battle
+    """Check if kingdom can be invaded (no active battle, 7 day buffer for any battle involvement)"""
+    # Check for active battle targeting this kingdom
     active = db.query(Battle).filter(
         Battle.kingdom_id == kingdom_id,
         Battle.resolved_at.is_(None)
@@ -222,31 +260,52 @@ def _check_kingdom_invasion_cooldown(db: Session, kingdom_id: str) -> Tuple[bool
     if active:
         return False, f"A {'coup' if active.is_coup else 'invasion'} is already in progress in this kingdom."
     
-    # Check for recent invasion
+    # Check if this kingdom is currently ATTACKING another kingdom
+    active_as_attacker = db.query(Battle).filter(
+        Battle.attacking_from_kingdom_id == kingdom_id,
+        Battle.resolved_at.is_(None)
+    ).first()
+    
+    if active_as_attacker:
+        return False, "This kingdom is currently invading another kingdom."
+    
+    # Check for recent invasion (as target) - 7 day buffer
     recent_invasion = db.query(Battle).filter(
         Battle.kingdom_id == kingdom_id,
         Battle.type == BattleType.INVASION.value,
         Battle.resolved_at.isnot(None),
-        Battle.resolved_at >= datetime.utcnow() - timedelta(days=INVASION_KINGDOM_COOLDOWN_DAYS)
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
     ).first()
     
     if recent_invasion:
         days_since = (datetime.utcnow() - recent_invasion.resolved_at).days
-        days_remaining = INVASION_KINGDOM_COOLDOWN_DAYS - days_since
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
         return False, f"This kingdom was invaded recently. Wait {days_remaining} more days."
     
-    # Check for recent coup
+    # Check for recent coup - 7 day buffer
     recent_coup = db.query(Battle).filter(
         Battle.kingdom_id == kingdom_id,
         Battle.type == BattleType.COUP.value,
         Battle.resolved_at.isnot(None),
-        Battle.resolved_at >= datetime.utcnow() - timedelta(days=INVASION_AFTER_COUP_COOLDOWN_DAYS)
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
     ).first()
     
     if recent_coup:
         days_since = (datetime.utcnow() - recent_coup.resolved_at).days
-        days_remaining = INVASION_AFTER_COUP_COOLDOWN_DAYS - days_since
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
         return False, f"This kingdom had a coup recently. Wait {days_remaining} more days before invading."
+    
+    # Check for recent invasion (as attacker) - 7 day buffer
+    recent_as_attacker = db.query(Battle).filter(
+        Battle.attacking_from_kingdom_id == kingdom_id,
+        Battle.resolved_at.isnot(None),
+        Battle.resolved_at >= datetime.utcnow() - timedelta(days=BATTLE_BUFFER_DAYS)
+    ).first()
+    
+    if recent_as_attacker:
+        days_since = (datetime.utcnow() - recent_as_attacker.resolved_at).days
+        days_remaining = BATTLE_BUFFER_DAYS - days_since
+        return False, f"This kingdom recently invaded another kingdom. Wait {days_remaining} more days."
     
     return True, ""
 
@@ -479,59 +538,198 @@ def _apply_battle_outcome(
     defenders: List[BattleParticipantSchema],
     attacker_victory: bool
 ) -> dict:
-    """Apply rewards and penalties based on battle outcome."""
+    """
+    Apply rewards and penalties based on battle outcome.
+    
+    COUP penalties (loser side):
+    - 50% gold loss (redistributed to winners)
+    - 100 reputation loss
+    - NO skill loss
+    
+    INVASION penalties (attackers lose):
+    - 50% of attacking kingdom's treasury → defending kingdom
+    - 10% from each attacker's gold → split among defenders
+    - 100 reputation loss
+    - Skill loss (attack, defense, leadership -1 each)
+    """
     winners = attackers if attacker_victory else defenders
     losers = defenders if attacker_victory else attackers
     
-    # Collect gold from losers
     gold_pool = 0
-    for loser in losers:
-        user = db.query(User).filter(User.id == loser.player_id).first()
-        if not user:
-            continue
-        
-        state = _get_player_state(db, user)
-        
-        gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
-        state.gold -= gold_taken
-        gold_pool += gold_taken
-        
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        if user_kingdom:
-            user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
-        
-        state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
-        state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
-        state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
     
-    # Distribute gold to winners
-    gold_per_winner = gold_pool // len(winners) if winners else 0
-    battle.gold_per_winner = gold_per_winner
+    # Handle based on battle type and outcome
+    if battle.is_coup:
+        # COUP: Losers lose 50% gold + rep, NO skill loss
+        for loser in losers:
+            user = db.query(User).filter(User.id == loser.player_id).first()
+            if not user:
+                continue
+            
+            state = _get_player_state(db, user)
+            
+            # Take 50% gold
+            gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
+            state.gold -= gold_taken
+            gold_pool += gold_taken
+            
+            # Lose reputation
+            user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == user.id,
+                UserKingdom.kingdom_id == kingdom.id
+            ).first()
+            if user_kingdom:
+                user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+            
+            # NO skill loss for coup failures
+        
+        # Distribute gold to winners
+        gold_per_winner = gold_pool // len(winners) if winners else 0
+        battle.gold_per_winner = gold_per_winner
+        
+        for winner in winners:
+            user = db.query(User).filter(User.id == winner.player_id).first()
+            if not user:
+                continue
+            
+            state = _get_player_state(db, user)
+            state.gold += gold_per_winner
+            
+            user_kingdom = db.query(UserKingdom).filter(
+                UserKingdom.user_id == user.id,
+                UserKingdom.kingdom_id == kingdom.id
+            ).first()
+            if not user_kingdom:
+                user_kingdom = UserKingdom(
+                    user_id=user.id,
+                    kingdom_id=kingdom.id,
+                    local_reputation=WINNER_REP_GAIN
+                )
+                db.add(user_kingdom)
+            else:
+                user_kingdom.local_reputation += WINNER_REP_GAIN
     
-    for winner in winners:
-        user = db.query(User).filter(User.id == winner.player_id).first()
-        if not user:
-            continue
+    elif battle.is_invasion:
+        if attacker_victory:
+            # INVASION SUCCESS: Attackers won, defenders lose
+            for loser in losers:
+                user = db.query(User).filter(User.id == loser.player_id).first()
+                if not user:
+                    continue
+                
+                state = _get_player_state(db, user)
+                
+                # Take 50% gold
+                gold_taken = int(state.gold * LOSER_GOLD_PERCENT)
+                state.gold -= gold_taken
+                gold_pool += gold_taken
+                
+                # Lose reputation
+                user_kingdom = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                if user_kingdom:
+                    user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+                
+                # Skill loss for invasion defenders who lose
+                state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
+                state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
+                state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
+            
+            # Distribute gold to winners
+            gold_per_winner = gold_pool // len(winners) if winners else 0
+            battle.gold_per_winner = gold_per_winner
+            
+            for winner in winners:
+                user = db.query(User).filter(User.id == winner.player_id).first()
+                if not user:
+                    continue
+                
+                state = _get_player_state(db, user)
+                state.gold += gold_per_winner
+                
+                user_kingdom = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                if not user_kingdom:
+                    user_kingdom = UserKingdom(
+                        user_id=user.id,
+                        kingdom_id=kingdom.id,
+                        local_reputation=WINNER_REP_GAIN
+                    )
+                    db.add(user_kingdom)
+                else:
+                    user_kingdom.local_reputation += WINNER_REP_GAIN
         
-        state = _get_player_state(db, user)
-        state.gold += gold_per_winner
-        
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        if not user_kingdom:
-            user_kingdom = UserKingdom(
-                user_id=user.id,
-                kingdom_id=kingdom.id,
-                local_reputation=WINNER_REP_GAIN
-            )
-            db.add(user_kingdom)
         else:
-            user_kingdom.local_reputation += WINNER_REP_GAIN
+            # INVASION FAILED: Defenders won, attackers lose
+            # Special penalties for failed invasion
+            
+            # 1. 50% of attacking kingdom's treasury → defending kingdom
+            if battle.attacking_from_kingdom_id:
+                attacking_kingdom = db.query(Kingdom).filter(
+                    Kingdom.id == battle.attacking_from_kingdom_id
+                ).first()
+                if attacking_kingdom and attacking_kingdom.treasury_gold:
+                    treasury_transfer = int(attacking_kingdom.treasury_gold * INVASION_TREASURY_TRANSFER_PERCENT)
+                    attacking_kingdom.treasury_gold -= treasury_transfer
+                    kingdom.treasury_gold = (kingdom.treasury_gold or 0) + treasury_transfer
+                    battle.loot_distributed = treasury_transfer
+            
+            # 2. 10% from each attacker's gold → split among defenders
+            attacker_gold_pool = 0
+            for attacker in attackers:
+                user = db.query(User).filter(User.id == attacker.player_id).first()
+                if not user:
+                    continue
+                
+                state = _get_player_state(db, user)
+                
+                # Take 10% of attacker's gold for defender pool
+                gold_for_defenders = int(state.gold * INVASION_ATTACKER_GOLD_TO_DEFENDERS_PERCENT)
+                state.gold -= gold_for_defenders
+                attacker_gold_pool += gold_for_defenders
+                
+                # Lose reputation
+                user_kingdom = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                if user_kingdom:
+                    user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+                
+                # Skill loss for failed invasion attackers
+                state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
+                state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
+                state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
+            
+            # Distribute attacker gold to defenders
+            gold_per_defender = attacker_gold_pool // len(defenders) if defenders else 0
+            battle.gold_per_winner = gold_per_defender
+            
+            for defender in defenders:
+                user = db.query(User).filter(User.id == defender.player_id).first()
+                if not user:
+                    continue
+                
+                state = _get_player_state(db, user)
+                state.gold += gold_per_defender
+                
+                # Winners gain reputation
+                user_kingdom = db.query(UserKingdom).filter(
+                    UserKingdom.user_id == user.id,
+                    UserKingdom.kingdom_id == kingdom.id
+                ).first()
+                if not user_kingdom:
+                    user_kingdom = UserKingdom(
+                        user_id=user.id,
+                        kingdom_id=kingdom.id,
+                        local_reputation=WINNER_REP_GAIN
+                    )
+                    db.add(user_kingdom)
+                else:
+                    user_kingdom.local_reputation += WINNER_REP_GAIN
     
     # Handle ruler change if attackers won
     old_ruler_id = kingdom.ruler_id

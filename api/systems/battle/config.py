@@ -184,6 +184,9 @@ COUP_KINGDOM_COOLDOWN_DAYS = 7       # Days between coups in same kingdom
 INVASION_KINGDOM_COOLDOWN_DAYS = 30  # Days before a kingdom can be invaded again
 INVASION_AFTER_COUP_COOLDOWN_DAYS = 7  # Days after a coup before kingdom can be invaded
 
+# Universal battle buffer - kingdoms involved in ANY battle get 7 day protection
+BATTLE_BUFFER_DAYS = 7  # Applies to kingdoms under coup, invasion, OR actively invading
+
 # ============================================================
 # INVASION REQUIREMENTS
 # ============================================================
@@ -206,9 +209,16 @@ INVASION_AFTER_COUP_COOLDOWN_DAYS = 7  # Days after a coup before kingdom can be
 LOSER_GOLD_PERCENT = 0.50  # Losers lose 50% of their gold
 WINNER_REP_GAIN = 100
 LOSER_REP_LOSS = 100
+
+# Skill penalties - ONLY for invasion losses, NOT coups
+# Coup losers only lose gold and rep (no skill loss)
 LOSER_ATTACK_LOSS = 1
 LOSER_DEFENSE_LOSS = 1
 LOSER_LEADERSHIP_LOSS = 1
+
+# Invasion-specific penalties (attackers fail)
+INVASION_TREASURY_TRANSFER_PERCENT = 0.50  # 50% of attacking kingdom treasury → defending kingdom
+INVASION_ATTACKER_GOLD_TO_DEFENDERS_PERCENT = 0.10  # 10% from each attacker's gold → split among defenders
 
 # ============================================================
 # HELPER FUNCTIONS

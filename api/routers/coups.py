@@ -248,7 +248,7 @@ def _apply_coup_outcome(
     Losers:
     - Lose 50% gold (pooled and given to winners)
     - Lose 100 reputation
-    - Lose 1 attack, 1 defense, 1 leadership
+    - NO skill loss (coups don't cause skill loss)
     
     Winners:
     - Split loser gold pool evenly
@@ -263,9 +263,6 @@ def _apply_coup_outcome(
         LOSER_GOLD_PERCENT,
         WINNER_REP_GAIN,
         LOSER_REP_LOSS,
-        LOSER_ATTACK_LOSS,
-        LOSER_DEFENSE_LOSS,
-        LOSER_LEADERSHIP_LOSS,
     )
     
     winners = attackers if attacker_victory else defenders
@@ -293,10 +290,7 @@ def _apply_coup_outcome(
         if user_kingdom:
             user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
         
-        # Lose skills
-        state.attack_power = max(1, state.attack_power - LOSER_ATTACK_LOSS)
-        state.defense_power = max(1, state.defense_power - LOSER_DEFENSE_LOSS)
-        state.leadership = max(0, state.leadership - LOSER_LEADERSHIP_LOSS)
+        # NO skill loss for coups - only gold and rep
     
     # Distribute gold to winners
     gold_per_winner = gold_pool // len(winners) if winners else 0
