@@ -108,7 +108,13 @@ struct ActionStatus: Codable {
     let endpoint: String?  // FULLY DYNAMIC: Backend provides complete endpoint with all params
     let slot: String?  // NEW: Which slot this action belongs to (building, economy, security, etc)
     
-    // Coup-specific fields (for view_coup action)
+    // DYNAMIC HANDLER - Backend tells frontend HOW to handle this action
+    let handler: String?  // "initiate_battle", "view_battle", "generic" (default)
+    let battleId: Int?    // For view_battle handler
+    let kingdomId: String?  // Target kingdom for battle actions
+    let kingdomName: String?  // For display
+    
+    // Legacy coup-specific fields (kept for backwards compat, use handler instead)
     let coupId: Int?
     let canPledge: Bool?
     let userSide: String?
@@ -136,7 +142,12 @@ struct ActionStatus: Codable {
         case displayOrder = "display_order"
         case endpoint
         case slot
-        // Coup fields
+        // Dynamic handler fields
+        case handler
+        case battleId = "battle_id"
+        case kingdomId = "kingdom_id"
+        case kingdomName = "kingdom_name"
+        // Legacy coup fields
         case coupId = "coup_id"
         case canPledge = "can_pledge"
         case userSide = "user_side"

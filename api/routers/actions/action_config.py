@@ -156,6 +156,22 @@ ACTION_TYPES = {
             "location": "not_ruler",
             "requirement_text": "Leadership T3+, 500 kingdom rep, not the ruler"
         }
+    },
+    "declare_invasion": {
+        "display_name": "Declare Invasion",
+        "icon": "flag.2.crossed.fill",
+        "description": "Declare war on this kingdom and conquer it",
+        "category": "warfare",
+        "cooldown_minutes": 0,  # No cooldown - but has other restrictions
+        "theme_color": "buttonDanger",
+        "display_order": 1,
+        "endpoint": "/battles/invasion/declare",
+        "always_unlocked": False,
+        "requirements": {
+            "location": "enemy_kingdom",
+            "must_be_ruler": True,
+            "requirement_text": "Must rule a kingdom to invade. Must be at target kingdom."
+        }
     }
 }
 
@@ -186,6 +202,10 @@ ACTION_SLOTS = {
     # POLITICAL SLOT - Power struggles
     "stage_coup": "political",
     "view_coup": "political",
+    
+    # WARFARE SLOT - External conquest
+    "declare_invasion": "warfare",
+    "view_invasion": "warfare",
 }
 
 
@@ -252,6 +272,16 @@ SLOT_DEFINITIONS = {
         "display_order": 0,  # Show at top - coups are important!
         "description": "Seize power through political action",
         "location": "home",  # Shows in "home" but action only added when not ruler
+        "content_type": "actions",
+    },
+    "warfare": {
+        "id": "warfare",
+        "display_name": "⚔️ Warfare",
+        "icon": "flag.2.crossed.fill",
+        "color_theme": "buttonDanger",
+        "display_order": 0,  # Show at top - invasions are important!
+        "description": "Declare war and conquer enemy kingdoms",
+        "location": "enemy",  # Only shows in enemy territory
         "content_type": "actions",
     },
 }

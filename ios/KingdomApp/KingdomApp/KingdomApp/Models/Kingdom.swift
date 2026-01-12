@@ -81,7 +81,10 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Coup eligibility (from backend)
     var canStageCoup: Bool  // True if current user can initiate a coup
     var coupIneligibilityReason: String?  // Why user can't stage coup (e.g., "Need T3 leadership")
-    var activeCoup: ActiveCoupData?  // Active coup in this kingdom (if any)
+    
+    // War state - Backend is source of truth!
+    var isAtWar: Bool  // True if there's an active battle (coup or invasion)
+    var activeCoup: ActiveCoupData?  // Active battle in this kingdom (if any)
 
     // Loading state
     var isCurrentCity: Bool  // True if user is currently inside this city (from API)
@@ -159,7 +162,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false, canStageCoup: Bool = false, coupIneligibilityReason: String? = nil) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false, canStageCoup: Bool = false, coupIneligibilityReason: String? = nil, isAtWar: Bool = false) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -178,6 +181,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.isEnemy = isEnemy
         self.canStageCoup = canStageCoup
         self.coupIneligibilityReason = coupIneligibilityReason
+        self.isAtWar = isAtWar  // Backend is source of truth!
         self.isCurrentCity = false  // Set by CityAPI after fetch
         self.hasBoundaryCached = true  // Assume true, CityAPI sets false if needed
         
@@ -191,7 +195,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.taxRate = 10
         self.travelFee = 10
         
-        // Coup data (populated from API)
+        // Battle data (populated from API)
         self.activeCoup = nil
         
         // Local-only defaults (not game-critical)

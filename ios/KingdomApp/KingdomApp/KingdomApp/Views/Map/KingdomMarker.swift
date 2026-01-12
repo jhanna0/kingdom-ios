@@ -20,7 +20,7 @@ struct KingdomMarker: View {
             isPlayer: isHomeKingdom,
             isEnemy: kingdom.isEnemy,
             isAllied: kingdom.isAllied,
-            isAtWar: isHomeKingdom && kingdom.activeCoup != nil
+            isAtWar: isHomeKingdom && kingdom.isAtWar
         )
     }
     
@@ -70,9 +70,9 @@ struct KingdomMarker: View {
                 }
                 .offset(x: 22, y: 22)
                 
-                // Status badge: Coup icon if active coup, Crown if claimed
-                if kingdom.activeCoup != nil {
-                    // Active coup - show crossed swords
+                // Status badge: War icon if at war, Crown if claimed
+                if kingdom.isAtWar {
+                    // At war - show crossed swords
                     ZStack {
                         Circle()
                             .fill(Color.black)

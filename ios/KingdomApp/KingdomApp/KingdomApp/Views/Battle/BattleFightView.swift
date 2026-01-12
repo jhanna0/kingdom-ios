@@ -30,8 +30,8 @@ struct BattleFightView: View {
     }
     
     // Battle-type aware labels
-    private var attackerLabel: String { battle.attackerLabel }
-    private var defenderLabel: String { battle.defenderLabel }
+    private var attackerLabel: String { battle.attackerLabel ?? "ATTACKERS" }
+    private var defenderLabel: String { battle.defenderLabel ?? "DEFENDERS" }
     
     private var sideColor: Color {
         isUserAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue

@@ -132,7 +132,10 @@ class CityAPI {
                 )
             }
             
-            // Active coup data (if any)
+            // War state - Backend is source of truth!
+            kingdom.isAtWar = kingdomData.is_at_war ?? false
+            
+            // Active battle data (if any)
             kingdom.activeCoup = kingdomData.active_coup
             
             // DYNAMIC BUILDINGS - Iterate buildings array from backend

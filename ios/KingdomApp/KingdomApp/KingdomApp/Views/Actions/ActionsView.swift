@@ -33,10 +33,10 @@ struct ActionsView: View {
     @State private var isInEnemyKingdom: Bool = false
     @State private var cachedKingdomId: String?
     
-    // Coup state
-    @State private var showCoupView = false
-    @State private var isInitiatingCoup = false
-    @State private var initiatedCoupId: Int?
+    // Battle state (dynamic - backend tells us what to do)
+    @State private var showBattleView = false
+    @State private var isInitiatingBattle = false
+    @State private var initiatedBattleId: Int?
     
     var currentKingdom: Kingdom? {
         guard let currentKingdomId = viewModel.player.currentKingdom else {
@@ -106,10 +106,10 @@ struct ActionsView: View {
                 .transition(.opacity)
             }
         }
-        .fullScreenCover(isPresented: $showCoupView) {
-            if let battleId = initiatedCoupId {
+        .fullScreenCover(isPresented: $showBattleView) {
+            if let battleId = initiatedBattleId {
                 BattleView(battleId: battleId, onDismiss: {
-                    showCoupView = false
+                    showBattleView = false
                     // Refresh action status after battle view closes
                     Task {
                         await loadActionStatus(force: true)
@@ -498,8 +498,9 @@ struct ActionsView: View {
         if action.unlocked == true {
             let actionCooldown = getSlotCooldown(for: action, status: status)
             
-            // Special handling for stage_coup - needs to open CoupView after initiating
-            if action.actionType == "stage_coup" {
+            // Check action handler type from backend - NO HARDCODED ACTION TYPES!
+            if action.handler == "initiate_battle" {
+                // Actions that POST to create a battle and open BattleView
                 ActionCard(
                     title: action.title ?? key.capitalized,
                     icon: action.icon ?? "bolt.fill",
@@ -507,18 +508,18 @@ struct ActionsView: View {
                     status: action,
                     fetchedAt: statusFetchedAt ?? Date(),
                     currentTime: currentTime,
-                    isEnabled: !isInitiatingCoup,
+                    isEnabled: !isInitiatingBattle,
                     activeCount: nil,
                     globalCooldownActive: false,
                     blockingAction: nil,
                     globalCooldownSecondsRemaining: 0,
-                    onAction: { initiateCoup(action: action) }
+                    onAction: { initiateBattle(action: action) }
                 )
             }
-            // Special handling for view_coup - opens existing coup directly
-            else if action.actionType == "view_coup" {
+            else if action.handler == "view_battle" {
+                // Actions that open an existing battle directly
                 ActionCard(
-                    title: action.title ?? "View Coup",
+                    title: action.title ?? "View Battle",
                     icon: action.icon ?? "bolt.fill",
                     description: action.description ?? "",
                     status: action,
@@ -529,7 +530,7 @@ struct ActionsView: View {
                     globalCooldownActive: false,
                     blockingAction: nil,
                     globalCooldownSecondsRemaining: 0,
-                    onAction: { openExistingCoup(coupId: action.coupId) }
+                    onAction: { openBattle(battleId: action.battleId) }
                 )
             }
             else {
@@ -558,46 +559,53 @@ struct ActionsView: View {
         }
     }
     
-    private func openExistingCoup(coupId: Int?) {
-        guard let id = coupId else {
-            errorMessage = "Coup not found"
+    private func openBattle(battleId: Int?) {
+        guard let id = battleId else {
+            errorMessage = "Battle not found"
             showError = true
             return
         }
-        initiatedCoupId = id
-        showCoupView = true
+        initiatedBattleId = id
+        showBattleView = true
     }
     
-    // MARK: - Coup Actions
+    // MARK: - Battle Actions (Dynamic - backend provides endpoint)
     
-    private func initiateCoup(action: ActionStatus) {
-        guard let kingdomId = currentKingdom?.id else {
+    /// Initiate a battle (coup or invasion) - backend tells us the endpoint
+    private func initiateBattle(action: ActionStatus) {
+        guard let endpoint = action.endpoint else {
+            errorMessage = "No endpoint provided"
+            showError = true
+            return
+        }
+        
+        guard let kingdomId = action.kingdomId ?? currentKingdom?.id else {
             errorMessage = "No kingdom selected"
             showError = true
             return
         }
         
-        isInitiatingCoup = true
+        isInitiatingBattle = true
         
         Task {
             do {
                 let request = try APIClient.shared.request(
-                    endpoint: "/battles/coup/initiate",
+                    endpoint: endpoint,
                     method: "POST",
-                    body: ["kingdom_id": kingdomId]
+                    body: ["target_kingdom_id": kingdomId]
                 )
-                let response: CoupInitiateResponse = try await APIClient.shared.execute(request)
+                let response: BattleInitiateResponse = try await APIClient.shared.execute(request)
                 
                 await MainActor.run {
-                    initiatedCoupId = response.coupId
-                    showCoupView = true
-                    isInitiatingCoup = false
+                    initiatedBattleId = response.battleId
+                    showBattleView = true
+                    isInitiatingBattle = false
                 }
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     showError = true
-                    isInitiatingCoup = false
+                    isInitiatingBattle = false
                 }
             }
         }

@@ -8,10 +8,10 @@ struct BattlePledgeView: View {
     let onDismiss: () -> Void
     let onPledge: (String) -> Void
     
-    // Battle-type aware labels
-    private var attackerTitle: String { battle.isCoup ? "ATTACKERS" : "INVADERS" }
+    // Battle-type aware labels from backend
+    private var attackerTitle: String { battle.attackerLabel ?? "ATTACKERS" }
     private var attackerSubtitle: String { battle.isCoup ? "Join the revolt" : "Join the invasion" }
-    private var defenderTitle: String { battle.isCoup ? "DEFENDERS" : "DEFENDERS" }
+    private var defenderTitle: String { battle.defenderLabel ?? "DEFENDERS" }
     private var defenderSubtitle: String { battle.isCoup ? "Protect the crown" : "Defend the realm" }
     
     @State private var selectedSide: String?
@@ -82,17 +82,48 @@ struct BattlePledgeView: View {
                     .tracking(1)
             }
             
-            // Steps
-            VStack(alignment: .leading, spacing: 6) {
-                howItWorksStep(number: "1", text: "Pledge your allegiance (12h)")
-                howItWorksStep(number: "2", text: "Sides fight each other for contorl (12h)")
-                howItWorksStep(number: "3", text: "Winning side claims the throne- and the spoils of war")
-                // TODO: Add consequences section (losers lose gold/skills)
+            // Steps from backend
+            if let steps = battle.howItWorks, !steps.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(steps) { step in
+                        howItWorksStep(number: step.number, text: step.text)
+                    }
+                }
+            }
+            
+            // Consequences from backend
+            if let consequences = battle.consequences, !consequences.isEmpty {
+                consequencesSection(consequences: consequences)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    private func consequencesSection(consequences: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Rectangle()
+                .fill(KingdomTheme.Colors.inkLight.opacity(0.3))
+                .frame(height: 1)
+                .padding(.vertical, 4)
+            
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                Text("CONSEQUENCES")
+                    .font(FontStyles.labelBadge)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .tracking(0.5)
+            }
+            
+            ForEach(consequences, id: \.self) { consequence in
+                Text(consequence)
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
     }
     
     private func howItWorksStep(number: String, text: String) -> some View {
@@ -161,7 +192,7 @@ struct BattlePledgeView: View {
     private func pledgedStatus(side: String) -> some View {
         let isAttacker = side.lowercased().contains("attack")
         let tint = isAttacker ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.royalBlue
-        let label = isAttacker ? "ATTACKERS" : "DEFENDERS"
+        let label = isAttacker ? attackerTitle : defenderTitle
         let icon = isAttacker ? "figure.fencing" : "shield.fill"
         
         return HStack(spacing: 12) {
@@ -230,14 +261,14 @@ struct BattlePledgeView: View {
             ScrollView {
                 VStack(spacing: KingdomTheme.Spacing.large) {
                     participantList(
-                        title: battle.attackerLabel,
+                        title: battle.attackerLabel ?? "ATTACKERS",
                         icon: "figure.fencing",
                         color: KingdomTheme.Colors.buttonDanger,
                         participants: battle.attackers
                     )
                     
                     participantList(
-                        title: battle.defenderLabel,
+                        title: battle.defenderLabel ?? "DEFENDERS",
                         icon: "shield.fill",
                         color: KingdomTheme.Colors.royalBlue,
                         participants: battle.defenders

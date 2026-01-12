@@ -77,7 +77,7 @@ class RollResult(BaseModel):
 
 class CoupInitiateRequest(BaseModel):
     """Request to initiate a coup"""
-    kingdom_id: str = Field(..., description="Kingdom where coup is being initiated")
+    target_kingdom_id: str = Field(..., description="Kingdom where coup is being initiated")
 
 
 class InvasionDeclareRequest(BaseModel):
@@ -199,6 +199,12 @@ class FightResolveResponse(BaseModel):
 # BATTLE EVENT RESPONSE (main detail response)
 # ============================================================
 
+class HowItWorksStep(BaseModel):
+    """A single step in how the battle works"""
+    number: str
+    text: str
+
+
 class BattleEventResponse(BaseModel):
     """Full battle event details"""
     id: int
@@ -254,6 +260,12 @@ class BattleEventResponse(BaseModel):
     attacker_victory: Optional[bool] = None
     resolved_at: Optional[datetime] = None
     winner_side: Optional[str] = None
+    
+    # UI Content - populated by backend based on battle type
+    how_it_works: List[HowItWorksStep] = []
+    consequences: List[str] = []
+    attacker_label: str = "ATTACKERS"
+    defender_label: str = "DEFENDERS"
     
     class Config:
         from_attributes = True

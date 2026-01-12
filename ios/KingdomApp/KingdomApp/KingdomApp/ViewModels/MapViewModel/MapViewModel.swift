@@ -122,7 +122,7 @@ class MapViewModel: ObservableObject {
         print("   - player.hometownKingdomId: \(player.hometownKingdomId ?? "nil")")
         print("   - kingdoms count: \(kingdoms.count)")
         for k in kingdoms {
-            print("   - Kingdom: \(k.name) (id=\(k.id)), activeCoup: \(k.activeCoup != nil)")
+            print("   - Kingdom: \(k.name) (id=\(k.id)), isAtWar: \(k.isAtWar), activeCoup: \(k.activeCoup != nil)")
         }
         
         // Find home kingdom and check for active coup
@@ -161,36 +161,46 @@ class MapViewModel: ObservableObject {
         updateWarState()
     }
     
-    /// Check if player is in a war state (active coup or invasion in their kingdom)
-    /// Updates music accordingly
+    /// Check if player is in a war state (active battle in any relevant kingdom)
+    /// Updates music accordingly - Backend is source of truth via kingdom.isAtWar!
     func updateWarState() {
         let wasInWar = isInWarState
         
-        // Check if there's an active coup in home kingdom
-        let hasCoupInHomeKingdom = activeCoupInHomeKingdom != nil
+        // Check if HOME kingdom is at war
+        let homeKingdomAtWar: Bool
+        if let homeKingdomId = player.hometownKingdomId,
+           let homeKingdom = kingdoms.first(where: { $0.id == homeKingdomId }) {
+            homeKingdomAtWar = homeKingdom.isAtWar
+        } else {
+            homeKingdomAtWar = false
+        }
         
-        // Check if any of player's ruled kingdoms have active coups
+        // Check if CURRENT kingdom is at war (where player is right now)
+        let currentKingdomAtWar: Bool
+        if let currentKingdomId = player.currentKingdom,
+           let currentKingdom = kingdoms.first(where: { $0.id == currentKingdomId }) {
+            currentKingdomAtWar = currentKingdom.isAtWar
+        } else {
+            currentKingdomAtWar = false
+        }
+        
+        // Check if any RULED kingdoms are at war
         let ruledKingdoms = kingdoms.filter { $0.rulerId == player.playerId }
-        let hasCoupInRuledKingdoms = ruledKingdoms.contains { $0.activeCoup != nil }
+        let ruledKingdomsAtWar = ruledKingdoms.contains { $0.isAtWar }
         
-        // TODO: Check for active invasions when invasion system is implemented
-        // Will check if:
-        // - Any ruled kingdom is being invaded (under attack)
-        // - Any ruled kingdom is invading another kingdom (attacking)
-        let hasInvasion = false  // Placeholder
+        // Also check activeCoupInHomeKingdom for backwards compat (from /notifications/updates)
+        let hasActiveCoup = activeCoupInHomeKingdom != nil
         
-        isInWarState = hasCoupInHomeKingdom || hasCoupInRuledKingdoms || hasInvasion
+        isInWarState = homeKingdomAtWar || currentKingdomAtWar || ruledKingdomsAtWar || hasActiveCoup
         
         // Update music if war state changed
         if isInWarState != wasInWar {
             if isInWarState {
                 print("🎵 ⚔️ WAR STATE DETECTED - Switching to war music")
-                if hasCoupInHomeKingdom {
-                    print("   - Coup in home kingdom")
-                }
-                if hasCoupInRuledKingdoms {
-                    print("   - Coup in ruled kingdom(s)")
-                }
+                if homeKingdomAtWar { print("   - Home kingdom is at war") }
+                if currentKingdomAtWar { print("   - Current kingdom is at war") }
+                if ruledKingdomsAtWar { print("   - Ruled kingdom(s) at war") }
+                if hasActiveCoup { print("   - Active coup in home kingdom") }
                 musicService.transitionToWarMusic()
             } else {
                 print("🎵 ☮️ PEACE RESTORED - Switching to peaceful music")

@@ -66,8 +66,8 @@ struct BattleVsPosterView: View {
     
     // Battle-type aware labels
     private var battleTypeLabel: String { battleType.displayName.uppercased() }
-    private var attackerLabel: String { battle.attackerLabel }
-    private var defenderLabel: String { battle.defenderLabel }
+    private var attackerLabel: String { battle.attackerLabel ?? "ATTACKERS" }
+    private var defenderLabel: String { battle.defenderLabel ?? "DEFENDERS" }
     
     var body: some View {
         VStack(spacing: 0) {

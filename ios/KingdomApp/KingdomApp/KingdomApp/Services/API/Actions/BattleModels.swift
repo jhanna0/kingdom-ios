@@ -99,6 +99,16 @@ struct BattleRollResult: Codable, Identifiable, Equatable {
 /// Typealias for backwards compatibility
 typealias CoupRollResult = BattleRollResult
 
+// MARK: - UI Content Models
+
+/// A step in "how it works" section, populated by backend
+struct HowItWorksStep: Codable, Identifiable, Equatable {
+    let number: String
+    let text: String
+    
+    var id: String { number }
+}
+
 // MARK: - Participant Models
 
 /// A player participating in a battle
@@ -241,6 +251,12 @@ struct BattleEventResponse: Codable, Identifiable {
     let resolvedAt: String?
     let winnerSide: String?
     
+    // UI Content - populated by backend based on battle type
+    let howItWorks: [HowItWorksStep]?
+    let consequences: [String]?
+    let attackerLabel: String?
+    let defenderLabel: String?
+    
     enum CodingKeys: String, CodingKey {
         case id, type
         case kingdomId = "kingdom_id"
@@ -271,6 +287,10 @@ struct BattleEventResponse: Codable, Identifiable {
         case attackerVictory = "attacker_victory"
         case resolvedAt = "resolved_at"
         case winnerSide = "winner_side"
+        case howItWorks = "how_it_works"
+        case consequences
+        case attackerLabel = "attacker_label"
+        case defenderLabel = "defender_label"
     }
     
     // MARK: - Computed Properties
@@ -331,16 +351,6 @@ struct BattleEventResponse: Codable, Identifiable {
     /// Win threshold for this battle type
     var winThreshold: Int {
         battleType.winThreshold
-    }
-    
-    /// Attacker side label based on battle type
-    var attackerLabel: String {
-        isCoup ? "Coupers" : "Invaders"
-    }
-    
-    /// Defender side label based on battle type
-    var defenderLabel: String {
-        isCoup ? "Crown" : "Defenders"
     }
     
     /// Captured count for attackers

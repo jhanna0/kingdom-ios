@@ -113,12 +113,15 @@ class KingdomData(BaseModel):
     can_stage_coup: bool = False  # Backend determines if current user can initiate a coup
     coup_ineligibility_reason: Optional[str] = None  # Why user can't stage coup (e.g., "Need T3 leadership")
     
-    # Active coup in this kingdom (if any)
+    # War state - Backend is source of truth!
+    is_at_war: bool = False  # True if there's an active battle (coup or invasion) in this kingdom
+    
+    # Active coup/battle in this kingdom (if any)
     active_coup: Optional['ActiveCoupData'] = None
 
 
 class ActiveCoupData(BaseModel):
-    """Active coup data for map badge and quick access"""
+    """Active battle data for map badge and quick access (coups or invasions)"""
     id: int
     kingdom_id: str
     kingdom_name: str
@@ -130,6 +133,7 @@ class ActiveCoupData(BaseModel):
     user_side: Optional[str] = None  # 'attackers', 'defenders', or None
     can_pledge: bool = False
     pledge_end_time: Optional[str] = None  # ISO timestamp for scheduling notifications
+    battle_type: str = "coup"  # "coup" or "invasion" - NEW: distinguish battle types
 
 
 class CityBoundaryResponse(BaseModel):

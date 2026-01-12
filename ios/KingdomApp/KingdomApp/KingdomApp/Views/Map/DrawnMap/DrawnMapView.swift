@@ -127,7 +127,7 @@ struct DrawnMapView: View {
             isPlayer: isHomeKingdom,
             isEnemy: kingdom.isEnemy,
             isAllied: kingdom.isAllied,
-            isAtWar: isHomeKingdom && kingdom.activeCoup != nil
+            isAtWar: isHomeKingdom && kingdom.isAtWar
         )
     }
     

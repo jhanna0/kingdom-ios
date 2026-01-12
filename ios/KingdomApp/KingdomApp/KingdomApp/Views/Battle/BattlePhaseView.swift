@@ -16,8 +16,8 @@ struct BattlePhaseView: View {
     }
     
     // Battle-type aware labels
-    private var attackerLabel: String { battle.attackerLabel }
-    private var defenderLabel: String { battle.defenderLabel }
+    private var attackerLabel: String { battle.attackerLabel ?? "ATTACKERS" }
+    private var defenderLabel: String { battle.defenderLabel ?? "DEFENDERS" }
     private var winThreshold: Int { battle.winThreshold }
     private var territoryCount: Int { battle.battleType.territoryCount }
     

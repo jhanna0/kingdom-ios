@@ -78,6 +78,7 @@ from schemas.battle import (
     RollResult,
     ActiveBattlesResponse,
     BattleEligibilityResponse,
+    HowItWorksStep,
 )
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso
@@ -126,17 +127,17 @@ def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> Opt
     kingdom_rep = _get_kingdom_reputation(db, user.id, kingdom_id)
     
     return InitiatorStats(
-        level=state.level,
+        level=state.level or 1,
         kingdom_reputation=kingdom_rep,
-        attack_power=state.attack_power,
-        defense_power=state.defense_power,
-        leadership=state.leadership,
-        building_skill=state.building_skill,
-        intelligence=state.intelligence,
-        contracts_completed=state.contracts_completed,
-        total_work_contributed=state.total_work_contributed,
-        coups_won=state.coups_won,
-        coups_failed=state.coups_failed
+        attack_power=state.attack_power or 1,
+        defense_power=state.defense_power or 1,
+        leadership=state.leadership or 0,
+        building_skill=state.building_skill or 0,
+        intelligence=state.intelligence or 0,
+        contracts_completed=state.contracts_completed or 0,
+        total_work_contributed=state.total_work_contributed or 0,
+        coups_won=state.coups_won or 0,
+        coups_failed=state.coups_failed or 0
     )
 
 
@@ -979,6 +980,37 @@ def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bo
 
 # ===== Build Response Helper =====
 
+def _get_battle_ui_content(battle_type: str) -> dict:
+    """Get UI content (how it works, consequences, labels) based on battle type."""
+    if battle_type == BattleType.COUP.value:
+        return {
+            "how_it_works": [
+                HowItWorksStep(number="1", text="Pledge your allegiance to a side"),
+                HowItWorksStep(number="2", text="Battle phase: fight to capture territories"),
+                HowItWorksStep(number="3", text="First to capture 2 territories wins the throne—and the spoils"),
+            ],
+            "consequences": [
+                "Losers forfeit 50% gold and 100 reputation"
+            ],
+            "attacker_label": "ATTACKERS",
+            "defender_label": "DEFENDERS",
+        }
+    else:  # invasion
+        return {
+            "how_it_works": [
+                HowItWorksStep(number="1", text="Armies gather during the declaration period"),
+                HowItWorksStep(number="2", text="Battle phase: invaders vs defenders clash"),
+                HowItWorksStep(number="3", text="Capture 3 territories to claim the kingdom and treasury"),
+            ],
+            "consequences": [
+                "Failed invasion: 50% kingdom treasury lost, attackers lose skills",
+                "Successful invasion: Defenders lose 50% gold and skills",
+            ],
+            "attacker_label": "INVADERS",
+            "defender_label": "DEFENDERS",
+        }
+
+
 def _build_battle_response(
     db: Session,
     battle: Battle,
@@ -1067,6 +1099,9 @@ def _build_battle_response(
         if attacking_kingdom:
             attacking_from_name = attacking_kingdom.name
     
+    # Get UI content based on battle type
+    ui_content = _get_battle_ui_content(battle.type)
+    
     return BattleEventResponse(
         id=battle.id,
         type=battle.type,
@@ -1098,7 +1133,11 @@ def _build_battle_response(
         is_resolved=battle.is_resolved,
         attacker_victory=battle.attacker_victory,
         resolved_at=battle.resolved_at,
-        winner_side=winner_side
+        winner_side=winner_side,
+        how_it_works=ui_content["how_it_works"],
+        consequences=ui_content["consequences"],
+        attacker_label=ui_content["attacker_label"],
+        defender_label=ui_content["defender_label"],
     )
 
 
@@ -1116,7 +1155,7 @@ def initiate_coup(
 ):
     """Initiate a coup in a kingdom."""
     state = _get_player_state(db, current_user)
-    kingdom = db.query(Kingdom).filter(Kingdom.id == request.kingdom_id).first()
+    kingdom = db.query(Kingdom).filter(Kingdom.id == request.target_kingdom_id).first()
     
     if not kingdom:
         raise HTTPException(status_code=404, detail="Kingdom not found")
@@ -1205,8 +1244,12 @@ def declare_invasion(
     """Declare an invasion of a kingdom. Ruler must be present at target kingdom."""
     state = _get_player_state(db, current_user)
     
+    # Get kingdoms this player rules
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
+    fiefs_ruled = [k.id for k in ruled_kingdoms]
+    
     # Check user is a ruler
-    if not state.fiefs_ruled or len(state.fiefs_ruled) == 0:
+    if not fiefs_ruled:
         raise HTTPException(status_code=400, detail="You must rule a kingdom to declare an invasion")
     
     # Must be at the target kingdom
@@ -1227,7 +1270,7 @@ def declare_invasion(
     
     # Get attacking kingdom (one of the kingdoms the user rules)
     # Use the first one for now - could make this selectable
-    attacking_from_id = state.fiefs_ruled[0]
+    attacking_from_id = fiefs_ruled[0]
     attacking_kingdom = db.query(Kingdom).filter(Kingdom.id == attacking_from_id).first()
     
     if not attacking_kingdom:
@@ -1436,7 +1479,11 @@ def check_battle_eligibility(
     can_invade = True
     invasion_reason = None
     
-    if not state.fiefs_ruled or len(state.fiefs_ruled) == 0:
+    # Get kingdoms this player rules
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
+    fiefs_ruled = [k.id for k in ruled_kingdoms]
+    
+    if not fiefs_ruled:
         can_invade = False
         invasion_reason = "Must rule a kingdom to invade"
     elif kingdom.ruler_id == current_user.id:
@@ -1450,7 +1497,7 @@ def check_battle_eligibility(
         invasion_reason = "Cannot invade a kingdom with no ruler"
     else:
         # Check empire
-        my_kingdom_id = state.fiefs_ruled[0]
+        my_kingdom_id = fiefs_ruled[0]
         my_kingdom = db.query(Kingdom).filter(Kingdom.id == my_kingdom_id).first()
         if my_kingdom:
             my_empire = my_kingdom.empire_id or my_kingdom.id

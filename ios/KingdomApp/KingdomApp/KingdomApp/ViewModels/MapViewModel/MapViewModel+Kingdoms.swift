@@ -221,10 +221,13 @@ extension MapViewModel {
             kingdom.checkedInPlayers = kingdomData.population
             kingdom.activeCitizens = kingdomData.active_citizens ?? 0
             
-            // Active coup data (if any)
+            // War state - Backend is source of truth!
+            kingdom.isAtWar = kingdomData.is_at_war ?? false
+            
+            // Active battle data (if any)
             kingdom.activeCoup = kingdomData.active_coup
-            if let coup = kingdomData.active_coup {
-                print("🔥 COUP FOUND in \(kingdom.name): id=\(coup.id), status=\(coup.status)")
+            if let battle = kingdomData.active_coup {
+                print("🔥 BATTLE FOUND in \(kingdom.name): id=\(battle.id), status=\(battle.status), type=\(battle.battle_type ?? "coup")")
             }
             
             // DYNAMIC BUILDINGS - Iterate buildings array from backend

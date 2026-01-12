@@ -488,6 +488,7 @@ def get_action_status(
                 "theme_color": "buttonSpecial",
                 "display_order": 1,
                 "endpoint": "/battles/coup/initiate",
+                "handler": "initiate_battle",  # Frontend knows to POST and open BattleView
                 "kingdom_id": kingdom.id,
             }
         else:
@@ -505,8 +506,99 @@ def get_action_status(
                 "theme_color": "buttonSpecial",
                 "display_order": 1,
                 "endpoint": None,
+                "handler": None,
                 "active_coup_id": active_coup_id,  # If there's an active coup, frontend can show it
             }
+    
+    # DECLARE INVASION - Available when in an enemy kingdom you can invade
+    # Uses same eligibility logic as /battles/eligibility/{kingdom_id}
+    can_declare_invasion = False
+    invasion_ineligibility_reason = None
+    
+    # Get kingdoms this player rules
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
+    fiefs_ruled = [k.id for k in ruled_kingdoms]
+    
+    if state.current_kingdom_id and kingdom:
+        # Check if this is an enemy kingdom (not our own)
+        is_enemy_kingdom = kingdom.ruler_id and kingdom.ruler_id != current_user.id
+        
+        if is_enemy_kingdom:
+            # Check invasion eligibility
+            if not fiefs_ruled:
+                invasion_ineligibility_reason = "Must rule a kingdom to invade"
+            elif not kingdom.ruler_id:
+                invasion_ineligibility_reason = "Cannot invade unruled kingdom"
+            else:
+                # Check empire - can't invade own empire
+                my_kingdom_id = fiefs_ruled[0] if fiefs_ruled else None
+                if my_kingdom_id:
+                    my_kingdom = db.query(Kingdom).filter(Kingdom.id == my_kingdom_id).first()
+                    if my_kingdom:
+                        my_empire = my_kingdom.empire_id or my_kingdom.id
+                        target_empire = kingdom.empire_id or kingdom.id
+                        if my_empire == target_empire:
+                            invasion_ineligibility_reason = "Cannot invade your own empire"
+                
+                # Check for active battle
+                if not invasion_ineligibility_reason:
+                    from db.models import Battle
+                    active_battle = db.query(Battle).filter(
+                        Battle.kingdom_id == kingdom.id,
+                        Battle.resolved_at.is_(None)
+                    ).first()
+                    
+                    if active_battle:
+                        battle_type = "Coup" if active_battle.is_coup else "Invasion"
+                        invasion_ineligibility_reason = f"{battle_type} already in progress"
+                
+                # Check invasion cooldown
+                if not invasion_ineligibility_reason:
+                    from routers.battles import _check_kingdom_invasion_cooldown
+                    ok, msg = _check_kingdom_invasion_cooldown(db, kingdom.id)
+                    if not ok:
+                        invasion_ineligibility_reason = msg
+                
+                # If no reason to block, can invade!
+                if not invasion_ineligibility_reason:
+                    can_declare_invasion = True
+            
+            # Add declare_invasion action
+            if can_declare_invasion:
+                actions["declare_invasion"] = {
+                    "ready": True,
+                    "seconds_remaining": 0,
+                    "unlocked": True,
+                    "action_type": "declare_invasion",
+                    "requirements_met": True,
+                    "title": "Declare Invasion",
+                    "icon": "flag.2.crossed.fill",
+                    "description": f"Declare war on {kingdom.name}",
+                    "category": "warfare",
+                    "theme_color": "buttonDanger",
+                    "display_order": 1,
+                    "endpoint": "/battles/invasion/declare",
+                    "handler": "initiate_battle",  # Frontend knows to POST and open BattleView
+                    "kingdom_id": kingdom.id,
+                    "kingdom_name": kingdom.name,
+                }
+            else:
+                actions["declare_invasion"] = {
+                    "ready": False,
+                    "seconds_remaining": 0,
+                    "unlocked": False,
+                    "action_type": "declare_invasion",
+                    "requirements_met": False,
+                    "requirement_description": invasion_ineligibility_reason,
+                    "title": "Declare Invasion",
+                    "icon": "flag.2.crossed.fill",
+                    "description": "Declare war on this kingdom",
+                    "category": "warfare",
+                    "theme_color": "buttonDanger",
+                    "display_order": 1,
+                    "endpoint": None,
+                    "handler": None,
+                }
     
     # VIEW BATTLE - Show when there's an active battle in the user's hometown kingdom
     if state.hometown_kingdom_id:
@@ -571,9 +663,10 @@ def get_action_status(
                 "category": "political",
                 "theme_color": "buttonDanger",
                 "display_order": 0,  # Show first in political slot
-                "endpoint": None,  # No endpoint - frontend handles opening BattleView
+                "endpoint": None,  # No endpoint - frontend uses handler
+                "handler": "view_battle",  # Frontend opens BattleView with battle_id
                 "coup_id": active_home_battle.id,  # Keep coup_id for backwards compat
-                "battle_id": active_home_battle.id,  # New field
+                "battle_id": active_home_battle.id,  # Used by handler
                 "battle_type": active_home_battle.type,  # "coup" or "invasion"
                 "can_pledge": can_pledge,
                 "user_side": user_side,

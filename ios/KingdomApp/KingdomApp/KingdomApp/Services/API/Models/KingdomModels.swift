@@ -117,11 +117,14 @@ struct CityKingdomData: Codable {
     let can_stage_coup: Bool?  // Backend determines if current user can stage coup
     let coup_ineligibility_reason: String?  // Why user can't stage coup (e.g., "Need T3 leadership")
     
-    // Active coup in this kingdom (if any)
+    // War state - Backend is source of truth!
+    let is_at_war: Bool?  // True if there's an active battle (coup or invasion)
+    
+    // Active coup/battle in this kingdom (if any)
     let active_coup: ActiveCoupData?
 }
 
-/// Active coup data for map badge and quick access
+/// Active battle data for map badge and quick access (coups or invasions)
 struct ActiveCoupData: Codable, Identifiable {
     let id: Int
     let kingdom_id: String
@@ -134,6 +137,17 @@ struct ActiveCoupData: Codable, Identifiable {
     let user_side: String?  // 'attackers', 'defenders', or nil
     let can_pledge: Bool
     let pledge_end_time: String?  // ISO timestamp - when pledge phase ends
+    let battle_type: String?  // "coup" or "invasion" - NEW: distinguish battle types
+    
+    /// Whether this is an invasion (vs a coup)
+    var isInvasion: Bool {
+        return battle_type == "invasion"
+    }
+    
+    /// Whether this is a coup (vs an invasion)
+    var isCoup: Bool {
+        return battle_type == nil || battle_type == "coup"
+    }
     
     /// Formatted time remaining
     var timeRemainingFormatted: String {

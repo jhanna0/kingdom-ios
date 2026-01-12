@@ -13,6 +13,7 @@ import math
 import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db, CoupEvent
+from db.models import Battle
 from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BUILDING_COLORS, AllianceInfo, ActiveCoupData
 from routers.alliances import are_empires_allied, get_alliance_between
 from osm_service import (
@@ -281,16 +282,34 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         checked_in_count = current_players.get(kingdom.id, 0)
         citizen_count = active_citizens.get(kingdom.id, 0)
         
-        # Check for active coup in this kingdom
+        # Check for active battle involving this kingdom
+        # A kingdom is "at war" if:
+        # 1. It's being attacked (battle.kingdom_id == this kingdom) - coup or invasion target
+        # 2. It's attacking another kingdom (battle.attacking_from_kingdom_id == this kingdom) - invasion source
         active_coup_data = None
-        active_coup = db.query(CoupEvent).filter(
-            CoupEvent.kingdom_id == kingdom.id,
-            CoupEvent.resolved_at.is_(None)
+        
+        # First check if this kingdom is being attacked
+        active_battle = db.query(Battle).filter(
+            Battle.kingdom_id == kingdom.id,
+            Battle.resolved_at.is_(None)
         ).first()
         
-        if active_coup:
-            attacker_ids = active_coup.get_attacker_ids()
-            defender_ids = active_coup.get_defender_ids()
+        # Also check if this kingdom is ATTACKING another kingdom (invasions only)
+        attacking_battle = db.query(Battle).filter(
+            Battle.attacking_from_kingdom_id == kingdom.id,
+            Battle.resolved_at.is_(None)
+        ).first()
+        
+        # Kingdom is at war if involved in any battle (attacking OR defending)
+        is_at_war = (active_battle is not None) or (attacking_battle is not None)
+        
+        # For the active_coup_data, prefer showing the battle where this kingdom is the target
+        # (so defenders see the battle in their kingdom, attackers see it in enemy kingdom)
+        battle_to_show = active_battle  # Primary: battles targeting this kingdom
+        
+        if battle_to_show:
+            attacker_ids = battle_to_show.get_attacker_ids()
+            defender_ids = battle_to_show.get_defender_ids()
             user_side = None
             can_pledge = False
             
@@ -302,23 +321,24 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 
                 # Can pledge if pledge phase is open and user hasn't pledged
                 can_pledge = (
-                    active_coup.is_pledge_phase and
+                    battle_to_show.is_pledge_phase and
                     current_user.id not in attacker_ids and
                     current_user.id not in defender_ids
                 )
             
             active_coup_data = ActiveCoupData(
-                id=active_coup.id,
+                id=battle_to_show.id,
                 kingdom_id=kingdom.id,
                 kingdom_name=kingdom.name,
-                initiator_name=active_coup.initiator_name,
-                status=active_coup.current_phase,
-                time_remaining_seconds=active_coup.time_remaining_seconds,
+                initiator_name=battle_to_show.initiator_name,
+                status=battle_to_show.current_phase,
+                time_remaining_seconds=battle_to_show.time_remaining_seconds,
                 attacker_count=len(attacker_ids),
                 defender_count=len(defender_ids),
                 user_side=user_side,
                 can_pledge=can_pledge,
-                pledge_end_time=active_coup.pledge_end_time.isoformat() if active_coup.pledge_end_time else None
+                pledge_end_time=battle_to_show.pledge_end_time.isoformat() if battle_to_show.pledge_end_time else None,
+                battle_type=battle_to_show.type  # "coup" or "invasion"
             )
         
         result[kingdom.id] = KingdomData(
@@ -341,6 +361,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             enemies=list(kingdom.enemies) if kingdom.enemies else [],
             can_stage_coup=can_stage_coup,
             coup_ineligibility_reason=coup_ineligibility_reason,
+            is_at_war=is_at_war,  # Backend is source of truth! (defending OR attacking)
             active_coup=active_coup_data
         )
     
