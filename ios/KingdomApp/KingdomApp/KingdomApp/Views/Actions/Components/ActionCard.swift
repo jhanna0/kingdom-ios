@@ -161,6 +161,10 @@ struct ActionCard: View {
     }
     
     private var actionButtonColor: Color {
+        // Use backend-provided button color if available
+        if let buttonColor = status.buttonColor {
+            return KingdomTheme.Colors.color(fromThemeName: buttonColor)
+        }
         // Hostile actions (scout/infiltrate) use emerald/teal, beneficial actions use green
         if status.category == "hostile" || status.actionType == "scout" {
             return KingdomTheme.Colors.royalEmerald
@@ -169,6 +173,19 @@ struct ActionCard: View {
     }
     
     private var actionButtonIcon: String {
+        // Use backend-provided button text to determine icon
+        if let buttonText = status.buttonText {
+            switch buttonText {
+            case "Fight!":
+                return "flame.fill"
+            case "Join":
+                return "person.badge.plus"
+            case "View":
+                return "eye.fill"
+            default:
+                break
+            }
+        }
         if status.category == "hostile" || status.actionType == "scout" {
             return "eye.fill"
         }
@@ -176,6 +193,10 @@ struct ActionCard: View {
     }
     
     private var actionButtonText: String {
+        // Use backend-provided button text if available
+        if let buttonText = status.buttonText {
+            return buttonText
+        }
         if status.actionType == "scout" {
             return "Infiltrate"
         }

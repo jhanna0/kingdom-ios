@@ -114,6 +114,10 @@ struct ActionStatus: Codable {
     let kingdomId: String?  // Target kingdom for battle actions
     let kingdomName: String?  // For display
     
+    // Button customization (backend controls button appearance)
+    let buttonText: String?  // "Fight!", "View", "Join", etc.
+    let buttonColor: String?  // Theme color name: "buttonDanger", "royalBlue", etc.
+    
     // Legacy coup-specific fields (kept for backwards compat, use handler instead)
     let coupId: Int?
     let canPledge: Bool?
@@ -147,6 +151,9 @@ struct ActionStatus: Codable {
         case battleId = "battle_id"
         case kingdomId = "kingdom_id"
         case kingdomName = "kingdom_name"
+        // Button customization
+        case buttonText = "button_text"
+        case buttonColor = "button_color"
         // Legacy coup fields
         case coupId = "coup_id"
         case canPledge = "can_pledge"

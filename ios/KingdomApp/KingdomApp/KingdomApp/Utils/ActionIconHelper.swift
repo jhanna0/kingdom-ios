@@ -26,6 +26,8 @@ struct ActionIconHelper {
             return "checkmark.seal.fill"
         case "invasion":
             return "shield.lefthalf.filled"
+        case "battle", "fighting", "fight":
+            return "flame.fill"
         case "property_purchase":
             return "house.fill"
         case "property_upgrade":
@@ -64,6 +66,8 @@ struct ActionIconHelper {
             return "Vote"
         case "invasion":
             return "Invasion"
+        case "battle", "fighting", "fight":
+            return "Battle"
         case "property_purchase":
             return "Property Purchase"
         case "property_upgrade":
@@ -102,6 +106,8 @@ struct ActionIconHelper {
             return "Voted"
         case "invasion":
             return "Invaded"
+        case "battle", "fighting", "fight":
+            return "Fighting"
         case "property_purchase":
             return "Purchased property"
         case "property_upgrade":
@@ -156,6 +162,8 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "invasion":
             return KingdomTheme.Colors.buttonDanger // Red
+        case "battle", "fighting", "fight":
+            return KingdomTheme.Colors.buttonDanger // Red for battles
         case "property_purchase":
             return KingdomTheme.Colors.buttonSuccess // Green
         case "property_upgrade":

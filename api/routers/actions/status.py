@@ -205,6 +205,33 @@ def get_action_status(
             )
             slot_cooldowns[slot] = cooldown_info
     
+    # Check for ACTIVE BATTLE cooldowns (separate from action slots)
+    # Battle cooldowns are stored as 'battle_{battle_id}' in action_cooldowns table
+    from db.models.action_cooldown import ActionCooldown
+    from systems.battle.config import BATTLE_ACTION_COOLDOWN_MINUTES
+    
+    active_battle_cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type.like('battle_%'),
+        ActionCooldown.expires_at > datetime.utcnow()
+    ).order_by(ActionCooldown.expires_at.desc()).first()
+    
+    if active_battle_cooldown:
+        remaining = (active_battle_cooldown.expires_at - datetime.utcnow()).total_seconds()
+        slot_cooldowns["active_battles"] = {
+            "ready": False,
+            "seconds_remaining": int(max(0, remaining)),
+            "blocking_action": "battle",
+            "blocking_slot": "active_battles"
+        }
+    else:
+        slot_cooldowns["active_battles"] = {
+            "ready": True,
+            "seconds_remaining": 0,
+            "blocking_action": None,
+            "blocking_slot": None
+        }
+    
     # Get crafting costs for all tiers
     crafting_costs = {}
     for tier in range(1, 6):
@@ -654,27 +681,43 @@ def get_action_status(
             
             # Determine display text based on phase, user status, and location
             # KEY: Once pledged, user can fight from ANYWHERE
+            # Button color based on user's side
+            if user_side == "attackers":
+                button_color = "buttonDanger"  # Red for attackers
+            elif user_side == "defenders":
+                button_color = "royalBlue"  # Blue for defenders
+            else:
+                button_color = "buttonPrimary"  # Default
+            
             if user_pledged:
                 # Already joined - can participate from anywhere!
                 if active_home_battle.is_pledge_phase:
                     title = f"View {battle_type_name}"
                     description = f"You've pledged as {user_side} - waiting for battle"
+                    button_text = "View"
                 else:
-                    title = "Fight!"
-                    description = f"The {battle_type_lower} battle is underway - join from anywhere!"
+                    title = f"⚔️ {battle_type_name} Battle"
+                    description = f"Fight for the {user_side}! Join from anywhere."
+                    button_text = "Fight!"
             elif not is_in_correct_kingdom_to_join:
                 # Not joined and not in correct location
                 title = "Travel Home to Vote"
                 description = f"Return to your home kingdom to pledge in the {battle_type_lower}"
+                button_text = "View"
+                button_color = "inkMedium"
             elif active_home_battle.is_pledge_phase:
                 # In correct location, can pledge
                 minutes_left = active_home_battle.time_remaining_seconds // 60
                 title = f"Vote in {battle_type_name}"
                 description = f"A {battle_type_lower} is underway! {minutes_left}m to pledge"
+                button_text = "Join"
+                button_color = "buttonPrimary"
             else:
                 # Battle phase but didn't pledge
                 title = "View Battle"
                 description = "Battle phase - you didn't pledge"
+                button_text = "View"
+                button_color = "inkMedium"
             
             # Rename key to view_battle for unified system, but keep view_coup for backwards compat
             actions["view_coup"] = {
@@ -687,10 +730,12 @@ def get_action_status(
                 "icon": "bolt.fill" if active_home_battle.is_coup else "flag.2.crossed.fill",
                 "description": description,
                 "category": "political",
-                "theme_color": "buttonDanger",
+                "theme_color": button_color,  # Dynamic based on user side
                 "display_order": 0,  # Show first in political slot
                 "endpoint": None,  # No endpoint - frontend uses handler
                 "handler": "view_battle",  # Frontend opens BattleView with battle_id
+                "button_text": button_text,  # NEW: "Fight!", "View", "Join"
+                "button_color": button_color,  # NEW: buttonDanger/royalBlue based on side
                 "coup_id": active_home_battle.id,  # Keep coup_id for backwards compat
                 "battle_id": active_home_battle.id,  # Used by handler
                 "battle_type": active_home_battle.type,  # "coup" or "invasion"
