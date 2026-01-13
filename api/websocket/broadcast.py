@@ -258,6 +258,17 @@ class PartyEvents:
     HUNT_ENDED = "hunt_ended"
 
 
+class DuelEvents:
+    """Events for PvP Arena duels"""
+    DUEL_INVITATION = "duel_invitation"
+    DUEL_OPPONENT_JOINED = "duel_opponent_joined"
+    DUEL_STARTED = "duel_started"
+    DUEL_ATTACK = "duel_attack"
+    DUEL_TURN_CHANGED = "duel_turn_changed"
+    DUEL_ENDED = "duel_ended"
+    DUEL_CANCELLED = "duel_cancelled"
+
+
 def notify_hunt_participants(
     hunt_session: dict,
     event_type: str,
@@ -310,3 +321,57 @@ def notify_hunt_participants(
         message=message
     )
 
+
+def broadcast_duel_event(
+    event_type: str,
+    match: dict,
+    target_user_ids: list,
+    data: dict = None
+) -> int:
+    """
+    Send a real-time notification for duel events.
+    
+    Args:
+        event_type: Type of event (use DuelEvents constants)
+        match: Duel match dict
+        target_user_ids: List of user IDs to notify
+        data: Additional event-specific data
+    
+    Returns:
+        Total number of connections notified
+    """
+    if not target_user_ids:
+        return 0
+    
+    # Filter out None values from user IDs
+    user_ids = [str(uid) for uid in target_user_ids if uid is not None]
+    
+    if not user_ids:
+        return 0
+    
+    message = {
+        "type": "duel_event",
+        "event_type": event_type,
+        "match_id": match.get("id") if match else None,
+        "match": match,
+        "data": data or {},
+        "timestamp": int(time.time() * 1000)
+    }
+    
+    if is_local_mode():
+        from .local_manager import local_manager
+        _run_async(local_manager.broadcast_to_users(user_ids, message))
+        logger.info(f"[Local WS] Duel {match.get('id') if match else 'N/A'}: {event_type} -> {len(user_ids)} players")
+        return len(user_ids)
+    
+    endpoint = get_websocket_endpoint()
+    if not endpoint:
+        return 0
+    
+    from .connection_manager import broadcast_to_multiple_users
+    
+    return broadcast_to_multiple_users(
+        endpoint_url=endpoint,
+        user_ids=user_ids,
+        message=message
+    )

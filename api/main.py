@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -223,6 +223,7 @@ app.include_router(hunts.router)
 app.include_router(incidents.router)
 app.include_router(battles.router)  # Unified battle system (coups + invasions)
 app.include_router(tutorial.router)  # Help/tutorial content
+app.include_router(duels.router)  # PvP Arena duels in Town Hall
 
 
 # ===== WebSocket Endpoint (Local Development) =====

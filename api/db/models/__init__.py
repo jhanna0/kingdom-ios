@@ -43,6 +43,9 @@ from .inventory import PlayerInventory
 from .item import Item
 from .hunt_session import HuntSession
 
+# PvP Arena Duels
+from .duel import DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, DuelOutcome
+
 __all__ = [
     "User",
     "PlayerState",
@@ -106,5 +109,12 @@ __all__ = [
     "PlayerInventory",
     "Item",
     "HuntSession",
+    # PvP Arena Duels
+    "DuelMatch",
+    "DuelInvitation",
+    "DuelAction",
+    "DuelStats",
+    "DuelStatus",
+    "DuelOutcome",
 ]
 

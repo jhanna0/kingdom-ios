@@ -13,7 +13,7 @@ enum AppConfig {
     }
     
     /// Set this to switch between local, Lambda, and production API
-    static let apiEnvironment: APIEnvironment = .lambda
+    static let apiEnvironment: APIEnvironment = .local
     
     /// Backend API base URL
     static var apiBaseURL: String {

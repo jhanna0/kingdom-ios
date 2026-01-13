@@ -47,7 +47,7 @@ struct TownHallView: View {
                             title: "Group Hunt",
                             description: "Hunt together for meat and glory",
                             color: KingdomTheme.Colors.buttonSuccess,
-                            badge: "Active"
+                            badge: nil
                         )
                     }
                     
@@ -64,14 +64,21 @@ struct TownHallView: View {
                         )
                     }
                     
+                    // PvP Arena
+                    NavigationLink {
+                        ArenaView(kingdomId: kingdom.id, kingdomName: kingdom.name, playerId: playerId)
+                    } label: {
+                        TownHallActivityCard(
+                            icon: "figure.fencing",
+                            title: "PvP Arena",
+                            description: "Duel friends in 1v1 combat",
+                            color: KingdomTheme.Colors.royalCrimson,
+                            badge: nil
+                        )
+                    }
+                    
                     // Coming Soon Activities
                     VStack(spacing: KingdomTheme.Spacing.small) {
-                        TownHallComingSoonCard(
-                            icon: "flag.2.crossed.fill",
-                            title: "Tournament Arena",
-                            description: "Compete in skill-based challenges"
-                        )
-                        
                         TownHallComingSoonCard(
                             icon: "sparkles",
                             title: "Festival Hall",
