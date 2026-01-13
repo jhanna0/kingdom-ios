@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, coups, invasions, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -178,6 +178,7 @@ async def startup_event():
         print("📦 Resources: /resources (item definitions)")
         print("🏹 Hunts: /hunts (Group hunting)")
         print("🕵️ Incidents: /incidents (Covert operations)")
+        print("📖 Tutorial: /tutorial (Help content)")
         print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
@@ -209,8 +210,6 @@ app.include_router(notifications.router)
 app.include_router(actions.router)
 app.include_router(property_router.router)
 app.include_router(intelligence.router)
-app.include_router(coups.router)
-app.include_router(invasions.router)
 app.include_router(alliances.router)
 app.include_router(players.router)
 app.include_router(friends.router)
@@ -222,6 +221,7 @@ app.include_router(market.router)
 app.include_router(hunts.router)
 app.include_router(incidents.router)
 app.include_router(battles.router)  # Unified battle system (coups + invasions)
+app.include_router(tutorial.router)  # Help/tutorial content
 
 
 # ===== WebSocket Endpoint (Local Development) =====

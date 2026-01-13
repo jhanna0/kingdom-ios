@@ -8,7 +8,7 @@ struct MapHUD: View {
     @Binding var showActivity: Bool
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
-    @State private var showBattleSimulator = false
+    @State private var showTutorial = false
     
     // Get home kingdom name
     private var homeKingdomName: String? {
@@ -136,14 +136,6 @@ struct MapHUD: View {
                         showActions = true
                     }
                     
-                    // Battle Simulator (debug)
-                    BrutalistIconButton(
-                        icon: "chart.bar.xaxis",
-                        backgroundColor: KingdomTheme.Colors.inkMedium
-                    ) {
-                        showBattleSimulator = true
-                    }
-                    
                     // Properties (icon only)
                     BrutalistIconButton(
                         icon: "house.fill",
@@ -158,6 +150,14 @@ struct MapHUD: View {
                         backgroundColor: KingdomTheme.Colors.buttonDanger
                     ) {
                         showActivity = true
+                    }
+                    
+                    // Help / Tutorial (icon only)
+                    BrutalistIconButton(
+                        icon: "questionmark",
+                        backgroundColor: KingdomTheme.Colors.inkMedium
+                    ) {
+                        showTutorial = true
                     }
                 }
             }
@@ -197,10 +197,8 @@ struct MapHUD: View {
         .onDisappear {
             stopUIUpdateTimer()
         }
-        .sheet(isPresented: $showBattleSimulator) {
-            NavigationStack {
-                BattleSimulatorView()
-            }
+        .sheet(isPresented: $showTutorial) {
+            TutorialView()
         }
     }
     
