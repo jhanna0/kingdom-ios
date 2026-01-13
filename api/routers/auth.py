@@ -320,3 +320,30 @@ def auth_health():
     """Check if auth service is working"""
     return {"status": "ok", "service": "authentication"}
 
+
+# ===== Client Debug Logging =====
+
+from pydantic import BaseModel
+
+class ClientLogRequest(BaseModel):
+    """Client-side log entry for debugging"""
+    step: str  # e.g., "signInWithApple_start", "signInWithApple_token_received"
+    message: str
+    device_id: Optional[str] = None
+    extra: Optional[dict] = None
+
+@router.post("/client-log")
+def client_log(log_entry: ClientLogRequest):
+    """
+    Receive debug logs from iOS client during sign-up flow.
+    
+    This helps debug crashes that happen before the user is fully authenticated.
+    No authentication required since it's used during sign-up.
+    """
+    device_info = f"[device:{log_entry.device_id}]" if log_entry.device_id else ""
+    extra_info = f" | extra: {log_entry.extra}" if log_entry.extra else ""
+    
+    print(f"📱 [CLIENT LOG] {device_info} [{log_entry.step}] {log_entry.message}{extra_info}")
+    
+    return {"status": "logged"}
+

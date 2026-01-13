@@ -64,6 +64,7 @@ app = FastAPI(
 PUBLIC_ROUTES = {
     "/auth/apple-signin",  # Sign in
     "/auth/health",        # Health check
+    "/auth/client-log",    # Client debug logging (for sign-up debugging)
     "/app-config",         # App config (version check)
     "/docs",               # Swagger docs (dev only)
     "/openapi.json",       # OpenAPI schema

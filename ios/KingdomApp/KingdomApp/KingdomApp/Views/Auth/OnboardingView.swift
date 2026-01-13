@@ -23,7 +23,10 @@ struct OnboardingView: View {
             
             VStack(spacing: 0) {
                 if currentStep == 0 {
-                    WelcomeStep(onContinue: { currentStep = 1 })
+                    WelcomeStep(onContinue: {
+                        DebugLogger.shared.log("onboarding_step", message: "Step 0 -> 1 (Welcome -> Hometown)")
+                        currentStep = 1
+                    })
                 } else if currentStep == 1 {
                     HometownStep(
                         locationManager: locationManager,
@@ -33,22 +36,36 @@ struct OnboardingView: View {
                         selectedCity: $selectedCity,
                         selectedCityOsmId: $selectedCityOsmId,
                         selectedCityCoordinate: $selectedCityCoordinate,
-                        onContinue: { currentStep = 2 }
+                        onContinue: {
+                            DebugLogger.shared.log("onboarding_step", message: "Step 1 -> 2 (Hometown -> DisplayName)", extra: [
+                                "selectedCity": selectedCity ?? "nil",
+                                "selectedCityOsmId": selectedCityOsmId ?? "nil"
+                            ])
+                            currentStep = 2
+                        }
                     )
                 } else if currentStep == 2 {
                     DisplayNameStep(
                         displayName: $displayName,
                         selectedCity: selectedCity ?? "your city",
                         onContinue: {
+                            DebugLogger.shared.log("onboarding_step", message: "Step 2 -> 3 (DisplayName -> Balance)", extra: [
+                                "displayName": displayName
+                            ])
                             currentStep = 3
                         }
                     )
                 } else if currentStep == 3 {
-                    BalanceStep(onContinue: { finishOnboarding() })
+                    BalanceStep(onContinue: {
+                        DebugLogger.shared.log("onboarding_step", message: "Step 3 -> Finish (Balance -> Complete)")
+                        finishOnboarding()
+                    })
                 }
             }
         }
         .onAppear {
+            DebugLogger.shared.log("onboarding_appear", message: "OnboardingView appeared")
+            
             // Only initialize once - resume at the correct step based on what's missing
             guard !hasInitializedStep else { return }
             hasInitializedStep = true
@@ -58,6 +75,12 @@ struct OnboardingView: View {
                 let hasHometown = user.hometown_kingdom_id != nil && !(user.hometown_kingdom_id?.isEmpty ?? true)
                 let trimmedName = user.display_name.trimmingCharacters(in: .whitespacesAndNewlines)
                 let hasValidName = !trimmedName.isEmpty && trimmedName != "User"
+                
+                DebugLogger.shared.log("onboarding_init", message: "Checking user state", extra: [
+                    "hasHometown": hasHometown,
+                    "hasValidName": hasValidName,
+                    "displayName": trimmedName
+                ])
                 
                 // Pre-fill display name when available (reduces friction for partial onboarding)
                 if hasValidName {
@@ -72,16 +95,25 @@ struct OnboardingView: View {
                     }
                     selectedCityOsmId = user.hometown_kingdom_id
                     currentStep = 2
+                    DebugLogger.shared.log("onboarding_skip", message: "Skipping to step 2 (display name)")
                 } else if !hasHometown {
                     // Needs hometown - start at step 1 (skip welcome for returning users)
                     currentStep = 1
+                    DebugLogger.shared.log("onboarding_skip", message: "Skipping to step 1 (hometown)")
                 }
                 // If both are missing, stay at step 0 (welcome)
+            } else {
+                DebugLogger.shared.log("onboarding_init", message: "No current user found")
             }
         }
     }
     
     private func finishOnboarding() {
+        DebugLogger.shared.log("onboarding_finish", message: "Finishing onboarding", extra: [
+            "displayName": displayName,
+            "selectedCityOsmId": selectedCityOsmId ?? "nil"
+        ])
+        
         Task {
             // Use existing hometown if user already has one
             let hometownId = selectedCityOsmId ?? authManager.currentUser?.hometown_kingdom_id
@@ -755,6 +787,11 @@ struct HometownStep: View {
     }
     
     private func fetchNearbyCity(coordinate: CLLocationCoordinate2D) {
+        DebugLogger.shared.log("hometown_fetch_start", message: "Fetching nearby city", extra: [
+            "lat": coordinate.latitude,
+            "lon": coordinate.longitude
+        ])
+        
         isLoadingCity = true
         
         Task {
@@ -767,6 +804,10 @@ struct HometownStep: View {
                 
                 let cityResponse: CityBoundaryResponse = try await apiClient.execute(request)
                 
+                DebugLogger.shared.log("hometown_fetch_success", message: "City found: \(cityResponse.name)", extra: [
+                    "osm_id": cityResponse.osm_id
+                ])
+                
                 await MainActor.run {
                     nearbyCity = cityResponse.name
                     selectedCity = cityResponse.name
@@ -776,6 +817,7 @@ struct HometownStep: View {
                     isLoadingCity = false
                 }
             } catch {
+                DebugLogger.shared.log("hometown_fetch_error", message: "City lookup failed: \(error.localizedDescription)")
                 print("City lookup error: \(error)")
                 await MainActor.run {
                     nearbyCity = "Unknown Location"

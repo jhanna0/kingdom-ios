@@ -25,6 +25,12 @@ class AuthManager: ObservableObject {
     
     @MainActor
     func signInWithApple(userID: String, identityToken: String? = nil, email: String?, name: String?) async {
+        DebugLogger.shared.log("signIn_start", message: "Starting Apple Sign In", extra: [
+            "hasIdentityToken": identityToken != nil,
+            "hasEmail": email != nil,
+            "hasName": name != nil
+        ])
+        
         do {
             struct AppleSignInRequest: Encodable {
                 let apple_user_id: String
@@ -42,20 +48,35 @@ class AuthManager: ObservableObject {
                 device_id: UIDevice.current.identifierForVendor?.uuidString
             )
             
+            DebugLogger.shared.log("signIn_request", message: "Sending request to /auth/apple-signin")
+            
             let request = try apiClient.request(endpoint: "/auth/apple-signin", method: "POST", body: body)
             let token: TokenResponse = try await apiClient.execute(request)
             
+            DebugLogger.shared.log("signIn_token_received", message: "Token received from server")
+            
             authToken = token.access_token
             saveToken(token.access_token)
+            
+            DebugLogger.shared.log("signIn_token_saved", message: "Token saved to keychain")
+            
             await fetchUserProfile()
+            
+            DebugLogger.shared.log("signIn_profile_fetched", message: "User profile fetched", extra: [
+                "hasCurrentUser": currentUser != nil,
+                "needsOnboarding": currentUser?.needsOnboarding ?? false
+            ])
             
             // Check if needs onboarding (no hometown OR no proper display name)
             if let user = currentUser, user.needsOnboarding {
                 needsOnboarding = true
+                DebugLogger.shared.log("signIn_complete", message: "Sign in complete - needs onboarding")
             } else {
                 isAuthenticated = true
+                DebugLogger.shared.log("signIn_complete", message: "Sign in complete - fully authenticated")
             }
         } catch {
+            DebugLogger.shared.log("signIn_error", message: "Sign in failed: \(error.localizedDescription)")
             // CRITICAL ERROR - sign in failed, block everything
             hasCriticalError = true
             criticalErrorMessage = "Sign in failed: \(error.localizedDescription)"
@@ -153,7 +174,15 @@ class AuthManager: ObservableObject {
     
     @MainActor
     func completeOnboarding(displayName: String, hometownKingdomId: String?) async {
-        guard authToken != nil else { return }
+        guard authToken != nil else {
+            DebugLogger.shared.log("onboarding_error", message: "No auth token for onboarding")
+            return
+        }
+        
+        DebugLogger.shared.log("onboarding_start", message: "Starting onboarding", extra: [
+            "displayName": displayName,
+            "hasHometownKingdomId": hometownKingdomId != nil
+        ])
         
         do {
             struct OnboardingRequest: Encodable {
@@ -166,12 +195,19 @@ class AuthManager: ObservableObject {
                 hometown_kingdom_id: hometownKingdomId
             )
             
+            DebugLogger.shared.log("onboarding_request", message: "Sending PATCH to /auth/me")
+            
             let request = try apiClient.request(endpoint: "/auth/me", method: "PATCH", body: body)
             currentUser = try await apiClient.execute(request)
             
+            DebugLogger.shared.log("onboarding_response", message: "Onboarding response received")
+            
             needsOnboarding = false
             isAuthenticated = true
+            
+            DebugLogger.shared.log("onboarding_complete", message: "Onboarding complete - user authenticated")
         } catch {
+            DebugLogger.shared.log("onboarding_error", message: "Onboarding failed: \(error.localizedDescription)")
             // CRITICAL ERROR - onboarding failed, block everything
             hasCriticalError = true
             criticalErrorMessage = "Failed to complete onboarding: \(error.localizedDescription)"

@@ -118,16 +118,28 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
         
+        let statusName: String
         switch manager.authorizationStatus {
-        case .authorizedWhenInUse, .authorizedAlways:
+        case .authorizedWhenInUse:
+            statusName = "authorizedWhenInUse"
             locationManager.startUpdatingLocation()
-        case .denied, .restricted:
+        case .authorizedAlways:
+            statusName = "authorizedAlways"
+            locationManager.startUpdatingLocation()
+        case .denied:
+            statusName = "denied"
             print("Location access denied")
+        case .restricted:
+            statusName = "restricted"
+            print("Location access restricted")
         case .notDetermined:
+            statusName = "notDetermined"
             requestPermissions()
         @unknown default:
-            break
+            statusName = "unknown"
         }
+        
+        DebugLogger.shared.log("location_auth_changed", message: "Authorization: \(statusName)")
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -141,6 +153,12 @@ extension LocationManager: CLLocationManagerDelegate {
         // Update current location
         currentLocation = location.coordinate
         
+        DebugLogger.shared.log("location_updated", message: "Got location", extra: [
+            "lat": location.coordinate.latitude,
+            "lon": location.coordinate.longitude,
+            "accuracy": location.horizontalAccuracy
+        ])
+        
         // For onboarding, we want to get an accurate location, so keep updating for a bit
         // In production, you might want to stop after getting accurate enough location
         if let currentLoc = currentLocation, 
@@ -150,6 +168,7 @@ extension LocationManager: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        DebugLogger.shared.log("location_error", message: "Location failed: \(error.localizedDescription)")
         print("Location error: \(error.localizedDescription)")
     }
 }
