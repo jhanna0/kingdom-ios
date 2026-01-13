@@ -37,136 +37,116 @@ TUTORIAL_SECTIONS = [
         icon="crown.fill",
         order=0,
         content="""
-**Kingdom: Territory** - real players fighting for control of real cities.
+**Kingdom: Territory**- real players fighting for control of real cities.
 
-Overthrow tyrants. Build empires. Betray your allies. Or be the loyal citizen who tips the balance in a war.
 
-Every kingdom on the map is ruled by a real person. Every gold coin was earned by someone. Every coup and invasion involves real players picking sides.
+Every kingdom on the map is ruled by a real person. Every gold coin was earned by someone. Every coup and invasion involves real players picking sides and fighting.
 
 There are no NPCs. Just you and everyone else.
 """
     ),
     TutorialSection(
-        id="claiming",
+        id="home_kingdom",
         title="Your Home Kingdom",
         icon="flag.fill",
         order=1,
         content="""
-You get **one** Home Kingdom. Pick somewhere you'll actually spend time- that's where you'll have the most day-to-day actions.
+You get **one** Home Kingdom. Pick the place you spend time the most time. That's where you will work, build reputation, and participate in local politics & events.
 
-**What your Home Kingdom is for**
-- Earn gold and **reputation** by working there
-- Help build structures and defend your territory
-- Get to know the politics (and decide if you like your ruler)
+**What you do there**
+- **Build** upgrades to your city & earn gold
+- **Earn reputation** by contributing to the kingdom
+- **Defend** your territory when enemies attack
+- **Coup** the ruler if you don't like how things are run
+"""
+    ),
+    TutorialSection(
+        id="becoming_ruler",
+        title="Becoming a Ruler",
+        icon="person.crop.circle.badge.checkmark",
+        order=2,
+        content="""
+**"I'm visiting a town with no ruler. Can I claim it?"**
 
-**Ruling your Home**
-- If it's unclaimed: claim it and become ruler
-- If it's ruled: build reputation by working, then coup when you're ready
+No. You can only claim your **Home Kingdom**. If you want to rule somewhere else:
+- Switch your home there (but then you lose your current home)
+- Or convince a ruler to **invade** it and appoint you as leader
 
-You can only claim one kingdom. Want more? Conquer them through invasion.
+**"I already rule. Can I claim another kingdom?"**
+
+No. One claim, ever. Want more territory? **Conquer it.**
+
+**"Can I invade an unruled town?"**
+
+No. Invasions need a defender. Unruled towns can only be claimed by locals.
+
+**"Can I donate gold to the treasury?"**
+
+No. The treasury only grows from **citizen actions** — taxes, travel fees, market income. You can't just dump gold in. Rulers depend on active citizens.
+
+**The path to power:** Claim your home → Coup your ruler → Invade for empire.
 """
     ),
     TutorialSection(
         id="location",
         title="Location Matters",
         icon="location.fill",
-        order=2,
+        order=3,
         content="""
-This is a location-based game. Where you physically are matters.
+Where you physically are determines what you can do.
 
-**Helping your kingdom**
-- Working, building, defending: do it while you're **inside your kingdom's territory**
+**In your territory:** Work, build, defend.
 
-**Attacking enemies**
-- Invasions, sabotage, war actions: do it while you're **in THEIR territory**
+**In enemy territory:** Invade, sabotage, fight.
 
-Kingdom is about real places. Your actions matter where you actually are.
+Your actions matter where you actually are.
 """
     ),
     TutorialSection(
         id="gold",
-        title="Gold & Economy",
+        title="Gold & Treasury",
         icon="g.circle.fill",
-        order=3,
+        order=4,
         content="""
-**No NPCs. Real players only.**
+Every coin was earned by a real person. No NPCs.
 
-Every coin was earned by a real person working. If a kingdom is poor, it needs more active citizens.
+**Citizens earn by:** Working, contracts, trading.
 
-**How citizens earn**
-- Work (labor, farming, crafting)
-- Complete contracts
-- Trade on the market
+**Rulers earn by:** Taxing labor (0-100%), charging travel fees, market income. All of this flows into the **kingdom treasury**.
 
-**How rulers earn**
-- Set a tax rate (0–100%) on citizen labor
-- Charge travel fees when players enter your territory
-- Spend from the kingdom treasury
+**The catch:** Rulers can't work in their own kingdom. Tax too hard and citizens will coup you.
 
-**The catch**
-Rulers can't work in their own kingdom. You depend on citizens — tax too hard and they'll coup you.
+**Protecting gold:** Build a **Vault** or enemies can heist your treasury.
 """
     ),
     TutorialSection(
         id="skills",
         title="Training",
         icon="figure.strengthtraining.traditional",
-        order=4,
+        order=5,
         content="""
-Train skills to become more powerful. Check your player profile to see all available skills and their effects.
+Train skills to get stronger. Check your profile for available skills.
 
-**How to Train**
-- Buy training contracts (costs gold)
-- Complete training actions
-- Education buildings reduce actions needed
+**How:** Buy training contracts → complete training actions.
 
-**Cost Scaling**
+**Cost:** Based on your TOTAL skill points across all skills. Every skill you train makes the next one more expensive.
 
-All skills cost the same to train. The cost is based on your TOTAL skill points across all skills - so every skill you train makes the next one more expensive.
+**Tip:** Education buildings reduce actions needed.
 """
     ),
     TutorialSection(
         id="buildings",
         title="Buildings",
         icon="building.2.fill",
-        order=5,
-        content="""
-Kingdoms can construct buildings for permanent bonuses. Check your kingdom to see available buildings and their effects.
-
-**Categories**
-
-- **Defense** - Walls protect against invasions, Vaults protect your treasury
-- **Economy** - Mines, Markets, Farms, Lumbermills generate resources and income
-- **Civic** - Town Hall unlocks group activities, Education speeds up training
-
-**Construction**
-
-Building takes collective effort. The bigger the kingdom's population, the more actions required. Citizens work on contracts to help build.
-
-Each building has 5 tiers. Higher tiers = better bonuses.
-"""
-    ),
-    TutorialSection(
-        id="treasury",
-        title="The Treasury",
-        icon="building.columns.fill",
         order=6,
         content="""
-Every kingdom has a treasury. This is the ruler's war chest.
+Kingdoms construct buildings for permanent bonuses.
 
-**How It Fills**
-- Taxes from citizen labor
-- Travel fees from visitors
-- Market income
+**Defense** — Walls (invasion protection), Vaults (treasury protection)
+**Economy** — Mines, Markets, Farms, Lumbermills
+**Civic** — Town Hall (group activities), Education (faster training)
 
-**What It's For**
-- Building walls, vaults, and other structures
-- Funding kingdom operations
-- Flexing on other rulers
-
-**Protecting It**
-
-Build a **Vault** to protect your treasury from heists. Without one, enemies can steal from you.
+**Construction** takes collective effort. Citizens work contracts to build. 5 tiers per building — higher = better.
 """
     ),
     TutorialSection(
@@ -177,21 +157,13 @@ Build a **Vault** to protect your treasury from heists. Without one, enemies can
         content="""
 Don't like your ruler? Overthrow them.
 
-A coup is an internal rebellion. Citizens pick sides and battle for control.
-
 **How it works**
-- **Pledge Phase (12h)** - join the rebellion or defend the crown
-- **Battle Phase** - fight over 3 territories
-- **First to capture 2 wins**
+1. **Pledge Phase (12h)** — citizens pick sides
+2. **Battle Phase** — fight over 3 territories
+3. **First to capture 2 wins**
 
-**To start a coup**
-- T3 Leadership skill
-- 500 reputation in the kingdom (earned by working there)
-- Be physically present
-
-**To join**
-- 100 reputation to pick a side
-- Show up and fight
+**To start:** T3 Leadership, 500 reputation, physically present.
+**To join:** 100 reputation, then show up and fight.
 
 The best coups are coordinated. Build alliances. Strike when the ruler is weak.
 """
@@ -202,27 +174,19 @@ The best coups are coordinated. Build alliances. Strike when the ruler is weak.
         icon="shield.lefthalf.filled",
         order=8,
         content="""
-Rulers can declare war on other kingdoms.
-
-Win an invasion and that kingdom joins your empire. Lose and your kingdom is punished.
+Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
 **How it works**
-- **Declaration Phase (12h)** - the target kingdom rallies defenders
-- **Battle Phase** - fight over 5 territories
-- **First to capture 3 wins**
-- **Victory** - attacker absorbs the kingdom into their empire
+1. **Declaration Phase (12h)** — defenders rally
+2. **Battle Phase** — fight over 5 territories
+3. **First to capture 3 wins**
 
-**To declare**
-- You must be a ruler
-- Physically visit the target kingdom first
+**To declare:** Be a ruler, physically visit the target first.
+**To join:** Must have visited that kingdom once, then fight from anywhere.
 
-**To join**
-- Must have visited that kingdom at least once
-- Then you can fight from anywhere
+**Walls matter.** They boost defender defense.
 
-**Walls matter.** They boost defender defense. Smart rulers invest in walls.
-
-**Cooldowns:** 30 days before a kingdom can be invaded again. 7 days after a coup.
+**Cooldowns:** 30 days between invasions. 7 days after a coup.
 """
     ),
     TutorialSection(
@@ -233,22 +197,16 @@ Win an invasion and that kingdom joins your empire. Lose and your kingdom is pun
         content="""
 **The "300" problem**
 
-We wanted large population differences to be fair, so battles use an **army coordination** calculation.
+10,000 vs 1,000 isn't 10:1 — it's closer to **3:1**. Smaller armies with a plan can win.
 
-10,000 vs 1,000 is not a 10:1 power difference. **It's closer to ~3:1.**
-That gives a smaller army with a plan a chance against huge invaders.
+**Stats**
+- **Attack** — chance to land hits
+- **Defense** — chance to block, slows territory loss
+- **Leadership** — army effectiveness at scale
 
-**How stats affect battle**
-- **Attack** - increases your chance to land a hit
-- **Defense** - increases your chance to block hits & makes territory loss slower
-- **Leadership** - makes your army more effective at scale
+**Mechanics:** Tug of war. Each round: MISS, HIT, or INJURE. Your Attack vs their Defense.
 
-**How battles work**
-- Tug of war: push the bar to your side to win
-- Each round you roll: MISS, HIT, or INJURE
-- Your Attack vs their Defense determines hit or miss
-
-**Try the Battle Simulator below** to see this in action.
+**Try the Battle Simulator** to see it in action.
 """
     ),
     TutorialSection(
@@ -257,15 +215,9 @@ That gives a smaller army with a plan a chance against huge invaders.
         icon="bell.fill",
         order=10,
         content="""
-Turn on notifications so you don't miss anything.
-
 **Settings → Action Notifications → Allow**
 
-You'll get alerts when:
-- Your cooldowns finish
-- Coup phases change
-- Battles need attention
-
+Get alerts for cooldowns, coup phases, and battles.
 """
     ),
 ]
@@ -280,7 +232,7 @@ async def get_tutorial():
     Sections are ordered and include icons for visual hierarchy.
     """
     return TutorialResponse(
-        version="1.0.2",
+        version="1.1.0",
         sections=sorted(TUTORIAL_SECTIONS, key=lambda s: s.order)
     )
 

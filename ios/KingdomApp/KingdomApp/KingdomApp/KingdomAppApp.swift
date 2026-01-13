@@ -221,6 +221,7 @@ struct AuthenticatedView: View {
     @State private var showActivity = false
     @State private var showNotifications = false
     @State private var hasUnreadNotifications = false
+    @State private var pendingFriendRequestCount: Int = 0
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
     @State private var displayedTravelEvent: TravelEvent?
@@ -308,7 +309,8 @@ struct AuthenticatedView: View {
                 showCharacterSheet: $showCharacterSheet,
                 showActions: $showActions,
                 showProperties: $showProperties,
-                showActivity: $showActivity
+                showActivity: $showActivity,
+                pendingFriendRequests: pendingFriendRequestCount
             )
             
             coupBadgeOverlay
@@ -429,6 +431,7 @@ struct AuthenticatedView: View {
             let summary = try await viewModel.apiService.notifications.getSummary()
             await MainActor.run {
                 hasUnreadNotifications = summary.hasUnread
+                pendingFriendRequestCount = summary.pendingFriendRequests
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")

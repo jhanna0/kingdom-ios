@@ -6,6 +6,7 @@ struct MapHUD: View {
     @Binding var showActions: Bool
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
+    var pendingFriendRequests: Int = 0
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
@@ -147,7 +148,8 @@ struct MapHUD: View {
                     // Friends (icon only)
                     BrutalistIconButton(
                         icon: "person.2.fill",
-                        backgroundColor: KingdomTheme.Colors.buttonDanger
+                        backgroundColor: KingdomTheme.Colors.buttonDanger,
+                        badgeCount: pendingFriendRequests
                     ) {
                         showActivity = true
                     }
@@ -326,6 +328,7 @@ struct BrutalistIconButton: View {
     var iconColor: Color = .white
     var size: CGFloat = 36
     var isCircular: Bool = false
+    var badgeCount: Int = 0
     let action: () -> Void
     
     var body: some View {
@@ -366,6 +369,27 @@ struct BrutalistIconButton: View {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(iconColor)
+                
+                // Badge overlay
+                if badgeCount > 0 {
+                    ZStack {
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 18, height: 18)
+                            .offset(x: 1, y: 1)
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 18, height: 18)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 1.5)
+                            )
+                        Text("\(min(badgeCount, 99))")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .offset(x: size / 2 - 4, y: -size / 2 + 4)
+                }
             }
         }
         .buttonStyle(PlainButtonStyle())

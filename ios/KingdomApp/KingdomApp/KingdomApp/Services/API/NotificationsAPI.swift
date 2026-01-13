@@ -28,9 +28,11 @@ class NotificationsAPI {
 
 struct NotificationSummary: Codable {
     let hasUnread: Bool
+    let pendingFriendRequests: Int
     
     enum CodingKeys: String, CodingKey {
         case hasUnread = "has_unread"
+        case pendingFriendRequests = "pending_friend_requests"
     }
 }
 

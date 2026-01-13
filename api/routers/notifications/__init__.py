@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Dict, Any
 
-from db import get_db, User, PlayerState, Contract, Kingdom, CoupEvent, InvasionEvent
+from db import get_db, User, PlayerState, Contract, Kingdom, CoupEvent, InvasionEvent, Friend
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from routers.actions.utils import format_datetime_iso
@@ -126,8 +126,15 @@ def get_quick_summary(
                     except:
                         pass
     
+    # Count pending friend requests received
+    pending_friend_requests = db.query(Friend).filter(
+        Friend.friend_user_id == current_user.id,
+        Friend.status == 'pending'
+    ).count()
+    
     return {
-        "has_unread": has_unread
+        "has_unread": has_unread,
+        "pending_friend_requests": pending_friend_requests
     }
 
 
