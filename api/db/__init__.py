@@ -39,6 +39,7 @@ from .models import (
     PlayerInventory,
     Item,
     HuntSession,
+    Friend,
 )
 
 __all__ = [
@@ -83,5 +84,6 @@ __all__ = [
     "PlayerInventory",
     "Item",
     "HuntSession",
+    "Friend",
 ]
 

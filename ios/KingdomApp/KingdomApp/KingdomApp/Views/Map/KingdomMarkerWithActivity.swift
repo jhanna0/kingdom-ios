@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Kingdom marker with flying activity icons that trickle out when players are active
+/// For kingdoms with rulers, generates fake activity to show the kingdom is "alive"
 struct KingdomMarkerWithActivity: View {
     let kingdom: Kingdom
     let homeKingdomId: String?
@@ -8,16 +9,88 @@ struct KingdomMarkerWithActivity: View {
     
     // Flying icons state
     @State private var flyingIcons: [FlyingIconData] = []
-    @State private var lastSeenPlayerIds: Set<Int> = []
-    @State private var refreshTimer: Timer?
-    @State private var pendingActivities: [PlayerActivity] = []
-    @State private var isTrickling = false
-    @State private var hasAccess: Bool = true  // Track if we have permission to view this kingdom
+    @State private var activityTimer: Timer?
     
-    // Polling configuration
-    private let pollInterval: TimeInterval = 8.0
-    private let trickleDelay: TimeInterval = 0.8  // Delay between each flying icon
-    private let maxFlyingIcons: Int = 6  // Don't show too many at once
+    // Activity generation configuration
+    private let minInterval: TimeInterval = 0.4   // Minimum seconds between activities
+    private let maxInterval: TimeInterval = 1.5   // Maximum seconds between activities
+    private let maxFlyingIcons: Int = 8           // Allow more simultaneous icons
+    
+    // Activity types with their icon and color sources
+    // Uses SkillConfig for skills, ActionIconHelper for actions
+    private struct ActivityType {
+        let icon: String
+        let color: Color
+        
+        // Skill-based activities (use SkillConfig)
+        static let attack = ActivityType(
+            icon: SkillConfig.get("attack").icon,
+            color: SkillConfig.get("attack").color
+        )
+        static let defense = ActivityType(
+            icon: SkillConfig.get("defense").icon,
+            color: SkillConfig.get("defense").color
+        )
+        static let leadership = ActivityType(
+            icon: SkillConfig.get("leadership").icon,
+            color: SkillConfig.get("leadership").color
+        )
+        static let building = ActivityType(
+            icon: SkillConfig.get("building").icon,
+            color: SkillConfig.get("building").color
+        )
+        static let intelligence = ActivityType(
+            icon: SkillConfig.get("intelligence").icon,
+            color: SkillConfig.get("intelligence").color
+        )
+        static let science = ActivityType(
+            icon: SkillConfig.get("science").icon,
+            color: SkillConfig.get("science").color
+        )
+        static let faith = ActivityType(
+            icon: SkillConfig.get("faith").icon,
+            color: SkillConfig.get("faith").color
+        )
+        
+        // Action-based activities (use ActionIconHelper)
+        static let farm = ActivityType(
+            icon: ActionIconHelper.icon(for: "farm"),
+            color: ActionIconHelper.actionColor(for: "farm")
+        )
+        static let patrol = ActivityType(
+            icon: ActionIconHelper.icon(for: "patrol"),
+            color: ActionIconHelper.actionColor(for: "patrol")
+        )
+        static let craft = ActivityType(
+            icon: ActionIconHelper.icon(for: "craft"),
+            color: ActionIconHelper.actionColor(for: "craft")
+        )
+        static let sabotage = ActivityType(
+            icon: ActionIconHelper.icon(for: "sabotage"),
+            color: ActionIconHelper.actionColor(for: "sabotage")
+        )
+    }
+    
+    private static let allActivities: [ActivityType] = [
+        // Skills (training)
+        .attack,
+        .defense,
+        .leadership,
+        .building,
+        .intelligence,
+        .science,
+        .faith,
+        // Actions
+        .farm,
+        .patrol,
+        .craft,
+        .sabotage
+    ]
+    
+    /// Only generate activity for kingdoms that have a ruler
+    private var shouldShowActivity: Bool {
+        return !kingdom.isUnclaimed
+    }
     
     var body: some View {
         ZStack {
@@ -41,140 +114,62 @@ struct KingdomMarkerWithActivity: View {
             )
         }
         .onAppear {
-            startPolling()
+            startActivityGeneration()
         }
         .onDisappear {
-            stopPolling()
+            stopActivityGeneration()
         }
-    }
-    
-    // MARK: - Polling
-    
-    private func startPolling() {
-        // Initial fetch
-        Task {
-            await fetchAndProcessActivity()
-        }
-        
-        // Periodic polling
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { _ in
-            Task {
-                await fetchAndProcessActivity()
+        .onChange(of: kingdom.isUnclaimed) { _, newValue in
+            // Start/stop activity when kingdom claim status changes
+            if newValue {
+                stopActivityGeneration()
+            } else {
+                startActivityGeneration()
             }
         }
     }
     
-    private func stopPolling() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+    // MARK: - Fake Activity Generation
+    
+    private func startActivityGeneration() {
+        guard shouldShowActivity else { return }
+        
+        // Schedule first activity after a random delay
+        scheduleNextActivity()
     }
     
-    private func fetchAndProcessActivity() async {
-        // Don't poll if we've already determined we don't have access
-        guard hasAccess else { return }
-        
-        do {
-            let response = try await KingdomAPIService.shared.player.getPlayersInKingdom(kingdom.id, limit: 10)
-            
-            await MainActor.run {
-                processNewActivity(players: response.players)
-            }
-        } catch let error as APIError {
-            // If we get a 403 Forbidden, stop polling this kingdom
-            if case .forbidden = error {
-                await MainActor.run {
-                    hasAccess = false
-                    stopPolling()  // Stop polling to prevent spam
-                }
-            }
-            // Other errors are silently ignored - marker still shows normally
-        } catch {
-            // Silently fail - no activity icons if we can't fetch
-            // This is fine - the marker still shows normally
-        }
+    private func stopActivityGeneration() {
+        activityTimer?.invalidate()
+        activityTimer = nil
     }
     
-    // MARK: - Activity Processing
-    
-    private func processNewActivity(players: [PlayerInKingdom]) {
-        let currentPlayerIds = Set(players.map(\.id))
+    private func scheduleNextActivity() {
+        guard shouldShowActivity else { return }
         
-        // Find new players (not seen before)
-        let newPlayerIds = currentPlayerIds.subtracting(lastSeenPlayerIds)
+        // Random interval between activities
+        let interval = Double.random(in: minInterval...maxInterval)
         
-        // Get activities from new players (filter out idle)
-        let newActivities = players
-            .filter { newPlayerIds.contains($0.id) && $0.activity.type != "idle" }
-            .map(\.activity)
-        
-        // Queue up new activities for trickling
-        if !newActivities.isEmpty {
-            pendingActivities.append(contentsOf: newActivities)
-            if !isTrickling {
-                Task {
-                    await trickleActivities()
-                }
+        activityTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { _ in
+            Task { @MainActor in
+                spawnRandomActivity()
+                scheduleNextActivity()  // Schedule the next one
             }
         }
+    }
+    
+    private func spawnRandomActivity() {
+        // Don't spawn too many at once
+        guard flyingIcons.count < maxFlyingIcons else { return }
         
-        // Update seen players
-        lastSeenPlayerIds = currentPlayerIds
-    }
-    
-    private func trickleActivities() async {
-        await MainActor.run {
-            isTrickling = true
-        }
+        // Pick a random activity
+        guard let activity = Self.allActivities.randomElement() else { return }
         
-        while await hasPendingActivities() {
-            guard let activity = await popNextActivity() else { break }
-            
-            // Don't spawn too many at once
-            let currentCount = await flyingIconCount()
-            if currentCount >= maxFlyingIcons {
-                // Wait for some to clear
-                try? await Task.sleep(nanoseconds: UInt64(trickleDelay * 1_000_000_000))
-                continue
-            }
-            
-            // Spawn the flying icon
-            await MainActor.run {
-                spawnFlyingIcon(for: activity)
-            }
-            
-            // Wait before next one (the trickle effect!)
-            try? await Task.sleep(nanoseconds: UInt64(trickleDelay * 1_000_000_000))
-        }
-        
-        await MainActor.run {
-            isTrickling = false
-        }
-    }
-    
-    @MainActor
-    private func hasPendingActivities() -> Bool {
-        !pendingActivities.isEmpty
-    }
-    
-    @MainActor
-    private func popNextActivity() -> PlayerActivity? {
-        pendingActivities.isEmpty ? nil : pendingActivities.removeFirst()
-    }
-    
-    @MainActor
-    private func flyingIconCount() -> Int {
-        flyingIcons.count
-    }
-    
-    // MARK: - Flying Icon Management
-    
-    private func spawnFlyingIcon(for activity: PlayerActivity) {
         // Random angle for variety (full 360°)
         let angle = Double.random(in: 0..<360)
         
         let iconData = FlyingIconData(
             icon: activity.icon,
-            color: ActionIconHelper.actionColor(for: activity.type),
+            color: activity.color,
             angle: angle
         )
         

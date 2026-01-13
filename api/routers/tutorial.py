@@ -40,7 +40,7 @@ TUTORIAL_SECTIONS = [
 **Kingdom: Territory**- real players fighting for control of real cities.
 
 
-Every kingdom on the map is ruled by a real person. Every gold coin was earned by someone. Every coup and invasion involves real players picking sides and fighting.
+Every kingdom on the map is ruled by a real person. Every coup and invasion involves real players picking sides and fighting.
 
 There are no NPCs. Just you and everyone else.
 """
@@ -69,8 +69,9 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 **"I'm visiting a town with no ruler. Can I claim it?"**
 
 No. You can only claim your **Home Kingdom**. If you want to rule somewhere else:
-- Switch your home there (but then you lose your current home)
-- Or convince a ruler to **invade** it and appoint you as leader
+- Switch your home there (but then you lose the ability to play in your hometown)
+- Coup your current ruler, then invade that town
+- Or convince your ruler to **invade** it and appoint you as leader
 
 **"I already rule. Can I claim another kingdom?"**
 
@@ -79,12 +80,6 @@ No. One claim, ever. Want more territory? **Conquer it.**
 **"Can I invade an unruled town?"**
 
 No. Invasions need a defender. Unruled towns can only be claimed by locals.
-
-**"Can I donate gold to the treasury?"**
-
-No. The treasury only grows from **citizen actions** — taxes, travel fees, market income. You can't just dump gold in. Rulers depend on active citizens.
-
-**The path to power:** Claim your home → Coup your ruler → Invade for empire.
 """
     ),
     TutorialSection(
@@ -108,28 +103,30 @@ Your actions matter where you actually are.
         icon="g.circle.fill",
         order=4,
         content="""
-Every coin was earned by a real person. No NPCs.
+Every coin in circulation was earned or traded.
 
-**Citizens earn by:** Working, contracts, trading.
+Building, working, contracts, and trading flow coins.
 
-**Rulers earn by:** Taxing labor (0-100%), charging travel fees, market income. All of this flows into the **kingdom treasury**.
+Kingdoms take a cut of income by taxes and travel fees.
 
-**The catch:** Rulers can't work in their own kingdom. Tax too hard and citizens will coup you.
+**Rulers cannot donate to kingdom treasury. Gold must be earned by citizens. Rulers pay no tax.**
 
-**Protecting gold:** Build a **Vault** or enemies can heist your treasury.
+Build a **Vault** or enemies can heist your treasury.
 """
     ),
     TutorialSection(
         id="skills",
-        title="Training",
+        title="Skills & Training",
         icon="figure.strengthtraining.traditional",
         order=5,
         content="""
 Train skills to get stronger. Check your profile for available skills.
 
+Skills unlock new content and give your character powerful perks.
+
 **How:** Buy training contracts → complete training actions.
 
-**Cost:** Based on your TOTAL skill points across all skills. Every skill you train makes the next one more expensive.
+**Cost:** Based on your TOTAL skill points across all skills. Every skill you train makes the next one more expensive. Therefore, it's very difficult to max an account. Pick the build path you think is best.
 
 **Tip:** Education buildings reduce actions needed.
 """
@@ -140,7 +137,11 @@ Train skills to get stronger. Check your profile for available skills.
         icon="building.2.fill",
         order=6,
         content="""
-Kingdoms construct buildings for permanent bonuses.
+Kingdoms construct buildings for permanent bonuses. These are citizen wide.
+Citizen perform the actions to build. Number of actions required for a building scales to the population of a kingdom.
+
+The most powerful player is one with the highest character skills, in the most developed kingdom.
+Contributing as often as possible to kingdom buildings is recommended for optimizing your kingdom.
 
 **Defense** — Walls (invasion protection), Vaults (treasury protection)
 **Economy** — Mines, Markets, Farms, Lumbermills
@@ -165,7 +166,7 @@ Don't like your ruler? Overthrow them.
 **To start:** T3 Leadership, 500 reputation, physically present.
 **To join:** 100 reputation, then show up and fight.
 
-The best coups are coordinated. Build alliances. Strike when the ruler is weak.
+The best coups are coordinated. Communicate often with your team.
 """
     ),
     TutorialSection(
@@ -176,9 +177,9 @@ The best coups are coordinated. Build alliances. Strike when the ruler is weak.
         content="""
 Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
-**How it works**
-1. **Declaration Phase (12h)** — defenders rally
-2. **Battle Phase** — fight over 5 territories
+**Once declared:**
+1. **Preparation Phase (12h)**- Both sides coordinate
+2. **Battle Phase**- fight over 5 territories
 3. **First to capture 3 wins**
 
 **To declare:** Be a ruler, physically visit the target first.
@@ -186,18 +187,47 @@ Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
 **Walls matter.** They boost defender defense.
 
-**Cooldowns:** 30 days between invasions. 7 days after a coup.
+A kingdom can only be attacked once every 30 days.
+"""
+    ),
+    TutorialSection(
+        id="sabotage",
+        title="Intelligence & Sabotage",
+        icon="eye.fill",
+        order=9,
+        content="""
+Can't invade yet? Disrupt them anyway.
+
+Intelligence operations let you spy on and sabotage enemy kingdoms. Must be physically present in their territory.
+
+**What you can do:**
+- **Steal Military Intelligence** — reveal their total Attack, Defense, Leadership, Population, and Wall strength
+- **Citizen Intel** — see who's doing what in their kingdom
+- **Project Sabotage** — add extra actions to their current building project, delaying completion
+- **Vault Heists** — steal gold directly from their treasury
+
+**Requirements:** Train Intelligence skill to unlock operations. Higher tiers unlock more powerful actions.
+
+**Risk:** Failed operations can alert the target ruler and expose your identity.
+
+Coordinate with your allies. Good intel wins wars before they start.
 """
     ),
     TutorialSection(
         id="battles",
         title="Battle System",
         icon="burst.fill",
-        order=9,
+        order=10,
         content="""
 **The "300" problem**
 
-10,000 vs 1,000 isn't 10:1 — it's closer to **3:1**. Smaller armies with a plan can win.
+If we calculated att vs def linearly, 10,000 vs 1,000 would be a 10:1 power blowout.
+
+To solve this, we implement an army-size effectiveness reduction.
+
+10,000 vs 1,000 isn't 10:1 — it's closer to **3:1**. Smaller armies with a plan can win. Especially when coordinating strategies across the different territories.
+
+Armies with higher leadership skills suffer less of this scaling penalty.
 
 **Stats**
 - **Attack** — chance to land hits
@@ -206,14 +236,14 @@ Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
 **Mechanics:** Tug of war. Each round: MISS, HIT, or INJURE. Your Attack vs their Defense.
 
-**Try the Battle Simulator** to see it in action.
+Try the **Battle Simulator** to see it in action.
 """
     ),
     TutorialSection(
         id="notifications",
         title="Notifications",
         icon="bell.fill",
-        order=10,
+        order=11,
         content="""
 **Settings → Action Notifications → Allow**
 

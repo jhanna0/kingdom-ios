@@ -11,8 +11,8 @@ struct FlyingActivityIcon: View {
     @State private var opacity: Double = 1.0
     
     // Animation parameters
-    private let flyDistance: CGFloat = 80
-    private let duration: Double = 2.0
+    private let flyDistance: CGFloat = 60
+    private let duration: Double = 1.6
     
     private var offset: CGSize {
         let radians = angle * .pi / 180
