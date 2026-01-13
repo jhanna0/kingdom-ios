@@ -46,6 +46,10 @@ enum AppConfig {
     /// - Enables debug features
     static let devMode = false
     
+    /// Force show onboarding flow (for testing)
+    /// When true, always shows onboarding regardless of user state
+    static let forceShowOnboarding = false
+    
     /// Contract completion hint time (matches backend behavior)
     /// In dev mode: instant completion
     /// In production: actual time calculations

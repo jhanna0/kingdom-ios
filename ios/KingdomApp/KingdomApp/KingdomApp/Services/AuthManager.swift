@@ -337,6 +337,11 @@ struct UserData: Codable {
     /// Returns true if the user needs to complete onboarding
     /// (missing hometown kingdom OR has a placeholder/empty display name)
     var needsOnboarding: Bool {
+        // Force onboarding for testing
+        if AppConfig.forceShowOnboarding {
+            return true
+        }
+        
         // No hometown kingdom selected
         if hometown_kingdom_id == nil || hometown_kingdom_id?.isEmpty == true {
             return true

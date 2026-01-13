@@ -546,12 +546,16 @@ struct HometownStep: View {
                                 }
                                 
                                 Text(cityName)
-                                    .font(.caption)
-                                    .fontWeight(.bold)
+                                    .font(FontStyles.labelBold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(KingdomTheme.Colors.parchment)
                                     .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(KingdomTheme.Colors.inkMedium, lineWidth: 2)
+                                    )
                                     .shadow(radius: 2)
                             }
                         }
@@ -606,14 +610,7 @@ struct HometownStep: View {
                         }
                         
                         // Privacy notice
-                        HStack(spacing: KingdomTheme.Spacing.small) {
-                            Image(systemName: "lock.shield.fill")
-                                .font(FontStyles.iconMini)
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            Text("Your precise location is NEVER stored—only the city you're in.")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
-                        }
+                        BulletPoint(icon: "lock.shield.fill", text: "Your precise location is never stored")
                     }
                     .padding(.horizontal, KingdomTheme.Spacing.large)
                     
@@ -693,54 +690,41 @@ struct HometownStep: View {
                         .padding(KingdomTheme.Spacing.large)
                     } else if let city = nearbyCity {
                         VStack(spacing: KingdomTheme.Spacing.medium) {
+                            // City header
                             HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .font(FontStyles.iconMedium)
+                                Image(systemName: "building.columns.fill")
+                                    .font(FontStyles.iconExtraLarge)
                                     .foregroundColor(.white)
-                                    .frame(width: 44, height: 44)
+                                    .frame(width: 48, height: 48)
                                     .brutalistBadge(
                                         backgroundColor: KingdomTheme.Colors.inkMedium,
-                                        cornerRadius: 10
+                                        cornerRadius: 12,
+                                        shadowOffset: 3,
+                                        borderWidth: 2
                                     )
                                 
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(city)
-                                        .font(FontStyles.headingMedium)
+                                        .font(FontStyles.headingLarge)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                     
-                                    Text("Your current location")
-                                        .font(FontStyles.labelMedium)
+                                    Text("Your homeland")
+                                        .font(FontStyles.bodySmall)
                                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 }
                                 
                                 Spacer()
-                                
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                                    .font(FontStyles.iconMedium)
                             }
                             
                             Rectangle()
-                                .fill(Color.black)
-                                .frame(height: 2)
+                                .fill(KingdomTheme.Colors.inkMedium.opacity(0.3))
+                                .frame(height: 1)
                             
                             // Info bullets
-                            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                                InfoBullet(text: "Build reputation by spending time here")
-                                InfoBullet(text: "Must be present to perform actions")
-                                InfoBullet(text: "Choose where you'll be most often")
+                            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                                BulletPoint(icon: "mappin.circle.fill", text: "Choose the place you'll be most often")
+                                BulletPoint(icon: "lock.shield.fill", text: "Your location is NEVER stored- only the city")
                             }
-                            
-                            // Privacy notice
-                            HStack(spacing: KingdomTheme.Spacing.small) {
-                                Image(systemName: "lock.shield.fill")
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                                Text("Your precise location is NEVER stored—only the city you're in.")
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                            }
-                            .padding(.top, KingdomTheme.Spacing.small)
                         }
                         .padding(KingdomTheme.Spacing.large)
                     }
@@ -831,18 +815,28 @@ struct HometownStep: View {
     }
 }
 
+struct BulletPoint: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        Label {
+            Text(text)
+                .font(FontStyles.bodySmall)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+        } icon: {
+            Image(systemName: icon)
+                .font(FontStyles.iconTiny)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+    }
+}
+
 struct InfoBullet: View {
     let text: String
     
     var body: some View {
-        HStack(alignment: .top, spacing: KingdomTheme.Spacing.small) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(FontStyles.iconMini)
-                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-            Text(text)
-                .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
+        BulletPoint(icon: "checkmark.circle.fill", text: text)
     }
 }
 
@@ -856,16 +850,17 @@ struct LocationOptionCard: View {
         Button(action: onSelect) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                    HStack(spacing: KingdomTheme.Spacing.small) {
                         Image(systemName: "mappin.circle.fill")
+                            .font(FontStyles.iconSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text(cityName)
-                            .font(KingdomTheme.Typography.headline())
+                            .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                     }
                     
                     Text(subtitle)
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 
@@ -873,18 +868,18 @@ struct LocationOptionCard: View {
                 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                        .font(.title2)
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
             .padding(KingdomTheme.Spacing.large)
             .background(isSelected ? KingdomTheme.Colors.parchmentHighlight : KingdomTheme.Colors.parchmentLight)
-            .cornerRadius(KingdomTheme.CornerRadius.large)
+            .cornerRadius(KingdomTheme.Brutalist.cornerRadiusMedium)
             .overlay(
-                RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
+                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                     .stroke(
-                        isSelected ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.border,
-                        lineWidth: isSelected ? 2 : 1
+                        isSelected ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.border,
+                        lineWidth: isSelected ? 3 : 2
                     )
             )
         }

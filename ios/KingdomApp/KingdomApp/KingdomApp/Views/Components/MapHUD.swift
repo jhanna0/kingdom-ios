@@ -155,7 +155,8 @@ struct MapHUD: View {
                     // Help / Tutorial (icon only)
                     BrutalistIconButton(
                         icon: "questionmark",
-                        backgroundColor: KingdomTheme.Colors.inkMedium
+                        backgroundColor: KingdomTheme.Colors.inkLight,
+                        isCircular: true
                     ) {
                         showTutorial = true
                     }
@@ -322,30 +323,49 @@ struct MapHUD: View {
 struct BrutalistIconButton: View {
     let icon: String
     var backgroundColor: Color = KingdomTheme.Colors.buttonPrimary
+    var iconColor: Color = .white
     var size: CGFloat = 36
+    var isCircular: Bool = false
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Offset shadow
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .frame(width: size, height: size)
-                    .offset(x: 2, y: 2)
-                
-                // Button
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(backgroundColor)
-                    .frame(width: size, height: size)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
+                if isCircular {
+                    // Offset shadow
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: size, height: size)
+                        .offset(x: 2, y: 2)
+                    
+                    // Button
+                    Circle()
+                        .fill(backgroundColor)
+                        .frame(width: size, height: size)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                } else {
+                    // Offset shadow
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black)
+                        .frame(width: size, height: size)
+                        .offset(x: 2, y: 2)
+                    
+                    // Button
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(backgroundColor)
+                        .frame(width: size, height: size)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                }
                 
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(iconColor)
             }
         }
         .buttonStyle(PlainButtonStyle())
