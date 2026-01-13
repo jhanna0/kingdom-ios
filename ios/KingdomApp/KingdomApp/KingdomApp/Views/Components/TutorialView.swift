@@ -14,18 +14,20 @@ struct TutorialView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if isLoading {
-                        loadingView
-                    } else if let error = error {
-                        errorView(error)
-                    } else {
-                        tutorialContent
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if isLoading {
+                            loadingView
+                        } else if let error = error {
+                            errorView(error)
+                        } else {
+                            tutorialContent(proxy: proxy)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
             .parchmentBackground()
             .navigationTitle("Help Book")
@@ -88,18 +90,112 @@ struct TutorialView: View {
     
     // MARK: - Tutorial Content
     
-    private var tutorialContent: some View {
+    private func tutorialContent(proxy: ScrollViewProxy) -> some View {
         VStack(spacing: 12) {
             // Header
             headerSection
             
+            // Table of Contents
+            tableOfContents(proxy: proxy)
+            
             // Sections (demos embedded inside cards)
             ForEach(sections) { section in
                 sectionCard(section)
+                    .id(section.id)
             }
             
             Spacer(minLength: 40)
         }
+    }
+    
+    // MARK: - Table of Contents
+    
+    private func tableOfContents(proxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 32, height: 32)
+                        .offset(x: 2, y: 2)
+                    Circle()
+                        .fill(KingdomTheme.Colors.goldLight)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                    Image(systemName: "list.bullet")
+                        .font(FontStyles.iconTiny)
+                        .foregroundColor(.white)
+                }
+                
+                Text("Table of Contents")
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            .padding(12)
+            
+            Rectangle()
+                .fill(Color.black.opacity(0.15))
+                .frame(height: 1)
+                .padding(.horizontal, 12)
+            
+            // TOC Items
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(sections) { section in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(section.id, anchor: .top)
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: section.icon)
+                                .font(.system(size: 12))
+                                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                                .frame(width: 20)
+                            
+                            Text(section.title)
+                                .font(FontStyles.labelMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    
+                    if section.id != sections.last?.id {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.08))
+                            .frame(height: 1)
+                            .padding(.leading, 42)
+                    }
+                }
+            }
+        }
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black)
+                    .offset(x: 3, y: 3)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
     }
     
     // MARK: - Notification Enable Button (inline in card)

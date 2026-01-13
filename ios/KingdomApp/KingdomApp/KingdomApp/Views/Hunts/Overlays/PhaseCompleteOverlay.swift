@@ -152,7 +152,6 @@ struct PhaseCompleteOverlay: View {
     private var bannerText: String {
         if let effects = phaseResult?.effects {
             if effects["killed"]?.boolValue == true { return "SLAIN!" }
-            if effects["escaped"]?.boolValue == true { return "ESCAPED!" }
             if effects["no_trail"]?.boolValue == true { return "LOST TRAIL" }
         }
         
@@ -177,13 +176,9 @@ struct PhaseCompleteOverlay: View {
     }
     
     private var outcomeSubtitle: String {
-        if let effects = phaseResult?.effects {
-            if effects["killed"]?.boolValue == true {
-                return "The hunt was successful!"
-            }
-            if effects["escaped"]?.boolValue == true {
-                return "The prey got away..."
-            }
+        // Use backend message if available
+        if let message = phaseResult?.outcome_message, !message.isEmpty {
+            return message
         }
         
         switch currentPhase {

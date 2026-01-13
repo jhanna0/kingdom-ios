@@ -415,7 +415,6 @@ class HuntSession:
                 "meat": self.total_meat,
                 "bonus_meat": self.bonus_meat,
                 "total_meat": self.total_meat + self.bonus_meat,
-                "meat_market_value": (self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE,
                 "items": self.items_dropped,
             },
             "party_size": len(self.participants),
@@ -722,12 +721,12 @@ class HuntManager:
             update["shift_applied"] = True
             
             if roll.is_critical:
-                update["events"].append("⚡ CRITICAL HIT!")
+                update["events"].append("CRITICAL HIT!")
             else:
-                update["events"].append("✓ Success!")
+                update["events"].append("Success!")
         else:
             update["shift_applied"] = False
-            update["events"].append("✗ Miss!")
+            update["events"].append("X Miss!")
         
         # Always send updated probabilities
         update["new_probabilities"] = state.creature_probabilities.copy()
@@ -891,7 +890,7 @@ class HuntManager:
         if outcome == "no_trail":
             no_trail_chance = state.drop_table_slots.get("no_trail", 0) / total_slots if total_slots > 0 else 0
             return {
-                "message": "❌ Trail lost... The forest reveals nothing.",
+                "message": "Trail lost. The forest reveals nothing.",
                 "effects": {
                     "no_trail": True,
                     "outcome": outcome,
@@ -912,7 +911,7 @@ class HuntManager:
         animal_chance = state.drop_table_slots.get(outcome, 0) / total_slots if total_slots > 0 else 0
         
         return {
-            "message": f"🎯 Master Roll landed on {session.animal_data['icon']} {session.animal_data['name']}!",
+            "message": f"You found {session.animal_data['icon']} {session.animal_data['name']} tracks!",
             "effects": {
                 "animal_found": True,
                 "outcome": outcome,
@@ -948,7 +947,7 @@ class HuntManager:
         if outcome == "hit":
             # VICTORY! Animal slain
             return {
-                "message": f"🎯 {session.animal_data['icon']} {session.animal_data['name']} slain!",
+                "message": f"{session.animal_data['name']} slain!",
                 "effects": {
                     "killed": True,
                     "outcome": outcome,
@@ -964,9 +963,9 @@ class HuntManager:
             session.total_meat = escaped_meat
             
             if outcome == "scare":
-                message = f"💨 The {session.animal_data['name']} got spooked and fled!"
+                message = f"The {session.animal_data['name']} got spooked and fled!"
             else:  # miss
-                message = f"😤 You missed! The {session.animal_data['name']} escaped!"
+                message = f"You missed the shot! The {session.animal_data['name']} escaped!"
             
             return {
                 "message": message,
@@ -1003,9 +1002,11 @@ class HuntManager:
             self._calculate_loot(session, loot_tier)
         
         # Build message based on outcome
-        if loot_tier == "rare":
+        if loot_tier == "nothing":
+            message = "You didn't find anything this time."
+        elif loot_tier == "rare":
             items_str = ", ".join(session.items_dropped) if session.items_dropped else "Sinew"
-            message = f"✨ RARE LOOT! You found: {items_str}!"
+            message = f"RARE LOOT! You found: {items_str}!"
         else:
             message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
@@ -1182,19 +1183,17 @@ class HuntManager:
                 effects["animal_hp"] = animal_hp
                 
                 if damage >= animal_hp:
-                    outcome_message = f"🎯 {session.animal_data['name']} slain!"
+                    outcome_message = f"{session.animal_data['name']} slain!"
                     effects["killed"] = True
                 elif group_roll.success_rate < config["escape_threshold"]:
                     session.animal_escaped = True
                     outcome_message = f"The {session.animal_data['name']} escaped!"
                     effects["escaped"] = True
                 else:
-                    # Partial success - wounded but escaped (get some meat)
+                    # Animal escaped - no reward!
                     session.animal_escaped = True
-                    session.total_meat = int(session.animal_data["meat"] * ESCAPED_MEAT_PERCENT)
-                    outcome_message = f"The wounded {session.animal_data['name']} got away..."
-                    effects["wounded_escape"] = True
-                    effects["consolation_meat"] = session.total_meat
+                    outcome_message = f"The {session.animal_data['name']} got away!"
+                    effects["escaped"] = True
                 
                 # Counterattack check
                 if self.rng.random() < config["counterattack_chance"]:
@@ -1225,7 +1224,7 @@ class HuntManager:
             # Set outcome message based on loot tier
             if loot_tier == "rare":
                 item_names = [item.replace("_", " ").title() for item in session.items_dropped]
-                outcome_message = f"✨ RARE LOOT! You found: {', '.join(item_names)}!"
+                outcome_message = f"RARE LOOT! You found: {', '.join(item_names)}!"
                 effects["loot_success"] = True
             else:
                 outcome_message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
@@ -1269,7 +1268,8 @@ class HuntManager:
     def _calculate_loot(self, session: HuntSession, loot_tier: str) -> None:
         """Calculate and assign loot based on hunt results.
 
-        Two-tier system:
+        Three-tier system:
+        - NOTHING: No loot at all!
         - COMMON: Just meat
         - RARE: Meat + Sinew (only for tier 2+ animals: boar, bear, moose)
 
@@ -1278,11 +1278,18 @@ class HuntManager:
         if not session.animal_data:
             return
 
+        # NOTHING tier = no loot at all!
+        if loot_tier == "nothing":
+            session.total_meat = 0
+            session.bonus_meat = 0
+            return
+
         animal = session.animal_data
         animal_tier = animal.get("tier", 0)
 
-        # Base meat reward (always)
-        session.total_meat = animal["meat"]
+        # Base meat reward - roll from 1 to max!
+        max_meat = animal["meat"]
+        session.total_meat = random.randint(1, max_meat) if max_meat > 1 else 1
 
         # Rare tier gives bonus meat too!
         if loot_tier == "rare":
@@ -1318,7 +1325,7 @@ class HuntManager:
             return
         
         animal_name = session.animal_data.get("name", "creature") if session.animal_data else "creature"
-        animal_icon = session.animal_data.get("icon", "🎯") if session.animal_data else "🎯"
+        animal_icon = session.animal_data.get("icon", "") if session.animal_data else ""
         items_str = ", ".join([item.replace("_", " ").title() for item in session.items_dropped])
         
         # Log activity for each participant so their friends see it

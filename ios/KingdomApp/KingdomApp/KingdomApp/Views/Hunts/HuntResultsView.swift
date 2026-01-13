@@ -106,14 +106,6 @@ struct HuntResultsView: View {
                         color: KingdomTheme.Colors.buttonSuccess
                     )
                     
-                    // Gold value
-                    lootBadge(
-                        icon: "dollarsign.circle.fill",
-                        value: "\(rewards.meat_market_value)",
-                        label: "Value",
-                        color: KingdomTheme.Colors.gold
-                    )
-                    
                     // Bonus (if any)
                     if rewards.bonus_meat > 0 {
                         lootBadge(
@@ -297,10 +289,14 @@ struct HuntResultsView: View {
             }
             return "Hunt Complete"
         case .failed:
-            if viewModel.hunt?.animal_escaped == true {
-                return "Escaped!"
-            } else if viewModel.hunt?.animal == nil {
+            if viewModel.hunt?.animal == nil {
                 return "Lost Trail"
+            }
+            // Use the outcome from the last phase result (scare vs miss)
+            if let lastResult = viewModel.hunt?.phase_results.last,
+               let effects = lastResult.effects,
+               let outcome = effects["outcome"]?.stringValue {
+                return outcome == "scare" ? "Spooked!" : "Missed!"
             }
             return "Hunt Failed"
         default: return "Hunt Complete"
@@ -312,10 +308,9 @@ struct HuntResultsView: View {
         case .completed:
             return "Successful hunt!"
         case .failed:
-            if viewModel.hunt?.animal_escaped == true {
-                return "The prey got away"
-            } else if viewModel.hunt?.animal == nil {
-                return "Couldn't find any tracks"
+            // Use the backend's outcome_message
+            if let lastResult = viewModel.hunt?.phase_results.last {
+                return lastResult.outcome_message
             }
             return "Better luck next time"
         default: return ""

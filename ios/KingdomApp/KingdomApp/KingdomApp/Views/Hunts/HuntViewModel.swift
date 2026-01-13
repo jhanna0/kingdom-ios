@@ -312,8 +312,11 @@ class HuntViewModel: ObservableObject {
                 uiState = .phaseActive(currentPhase)
                 
             } else {
-                error = response.message
-                showError = true
+                // Silently ignore "cannot roll" - it's just timing, not a real error
+                if !response.message.contains("Cannot roll") {
+                    error = response.message
+                    showError = true
+                }
                 syncUIState()
             }
         } catch {

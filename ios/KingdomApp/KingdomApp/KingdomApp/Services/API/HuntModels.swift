@@ -291,7 +291,6 @@ struct HuntRewards: Codable {
     let meat: Int
     let bonus_meat: Int
     let total_meat: Int
-    let meat_market_value: Int
     let items: [String]
 }
 

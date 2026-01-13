@@ -60,7 +60,7 @@ ANIMALS = {
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "meat": 2,
+        "meat": 1,
         "description": "Fast but fragile. Common in meadows.",
     },
     "deer": {
@@ -70,7 +70,7 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 8,
+        "meat": 2,
         "description": "Graceful and alert. A worthy hunt.",
     },
     "boar": {
@@ -80,7 +80,7 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 15,
+        "meat": 3,
         "description": "Aggressive when cornered. Dangerous tusks.",
     },
     "bear": {
@@ -90,7 +90,7 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 25,
+        "meat": 4,
         "description": "The king of the forest. Approach with caution.",
     },
     "moose": {
@@ -100,7 +100,7 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 35,
+        "meat": 4,
         "description": "Massive and unpredictable. Legendary game.",
     },
 }
