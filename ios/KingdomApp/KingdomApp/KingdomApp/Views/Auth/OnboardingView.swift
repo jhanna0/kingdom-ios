@@ -344,11 +344,6 @@ struct DisplayNameStep: View {
     let onContinue: () -> Void
     
     @State private var validationResult: UsernameValidator.ValidationResult = .valid
-    @State private var showValidation = false
-    
-    var validationHints: [ValidationHint] {
-        UsernameValidator.getValidationHints(for: displayName)
-    }
     
     var isValid: Bool {
         validationResult.isValid && !displayName.isEmpty
@@ -400,46 +395,32 @@ struct DisplayNameStep: View {
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .textFieldStyle(.plain)
                         .padding(KingdomTheme.Spacing.medium)
+                        .submitLabel(.done)
                 }
                 .background(Color.white)
                 .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
                 .overlay(
                     RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
-                        .stroke(
-                            showValidation && !validationResult.isValid ? 
-                                Color.red : Color.black, 
-                            lineWidth: showValidation && !validationResult.isValid ? 3 : 2
-                        )
+                        .stroke(Color.black, lineWidth: 2)
                 )
-                .onChange(of: displayName) { oldValue, newValue in
-                    showValidation = !newValue.isEmpty
-                    validationResult = UsernameValidator.validate(newValue)
+                .onChange(of: displayName) { _, newValue in
+                    // Limit to 20 characters
+                    if newValue.count > 20 {
+                        displayName = String(newValue.prefix(20))
+                    }
+                    validationResult = UsernameValidator.validate(displayName)
                 }
                 
-                // Validation hints
-                if showValidation && !displayName.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(validationHints) { hint in
-                            HStack(spacing: 8) {
-                                Image(systemName: hint.isValid ? "checkmark.circle.fill" : "circle")
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(hint.isValid ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight)
-                                
-                                Text(hint.text)
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(hint.isValid ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
-                            }
-                        }
-                        
-                        if !validationResult.isValid && !validationResult.errorMessage.isEmpty {
-                            Text(validationResult.errorMessage)
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(.red)
-                                .padding(.top, 2)
-                        }
-                    }
-                    .padding(.top, 4)
+                // Requirements - always visible, static
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• 3-20 characters")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Text("• Letters and numbers only")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
+                .padding(.top, 4)
                 
                 Text("Must be unique across all kingdoms")
                     .font(FontStyles.labelSmall)

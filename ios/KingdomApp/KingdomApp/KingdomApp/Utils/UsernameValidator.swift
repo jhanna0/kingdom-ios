@@ -86,8 +86,14 @@ struct UsernameValidator {
 
 /// Validation hint for UI display
 struct ValidationHint: Identifiable {
-    let id = UUID()
+    let id: String  // Stable ID based on text, not random UUID
     let text: String
     let isValid: Bool
+    
+    init(text: String, isValid: Bool) {
+        self.id = text  // Use text as stable identifier
+        self.text = text
+        self.isValid = isValid
+    }
 }
 
