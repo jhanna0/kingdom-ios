@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, log_activity, set_cooldown
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity
 from .constants import WORK_BASE_COOLDOWN, FARM_COOLDOWN, FARM_GOLD_REWARD
 from .tax_utils import apply_kingdom_tax_with_bonus
 
@@ -29,28 +29,25 @@ def perform_farming(
             detail="Player state not found"
         )
     
-    # ACTION SLOT CHECK: Check if any action in the ECONOMY slot is on cooldown
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown_from_table(
-            db, current_user.id, 
-            current_action_type="farm",
-            work_cooldown=work_cooldown
+        cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
+        cooldown_result = check_and_set_slot_cooldown_atomic(
+            db, current_user.id,
+            action_type="farm",
+            cooldown_minutes=FARM_COOLDOWN,
+            expires_at=cooldown_expires
         )
         
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
             minutes = remaining // 60
             seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
+            blocking_action = cooldown_result["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Economy action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
-    
-    # Set cooldown IMMEDIATELY to prevent double-click exploits
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)
-    set_cooldown(db, current_user.id, "farm", cooldown_expires)
     
     # Check if user is checked in
     if not state.current_kingdom_id:

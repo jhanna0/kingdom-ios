@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, log_activity, set_cooldown
-from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity, get_cooldown, set_cooldown
+from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD, PATROL_COOLDOWN
 
 
 router = APIRouter()
@@ -21,6 +21,8 @@ def start_patrol(
     db: Session = Depends(get_db)
 ):
     """Start a 10-minute patrol to guard against saboteurs"""
+    from db.models.action_cooldown import ActionCooldown
+    
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -28,49 +30,52 @@ def start_patrol(
             detail="Player state not found"
         )
     
-    # ACTION SLOT CHECK: Check if any action in the SECURITY slot is on cooldown
-    if not DEV_MODE:
-        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown_from_table(
-            db, current_user.id,
-            current_action_type="patrol",
-            work_cooldown=work_cooldown
-        )
-        
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
-            minutes = remaining // 60
-            seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Security action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
-            )
-    
-    # Check if already patrolling
-    from db.models.action_cooldown import ActionCooldown
-    patrol_cooldown = db.query(ActionCooldown).filter(
-        ActionCooldown.user_id == current_user.id,
-        ActionCooldown.action_type == "patrol"
-    ).first()
-    
-    if patrol_cooldown and patrol_cooldown.expires_at and patrol_cooldown.expires_at > datetime.utcnow():
-        remaining = int((patrol_cooldown.expires_at - datetime.utcnow()).total_seconds())
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Already on patrol. {remaining}s remaining"
-        )
-    
-    # Check if user is checked in
+    # Check if user is checked in (do this first, before locking)
     if not state.current_kingdom_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must be checked into a kingdom to patrol"
         )
     
-    # Start patrol
-    patrol_end = datetime.utcnow() + timedelta(minutes=PATROL_DURATION_MINUTES)
-    set_cooldown(db, current_user.id, "patrol", patrol_end)
+    now = datetime.utcnow()
+    patrol_end = now + timedelta(minutes=PATROL_DURATION_MINUTES)
+    
+    # ATOMIC CHECK + SET for patrol
+    # Patrol is unique: we check expires_at (active patrol), not last_performed
+    if not DEV_MODE:
+        # Lock the row with FOR UPDATE to prevent race conditions
+        patrol_cooldown = db.query(ActionCooldown).filter(
+            ActionCooldown.user_id == current_user.id,
+            ActionCooldown.action_type == "patrol"
+        ).with_for_update().first()
+        
+        # Check if already patrolling (expires_at > now)
+        if patrol_cooldown and patrol_cooldown.expires_at and patrol_cooldown.expires_at > now:
+            remaining = int((patrol_cooldown.expires_at - now).total_seconds())
+            minutes = remaining // 60
+            seconds = remaining % 60
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Already on patrol. {minutes}m {seconds}s remaining"
+            )
+        
+        # Not patrolling - set the cooldown atomically (we hold the lock)
+        if patrol_cooldown:
+            patrol_cooldown.last_performed = now
+            patrol_cooldown.expires_at = patrol_end
+        else:
+            patrol_cooldown = ActionCooldown(
+                user_id=current_user.id,
+                action_type="patrol",
+                last_performed=now,
+                expires_at=patrol_end
+            )
+            db.add(patrol_cooldown)
+        
+        db.flush()
+    else:
+        # DEV_MODE: no locking, just set cooldown
+        set_cooldown(db, current_user.id, "patrol", patrol_end)
     
     # Award reputation to user_kingdoms table
     from db.models.kingdom import UserKingdom

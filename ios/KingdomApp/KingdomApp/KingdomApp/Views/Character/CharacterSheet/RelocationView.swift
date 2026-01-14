@@ -20,7 +20,7 @@ struct RelocationView: View {
                                 .font(FontStyles.headingLarge)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                             
-                            Text("Your hometown appears in royal blue on the map. You can change this once every \(status.cooldown_days) days.")
+                            Text("WARNING: You may only change your hometown every \(status.cooldown_days) days.")
                                 .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
@@ -65,7 +65,7 @@ struct RelocationView: View {
             }
         } message: {
             if let kingdomName = player.currentKingdomName {
-                Text("Set \(kingdomName) as your hometown? This will appear in royal blue on your map.")
+                Text("Set \(kingdomName) as your hometown?")
             }
         }
         .overlay {

@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, PlayerItem, Property
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown
-from .constants import WORK_BASE_COOLDOWN
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown
+from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
 router = APIRouter()
@@ -250,24 +250,30 @@ def work_on_craft(
             detail="Player state not found"
         )
     
-    # ACTION SLOT CHECK: Check if any action in the PERSONAL slot is on cooldown
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
+    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown_from_table(
+        cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
-            current_action_type="crafting",
-            work_cooldown=work_cooldown
+            action_type="crafting",
+            cooldown_minutes=cooldown_minutes,
+            expires_at=cooldown_expires
         )
         
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
             minutes = remaining // 60
             seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
+            blocking_action = cooldown_result["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Personal action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
+    else:
+        # DEV_MODE: still set cooldown for functionality, just skip the check
+        set_cooldown(db, current_user.id, "crafting", cooldown_expires)
     
     # Check if user is checked in
     if not state.current_kingdom_id:
@@ -314,10 +320,7 @@ def work_on_craft(
     )
     db.add(contribution)
     
-    # Update cooldown in action_cooldowns table
-    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-    set_cooldown(db, current_user.id, "crafting", cooldown_expires)
+    # Cooldown already set atomically at the start of the function
     state.experience += xp_earned
     
     # Check if complete

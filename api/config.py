@@ -5,7 +5,9 @@ import os
 
 # ===== DEVELOPMENT MODE =====
 # Set to True to enable development features
-DEV_MODE = os.getenv("DEV_MODE", "True").lower() == "true"
+# IMPORTANT: Defaults to False for production safety - cooldowns are enforced!
+# Set DEV_MODE=true in your environment to disable cooldowns for testing.
+DEV_MODE = os.getenv("DEV_MODE", "False").lower() == "true"
 
 # Dev mode features:
 # - Rulers can accept their own contracts

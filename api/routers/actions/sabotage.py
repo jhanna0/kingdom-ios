@@ -12,7 +12,7 @@ from db import get_db, User, Kingdom, Contract, PlayerState, ActionCooldown
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
-from .utils import check_cooldown, check_global_action_cooldown_from_table, format_datetime_iso, calculate_cooldown, set_cooldown, get_cooldown
+from .utils import check_cooldown, check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, get_cooldown
 from .constants import WORK_BASE_COOLDOWN, SABOTAGE_COOLDOWN
 from .tax_utils import apply_kingdom_tax
 
@@ -426,28 +426,28 @@ def sabotage_contract(
             detail="Player state not found"
         )
     
-    # ACTION SLOT CHECK: Check if any action in the INTELLIGENCE slot is on cooldown
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
+    cooldown_expires = datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)
     if not DEV_MODE:
-        work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
-        global_cooldown = check_global_action_cooldown_from_table(
+        cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
-            current_action_type="sabotage",
-            work_cooldown=work_cooldown
+            action_type="sabotage",
+            cooldown_minutes=SABOTAGE_COOLDOWN_HOURS * 60,
+            expires_at=cooldown_expires
         )
         
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
             minutes = remaining // 60
             seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
+            blocking_action = cooldown_result["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Intelligence action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
-    
-    # Set cooldown IMMEDIATELY to prevent double-click exploits
-    cooldown_expires = datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)
-    set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
+    else:
+        # DEV_MODE: still set cooldown for functionality, just skip the check
+        set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
     
     # Check if user has enough gold
     if state.gold < SABOTAGE_COST:

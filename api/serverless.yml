@@ -19,7 +19,7 @@ provider:
     JWT_SECRET_KEY: ${ssm:/kingdom/jwt-secret-key}
     # Apple Sign In verification
     APPLE_APP_ID: ${ssm:/kingdom/apple-app-id}  # Your iOS app's bundle ID
-    DEV_MODE: 'True'  # Set to 'False' in production!
+    DEV_MODE: 'False'  # Production mode - cooldowns enforced with atomic locking
     # WebSocket config
     CONNECTIONS_TABLE: ${self:service}-connections-${sls:stage}
     WEBSOCKET_API_ENDPOINT:

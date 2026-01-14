@@ -12,7 +12,7 @@ from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import (
     calculate_cooldown, 
-    check_global_action_cooldown_from_table, 
+    check_and_set_slot_cooldown_atomic, 
     format_datetime_iso,
     set_cooldown
 )
@@ -39,27 +39,29 @@ def work_on_contract(
         )
     
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown_from_table(
+        cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
-            current_action_type="work",
-            work_cooldown=cooldown_minutes
+            action_type="work",
+            cooldown_minutes=cooldown_minutes,
+            expires_at=cooldown_expires
         )
         
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
             minutes = remaining // 60
             seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
+            blocking_action = cooldown_result["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Building action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
-    
-    # Set cooldown IMMEDIATELY to prevent double-click exploits
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-    set_cooldown(db, current_user.id, "work", cooldown_expires)
+    else:
+        # DEV_MODE: still set cooldown for functionality, just skip the check
+        set_cooldown(db, current_user.id, "work", cooldown_expires)
     
     # Get contract from unified_contracts (kingdom buildings only)
     contract = db.query(UnifiedContract).filter(
@@ -190,27 +192,29 @@ def work_on_property_upgrade(
         )
     
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
-        global_cooldown = check_global_action_cooldown_from_table(
+        cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
-            current_action_type="work",
-            work_cooldown=cooldown_minutes
+            action_type="work",
+            cooldown_minutes=cooldown_minutes,
+            expires_at=cooldown_expires
         )
         
-        if not global_cooldown["ready"]:
-            remaining = global_cooldown["seconds_remaining"]
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
             minutes = remaining // 60
             seconds = remaining % 60
-            blocking_action = global_cooldown["blocking_action"]
+            blocking_action = cooldown_result["blocking_action"]
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Building action ({blocking_action}) is on cooldown. Wait {minutes}m {seconds}s."
             )
-    
-    # Set cooldown IMMEDIATELY to prevent double-click exploits
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-    set_cooldown(db, current_user.id, "work", cooldown_expires)
+    else:
+        # DEV_MODE: still set cooldown for functionality, just skip the check
+        set_cooldown(db, current_user.id, "work", cooldown_expires)
     
     # Get contract from unified_contracts (property contracts)
     # Property contracts use type='property', tier=1 for construction, tier>1 for upgrades

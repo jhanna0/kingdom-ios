@@ -73,6 +73,71 @@ def set_cooldown(db: Session, user_id: int, action_type: str, expires_at: dateti
         db.add(cooldown)
 
 
+def check_and_set_cooldown_atomic(
+    db: Session, 
+    user_id: int, 
+    action_type: str, 
+    cooldown_minutes: float,
+    expires_at: datetime = None
+) -> Dict:
+    """
+    ATOMIC cooldown check and set - prevents race conditions in serverless.
+    
+    Uses SELECT FOR UPDATE to lock the row, then checks + updates in one transaction.
+    This prevents the TOCTOU race where multiple Lambda instances could all pass
+    the cooldown check before any of them set the new cooldown.
+    
+    Returns:
+        {"ready": True} if action can proceed (cooldown has been set)
+        {"ready": False, "seconds_remaining": N, "blocking_action": str} if on cooldown
+    """
+    from sqlalchemy import text
+    
+    now = datetime.utcnow()
+    required_seconds = cooldown_minutes * 60
+    
+    # Lock the row with FOR UPDATE (or create if doesn't exist)
+    cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == user_id,
+        ActionCooldown.action_type == action_type
+    ).with_for_update().first()
+    
+    if cooldown and cooldown.last_performed:
+        elapsed = (now - cooldown.last_performed).total_seconds()
+        
+        if elapsed < required_seconds:
+            # Still on cooldown - return without modifying
+            remaining = int(required_seconds - elapsed)
+            return {
+                "ready": False, 
+                "seconds_remaining": remaining,
+                "blocking_action": action_type
+            }
+        
+        # Cooldown expired - update it atomically (we hold the lock)
+        cooldown.last_performed = now
+        cooldown.expires_at = expires_at
+    else:
+        # No cooldown record exists - create one
+        if cooldown:
+            # Row exists but no last_performed
+            cooldown.last_performed = now
+            cooldown.expires_at = expires_at
+        else:
+            cooldown = ActionCooldown(
+                user_id=user_id,
+                action_type=action_type,
+                last_performed=now,
+                expires_at=expires_at
+            )
+            db.add(cooldown)
+    
+    # Flush to ensure the lock is held until commit
+    db.flush()
+    
+    return {"ready": True, "seconds_remaining": 0, "blocking_action": None}
+
+
 def check_cooldown_from_table(db: Session, user_id: int, action_type: str, cooldown_minutes: float) -> Dict:
     """Check if action is off cooldown using action_cooldowns table"""
     cooldown = get_cooldown(db, user_id, action_type)
@@ -182,6 +247,106 @@ def check_global_action_cooldown_from_table(
             "blocking_action": blocking_action,
             "blocking_slot": get_action_slot(blocking_action) if blocking_action else None
         }
+    
+    return {"ready": True, "seconds_remaining": 0, "blocking_action": None, "blocking_slot": None}
+
+
+def check_and_set_slot_cooldown_atomic(
+    db: Session, 
+    user_id: int,
+    action_type: str,
+    cooldown_minutes: float,
+    expires_at: datetime = None,
+    work_cooldown: float = WORK_BASE_COOLDOWN,
+    patrol_cooldown: float = PATROL_COOLDOWN,
+    farm_cooldown: float = FARM_COOLDOWN,
+    sabotage_cooldown: float = SABOTAGE_COOLDOWN,
+    training_cooldown: float = TRAINING_COOLDOWN
+) -> Dict:
+    """
+    ATOMIC slot-based cooldown check and set - prevents race conditions in serverless.
+    
+    Uses SELECT FOR UPDATE to lock all rows in the same slot, checks if any are on cooldown,
+    and if not, sets the cooldown for the current action atomically.
+    
+    This prevents TOCTOU races where multiple Lambda instances could all pass the cooldown 
+    check before any of them set the new cooldown.
+    
+    Returns:
+        {"ready": True} if action can proceed (cooldown has been set)
+        {"ready": False, "seconds_remaining": N, "blocking_action": str} if on cooldown
+    """
+    from .action_config import get_action_slot, ACTION_SLOTS
+    
+    now = datetime.utcnow()
+    
+    action_cooldowns = {
+        "work": work_cooldown,
+        "patrol": patrol_cooldown,
+        "farm": farm_cooldown,
+        "sabotage": sabotage_cooldown,
+        "training": training_cooldown,
+        "crafting": work_cooldown,
+        "intelligence": 24 * 60,
+        "chop_wood": farm_cooldown,
+        "property_upgrade": work_cooldown,
+        "vault_heist": 168 * 60,
+    }
+    
+    # Get the slot for this action
+    current_slot = get_action_slot(action_type)
+    
+    # Find all action types in the same slot
+    actions_in_slot = [a for a, s in ACTION_SLOTS.items() if s == current_slot]
+    
+    # Lock ALL rows for this user in this slot with FOR UPDATE
+    # This prevents any other request from reading these rows until we commit
+    cooldowns = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == user_id,
+        ActionCooldown.action_type.in_(actions_in_slot)
+    ).with_for_update().all()
+    
+    # Check if any action in the slot is still on cooldown
+    max_remaining = 0
+    blocking_action = None
+    
+    for cooldown in cooldowns:
+        if cooldown.action_type in action_cooldowns and cooldown.last_performed:
+            cooldown_mins = action_cooldowns[cooldown.action_type]
+            elapsed = (now - cooldown.last_performed).total_seconds()
+            required = cooldown_mins * 60
+            remaining = required - elapsed
+            
+            if remaining > max_remaining:
+                max_remaining = remaining
+                blocking_action = cooldown.action_type
+    
+    if max_remaining > 0:
+        # Still on cooldown - return without modifying (lock will release on commit/rollback)
+        return {
+            "ready": False,
+            "seconds_remaining": int(max_remaining),
+            "blocking_action": blocking_action,
+            "blocking_slot": current_slot
+        }
+    
+    # Not on cooldown - set the cooldown for this action atomically
+    existing = next((c for c in cooldowns if c.action_type == action_type), None)
+    
+    if existing:
+        existing.last_performed = now
+        existing.expires_at = expires_at
+    else:
+        new_cooldown = ActionCooldown(
+            user_id=user_id,
+            action_type=action_type,
+            last_performed=now,
+            expires_at=expires_at
+        )
+        db.add(new_cooldown)
+    
+    # Flush to ensure the update is visible within this transaction
+    db.flush()
     
     return {"ready": True, "seconds_remaining": 0, "blocking_action": None, "blocking_slot": None}
 

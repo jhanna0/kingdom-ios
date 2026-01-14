@@ -1,11 +1,12 @@
 """
 Resource Gathering action - Click to gather wood/iron
-No backend cooldown - frontend handles 0.5s tap cooldown
+1 second backend cooldown to prevent scripted abuse
 """
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 
-from db import get_db, User
+from db import get_db, User, ActionCooldown
 from routers.auth import get_current_user
 from systems.gathering import GatherManager, GatherConfig
 from .utils import log_activity
@@ -14,6 +15,9 @@ router = APIRouter()
 
 # Singleton manager
 _gather_manager = GatherManager()
+
+# 1 second cooldown to prevent scripted abuse (frontend uses 0.5s)
+GATHER_COOLDOWN_SECONDS = 1
 
 
 @router.post("/gather")
@@ -25,8 +29,8 @@ def gather_resource(
     """
     Gather a resource (wood or iron).
     
-    NO BACKEND COOLDOWN - this is meant to be clicked rapidly.
-    Frontend handles 0.5s cooldown to prevent spam.
+    1 second backend cooldown prevents scripted abuse while allowing rapid clicking.
+    Frontend handles 0.5s cooldown for UX.
     
     Returns tier (black/brown/green/gold) and amount gathered (0-3).
     Resources are automatically added to player inventory.
@@ -37,6 +41,40 @@ def gather_resource(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Player state not found"
         )
+    
+    # ATOMIC COOLDOWN CHECK + SET - prevents scripted abuse
+    now = datetime.utcnow()
+    action_type = f"gather_{resource_type}"
+    
+    # Lock the row with FOR UPDATE
+    cooldown = db.query(ActionCooldown).filter(
+        ActionCooldown.user_id == current_user.id,
+        ActionCooldown.action_type == action_type
+    ).with_for_update().first()
+    
+    if cooldown and cooldown.last_performed:
+        elapsed = (now - cooldown.last_performed).total_seconds()
+        if elapsed < GATHER_COOLDOWN_SECONDS:
+            # Silently return empty result - don't show error for rapid clicking
+            return {
+                "resource_type": resource_type,
+                "tier": "black",
+                "amount": 0,
+                "new_total": getattr(state, GatherConfig.get_resource(resource_type)["player_field"], 0)
+            }
+        cooldown.last_performed = now
+    else:
+        if cooldown:
+            cooldown.last_performed = now
+        else:
+            cooldown = ActionCooldown(
+                user_id=current_user.id,
+                action_type=action_type,
+                last_performed=now
+            )
+            db.add(cooldown)
+    
+    db.flush()
     
     # Validate resource type
     resource_config = GatherConfig.get_resource(resource_type)

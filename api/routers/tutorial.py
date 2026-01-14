@@ -58,7 +58,10 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 - **Earn reputation** by contributing to the kingdom
 - **Defend** your territory when enemies attack
 - **Coup** the ruler if you don't like how things are run
+
+**Reputation is earned per kingdom**. Switching kingdoms resets it to 0. This prevents randoms from switching to your kingdom and couping.
 """
+
     ),
     TutorialSection(
         id="becoming_ruler",

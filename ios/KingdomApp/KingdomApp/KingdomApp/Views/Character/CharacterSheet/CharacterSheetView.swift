@@ -7,6 +7,7 @@ struct CharacterSheetView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var alertTitle = "Error"
     @State private var trainingContracts: [TrainingContract] = []
     @State private var craftingQueue: [CraftingContract] = []
     @State private var craftingCosts: CraftingCosts?
@@ -110,7 +111,7 @@ struct CharacterSheetView: View {
                 .foregroundColor(KingdomTheme.Colors.buttonPrimary)
             }
         }
-        .alert("Error", isPresented: $showError) {
+        .alert(alertTitle, isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
@@ -188,6 +189,7 @@ struct CharacterSheetView: View {
             await MainActor.run {
                 player.updateFromAPIState(playerState)
                 
+                alertTitle = "Success"
                 if response.lost_ruler_status {
                     errorMessage = "Relocated to \(response.new_hometown_name). You lost ruler status in \(response.old_hometown_name)."
                 } else {
@@ -204,6 +206,7 @@ struct CharacterSheetView: View {
             }
         } catch {
             await MainActor.run {
+                alertTitle = "Error"
                 errorMessage = error.localizedDescription
                 showError = true
                 
@@ -232,6 +235,7 @@ struct CharacterSheetView: View {
                 }
             } catch {
                 await MainActor.run {
+                    alertTitle = "Error"
                     errorMessage = error.localizedDescription
                     showError = true
                     
@@ -261,6 +265,7 @@ struct CharacterSheetView: View {
                 }
             } catch {
                 await MainActor.run {
+                    alertTitle = "Error"
                     errorMessage = error.localizedDescription
                     showError = true
                     
