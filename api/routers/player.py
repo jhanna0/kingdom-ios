@@ -247,8 +247,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     
     # Build DYNAMIC resources data - frontend renders without hardcoding!
     # Maps resource keys to player state columns (gold is in state.gold, iron in state.iron, etc.)
+    # Gold is stored as float for precise tax math, but displayed as int
     resource_column_map = {
-        "gold": state.gold,
+        "gold": int(state.gold),
         "iron": state.iron,
         "steel": state.steel,
         "wood": state.wood,
@@ -695,7 +696,7 @@ def add_gold(
     state.updated_at = datetime.utcnow()
     db.commit()
     
-    return {"success": True, "new_gold": state.gold}
+    return {"success": True, "new_gold": int(state.gold)}
 
 
 @router.post("/gold/spend")
@@ -723,7 +724,7 @@ def spend_gold(
     state.updated_at = datetime.utcnow()
     db.commit()
     
-    return {"success": True, "new_gold": state.gold}
+    return {"success": True, "new_gold": int(state.gold)}
 
 
 @router.post("/experience/add")
@@ -851,7 +852,7 @@ def train_stat(
     if state.gold < cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient gold. Need {cost}g, have {state.gold}g"
+            detail=f"Insufficient gold. Need {cost}g, have {int(state.gold)}g"
         )
     
     state.gold -= cost
@@ -865,7 +866,7 @@ def train_stat(
         "stat_display_name": display_name,
         "new_level": new_level,
         "cost": cost,
-        "remaining_gold": state.gold
+        "remaining_gold": int(state.gold)
     }
 
 
@@ -982,7 +983,7 @@ def dev_boost(
     return {
         "success": True,
         "message": "Dev boost applied!" + (" (includes +500 reputation in current kingdom)" if reputation_boosted else ""),
-        "gold": state.gold,
+        "gold": int(state.gold),
         "level": state.level,
         "skill_points": state.skill_points,
         "levels_gained": levels_gained,

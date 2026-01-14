@@ -307,7 +307,7 @@ class HuntSession:
     # Phase results
     phase_results: List[PhaseResult] = field(default_factory=list)
     
-    # Rewards (Meat + Rare Items - NO GOLD from hunts!)
+    # Rewards (Meat + Gold + Rare Items)
     total_meat: int = 0
     bonus_meat: int = 0  # From blessing bonus
     items_dropped: List[str] = field(default_factory=list)
@@ -1274,7 +1274,7 @@ class HuntManager:
         - COMMON: Just meat
         - RARE: Meat + Sinew (only for tier 2+ animals: boar, bear, moose)
 
-        NO GOLD DROPS - players can sell meat at market for gold.
+        Gold drops equal to meat earned (taxed by kingdom).
         """
         if not session.animal_data:
             return

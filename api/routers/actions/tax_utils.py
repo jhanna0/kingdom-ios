@@ -13,8 +13,8 @@ def apply_kingdom_tax(
     db: Session,
     kingdom_id: str,
     player_state: PlayerState,
-    gross_income: int
-) -> Tuple[int, int, int]:
+    gross_income: float
+) -> Tuple[float, float, int]:
     """
     Apply kingdom tax to player's income.
     
@@ -26,13 +26,13 @@ def apply_kingdom_tax(
     
     Returns:
         Tuple of (net_income, tax_amount, tax_rate):
-        - net_income: Amount player receives after tax
-        - tax_amount: Amount sent to kingdom treasury
-        - tax_rate: Tax rate percentage that was applied
+        - net_income: Amount player receives after tax (float)
+        - tax_amount: Amount sent to kingdom treasury (float)
+        - tax_rate: Tax rate percentage that was applied (int)
     
     Notes:
         - Rulers are exempt from taxes in their own kingdom
-        - Tax is rounded down (int division)
+        - Gold stored as floats for precise math; convert to int for frontend display
         - Tax is added to kingdom treasury automatically
     """
     if gross_income <= 0:
@@ -48,9 +48,9 @@ def apply_kingdom_tax(
     if kingdom.ruler_id and kingdom.ruler_id == player_state.user_id:
         return (gross_income, 0, 0)
     
-    # Calculate tax
+    # Calculate tax (precise float math - no rounding)
     tax_rate = kingdom.tax_rate
-    tax_amount = int(gross_income * tax_rate / 100)
+    tax_amount = gross_income * tax_rate / 100
     net_income = gross_income - tax_amount
     
     # Add tax to kingdom treasury
@@ -64,9 +64,9 @@ def apply_kingdom_tax_with_bonus(
     db: Session,
     kingdom_id: str,
     player_state: PlayerState,
-    base_income: int,
+    base_income: float,
     bonus_multiplier: float = 1.0
-) -> Tuple[int, int, int, int]:
+) -> Tuple[float, float, int, float]:
     """
     Apply kingdom tax to player's income, accounting for bonuses.
     
@@ -82,13 +82,13 @@ def apply_kingdom_tax_with_bonus(
     
     Returns:
         Tuple of (net_income, tax_amount, tax_rate, gross_income):
-        - net_income: Amount player receives after tax
-        - tax_amount: Amount sent to kingdom treasury
-        - tax_rate: Tax rate percentage that was applied
-        - gross_income: Income after bonus but before tax
+        - net_income: Amount player receives after tax (float)
+        - tax_amount: Amount sent to kingdom treasury (float)
+        - tax_rate: Tax rate percentage that was applied (int)
+        - gross_income: Income after bonus but before tax (float)
     """
     # Apply bonus first
-    gross_income = int(base_income * bonus_multiplier)
+    gross_income = base_income * bonus_multiplier
     
     # Then apply tax
     net_income, tax_amount, tax_rate = apply_kingdom_tax(

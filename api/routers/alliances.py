@@ -233,7 +233,7 @@ def propose_alliance(
     if state.gold < ALLIANCE_PROPOSAL_COST:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Need {ALLIANCE_PROPOSAL_COST}g to propose alliance. Have {state.gold}g"
+            detail=f"Need {ALLIANCE_PROPOSAL_COST}g to propose alliance. Have {int(state.gold)}g"
         )
     
     # Deduct gold

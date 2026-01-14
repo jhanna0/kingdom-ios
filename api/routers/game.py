@@ -223,7 +223,7 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
         "city_boundary_osm_id": kingdom.city_boundary_osm_id,
         "population": kingdom.population,
         "level": kingdom.level,
-        "treasury_gold": kingdom.treasury_gold,
+        "treasury_gold": int(kingdom.treasury_gold),
         "checked_in_players": checked_in_count,  # LIVE COUNT
         "active_citizens": active_citizens_count,  # LIVE COUNT of citizens
         "buildings": buildings,  # DYNAMIC BUILDINGS with metadata + upgrade costs
@@ -534,7 +534,7 @@ def get_my_kingdoms(
         kingdoms.append({
             "id": kingdom.id,
             "name": kingdom.name,
-            "treasury_gold": kingdom.treasury_gold,
+            "treasury_gold": int(kingdom.treasury_gold),
             "checked_in_players": checked_in_count  # LIVE COUNT
         })
     

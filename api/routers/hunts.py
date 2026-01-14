@@ -23,6 +23,7 @@ from datetime import datetime
 from db import get_db
 from db.models import User, PlayerState, PlayerInventory
 from routers.auth import get_current_user
+from routers.actions.tax_utils import apply_kingdom_tax
 from systems.hunting import HuntManager, HuntConfig, HuntPhase
 from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
 from websocket.broadcast import notify_hunt_participants, PartyEvents
@@ -97,9 +98,12 @@ def add_to_inventory(db: Session, user_id: int, item_id: str, quantity: int) -> 
 def apply_hunt_rewards(db: Session, hunt: dict) -> None:
     """Apply hunt rewards to participants.
     
-    Hunts award MEAT (not gold!) and sinew (rare) for bow crafting.
+    Hunts award MEAT + GOLD (equal amounts) and sinew (rare) for bow crafting.
+    Gold is taxed by the kingdom where the hunt takes place.
     Uses proper inventory table, not columns per item type!
     """
+    kingdom_id = hunt.get("kingdom_id")
+    
     for player_id_str, participant in hunt.get("participants", {}).items():
         player_id = int(player_id_str)
         meat_earned = participant.get("meat_earned", 0)
@@ -108,6 +112,18 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
         # Add meat to inventory
         if meat_earned > 0:
             add_to_inventory(db, player_id, "meat", meat_earned)
+        
+        # Add gold equal to meat earned (with tax)
+        if meat_earned > 0:
+            player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+            if player_state:
+                net_gold, tax_amount, tax_rate = apply_kingdom_tax(
+                    db, kingdom_id, player_state, float(meat_earned)
+                )
+                player_state.gold += net_gold
+                # Store gold earned in participant data for response
+                participant["gold_earned"] = net_gold
+                participant["gold_tax"] = tax_amount
         
         # Add rare drops (sinew, etc)
         for item_id in items_earned:
@@ -146,7 +162,7 @@ def get_hunt_config():
     Get hunt configuration for the UI.
     Includes timing, party limits, animals, phases, and drop tables.
     
-    NOTE: Hunts drop MEAT (not gold!) + sinew (rare) for bow crafting.
+    NOTE: Hunts drop MEAT + GOLD (equal amounts, gold is taxed) + sinew (rare) for bow crafting.
     """
     from systems.hunting.config import (
         PHASE_CONFIG, ANIMALS, TRACK_TIER_THRESHOLDS, DROP_TABLES, MEAT_MARKET_VALUE,
@@ -222,7 +238,7 @@ def get_hunt_config():
             "blessing": BLESSING_DROP_TABLE_DISPLAY,
         },
         "notes": {
-            "rewards": "Hunts drop MEAT + sinew (rare). NO GOLD!",
+            "rewards": "Hunts drop MEAT + GOLD (equal, taxed) + sinew (rare)",
             "sinew": "Rarer from small game, more common from big game",
             "bow": "Craft hunting bow with 10 wood + 3 sinew for +2 attack in hunts",
         },

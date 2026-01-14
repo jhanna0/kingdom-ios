@@ -390,12 +390,12 @@ def _handle_successful_sabotage(
                 "gold_paid": sabotage_cost
             },
             "rewards": {
-                "gold": net_reward,
+                "gold": int(net_reward),
                 "gold_before_tax": SABOTAGE_GOLD_REWARD,
-                "tax_amount": reward_tax,
+                "tax_amount": int(reward_tax),
                 "tax_rate": reward_tax_rate,
                 "reputation": SABOTAGE_REP_REWARD if saboteur_state.hometown_kingdom_id else 0,
-                "net_gold": net_reward - sabotage_cost
+                "net_gold": int(net_reward) - sabotage_cost
             },
             "next_sabotage_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=SABOTAGE_COOLDOWN_HOURS)),
             "statistics": {
@@ -453,7 +453,7 @@ def sabotage_contract(
     if state.gold < SABOTAGE_COST:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient gold. Need {SABOTAGE_COST}g, have {state.gold}g"
+            detail=f"Insufficient gold. Need {SABOTAGE_COST}g, have {int(state.gold)}g"
         )
     
     # Check if user is checked in

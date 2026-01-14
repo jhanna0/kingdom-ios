@@ -146,7 +146,7 @@ def get_all_resources():
         "notes": {
             "dynamic_rendering": "Frontend should render all resources from this config",
             "storage": "gold/iron/steel/wood are PlayerState columns. meat/sinew use player_inventory table.",
-            "hunting": "Hunts drop meat (always) + sinew (rare). Craft hunting bow with 10 wood + 3 sinew."
+            "hunting": "Hunts drop meat + gold (equal amounts, taxed) + sinew (rare). Craft hunting bow with 10 wood + 3 sinew."
         }
     }
 

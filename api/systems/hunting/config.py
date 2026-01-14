@@ -248,7 +248,7 @@ ANIMAL_WEIGHTS_BY_TIER = {
 #
 # The blessing phase shifts odds from common to rare.
 # Sinew is used to craft hunting bow (10 wood + 3 sinew)
-# NO GOLD DROPS! Meat can be sold at market for gold if needed.
+# Gold drops equal to meat earned (gold is taxed by kingdom).
 
 # What drops for each loot tier (applied after blessing resolution)
 LOOT_TIERS = {
@@ -431,7 +431,7 @@ ESCAPED_MEAT_PERCENT = 0.3  # 30% of normal meat if animal escapes (wounded it a
 # ============================================================
 # MEAT VALUE (for market selling)
 # ============================================================
-MEAT_MARKET_VALUE = 2  # 1 meat sells for 2 gold at market
+MEAT_MARKET_VALUE = 1  # 1 meat = 1 gold (gold is awarded directly from hunts now)
 
 
 # ============================================================

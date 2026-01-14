@@ -11,7 +11,7 @@ Moved to other tables:
 TODO: These columns should be computed on read, not stored:
 - kingdoms_ruled, total_conquests, coups_won, coups_failed, total_checkins
 """
-from sqlalchemy import Column, String, DateTime, Integer, BigInteger, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, Integer, BigInteger, Boolean, ForeignKey, Float
 from datetime import datetime
 
 from ..base import Base
@@ -33,7 +33,8 @@ class PlayerState(Base):
     current_kingdom_id = Column(String, nullable=True)
     
     # Resources (legacy columns - new items use player_inventory table!)
-    gold = Column(Integer, default=100)
+    # Gold stored as float for precise tax calculations; convert to int when sending to frontend
+    gold = Column(Float, default=100.0)
     iron = Column(Integer, default=0)
     steel = Column(Integer, default=0)
     wood = Column(Integer, default=0)

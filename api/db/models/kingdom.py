@@ -30,7 +30,8 @@ class Kingdom(Base):
     # Game state
     population = Column(Integer, default=0)
     level = Column(Integer, default=1)
-    treasury_gold = Column(Integer, default=0)
+    # Treasury stored as float for precise tax calculations; convert to int when sending to frontend
+    treasury_gold = Column(Float, default=0.0)
     checked_in_players = Column(Integer, default=0)
     
     # Buildings - NOW STORED IN kingdom_buildings TABLE!

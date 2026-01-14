@@ -307,7 +307,7 @@ def get_property_status(
             })
     
     return {
-        "player_gold": state.gold,
+        "player_gold": int(state.gold),
         "player_wood": state.wood,
         "player_reputation": current_kingdom_reputation,
         "player_level": state.level,
@@ -406,7 +406,7 @@ def purchase_land(
     if state.gold < land_price:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {land_price}g, have {state.gold}g"
+            detail=f"Not enough gold. Need {land_price}g, have {int(state.gold)}g"
         )
     
     # Validate location

@@ -25,7 +25,7 @@ def build_kingdom_updates(db: Session, user: User) -> List[Dict[str, Any]]:
             "name": kingdom.name,
             "level": kingdom.level,
             "population": kingdom.population,
-            "treasury": kingdom.treasury_gold,
+            "treasury": int(kingdom.treasury_gold),
             "open_contracts": open_contracts
         })
     

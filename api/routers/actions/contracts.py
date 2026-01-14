@@ -168,9 +168,9 @@ def work_on_contract(
         "is_complete": is_complete,
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "rewards": {
-            "gold": net_income,
-            "gold_before_tax": gross_income,
-            "tax_amount": tax_amount,
+            "gold": int(net_income),
+            "gold_before_tax": int(gross_income),
+            "tax_amount": int(tax_amount),
             "tax_rate": tax_rate,
             "experience": None,
             "reputation": None,

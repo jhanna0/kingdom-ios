@@ -115,6 +115,11 @@ class PlayerState(BaseModel):
     def serialize_timestamps(self, dt: Optional[datetime]) -> Optional[str]:
         return serialize_datetime_with_z(dt)
     
+    @field_serializer('gold')
+    def serialize_gold(self, value: float) -> int:
+        """Floor gold to integer for frontend display (stored as float for precise tax math)"""
+        return int(value)
+    
     class Config:
         from_attributes = True
 

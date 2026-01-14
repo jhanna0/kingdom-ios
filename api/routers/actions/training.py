@@ -97,7 +97,7 @@ def get_training_costs(
         "total_training_purchases": state.total_training_purchases or 0,
         "costs": costs,
         "current_stats": current_stats,
-        "gold": state.gold
+        "gold": int(state.gold)
     }
 
 
@@ -194,7 +194,7 @@ def purchase_training(
     if state.gold < training_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {training_cost}g, have {state.gold}g"
+            detail=f"Not enough gold. Need {training_cost}g, have {int(state.gold)}g"
         )
     
     # Create the contract in the database

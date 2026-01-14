@@ -304,7 +304,7 @@ def gather_intelligence(
     if state.gold < INTELLIGENCE_COST:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient gold. Need {INTELLIGENCE_COST}g, have {state.gold}g"
+            detail=f"Insufficient gold. Need {INTELLIGENCE_COST}g, have {int(state.gold)}g"
         )
     
     # Check cooldown (using action_cooldowns table)

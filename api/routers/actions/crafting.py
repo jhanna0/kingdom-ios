@@ -76,7 +76,7 @@ def get_crafting_costs(
     return {
         "costs": costs,
         "player_resources": {
-            "gold": state.gold,
+            "gold": int(state.gold),
             "iron": state.iron,
             "steel": state.steel
         }
@@ -175,7 +175,7 @@ def purchase_craft(
     if state.gold < gold_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {gold_cost}g, have {state.gold}g"
+            detail=f"Not enough gold. Need {gold_cost}g, have {int(state.gold)}g"
         )
     
     if state.iron < iron_required:

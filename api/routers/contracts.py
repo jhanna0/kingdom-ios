@@ -238,7 +238,7 @@ def create_contract(
     if kingdom.treasury_gold < upfront_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient treasury funds. Need {upfront_cost}g ({actions_required} actions × {action_reward}g/action). Have: {kingdom.treasury_gold}g"
+            detail=f"Insufficient treasury funds. Need {upfront_cost}g ({actions_required} actions × {action_reward}g/action). Have: {int(kingdom.treasury_gold)}g"
         )
     
     # Deduct upfront cost from treasury

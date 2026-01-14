@@ -1,7 +1,7 @@
 """
 Kingdom schemas
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional, List
 from datetime import datetime
 
@@ -37,7 +37,12 @@ class KingdomState(BaseModel):
     # Game state
     population: int = 0
     level: int = 1
-    treasury_gold: int = 0
+    treasury_gold: int = 0  # Stored as float in DB, serialized as int
+    
+    @field_serializer('treasury_gold')
+    def serialize_treasury(self, value: float) -> int:
+        """Floor treasury to integer for frontend display"""
+        return int(value)
     checked_in_players: int = 0
     
     # Buildings

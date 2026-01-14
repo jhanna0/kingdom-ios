@@ -291,6 +291,7 @@ struct BalanceStep: View {
                     .frame(height: 2)
                 
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    InfoBullet(text: "Exact rewards and perks are still being refined and may change")
                     InfoBullet(text: "Rewards and drop rates may change over time")
                     InfoBullet(text: "Overpowered strategies may be adjusted")
                     InfoBullet(text: "Updates focus on stability and a fair economy")

@@ -34,7 +34,7 @@ def build_player_summary(db: Session, user: User, state: PlayerState) -> Dict[st
     kingdoms_ruled = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).count()
     
     return {
-        "gold": state.gold,
+        "gold": int(state.gold),
         "level": state.level,
         "experience": state.experience,
         "xp_to_next_level": xp_to_next_level,
