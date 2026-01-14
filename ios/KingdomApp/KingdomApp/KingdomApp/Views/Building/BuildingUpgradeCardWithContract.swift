@@ -83,6 +83,28 @@ struct BuildingUpgradeCardWithContract: View {
                             .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .padding(.leading, 4)
+                        
+                        Spacer()
+                        
+                        // Estimated actions for next level (always show if not max)
+                        if !isMaxLevel && actionsRequired > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "hammer.fill")
+                                    .font(FontStyles.iconMini)
+                                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                Text("\(actionsRequired)")
+                                    .font(FontStyles.labelBold)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.parchment,
+                                cornerRadius: 6,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
+                        }
                     }
                 }
             }

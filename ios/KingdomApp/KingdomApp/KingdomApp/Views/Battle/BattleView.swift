@@ -293,6 +293,7 @@ class BattleViewModel: ObservableObject {
         let battleTypeName = battle?.isCoup == true ? "Coup" : "Invasion"
         
         // Schedule notification for when cooldown ends
+        // InAppNotificationManager intercepts these when app is in foreground
         if result.cooldownSeconds > 0 {
             Task {
                 await NotificationManager.shared.scheduleActionCooldownNotification(
@@ -329,6 +330,7 @@ class BattleViewModel: ObservableObject {
         }
         
         // Schedule battle cooldown notification if user has one
+        // InAppNotificationManager intercepts these when app is in foreground
         if battle.isBattlePhase, let cooldown = battle.battleCooldownSeconds, cooldown > 0 {
             Task {
                 await NotificationManager.shared.scheduleActionCooldownNotification(

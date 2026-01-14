@@ -163,11 +163,16 @@ struct MarketView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(viewModel.myActiveOrders) { order in
-                        OrderRowView(order: order) {
-                            Task {
-                                await viewModel.cancelOrder(orderId: order.id)
-                            }
-                        }
+                        OrderRowView(
+                            order: order,
+                            onCancel: {
+                                Task {
+                                    await viewModel.cancelOrder(orderId: order.id)
+                                }
+                            },
+                            itemDisplayName: viewModel.displayName(for: order.itemType),
+                            itemIcon: viewModel.icon(for: order.itemType)
+                        )
                     }
                 }
             }
@@ -217,13 +222,22 @@ struct MarketView: View {
                 VStack(spacing: 8) {
                     ForEach(viewModel.recentTrades.prefix(10)) { trade in
                         HStack(spacing: 12) {
+                            // Item icon and name
+                            Image(systemName: viewModel.icon(for: trade.itemType))
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(viewModel.color(for: trade.itemType))
+                            
+                            Text(viewModel.displayName(for: trade.itemType))
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
                             Text("\(trade.quantity)x @ \(trade.pricePerUnit)g")
                                 .font(FontStyles.bodyMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             
                             Spacer()
                             
-                            Text(trade.createdAt, style: .relative)
+                            Text(TimeFormatter.timeAgo(from: trade.createdAt))
                                 .font(FontStyles.labelSmall)
                                 .foregroundColor(KingdomTheme.Colors.inkLight)
                         }
@@ -271,6 +285,8 @@ struct ResourceBadge: View {
 struct OrderRowView: View {
     let order: MarketOrder
     let onCancel: () -> Void
+    var itemDisplayName: String = ""
+    var itemIcon: String = "questionmark.circle"
     
     var body: some View {
         HStack(spacing: 12) {
@@ -288,11 +304,20 @@ struct OrderRowView: View {
                 )
             
             VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Image(systemName: itemIcon)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Text(itemDisplayName.isEmpty ? order.itemType.capitalized : itemDisplayName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
                 Text("\(order.quantityRemaining)/\(order.quantityOriginal) @ \(order.pricePerUnit)g")
-                    .font(FontStyles.bodyMediumBold)
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                Text(order.createdAt, style: .relative)
+                Text(TimeFormatter.timeAgo(from: order.createdAt))
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
@@ -331,20 +356,32 @@ struct CreateOrderView: View {
         return pricePerUnit * quantity
     }
     
-    var canAfford: Bool {
-        guard orderType == .buy, let info = viewModel.marketInfo else {
-            return true
+    
+    /// How many of the selected item does the player own?
+    var playerInventoryForItem: Int {
+        viewModel.marketInfo?.playerResources[selectedItemType] ?? 0
+    }
+    
+    /// Max quantity allowed based on order type
+    var maxQuantity: Int {
+        if orderType == .sell {
+            // Can only sell what you own
+            return max(1, playerInventoryForItem)
+        } else {
+            // Can only buy what you can pay for
+            guard let info = viewModel.marketInfo, pricePerUnit > 0 else { return 1 }
+            return max(1, info.playerGold / pricePerUnit)
         }
-        return info.playerGold >= totalCost
     }
     
     var hasEnoughItems: Bool {
-        guard orderType == .sell,
-              let info = viewModel.marketInfo,
-              let available = info.playerResources[selectedItemType] else {
-            return true
-        }
-        return available >= quantity
+        guard orderType == .sell else { return true }
+        return playerInventoryForItem >= quantity
+    }
+    
+    /// Can the player sell this item? (must own at least 1)
+    var canSellItem: Bool {
+        playerInventoryForItem > 0
     }
     
     var body: some View {
@@ -365,27 +402,7 @@ struct CreateOrderView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(viewModel.availableItems) { item in
-                                        Button(action: { selectedItemType = item.itemId }) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: item.icon)
-                                                    .font(.system(size: 14, weight: .bold))
-                                                Text(item.displayName)
-                                                    .font(FontStyles.labelLarge)
-                                            }
-                                            .foregroundColor(selectedItemType == item.itemId ? .white : KingdomTheme.Colors.inkDark)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 10)
-                                            .background(
-                                                selectedItemType == item.itemId
-                                                    ? viewModel.color(for: item.itemId)
-                                                    : KingdomTheme.Colors.parchmentLight
-                                            )
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .strokeBorder(Color.black, lineWidth: 2)
-                                            )
-                                        }
+                                        itemButton(for: item)
                                     }
                                 }
                             }
@@ -411,22 +428,38 @@ struct CreateOrderView: View {
                             
                             HStack(spacing: 12) {
                                 ForEach(OrderType.allCases, id: \.self) { type in
-                                    Button(action: { orderType = type }) {
-                                        Text(type.rawValue.uppercased())
-                                            .font(FontStyles.labelLarge)
-                                            .foregroundColor(orderType == type ? .white : KingdomTheme.Colors.inkDark)
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 12)
-                                            .background(
-                                                orderType == type
-                                                    ? (type == .buy ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                                                    : KingdomTheme.Colors.parchmentLight
-                                            )
-                                            .cornerRadius(8)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(Color.black, lineWidth: 2)
-                                            )
+                                    Button(action: {
+                                        orderType = type
+                                        // Reset quantity when switching order types
+                                        // For sell: cap to inventory, for buy: reset to 1
+                                        if type == .sell {
+                                            quantity = min(quantity, max(1, playerInventoryForItem))
+                                        } else {
+                                            quantity = min(quantity, maxQuantity)
+                                        }
+                                    }) {
+                                        VStack(spacing: 4) {
+                                            Text(type.rawValue.uppercased())
+                                                .font(FontStyles.labelLarge)
+                                            
+                                            // Subtitle hint
+                                            Text(type == .buy ? "Place buy order" : "Sell from inventory")
+                                                .font(.system(size: 10))
+                                                .opacity(0.8)
+                                        }
+                                        .foregroundColor(orderType == type ? .white : KingdomTheme.Colors.inkDark)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            orderType == type
+                                                ? (type == .buy ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                                                : KingdomTheme.Colors.parchmentLight
+                                        )
+                                        .cornerRadius(8)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
                                     }
                                 }
                             }
@@ -455,15 +488,15 @@ struct CreateOrderView: View {
                                     )
                                 
                                 VStack(spacing: 8) {
-                                    incrementButton("+100") { pricePerUnit = min(10000, pricePerUnit + 100) }
-                                    incrementButton("+10") { pricePerUnit = min(10000, pricePerUnit + 10) }
-                                    incrementButton("+1") { pricePerUnit = min(10000, pricePerUnit + 1) }
+                                    incrementButton("+100") { updatePrice(min(10000, pricePerUnit + 100)) }
+                                    incrementButton("+10") { updatePrice(min(10000, pricePerUnit + 10)) }
+                                    incrementButton("+1") { updatePrice(min(10000, pricePerUnit + 1)) }
                                 }
                                 
                                 VStack(spacing: 8) {
-                                    incrementButton("-100") { pricePerUnit = max(1, pricePerUnit - 100) }
-                                    incrementButton("-10") { pricePerUnit = max(1, pricePerUnit - 10) }
-                                    incrementButton("-1") { pricePerUnit = max(1, pricePerUnit - 1) }
+                                    incrementButton("-100") { updatePrice(max(1, pricePerUnit - 100)) }
+                                    incrementButton("-10") { updatePrice(max(1, pricePerUnit - 10)) }
+                                    incrementButton("-1") { updatePrice(max(1, pricePerUnit - 1)) }
                                 }
                             }
                         }
@@ -472,9 +505,27 @@ struct CreateOrderView: View {
                         
                         // Quantity
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Quantity (1-20)")
-                                .font(FontStyles.headingMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            HStack {
+                                Text("Quantity")
+                                    .font(FontStyles.headingMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                                
+                                Spacer()
+                                
+                                // Show inventory info when selling
+                                if orderType == .sell {
+                                    HStack(spacing: 4) {
+                                        Text("You have:")
+                                            .font(FontStyles.labelMedium)
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                        Text("\(playerInventoryForItem)")
+                                            .font(FontStyles.labelLarge)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(playerInventoryForItem > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                                    }
+                                }
+                                // No cap label for buying - free market!
+                            }
                             
                             HStack(spacing: 12) {
                                 // Current quantity display
@@ -491,15 +542,32 @@ struct CreateOrderView: View {
                                     )
                                 
                                 VStack(spacing: 8) {
-                                    incrementButton("+10") { quantity = min(20, quantity + 10) }
-                                    incrementButton("+5") { quantity = min(20, quantity + 5) }
-                                    incrementButton("+1") { quantity = min(20, quantity + 1) }
+                                    incrementButton("+10") { quantity = min(maxQuantity, quantity + 10) }
+                                    incrementButton("+5") { quantity = min(maxQuantity, quantity + 5) }
+                                    incrementButton("+1") { quantity = min(maxQuantity, quantity + 1) }
                                 }
                                 
                                 VStack(spacing: 8) {
                                     incrementButton("-10") { quantity = max(1, quantity - 10) }
                                     incrementButton("-5") { quantity = max(1, quantity - 5) }
                                     incrementButton("-1") { quantity = max(1, quantity - 1) }
+                                }
+                            }
+                            
+                            // Max button for convenience
+                            if orderType == .sell && playerInventoryForItem > 1 {
+                                Button(action: { quantity = playerInventoryForItem }) {
+                                    Text("Sell All (\(playerInventoryForItem))")
+                                        .font(FontStyles.labelLarge)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(KingdomTheme.Colors.buttonDanger)
+                                        .cornerRadius(8)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
                                 }
                             }
                         }
@@ -539,32 +607,38 @@ struct CreateOrderView: View {
                         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                         
                         // Validation Messages
-                        if orderType == .buy && !canAfford {
-                            Text("Not enough gold")
-                                .font(FontStyles.labelLarge)
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
-                                )
-                        }
-                        
-                        if orderType == .sell && !hasEnoughItems {
-                            Text("Not enough \(itemDisplayName(for: selectedItemType))")
-                                .font(FontStyles.labelLarge)
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
-                                )
+                        if orderType == .sell && playerInventoryForItem == 0 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                Text("You don't have any \(itemDisplayName(for: selectedItemType)) to sell")
+                                    .font(FontStyles.labelLarge)
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
+                            )
+                        } else if orderType == .sell && !hasEnoughItems {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                                Text("Not enough \(itemDisplayName(for: selectedItemType)) - you have \(playerInventoryForItem)")
+                                    .font(FontStyles.labelLarge)
+                                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(KingdomTheme.Colors.buttonDanger, lineWidth: 2)
+                            )
                         }
                         
                         // Place Order Button
@@ -645,6 +719,65 @@ struct CreateOrderView: View {
         }
     }
     
+    /// Update price and recalculate max quantity for buy orders
+    private func updatePrice(_ newPrice: Int) {
+        pricePerUnit = newPrice
+        // For buy orders, recalculate max affordable quantity and cap if needed
+        if orderType == .buy {
+            let newMax = maxQuantity
+            if quantity > newMax {
+                quantity = max(1, newMax)
+            }
+        }
+    }
+    
+    /// Item button for the item selector
+    @ViewBuilder
+    private func itemButton(for item: MarketItem) -> some View {
+        let inventoryCount = viewModel.marketInfo?.playerResources[item.itemId] ?? 0
+        let isSelected = selectedItemType == item.itemId
+        let canSelect = orderType == .buy || inventoryCount > 0
+        
+        Button(action: {
+            selectedItemType = item.itemId
+            if orderType == .sell {
+                quantity = min(quantity, max(1, inventoryCount))
+            }
+        }) {
+            itemButtonContent(item: item, inventoryCount: inventoryCount, isSelected: isSelected, canSelect: canSelect)
+        }
+        .opacity(canSelect ? 1.0 : 0.5)
+    }
+    
+    /// Content for item button (extracted for compiler)
+    private func itemButtonContent(item: MarketItem, inventoryCount: Int, isSelected: Bool, canSelect: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: item.icon)
+                .font(.system(size: 14, weight: .bold))
+            Text(item.displayName)
+                .font(FontStyles.labelLarge)
+        }
+        .foregroundColor(isSelected ? .white : (canSelect ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkLight))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(itemButtonBackground(isSelected: isSelected, canSelect: canSelect, itemId: item.itemId))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.black, lineWidth: 2)
+        )
+    }
+    
+    private func itemButtonBackground(isSelected: Bool, canSelect: Bool, itemId: String) -> Color {
+        if isSelected {
+            return viewModel.color(for: itemId)
+        } else if canSelect {
+            return KingdomTheme.Colors.parchmentLight
+        } else {
+            return KingdomTheme.Colors.parchment.opacity(0.5)
+        }
+    }
+    
     private func incrementButton(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
@@ -662,15 +795,23 @@ struct CreateOrderView: View {
     }
     
     var isValid: Bool {
+        // Must have an item selected
+        guard !selectedItemType.isEmpty else { return false }
+        
         // Can't place order if no items available
         guard let items = viewModel.marketInfo?.availableItems, !items.isEmpty else {
             return false
         }
         
+        // Quantity must be at least 1
+        guard quantity >= 1 else { return false }
+        
         if orderType == .buy {
-            return canAfford
+            // Buy is always valid if quantity >= 1 (quantity is already capped to gold)
+            return true
         } else {
-            return hasEnoughItems
+            // For sell: must have inventory AND enough of it
+            return playerInventoryForItem > 0 && hasEnoughItems
         }
     }
     
@@ -755,18 +896,20 @@ class MarketViewModel: ObservableObject {
         }
     }
     
-    /// Load market page data (info, orders, recent trades)
+    /// Load market page data (info, orders, recent trades, available items)
     func loadMarket() async {
         do {
             async let info = api.getMarketInfo()
             async let orders = api.getMyOrders()
             async let trades = api.getRecentTrades(itemType: nil, limit: 20)  // All items
+            async let items = api.getAvailableItems()
             
-            let (infoResult, ordersResult, tradesResult) = try await (info, orders, trades)
+            let (infoResult, ordersResult, tradesResult, itemsResult) = try await (info, orders, trades, items)
             
             self.marketInfo = infoResult
             self.myActiveOrders = ordersResult.activeOrders
             self.recentTrades = tradesResult
+            self.availableItems = itemsResult.items
         } catch {
             showError(message: error.localizedDescription)
         }

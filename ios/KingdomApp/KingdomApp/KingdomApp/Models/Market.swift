@@ -205,6 +205,7 @@ struct MarketInfo: Codable {
     let kingdomId: String
     let kingdomName: String
     let marketLevel: Int
+    let canAccessMarket: Bool  // Requires home kingdom OR Merchant tier 3+
     let availableItems: [ItemType]
     let message: String?
     let playerGold: Int
@@ -216,6 +217,7 @@ struct MarketInfo: Codable {
         case kingdomId = "kingdom_id"
         case kingdomName = "kingdom_name"
         case marketLevel = "market_level"
+        case canAccessMarket = "can_access_market"
         case availableItems = "available_items"
         case message
         case playerGold = "player_gold"

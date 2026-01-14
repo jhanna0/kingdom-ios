@@ -51,6 +51,8 @@ struct GatheringView: View {
     // Animation state
     @State private var floatingNumbers: [FloatingNumber] = []
     @State private var iconColor: Color? = nil  // nil = use base color
+    @State private var currentTierLevel: Int = 0
+    @State private var iconColorLockUntil: Date? = nil
     
     var body: some View {
         ZStack {
@@ -185,7 +187,22 @@ struct GatheringView: View {
         
         guard let result = viewModel.lastResult else { return }
         
-        iconColor = result.tierColor
+        let newLevel = result.amount
+        
+        // Only update icon color if new level >= current level OR no lock
+        if newLevel >= currentTierLevel || iconColorLockUntil == nil {
+            iconColor = result.tierColor
+            currentTierLevel = newLevel
+            iconColorLockUntil = Date().addingTimeInterval(1.0)
+            
+            // Clear the lock after 1 second (color persists until next tap)
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if let lockUntil = iconColorLockUntil, Date() >= lockUntil {
+                    iconColorLockUntil = nil
+                }
+            }
+        }
         
         if let haptic = result.haptic {
             let style: UIImpactFeedbackGenerator.FeedbackStyle = haptic == "heavy" ? .heavy : .medium
@@ -196,7 +213,21 @@ struct GatheringView: View {
     }
     
     private func showCooldownFeedback() {
-        iconColor = KingdomTheme.Colors.inkDark
+        // Cooldown feedback (level 0) never overrides existing color
+        if iconColorLockUntil == nil {
+            iconColor = KingdomTheme.Colors.inkDark
+            currentTierLevel = 0
+            iconColorLockUntil = Date().addingTimeInterval(1.0)
+            
+            // Clear the lock after 1 second (color persists until next tap)
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if let lockUntil = iconColorLockUntil, Date() >= lockUntil {
+                    iconColorLockUntil = nil
+                }
+            }
+        }
+        
         spawnFloatingNumber(amount: 0, color: KingdomTheme.Colors.inkDark)
     }
     

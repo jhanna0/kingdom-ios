@@ -40,7 +40,7 @@ MAX_PARTY_SIZE = 5                     # Maximum hunters
 # - track_threshold: Minimum tracking score to encounter
 # - hp: How much "progress" needed to kill
 # - danger: How much danger it poses (affects injury)
-# - meat: Amount of meat dropped (main hunting reward!)
+# - meat: Max meat dropped (actual drop is level to 2x level, where level = tier + 1)
 
 ANIMALS = {
     "squirrel": {
@@ -50,7 +50,7 @@ ANIMALS = {
         "track_threshold": 0,     # Always findable
         "hp": 1,
         "danger": 0,
-        "meat": 1,
+        "meat": 2,                # Level 1: drops 1-2 meat
         "description": "A quick little critter. Easy prey.",
     },
     "rabbit": {
@@ -60,7 +60,7 @@ ANIMALS = {
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "meat": 1,
+        "meat": 2,                # Level 1: drops 1-2 meat
         "description": "Fast but fragile. Common in meadows.",
     },
     "deer": {
@@ -70,7 +70,7 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 2,
+        "meat": 4,                # Level 2: drops 2-4 meat
         "description": "Graceful and alert. A worthy hunt.",
     },
     "boar": {
@@ -80,7 +80,7 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 3,
+        "meat": 6,                # Level 3: drops 3-6 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
     },
     "bear": {
@@ -90,7 +90,7 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 4,
+        "meat": 8,                # Level 4: drops 4-8 meat
         "description": "The king of the forest. Approach with caution.",
     },
     "moose": {
@@ -100,7 +100,7 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 4,
+        "meat": 10,               # Level 5: drops 5-10 meat
         "description": "Massive and unpredictable. Legendary game.",
     },
 }

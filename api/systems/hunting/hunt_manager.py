@@ -960,7 +960,10 @@ class HuntManager:
         else:
             # SCARE or MISS - animal escapes
             session.animal_escaped = True
-            escaped_meat = int(session.animal_data.get("meat", 0) * ESCAPED_MEAT_PERCENT)
+            # Consolation meat based on animal level (30% of max possible)
+            animal_level = session.animal_data.get("tier", 0) + 1
+            max_possible_meat = animal_level * 2
+            escaped_meat = int(max_possible_meat * ESCAPED_MEAT_PERCENT)
             session.total_meat = escaped_meat
             
             if outcome == "scare":
@@ -1288,9 +1291,12 @@ class HuntManager:
         animal = session.animal_data
         animal_tier = animal.get("tier", 0)
 
-        # Base meat reward - roll from 1 to max!
-        max_meat = animal["meat"]
-        session.total_meat = random.randint(1, max_meat) if max_meat > 1 else 1
+        # Meat reward based on animal level: min = level, max = 2x level
+        # Tier 0 = level 1 (1-2 meat), Tier 4 = level 5 (5-10 meat)
+        animal_level = animal_tier + 1
+        min_meat = animal_level
+        max_meat = animal_level * 2
+        session.total_meat = random.randint(min_meat, max_meat)
 
         # Rare tier gives bonus meat too!
         if loot_tier == "rare":

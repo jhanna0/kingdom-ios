@@ -941,6 +941,7 @@ extension ActionsView {
         }
         
         // Schedule notification if there's a cooldown
+        // InAppNotificationManager intercepts these when app is in foreground
         if cooldownSeconds > 0 {
             await NotificationManager.shared.scheduleActionCooldownNotification(
                 actionName: actionName,

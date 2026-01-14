@@ -1,10 +1,25 @@
 """
 Market schemas - Grand Exchange style order book
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+
+def serialize_datetime_with_z(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize datetime to ISO8601 string with Z suffix for iOS compatibility"""
+    if dt is None:
+        return None
+    # Strip microseconds - Swift's .iso8601 decoder can't parse them
+    dt_no_micro = dt.replace(microsecond=0)
+    iso_str = dt_no_micro.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    elif not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+        # Naive datetime - assume UTC and add Z
+        return iso_str + 'Z'
+    return iso_str
 
 
 class OrderType(str, Enum):
@@ -51,6 +66,11 @@ class MarketOrderResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    @field_serializer('created_at', 'updated_at', 'filled_at')
+    @classmethod
+    def serialize_dt(cls, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class MarketTransactionResponse(BaseModel):
@@ -67,6 +87,11 @@ class MarketTransactionResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    @field_serializer('created_at')
+    @classmethod
+    def serialize_dt(cls, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class OrderBookEntry(BaseModel):
@@ -100,6 +125,11 @@ class PriceHistoryEntry(BaseModel):
     timestamp: datetime
     price: int
     quantity: int
+    
+    @field_serializer('timestamp')
+    @classmethod
+    def serialize_dt(cls, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
 
 
 class PriceHistory(BaseModel):
@@ -153,9 +183,12 @@ class MarketInfoResponse(BaseModel):
     kingdom_name: str
     market_level: int
     
+    # Market access - requires home kingdom OR Merchant tier 3+
+    can_access_market: bool = True
+    
     # Available items (based on kingdom buildings)
     available_items: List[str]  # List of item_ids from resources.RESOURCES
-    message: Optional[str] = None  # Message to display when no items available
+    message: Optional[str] = None  # Message to display when no access or no items
     
     # Player resources
     player_gold: int

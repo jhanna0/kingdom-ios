@@ -74,6 +74,10 @@ struct KingdomAppApp: App {
                 Task {
                     _ = await NotificationManager.shared.requestPermission()
                 }
+                
+                // Initialize in-app notification manager (sets itself as UNUserNotificationCenter delegate)
+                // This intercepts notifications when app is in foreground and shows stylish toast instead
+                _ = InAppNotificationManager.shared
             }
             // API errors use BlockingErrorWindow which is a UIKit window overlay
             // that appears above ALL content including sheets - handled by APIClient directly
@@ -352,6 +356,8 @@ struct AuthenticatedView: View {
         popupNotificationOverlay
         travelNotificationOverlay
         weatherToastOverlay
+        // In-app notifications use UIWindow overlay (InAppNotificationManager)
+        // so they appear above sheets and all other content
     }
     
     @ViewBuilder

@@ -530,13 +530,13 @@ SKILLS = {
         "stat_attribute": "merchant",
         "icon": "dollarsign.circle.fill",
         "category": "economy",
-        "description": "Reduces taxes and improves trading capacity",
+        "description": "Unlocks trading capabilities and market advantages",
         "benefits": {
-            1: ["-5% tax on all transactions", "+10% gold from building contracts"],
-            2: ["-10% tax on all transactions", "+20% gold from building contracts", "Can list 2 market orders at once"],
-            3: ["-15% tax on all transactions", "+30% gold from building contracts", "Can list 3 market orders at once"],
-            4: ["-20% tax on all transactions", "+40% gold from building contracts", "Can list 4 market orders at once"],
-            5: ["-25% tax on all transactions", "+50% gold from building contracts", "Can list 5 market orders at once", "No market listing fees"]
+            1: ["Unlocks player-to-player trading"],
+            2: ["Instant market purchases refund the difference if seller's price was lower than your bid"],
+            3: ["Ability to buy and sell to markets of other kingdoms"],
+            4: ["Receive bonus gold when buyers bid higher than your asking price"],
+            5: ["50% reduced taxes on all market transactions"]
         }
     }
 }

@@ -102,6 +102,18 @@ def create_order(
             detail="This kingdom has no market. The ruler must build a market first."
         )
     
+    # Check if player can use this market
+    # By default, you can only use the market in your HOME kingdom
+    # Merchant skill tier 3+ unlocks using markets in foreign kingdoms
+    is_home_kingdom = state.hometown_kingdom_id == state.current_kingdom_id
+    merchant_level = getattr(state, 'merchant', 0)
+    
+    if not is_home_kingdom and merchant_level < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only use the market in your home kingdom. Merchant skill tier 3 unlocks foreign market access."
+        )
+    
     # Validate item exists in RESOURCES config
     if request.item_type not in RESOURCES:
         raise HTTPException(
@@ -447,8 +459,8 @@ def get_market_info(
     
     Shows:
     - Kingdom market details
-    - Available items for trading
-    - Your resources
+    - Available items for trading (ALL tradeable items, not just what player owns)
+    - Your resources/inventory (for sell quantity limits)
     - Market activity stats
     """
     state = current_user.player_state
@@ -471,23 +483,21 @@ def get_market_info(
             detail="Kingdom not found"
         )
     
-    # Get market commodities (iron, steel, wood) - main page tabs
-    available_items = get_market_commodities(kingdom)
+    # Check if player can access this market
+    is_home_kingdom = state.hometown_kingdom_id == state.current_kingdom_id
+    merchant_level = getattr(state, 'merchant', 0)
+    can_access_market = is_home_kingdom or merchant_level >= 3
     
-    # Generate message if no commodities available
+    # Get ALL tradeable items (commodities + inventory items like meat/sinew)
+    # Users can BUY anything tradeable, SELL only what they own
+    available_items = get_all_tradeable_items(kingdom) if can_access_market else []
+    
+    # Generate message based on access
     message = None
-    if not available_items:
-        requirements = []
-        if kingdom.mine_level < 2:
-            requirements.append(f"Mine level 2 (currently {kingdom.mine_level})")
-        lumbermill_level = getattr(kingdom, 'lumbermill_level', 0)
-        if lumbermill_level < 1 and kingdom.farm_level < 1:
-            requirements.append(f"Lumbermill level 1 or Farm level 1")
-        
-        if requirements:
-            message = f"No items available for trading. Kingdom needs: {', '.join(requirements)}"
-        else:
-            message = "No items available for trading. Kingdom needs higher building levels."
+    if not can_access_market:
+        message = "You can only use the market in your home kingdom. Train Merchant to tier 3 to unlock foreign market access."
+    elif not available_items:
+        message = "No items available for trading yet."
     
     # Count active orders
     total_active_orders = db.query(func.count(MarketOrder.id)).filter(
@@ -507,10 +517,13 @@ def get_market_info(
     ).scalar()
     
     # Build player resources from both column storage and inventory
+    # This tells the frontend how much the player can SELL of each item
     player_resources = {}
     for item_id, config in RESOURCES.items():
         if config.get("storage_type") == "column":
-            player_resources[item_id] = getattr(state, item_id, 0)
+            value = getattr(state, item_id, 0)
+            # Handle float gold - convert to int for display
+            player_resources[item_id] = int(value) if isinstance(value, float) else value
         else:
             inv = db.query(PlayerInventory).filter(
                 PlayerInventory.user_id == current_user.id,
@@ -522,9 +535,10 @@ def get_market_info(
         kingdom_id=kingdom.id,
         kingdom_name=kingdom.name,
         market_level=kingdom.market_level,
+        can_access_market=can_access_market,
         available_items=available_items,
         message=message,
-        player_gold=state.gold,
+        player_gold=int(state.gold) if isinstance(state.gold, float) else state.gold,
         player_resources=player_resources,
         total_active_orders=total_active_orders or 0,
         total_transactions_24h=total_transactions_24h or 0
