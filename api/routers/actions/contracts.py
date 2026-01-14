@@ -38,10 +38,12 @@ def work_on_contract(
             detail="Player state not found"
         )
     
+    # Calculate skill-adjusted cooldown ONCE - used for both check and display
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
+    # Pass the SAME cooldown_minutes we calculated - no desync!
     if not DEV_MODE:
         cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
@@ -191,10 +193,12 @@ def work_on_property_upgrade(
             detail="Player state not found"
         )
     
+    # Calculate skill-adjusted cooldown ONCE - used for both check and display
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
+    # Pass the SAME cooldown_minutes we calculated - no desync!
     if not DEV_MODE:
         cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,

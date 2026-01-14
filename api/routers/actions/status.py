@@ -187,21 +187,29 @@ def get_action_status(
     # Each slot can have one action running - different slots can run in parallel
     from .action_config import get_action_slot, get_all_slot_definitions, get_slots_for_location, SLOT_DEFINITIONS, ACTION_SLOTS
     
+    # Map action types to their calculated cooldowns (skill-adjusted where applicable)
+    action_cooldown_map = {
+        "work": work_cooldown,
+        "farm": farm_cooldown,
+        "patrol": patrol_cooldown,
+        "training": training_cooldown,
+        "crafting": work_cooldown,  # Uses building skill
+        "scout": sabotage_cooldown,
+        "chop_wood": farm_cooldown,
+    }
+    
     slot_cooldowns = {}
     action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout", "chop_wood"]
     
     for action_type in action_types_to_check:
         slot = get_action_slot(action_type)
         if slot not in slot_cooldowns:
+            # Pass the SAME skill-adjusted cooldown that the action endpoint uses
             cooldown_info = check_global_action_cooldown_from_table(
                 db,
                 current_user.id,
                 current_action_type=action_type,
-                work_cooldown=work_cooldown, 
-                patrol_cooldown=patrol_cooldown,
-                farm_cooldown=farm_cooldown,
-                sabotage_cooldown=sabotage_cooldown,
-                training_cooldown=training_cooldown
+                cooldown_minutes=action_cooldown_map[action_type]
             )
             slot_cooldowns[slot] = cooldown_info
     

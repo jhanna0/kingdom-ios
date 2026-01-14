@@ -173,46 +173,29 @@ def check_cooldown(last_action: datetime, cooldown_minutes: float) -> Dict:
 def check_global_action_cooldown_from_table(
     db: Session, 
     user_id: int,
-    current_action_type: str = None,
-    work_cooldown: float = WORK_BASE_COOLDOWN,
-    patrol_cooldown: float = PATROL_COOLDOWN,
-    farm_cooldown: float = FARM_COOLDOWN,
-    sabotage_cooldown: float = SABOTAGE_COOLDOWN,
-    training_cooldown: float = TRAINING_COOLDOWN
+    current_action_type: str,
+    cooldown_minutes: float
 ) -> Dict:
     """
     Check if any action in the SAME SLOT is on cooldown.
     
-    NEW: Parallel action system - actions in different slots can run simultaneously!
+    Parallel action system - actions in different slots can run simultaneously!
     - building slot: work, property_upgrade
     - economy slot: farm, chop_wood
     - security slot: patrol
-    - intelligence slot: scout, sabotage, vault_heist
+    - intelligence slot: scout
     - personal slot: training, crafting
     
-    Args:
-        current_action_type: The action being attempted (to check its slot)
+    IMPORTANT: The caller must pass the skill-adjusted cooldown_minutes
+    (use calculate_cooldown() before calling). This same value is used for
+    all actions in the slot since they share the cooldown.
     """
-    # Import here to avoid circular dependency
     from .action_config import get_action_slot
     
     now = datetime.utcnow()
     
-    action_cooldowns = {
-        "work": work_cooldown,
-        "patrol": patrol_cooldown,
-        "farm": farm_cooldown,
-        "sabotage": sabotage_cooldown,
-        "training": training_cooldown,
-        "crafting": work_cooldown,
-        "intelligence": 24 * 60,  # 24 hours for intelligence gathering
-        "chop_wood": farm_cooldown,
-        "property_upgrade": work_cooldown,
-        "vault_heist": 168 * 60,  # 7 days for vault heist
-    }
-    
     # Get the slot for the action being attempted
-    current_slot = get_action_slot(current_action_type) if current_action_type else None
+    current_slot = get_action_slot(current_action_type)
     
     # Get all cooldowns for this user
     cooldowns = db.query(ActionCooldown).filter(
@@ -221,20 +204,20 @@ def check_global_action_cooldown_from_table(
     
     max_remaining = 0
     blocking_action = None
+    required_seconds = cooldown_minutes * 60
     
     for cooldown in cooldowns:
-        if cooldown.action_type in action_cooldowns and cooldown.last_performed:
+        if cooldown.last_performed:
             # PARALLEL ACTION SYSTEM: Only check actions in the SAME slot
             action_slot = get_action_slot(cooldown.action_type)
             
             # Skip actions in different slots (they can run in parallel!)
-            if current_slot and action_slot != current_slot:
+            if action_slot != current_slot:
                 continue
             
-            cooldown_minutes = action_cooldowns[cooldown.action_type]
+            # Use the passed cooldown_minutes (already skill-adjusted by caller)
             elapsed = (now - cooldown.last_performed).total_seconds()
-            required = cooldown_minutes * 60
-            remaining = required - elapsed
+            remaining = required_seconds - elapsed
             
             if remaining > max_remaining:
                 max_remaining = remaining
@@ -256,12 +239,7 @@ def check_and_set_slot_cooldown_atomic(
     user_id: int,
     action_type: str,
     cooldown_minutes: float,
-    expires_at: datetime = None,
-    work_cooldown: float = WORK_BASE_COOLDOWN,
-    patrol_cooldown: float = PATROL_COOLDOWN,
-    farm_cooldown: float = FARM_COOLDOWN,
-    sabotage_cooldown: float = SABOTAGE_COOLDOWN,
-    training_cooldown: float = TRAINING_COOLDOWN
+    expires_at: datetime = None
 ) -> Dict:
     """
     ATOMIC slot-based cooldown check and set - prevents race conditions in serverless.
@@ -272,6 +250,10 @@ def check_and_set_slot_cooldown_atomic(
     This prevents TOCTOU races where multiple Lambda instances could all pass the cooldown 
     check before any of them set the new cooldown.
     
+    IMPORTANT: The caller must pass the skill-adjusted cooldown_minutes 
+    (use calculate_cooldown() before calling this function).
+    This same value is used for BOTH checking and setting - no desync!
+    
     Returns:
         {"ready": True} if action can proceed (cooldown has been set)
         {"ready": False, "seconds_remaining": N, "blocking_action": str} if on cooldown
@@ -279,19 +261,6 @@ def check_and_set_slot_cooldown_atomic(
     from .action_config import get_action_slot, ACTION_SLOTS
     
     now = datetime.utcnow()
-    
-    action_cooldowns = {
-        "work": work_cooldown,
-        "patrol": patrol_cooldown,
-        "farm": farm_cooldown,
-        "sabotage": sabotage_cooldown,
-        "training": training_cooldown,
-        "crafting": work_cooldown,
-        "intelligence": 24 * 60,
-        "chop_wood": farm_cooldown,
-        "property_upgrade": work_cooldown,
-        "vault_heist": 168 * 60,
-    }
     
     # Get the slot for this action
     current_slot = get_action_slot(action_type)
@@ -307,15 +276,16 @@ def check_and_set_slot_cooldown_atomic(
     ).with_for_update().all()
     
     # Check if any action in the slot is still on cooldown
+    # USE THE SAME cooldown_minutes FOR ALL ACTIONS IN THE SLOT
+    # (They share the same slot, so they share the same cooldown duration)
     max_remaining = 0
     blocking_action = None
+    required_seconds = cooldown_minutes * 60
     
     for cooldown in cooldowns:
-        if cooldown.action_type in action_cooldowns and cooldown.last_performed:
-            cooldown_mins = action_cooldowns[cooldown.action_type]
+        if cooldown.last_performed:
             elapsed = (now - cooldown.last_performed).total_seconds()
-            required = cooldown_mins * 60
-            remaining = required - elapsed
+            remaining = required_seconds - elapsed
             
             if remaining > max_remaining:
                 max_remaining = remaining
@@ -349,43 +319,6 @@ def check_and_set_slot_cooldown_atomic(
     db.flush()
     
     return {"ready": True, "seconds_remaining": 0, "blocking_action": None, "blocking_slot": None}
-
-
-def check_global_action_cooldown(state, work_cooldown: float, patrol_cooldown: float = PATROL_COOLDOWN,
-                                  farm_cooldown: float = FARM_COOLDOWN,
-                                  sabotage_cooldown: float = SABOTAGE_COOLDOWN,
-                                  training_cooldown: float = TRAINING_COOLDOWN) -> Dict:
-    """Check if ANY action is on cooldown (legacy - uses player_state columns)"""
-    now = datetime.utcnow()
-    actions = [
-        ("work", state.last_work_action, work_cooldown),
-        ("patrol", state.last_patrol_action, patrol_cooldown),
-        ("farm", state.last_farm_action, farm_cooldown),
-        ("sabotage", state.last_sabotage_action, sabotage_cooldown),
-        ("training", state.last_training_action, training_cooldown),
-    ]
-    
-    max_remaining = 0
-    blocking_action = None
-    
-    for action_name, last_action, cooldown_minutes in actions:
-        if last_action:
-            elapsed = (now - last_action).total_seconds()
-            required = cooldown_minutes * 60
-            remaining = required - elapsed
-            
-            if remaining > max_remaining:
-                max_remaining = remaining
-                blocking_action = action_name
-    
-    if max_remaining > 0:
-        return {
-            "ready": False,
-            "seconds_remaining": int(max_remaining),
-            "blocking_action": blocking_action
-        }
-    
-    return {"ready": True, "seconds_remaining": 0, "blocking_action": None}
 
 
 def get_equipped_items(db: Session, user_id: int) -> Dict:

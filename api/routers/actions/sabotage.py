@@ -431,7 +431,7 @@ def sabotage_contract(
     if not DEV_MODE:
         cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
-            action_type="sabotage",
+            action_type="scout",
             cooldown_minutes=SABOTAGE_COOLDOWN_HOURS * 60,
             expires_at=cooldown_expires
         )
@@ -447,7 +447,7 @@ def sabotage_contract(
             )
     else:
         # DEV_MODE: still set cooldown for functionality, just skip the check
-        set_cooldown(db, current_user.id, "sabotage", cooldown_expires)
+        set_cooldown(db, current_user.id, "scout", cooldown_expires)
     
     # Check if user has enough gold
     if state.gold < SABOTAGE_COST:

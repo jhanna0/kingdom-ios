@@ -349,7 +349,7 @@ def get_action_config(action_type: str) -> dict:
 
 
 def get_action_cooldown(action_type: str) -> float:
-    """Get cooldown in minutes for an action"""
+    """Get BASE cooldown in minutes for an action (before skill adjustment)"""
     config = get_action_config(action_type)
     return config.get("cooldown_minutes", 120)  # Default 2 hours
 
