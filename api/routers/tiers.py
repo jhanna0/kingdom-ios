@@ -8,6 +8,17 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/tiers", tags=["tiers"])
 
 
+# ===== SCALING CONSTANTS =====
+# Kingdom building contract costs scale with level and population
+
+BUILDING_BASE_CONSTRUCTION_COST = 1000
+BUILDING_LEVEL_COST_EXPONENT = 1.7
+BUILDING_POPULATION_COST_DIVISOR = 50
+BUILDING_BASE_ACTIONS_REQUIRED = 100
+BUILDING_LEVEL_ACTIONS_EXPONENT = 1.7
+BUILDING_POPULATION_ACTIONS_DIVISOR = 30
+
+
 # ===== PROPERTY TIERS - FULLY DYNAMIC =====
 # Add new tiers here and they'll appear in iOS automatically!
 # upgrade_costs: Resources required to upgrade TO this tier (from previous tier)

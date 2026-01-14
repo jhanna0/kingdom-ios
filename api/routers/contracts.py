@@ -20,35 +20,12 @@ from websocket.broadcast import notify_kingdom, KingdomEvents
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
-
-# ===== SCALING CONSTANTS =====
-BASE_CONSTRUCTION_COST = 1000
-LEVEL_COST_EXPONENT = 1.7
-POPULATION_COST_DIVISOR = 50
-BASE_ACTIONS_REQUIRED = 100
-LEVEL_ACTIONS_EXPONENT = 1.7
-POPULATION_ACTIONS_DIVISOR = 30
-
-
-def calculate_base_hours(building_type: str, building_level: int, population: int) -> float:
-    """Calculate base hours required based on building type, level, and population"""
-    base_hours = 2.0 * math.pow(2.0, building_level - 1)
-    population_multiplier = 1.0 + (population / 30.0)
-    return base_hours * population_multiplier
-
-
-def calculate_construction_cost(building_level: int, population: int) -> int:
-    """Calculate upfront construction cost"""
-    base_cost = BASE_CONSTRUCTION_COST * math.pow(LEVEL_COST_EXPONENT, building_level - 1)
-    population_multiplier = 1.0 + (population / POPULATION_COST_DIVISOR)
-    return int(base_cost * population_multiplier)
-
-
-def calculate_actions_required(building_type: str, building_level: int, population: int) -> int:
-    """Calculate total actions required"""
-    base_actions = BASE_ACTIONS_REQUIRED * math.pow(LEVEL_ACTIONS_EXPONENT, building_level - 1)
-    population_multiplier = 1.0 + (population / POPULATION_ACTIONS_DIVISOR)
-    return int(base_actions * population_multiplier)
+# Import centralized kingdom calculations
+from services.kingdom_service import (
+    get_active_citizens_count,
+    calculate_actions_required,
+    calculate_construction_cost,
+)
 
 
 def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
@@ -247,11 +224,13 @@ def create_contract(
             detail=f"Kingdom already has an active contract for {existing_contract.type}"
         )
     
-    # Calculate actions required
+    # Calculate actions required using LIVE citizen count (players with this kingdom as hometown)
+    active_citizens_count = get_active_citizens_count(db, kingdom_id)
+    
     if total_actions_required:
         actions_required = total_actions_required
     else:
-        actions_required = calculate_actions_required(building_type, building_level, base_population)
+        actions_required = calculate_actions_required(building_type, building_level, active_citizens_count)
     
     # Calculate upfront cost: actions_required × action_reward
     upfront_cost = actions_required * action_reward

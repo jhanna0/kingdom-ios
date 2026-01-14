@@ -109,7 +109,7 @@ def list_kingdoms(
 @router.get("/kingdoms/{kingdom_id}")
 def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     """Get kingdom details with building upgrade costs"""
-    from routers.contracts import calculate_actions_required, calculate_construction_cost
+    from services.kingdom_service import calculate_actions_required, calculate_construction_cost, get_active_citizens_count
     from routers.tiers import BUILDING_TYPES
     from schemas.common import BUILDING_COLORS
     from db.models import PlayerState, UserKingdom
@@ -136,10 +136,7 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     ).count()
     
     # CALCULATE LIVE: Count active citizens (alive citizens whose hometown is this kingdom)
-    active_citizens_count = db.query(PlayerState).filter(
-        PlayerState.hometown_kingdom_id == kingdom.id,
-        PlayerState.is_alive == True
-    ).count()
+    active_citizens_count = get_active_citizens_count(db, kingdom.id)
     
     # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata with upgrade costs
     # Read from kingdom_buildings table (NEW WAY) with fallback to columns (OLD WAY)
@@ -161,12 +158,13 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
             level = getattr(kingdom, level_attr, 0)
         
         # Calculate upgrade cost for next level (None if at max)
+        # Use LIVE citizen count (players with this kingdom as hometown) for scaling
         max_level = building_meta["max_tier"]
         upgrade_cost = None
         if level < max_level:
             next_level = level + 1
-            actions = calculate_actions_required(building_meta["display_name"], next_level, kingdom.population)
-            construction_cost = calculate_construction_cost(next_level, kingdom.population)
+            actions = calculate_actions_required(building_meta["display_name"], next_level, active_citizens_count)
+            construction_cost = calculate_construction_cost(next_level, active_citizens_count)
             upgrade_cost = {
                 "actions_required": actions,
                 "construction_cost": construction_cost,

@@ -109,16 +109,8 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         current_players = {kingdom_id: count for kingdom_id, count in player_counts}
     
     # Count active citizens (all alive citizens whose hometown is this kingdom)
-    active_citizens = {}
-    if kingdom_ids:
-        citizen_counts = db.query(
-            PlayerState.hometown_kingdom_id,
-            func.count(PlayerState.user_id)
-        ).filter(
-            PlayerState.hometown_kingdom_id.in_(kingdom_ids),
-            PlayerState.is_alive == True
-        ).group_by(PlayerState.hometown_kingdom_id).all()
-        active_citizens = {kingdom_id: count for kingdom_id, count in citizen_counts}
+    from services.kingdom_service import get_active_citizens_batch
+    active_citizens = get_active_citizens_batch(db, kingdom_ids)
     
     # Build result
     result = {}
@@ -225,7 +217,11 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
         # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
         # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
         # Import cost calculation functions
-        from routers.contracts import calculate_actions_required, calculate_construction_cost
+        from services.kingdom_service import calculate_actions_required, calculate_construction_cost, get_active_citizens_count
+        
+        # CALCULATE LIVE: Get citizen count for this kingdom for accurate cost calculation
+        # Must calculate this BEFORE the building loop since we need it for upgrade costs
+        citizen_count_for_cost = active_citizens.get(kingdom.id, 0)
         
         buildings = []
         for building_type, building_meta in BUILDING_TYPES.items():
@@ -238,8 +234,9 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             max_level = building_meta["max_tier"]
             if level < max_level:
                 next_level = level + 1
-                actions = calculate_actions_required(building_meta["display_name"], next_level, kingdom.population)
-                construction_cost = calculate_construction_cost(next_level, kingdom.population)
+                # Use LIVE citizen count for accurate cost calculation (not stale kingdom.population)
+                actions = calculate_actions_required(building_meta["display_name"], next_level, citizen_count_for_cost)
+                construction_cost = calculate_construction_cost(next_level, citizen_count_for_cost)
                 upgrade_cost = BuildingUpgradeCost(
                     actions_required=actions,
                     construction_cost=construction_cost,
