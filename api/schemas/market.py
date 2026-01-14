@@ -183,6 +183,9 @@ class MarketInfoResponse(BaseModel):
     kingdom_name: str
     market_level: int
     
+    # Current player info (for determining trade direction in recent trades)
+    player_id: int
+    
     # Market access - requires home kingdom OR Merchant tier 3+
     can_access_market: bool = True
     

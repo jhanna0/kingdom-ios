@@ -535,6 +535,7 @@ def get_market_info(
         kingdom_id=kingdom.id,
         kingdom_name=kingdom.name,
         market_level=kingdom.market_level,
+        player_id=current_user.id,
         can_access_market=can_access_market,
         available_items=available_items,
         message=message,

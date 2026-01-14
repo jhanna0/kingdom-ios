@@ -28,7 +28,7 @@ from sqlalchemy import and_, or_
 from typing import List, Optional, Tuple
 from datetime import datetime
 
-from db.models import MarketOrder, MarketTransaction, OrderType, OrderStatus, PlayerState, User, PlayerInventory
+from db.models import MarketOrder, MarketTransaction, OrderType, OrderStatus, PlayerState, User, PlayerInventory, Kingdom
 from routers.resources import RESOURCES
 
 
@@ -146,10 +146,20 @@ class MarketMatchingEngine:
                 
                 remaining_quantity -= match_quantity
                 
-                # Refund buyer for price improvement
+                # Handle price difference (buyer bid higher than seller's ask)
                 price_diff = price_per_unit - match_price
                 if price_diff > 0:
-                    state.gold += price_diff * match_quantity
+                    diff_gold = price_diff * match_quantity
+                    buyer_merchant_level = getattr(state, 'merchant', 0)
+                    
+                    if buyer_merchant_level >= 2:
+                        # Merchant T2: Buyer keeps the excess
+                        state.gold += diff_gold
+                    else:
+                        # No perk: Excess goes to kingdom treasury
+                        kingdom = self.db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+                        if kingdom:
+                            kingdom.treasury_gold += diff_gold
         
         else:  # SELL order
             # Match against buy orders (highest price first, then FIFO)
@@ -198,10 +208,31 @@ class MarketMatchingEngine:
                 
                 remaining_quantity -= match_quantity
                 
-                # Seller gets price improvement
+                # Handle price difference (buyer paid more than seller asked)
                 price_diff = match_price - price_per_unit
                 if price_diff > 0:
-                    state.gold += price_diff * match_quantity
+                    diff_gold = price_diff * match_quantity
+                    seller_merchant_level = getattr(state, 'merchant', 0)
+                    
+                    # Get the buyer's merchant level to check T2
+                    buyer_user = self.db.query(User).filter(User.id == buy_order.player_id).first()
+                    buyer_merchant_level = 0
+                    if buyer_user and buyer_user.player_state:
+                        buyer_merchant_level = getattr(buyer_user.player_state, 'merchant', 0)
+                    
+                    if buyer_merchant_level >= 2:
+                        # Buyer has T2: They get the refund (already locked gold is returned)
+                        # The buyer's gold was already locked when they placed the order
+                        # So we need to refund them the difference
+                        buyer_user.player_state.gold += diff_gold
+                    elif seller_merchant_level >= 4:
+                        # Seller has T4 (and buyer doesn't have T2): Seller gets the bonus
+                        state.gold += diff_gold
+                    else:
+                        # Neither has the perk: Goes to kingdom treasury
+                        kingdom = self.db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+                        if kingdom:
+                            kingdom.treasury_gold += diff_gold
         
         # Update our order's remaining quantity and status
         order.quantity_remaining = remaining_quantity
@@ -281,12 +312,31 @@ class MarketMatchingEngine:
         buyer_state = buyer.player_state
         seller_state = seller.player_state
         
+        # Get kingdom for taxes
+        kingdom = self.db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+        
         # Transfer resources
         # Buyer receives items
         self._modify_player_resource(buyer_state, item_type, quantity)
         
-        # Seller receives gold
-        seller_state.gold += total_gold
+        # Apply tax to seller's income
+        # Tax goes to the kingdom where the trade happens
+        tax_rate = kingdom.tax_rate if kingdom else 0
+        
+        # Check for Merchant T5: 50% reduced taxes
+        seller_merchant_level = getattr(seller_state, 'merchant', 0)
+        if seller_merchant_level >= 5:
+            tax_rate = tax_rate // 2  # 50% reduced taxes
+        
+        tax_amount = int(total_gold * tax_rate / 100)
+        net_gold = total_gold - tax_amount
+        
+        # Seller receives gold after tax
+        seller_state.gold += net_gold
+        
+        # Kingdom treasury receives tax
+        if kingdom and tax_amount > 0:
+            kingdom.treasury_gold += tax_amount
         
         # Create transaction record
         # Note: order_id fields are nullable to allow creating transaction before order exists
@@ -299,7 +349,7 @@ class MarketMatchingEngine:
             sell_order_id=sell_order_id,
             quantity=quantity,
             price_per_unit=price_per_unit,
-            total_gold=total_gold
+            total_gold=total_gold  # Store gross amount, tax is applied separately
         )
         self.db.add(transaction)
         

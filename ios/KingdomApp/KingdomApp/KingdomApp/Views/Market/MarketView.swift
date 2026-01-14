@@ -102,21 +102,7 @@ struct MarketView: View {
                 
                 Spacer()
             }
-            
-            // Resources
-            HStack(spacing: 16) {
-                ResourceBadge(icon: "g.circle.fill", value: info.playerGold, color: KingdomTheme.Colors.goldLight)
-                
-                if let iron = info.playerResources["iron"] {
-                    ResourceBadge(icon: "gearshape.fill", value: iron, color: .gray)
-                }
-                if let steel = info.playerResources["steel"] {
-                    ResourceBadge(icon: "wrench.and.screwdriver.fill", value: steel, color: .blue)
-                }
-                if let wood = info.playerResources["wood"] {
-                    ResourceBadge(icon: "tree.fill", value: wood, color: .brown)
-                }
-            }
+        
         }
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
@@ -221,27 +207,7 @@ struct MarketView: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(viewModel.recentTrades.prefix(10)) { trade in
-                        HStack(spacing: 12) {
-                            // Item icon and name
-                            Image(systemName: viewModel.icon(for: trade.itemType))
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(viewModel.color(for: trade.itemType))
-                            
-                            Text(viewModel.displayName(for: trade.itemType))
-                                .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Text("\(trade.quantity)x @ \(trade.pricePerUnit)g")
-                                .font(FontStyles.bodyMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            
-                            Spacer()
-                            
-                            Text(TimeFormatter.timeAgo(from: trade.createdAt))
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
-                        }
-                        .padding(.vertical, 8)
+                        recentTradeRow(trade: trade)
                     }
                 }
             }
@@ -249,6 +215,52 @@ struct MarketView: View {
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
+    }
+    
+    // MARK: - Recent Trade Row
+    
+    private func recentTradeRow(trade: MarketTransaction) -> some View {
+        let playerId = viewModel.marketInfo?.playerId
+        let isBuyer = trade.buyerId == playerId
+        let isSeller = trade.sellerId == playerId
+        
+        return HStack(spacing: 8) {
+            // Direction arrow (if player is involved)
+            if isBuyer {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+            } else if isSeller {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+            } else {
+                // Not involved - show neutral swap icon
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+            }
+            
+            // Item icon and name
+            Image(systemName: viewModel.icon(for: trade.itemType))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(viewModel.color(for: trade.itemType))
+            
+            Text(viewModel.displayName(for: trade.itemType))
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Text("\(trade.quantity)x @ \(trade.pricePerUnit)g")
+                .font(FontStyles.bodyMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            Spacer()
+            
+            Text(TimeFormatter.timeAgo(from: trade.createdAt))
+                .font(FontStyles.labelSmall)
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+        }
+        .padding(.vertical, 8)
     }
     
 }
