@@ -125,7 +125,8 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,
             "status": "completed" if contract.completed_at else "in_progress",
-            "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None
+            "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
+            "endpoint": f"/actions/work-property/{contract.id}"
         })
     
     return result

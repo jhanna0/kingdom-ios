@@ -473,8 +473,8 @@ SKILLS = {
             1: ["-5% action cooldowns"],
             2: ["-8% action cooldowns"],
             3: ["-12% action cooldowns"],
-            4: ["-15% action cooldowns", "5% chance to refund action cooldown"],
-            5: ["-18% action cooldowns", "10% chance to refund action cooldown"]
+            4: ["-15% action cooldowns", "10% chance to refund action cooldown"],
+            5: ["-18% action cooldowns", "Ability to build two actions at once"]
         },
         "mechanics": {
             "cooldown_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},

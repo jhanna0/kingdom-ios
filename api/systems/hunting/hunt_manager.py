@@ -915,9 +915,9 @@ class HuntManager:
         
         state.is_resolved = True
         
-        # Broadcast rare loot drops to friends' activity feeds
-        if state.phase == HuntPhase.BLESSING and result.get("effects", {}).get("is_rare"):
-            self._broadcast_rare_loot(db, session)
+        # Broadcast item drops to friends' activity feeds (fur, sinew, rabbit's foot, etc.)
+        if state.phase == HuntPhase.BLESSING and session.items_dropped:
+            self._broadcast_loot_drop(db, session, loot_tier)
         
         # Create phase result for history
         from ..rolls import GroupRollResult, RollResult as EngineRollResult
@@ -1157,7 +1157,11 @@ class HuntManager:
         # Common outcomes FIRST (low rolls), rare outcomes LAST (high rolls)
         TRACK_ORDER = ["no_trail", "squirrel", "rabbit", "deer", "boar", "bear", "moose"]
         ATTACK_ORDER = ["scare", "miss", "hit"]  # Bad → Good
-        BLESSING_ORDER = ["nothing", "common", "rare"]  # Nothing → Common → Rare
+        # !!! CRITICAL: This list MUST match BLESSING_DROP_TABLE keys in config.py !!!
+        # !!! If you add a new loot tier to BLESSING_DROP_TABLE, ADD IT HERE TOO !!!
+        # !!! Missing tiers get absorbed into the next tier - players get wrong drops !!!
+        # !!! This bug has broken the game TWICE now. Don't let it happen again. !!!
+        BLESSING_ORDER = ["nothing", "common", "uncommon", "rare"]  # Nothing → Common → Uncommon → Rare
         
         # Determine which order to use based on the keys present
         if "no_trail" in slots:
@@ -1459,10 +1463,12 @@ class HuntManager:
             p.meat_earned = meat_per_player + bonus
             p.items_earned = session.items_dropped.copy()  # Everyone gets all drops (for now)
     
-    def _broadcast_rare_loot(self, db, session: HuntSession) -> None:
+    def _broadcast_loot_drop(self, db, session: HuntSession, loot_tier: str) -> None:
         """
-        Broadcast rare loot drop to all participants' activity feeds.
+        Broadcast item drops to all participants' activity feeds.
         This shows up in their friends' activity feeds!
+        
+        Broadcasts fur, sinew, rabbit's foot - any item drop worth sharing.
         """
         if not session.items_dropped:
             return
@@ -1471,14 +1477,22 @@ class HuntManager:
         animal_icon = session.animal_data.get("icon", "") if session.animal_data else ""
         items_str = ", ".join([item.replace("_", " ").title() for item in session.items_dropped])
         
+        # Different messaging based on rarity
+        if loot_tier == "rare":
+            action_type = "rare_loot"
+            description = f"Found rare loot hunting {animal_icon} {animal_name}: {items_str}!"
+        else:
+            action_type = "loot_drop"
+            description = f"Found {items_str} hunting {animal_icon} {animal_name}!"
+        
         # Log activity for each participant so their friends see it
         for participant in session.participants.values():
             log_activity(
                 db=db,
                 user_id=participant.player_id,
-                action_type="rare_loot",
+                action_type=action_type,
                 action_category="hunt",
-                description=f"Found rare loot hunting {animal_icon} {animal_name}: {items_str}!",
+                description=description,
                 kingdom_id=session.kingdom_id,
                 amount=None,
                 details={
@@ -1486,6 +1500,7 @@ class HuntManager:
                     "animal_name": animal_name,
                     "animal_icon": animal_icon,
                     "items": session.items_dropped,
+                    "loot_tier": loot_tier,
                     "party_size": len(session.participants),
                     "total_meat": session.total_meat + session.bonus_meat,
                 },

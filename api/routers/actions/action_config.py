@@ -113,7 +113,7 @@ ACTION_TYPES = {
         "cooldown_minutes": 120,  # 2 hours
         "theme_color": "buttonPrimary",
         "display_order": 1,
-        "endpoint": "/actions/property/{contract_id}/work",
+        "endpoint": "/actions/work-property/{contract_id}",
         "always_unlocked": False,
         "requirements": {
             "property": "owned",

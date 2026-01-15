@@ -192,6 +192,11 @@ ATTACK_SHIFT_PER_SUCCESS = {
 # Four-tier system: prayers shift odds from nothing → meat → fur → sinew
 # Common creatures (tier 0-1) have higher chance of no loot
 # Rare creatures (tier 3-4) are almost guaranteed loot
+#
+# !!! CRITICAL: If you add/remove tiers here, you MUST also update !!!
+# !!! BLESSING_ORDER in hunt_manager.py _roll_on_drop_table() !!!
+# !!! Missing tiers cause drops to go to the WRONG tier. Game-breaking bug. !!!
+#
 BLESSING_DROP_TABLE = {
     "nothing": 25,    # No loot at all
     "common": 62,     # Just meat

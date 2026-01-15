@@ -409,7 +409,7 @@ struct ActionsView: View {
                     globalCooldownActive: !isReady,
                     blockingAction: cooldown?.blockingAction,
                     globalCooldownSecondsRemaining: remainingSeconds,
-                    onAction: { performPropertyUpgrade(contractId: contract.id) }
+                    onAction: { performPropertyUpgrade(contract: contract) }
                 )
             }
         }
@@ -833,10 +833,16 @@ extension ActionsView {
         }
     }
     
-    private func performPropertyUpgrade(contractId: String) {
+    private func performPropertyUpgrade(contract: PropertyUpgradeContract) {
+        guard let endpoint = contract.endpoint else {
+            errorMessage = "Action not available (no endpoint)"
+            showError = true
+            return
+        }
+        
         Task {
             do {
-                let response = try await KingdomAPIService.shared.actions.workOnPropertyUpgrade(contractId: contractId)
+                let response = try await KingdomAPIService.shared.actions.performGenericAction(endpoint: endpoint)
                 
                 await loadActionStatus(force: true)
                 await viewModel.refreshPlayerFromBackend()

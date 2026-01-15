@@ -39,6 +39,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let cost: Int
     let status: String
     let startedAt: String
+    let endpoint: String?  // Dynamic endpoint from backend
     
     var id: String { contractId }
     
@@ -53,6 +54,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
         case actionsCompleted = "actions_completed"
         case cost
         case startedAt = "started_at"
+        case endpoint
     }
     
     var progress: Double {
