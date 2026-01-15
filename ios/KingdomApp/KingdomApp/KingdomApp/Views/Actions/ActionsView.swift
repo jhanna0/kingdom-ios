@@ -38,6 +38,10 @@ struct ActionsView: View {
     @State private var isInitiatingBattle = false
     @State private var initiatedBattleId: Int?
     
+    // Confirmation state for dangerous actions (coups/invasions)
+    @State private var showBattleConfirmation = false
+    @State private var pendingBattleAction: ActionStatus?
+    
     var currentKingdom: Kingdom? {
         guard let currentKingdomId = viewModel.player.currentKingdom else {
             return nil
@@ -90,6 +94,19 @@ struct ActionsView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .alert(pendingBattleAction?.title ?? "Confirm Action", isPresented: $showBattleConfirmation) {
+            Button("Cancel", role: .cancel) {
+                pendingBattleAction = nil
+            }
+            Button(pendingBattleAction?.title ?? "Confirm", role: .destructive) {
+                if let action = pendingBattleAction {
+                    executeBattleInitiation(action: action)
+                }
+                pendingBattleAction = nil
+            }
+        } message: {
+            Text(getBattleConfirmationMessage())
         }
         .overlay {
             if showReward, let reward = currentReward {
@@ -571,8 +588,32 @@ struct ActionsView: View {
     
     // MARK: - Battle Actions (Dynamic - backend provides endpoint)
     
-    /// Initiate a battle (coup or invasion) - backend tells us the endpoint
+    /// Show confirmation before initiating a battle (coup or invasion)
     private func initiateBattle(action: ActionStatus) {
+        pendingBattleAction = action
+        showBattleConfirmation = true
+    }
+    
+    /// Get confirmation message for pending battle action
+    private func getBattleConfirmationMessage() -> String {
+        guard let action = pendingBattleAction else {
+            return "Are you sure you want to proceed?"
+        }
+        
+        let kingdomName = currentKingdom?.name ?? "this kingdom"
+        
+        // Customize message based on action type
+        if action.endpoint?.contains("invasion") == true {
+            return "You are about to declare war on \(kingdomName). This will start a battle that other players can join. Are you sure?"
+        } else if action.endpoint?.contains("coup") == true {
+            return "You are about to stage a coup in \(kingdomName). This will challenge the current ruler for control. Are you sure?"
+        } else {
+            return action.description ?? "Are you sure you want to proceed with this action?"
+        }
+    }
+    
+    /// Actually execute the battle initiation after confirmation
+    private func executeBattleInitiation(action: ActionStatus) {
         guard let endpoint = action.endpoint else {
             errorMessage = "No endpoint provided"
             showError = true
