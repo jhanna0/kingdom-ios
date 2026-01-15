@@ -21,10 +21,11 @@ from typing import Optional, List, Dict
 from datetime import datetime
 
 from db import get_db
-from db.models import User, PlayerState, PlayerInventory
+from db.models import User, PlayerState, PlayerInventory, Kingdom
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
 from systems.hunting import HuntManager, HuntConfig, HuntPhase
+from systems.hunting.config import HUNTING_PERMIT_COST, HUNTING_PERMIT_DURATION_MINUTES
 from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
 from websocket.broadcast import notify_hunt_participants, PartyEvents
 
@@ -323,6 +324,11 @@ def get_hunt_config():
             "sinew": "Rarer drop from boar and larger game - used to craft hunting bow",
             "bow": "Craft hunting bow with 10 wood + 3 sinew for +2 attack in hunts",
         },
+        "hunting_permit": {
+            "cost": HUNTING_PERMIT_COST,
+            "duration_minutes": HUNTING_PERMIT_DURATION_MINUTES,
+            "description": "Required to hunt in kingdoms other than your hometown",
+        },
     }
 
 
@@ -349,6 +355,126 @@ def get_kingdom_hunt(
     return {"active_hunt": None}
 
 
+@router.get("/permit-status/{kingdom_id}")
+def get_permit_status(
+    kingdom_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get hunting permit status for a kingdom.
+    
+    Returns whether the user needs a permit and if they have one.
+    """
+    player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
+    if not player_state:
+        raise HTTPException(status_code=404, detail="Player state not found")
+    
+    is_hometown = player_state.hometown_kingdom_id == kingdom_id
+    is_visiting = player_state.current_kingdom_id == kingdom_id and not is_hometown
+    
+    has_valid_permit = (
+        player_state.hunting_permit_kingdom_id == kingdom_id and
+        player_state.hunting_permit_expires_at and
+        player_state.hunting_permit_expires_at > datetime.utcnow()
+    )
+    
+    permit_expires_at = None
+    minutes_remaining = 0
+    if has_valid_permit:
+        permit_expires_at = player_state.hunting_permit_expires_at.isoformat()
+        remaining = player_state.hunting_permit_expires_at - datetime.utcnow()
+        minutes_remaining = max(0, int(remaining.total_seconds() / 60))
+    
+    return {
+        "kingdom_id": kingdom_id,
+        "is_hometown": is_hometown,
+        "is_visiting": is_visiting,
+        "needs_permit": is_visiting,
+        "has_valid_permit": has_valid_permit,
+        "can_hunt": is_hometown or has_valid_permit,
+        "permit_expires_at": permit_expires_at,
+        "minutes_remaining": minutes_remaining,
+        "permit_cost": HUNTING_PERMIT_COST,
+        "permit_duration_minutes": HUNTING_PERMIT_DURATION_MINUTES,
+    }
+
+
+@router.post("/buy-permit")
+def buy_hunting_permit(
+    request: CreateHuntRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Buy a hunting permit for a kingdom you're visiting.
+    
+    - Costs 10 gold (goes to kingdom treasury)
+    - Valid for 10 minutes
+    - Required to start hunts in non-hometown kingdoms
+    """
+    from datetime import timedelta
+    
+    player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
+    if not player_state:
+        raise HTTPException(status_code=404, detail="Player state not found")
+    
+    # Must be visiting the kingdom (not your hometown)
+    if player_state.current_kingdom_id != request.kingdom_id:
+        return {
+            "success": False,
+            "message": "You must be in the kingdom to buy a permit",
+        }
+    
+    if player_state.hometown_kingdom_id == request.kingdom_id:
+        return {
+            "success": False,
+            "message": "You don't need a permit in your hometown!",
+        }
+    
+    # Check if already has a valid permit for this kingdom
+    if (player_state.hunting_permit_kingdom_id == request.kingdom_id and 
+        player_state.hunting_permit_expires_at and 
+        player_state.hunting_permit_expires_at > datetime.utcnow()):
+        remaining = player_state.hunting_permit_expires_at - datetime.utcnow()
+        minutes_left = int(remaining.total_seconds() / 60)
+        return {
+            "success": False,
+            "message": f"You already have a valid permit ({minutes_left}m remaining)",
+            "permit_expires_at": player_state.hunting_permit_expires_at.isoformat(),
+        }
+    
+    # Check gold
+    if player_state.gold < HUNTING_PERMIT_COST:
+        return {
+            "success": False,
+            "message": f"Not enough gold (need {HUNTING_PERMIT_COST}g)",
+        }
+    
+    # Get kingdom to add gold to treasury
+    kingdom = db.query(Kingdom).filter(Kingdom.id == request.kingdom_id).first()
+    if not kingdom:
+        raise HTTPException(status_code=404, detail="Kingdom not found")
+    
+    # Deduct gold and add to kingdom treasury
+    player_state.gold -= HUNTING_PERMIT_COST
+    kingdom.treasury_gold += HUNTING_PERMIT_COST
+    
+    # Set permit
+    player_state.hunting_permit_kingdom_id = request.kingdom_id
+    player_state.hunting_permit_expires_at = datetime.utcnow() + timedelta(minutes=HUNTING_PERMIT_DURATION_MINUTES)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Hunting permit purchased! Valid for {HUNTING_PERMIT_DURATION_MINUTES} minutes.",
+        "permit_expires_at": player_state.hunting_permit_expires_at.isoformat(),
+        "gold_spent": HUNTING_PERMIT_COST,
+        "new_gold": int(player_state.gold),
+    }
+
+
 # --- Dynamic routes (after static routes) ---
 
 @router.post("/create", response_model=HuntResponse)
@@ -361,16 +487,36 @@ def create_hunt(
     """
     Create a new group hunt in a kingdom.
     Players can only have one active hunt at a time.
-    Players can only create hunts in their hometown kingdom.
+    Players can create hunts in their hometown OR in kingdoms where they have a valid hunting permit.
     """
-    # Check that user is in the kingdom they're trying to create a hunt in
     player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
-    user_kingdom = player_state.hometown_kingdom_id if player_state else None
-    
-    if not user_kingdom or user_kingdom != request.kingdom_id:
+    if not player_state:
         return HuntResponse(
             success=False,
-            message="You can only create hunts in your hometown kingdom",
+            message="Player state not found",
+            hunt=None,
+        )
+    
+    # Must be in the kingdom you're trying to hunt in
+    if player_state.current_kingdom_id != request.kingdom_id:
+        return HuntResponse(
+            success=False,
+            message="You must be in the kingdom to start a hunt",
+            hunt=None,
+        )
+    
+    # Check if this is hometown OR has valid permit
+    is_hometown = player_state.hometown_kingdom_id == request.kingdom_id
+    has_valid_permit = (
+        player_state.hunting_permit_kingdom_id == request.kingdom_id and
+        player_state.hunting_permit_expires_at and
+        player_state.hunting_permit_expires_at > datetime.utcnow()
+    )
+    
+    if not is_hometown and not has_valid_permit:
+        return HuntResponse(
+            success=False,
+            message="You need a hunting permit to hunt in this kingdom! (10g for 10 minutes)",
             hunt=None,
         )
     

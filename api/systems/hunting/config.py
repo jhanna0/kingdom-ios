@@ -31,6 +31,10 @@ HUNT_COOLDOWN_MINUTES = 30             # Cooldown between hunts
 MIN_PARTY_SIZE = 1                     # Solo hunting allowed
 MAX_PARTY_SIZE = 5                     # Maximum hunters
 
+# Hunting Permit (for visitors)
+HUNTING_PERMIT_COST = 10               # Gold cost to buy a permit
+HUNTING_PERMIT_DURATION_MINUTES = 10   # How long the permit lasts
+
 
 # ============================================================
 # ANIMAL DEFINITIONS

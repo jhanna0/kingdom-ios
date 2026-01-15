@@ -917,6 +917,8 @@ class HuntManager:
         
         # Broadcast item drops to friends' activity feeds (fur, sinew, rabbit's foot, etc.)
         if state.phase == HuntPhase.BLESSING and session.items_dropped:
+            # Get loot_tier from the result effects
+            loot_tier = result.get("effects", {}).get("loot_tier", "common")
             self._broadcast_loot_drop(db, session, loot_tier)
         
         # Create phase result for history

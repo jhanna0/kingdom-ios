@@ -112,4 +112,25 @@ class HuntAPI {
         let request = client.request(endpoint: "/hunts/leaderboard/\(kingdomId)", method: "GET")
         return try await client.execute(request)
     }
+    
+    // MARK: - Hunting Permit
+    
+    /// Get permit status for a kingdom
+    func getPermitStatus(kingdomId: String) async throws -> HuntingPermitStatusResponse {
+        let request = client.request(endpoint: "/hunts/permit-status/\(kingdomId)", method: "GET")
+        return try await client.execute(request)
+    }
+    
+    /// Buy a hunting permit for a kingdom (for visitors)
+    func buyPermit(kingdomId: String) async throws -> HuntingPermitResponse {
+        struct BuyPermitRequest: Encodable {
+            let kingdom_id: String
+        }
+        let request = try client.request(
+            endpoint: "/hunts/buy-permit",
+            method: "POST",
+            body: BuyPermitRequest(kingdom_id: kingdomId)
+        )
+        return try await client.execute(request)
+    }
 }

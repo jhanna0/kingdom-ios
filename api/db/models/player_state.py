@@ -82,6 +82,10 @@ class PlayerState(Base):
     times_executed = Column(Integer, default=0)
     executions_ordered = Column(Integer, default=0)
     
+    # Hunting Permit (for visiting hunters)
+    hunting_permit_kingdom_id = Column(String, nullable=True)  # Kingdom where permit is valid
+    hunting_permit_expires_at = Column(DateTime, nullable=True)  # When permit expires
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

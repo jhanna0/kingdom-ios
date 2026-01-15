@@ -37,6 +37,10 @@ class HuntViewModel: ObservableObject {
     @Published var preview: HuntPreviewResponse?
     @Published var currentPhaseResult: PhaseResultData?
     
+    // Permit status (for visitors)
+    @Published var permitStatus: HuntingPermitStatusResponse?
+    @Published var isBuyingPermit = false
+    
     @Published var error: String?
     @Published var showError = false
     
@@ -490,12 +494,48 @@ class HuntViewModel: ObservableObject {
     func checkForActiveHunt(kingdomId: String) async {
         uiState = .loading
         do {
-            let response = try await KingdomAPIService.shared.hunts.getActiveHunt(kingdomId: kingdomId)
-            hunt = response.active_hunt
+            // Check permit status and active hunt in parallel
+            async let permitTask = KingdomAPIService.shared.hunts.getPermitStatus(kingdomId: kingdomId)
+            async let huntTask = KingdomAPIService.shared.hunts.getActiveHunt(kingdomId: kingdomId)
+            
+            let (permitResponse, huntResponse) = try await (permitTask, huntTask)
+            
+            permitStatus = permitResponse
+            hunt = huntResponse.active_hunt
             syncUIState()
         } catch {
             hunt = nil
             uiState = .noHunt
+        }
+    }
+    
+    func loadPermitStatus(kingdomId: String) async {
+        do {
+            permitStatus = try await KingdomAPIService.shared.hunts.getPermitStatus(kingdomId: kingdomId)
+        } catch {
+            print("Failed to load permit status: \(error)")
+        }
+    }
+    
+    func buyPermit(kingdomId: String) async -> Bool {
+        isBuyingPermit = true
+        defer { isBuyingPermit = false }
+        
+        do {
+            let response = try await KingdomAPIService.shared.hunts.buyPermit(kingdomId: kingdomId)
+            if response.success {
+                // Reload permit status
+                await loadPermitStatus(kingdomId: kingdomId)
+                return true
+            } else {
+                error = response.message
+                showError = true
+                return false
+            }
+        } catch {
+            self.error = error.localizedDescription
+            showError = true
+            return false
         }
     }
     

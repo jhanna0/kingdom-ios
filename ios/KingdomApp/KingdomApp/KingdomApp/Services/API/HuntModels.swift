@@ -642,3 +642,26 @@ struct HuntLeaderboardResponse: Codable {
     }
 }
 
+// MARK: - Hunting Permit Models
+
+struct HuntingPermitStatusResponse: Codable {
+    let kingdom_id: String
+    let is_hometown: Bool
+    let is_visiting: Bool
+    let needs_permit: Bool
+    let has_valid_permit: Bool
+    let can_hunt: Bool
+    let permit_expires_at: String?
+    let minutes_remaining: Int
+    let permit_cost: Int
+    let permit_duration_minutes: Int
+}
+
+struct HuntingPermitResponse: Codable {
+    let success: Bool
+    let message: String
+    let permit_expires_at: String?
+    let gold_spent: Int?
+    let new_gold: Int?
+}
+
