@@ -293,34 +293,12 @@ def work_on_property_upgrade(
         # Mark as completed
         contract.completed_at = datetime.utcnow()
         
-        # tier=1 means new construction, tier>1 means upgrade
-        if contract.tier == 1 and "|" in (contract.target_id or ""):
-            # NEW CONSTRUCTION: Create the property
-            # target_id is encoded as "property_id|location"
-            parts = contract.target_id.split("|")
-            property_id = parts[0]
-            location = parts[1] if len(parts) > 1 else "center"
-            
-            new_property = Property(
-                id=property_id,
-                kingdom_id=contract.kingdom_id,
-                kingdom_name=contract.kingdom_name,
-                owner_id=current_user.id,
-                owner_name=current_user.display_name,
-                tier=1,
-                location=location,
-                purchased_at=datetime.utcnow(),
-                last_upgraded=None
-            )
-            db.add(new_property)
-        else:
-            # UPGRADE: Update existing property tier
-            property = db.query(Property).filter(
-                Property.id == contract.target_id
-            ).first()
-            
-            if property:
-                property.tier = contract.tier
+        # Update the property tier (property is created at purchase time with tier=0)
+        property = db.query(Property).filter(Property.id == contract.target_id).first()
+        
+        if property:
+            property.tier = contract.tier
+            if contract.tier > 1:
                 property.last_upgraded = datetime.utcnow()
     
     db.commit()
@@ -329,12 +307,12 @@ def work_on_property_upgrade(
     
     # Build a better message
     if is_complete:
-        if contract.tier == 1 and "|" in (contract.target_id or ""):
+        if contract.tier == 1:
             message = f"Property construction complete! You now own land in the kingdom!"
         else:
             message = f"Property upgraded to Tier {contract.tier}! Your land grows stronger!"
     else:
-        action_word = "constructing" if (contract.tier == 1 and "|" in (contract.target_id or "")) else "upgrading"
+        action_word = "constructing" if contract.tier == 1 else "upgrading"
         message = f"You worked on {action_word} your property!"
     
     return {

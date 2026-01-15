@@ -358,9 +358,10 @@ def purchase_land(
     ).first()
     
     if existing_property:
+        tier_desc = "under construction" if existing_property.tier == 0 else f"Tier {existing_property.tier}"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"You already own property in {request.kingdom_name} (Tier {existing_property.tier})"
+            detail=f"You already own property in {request.kingdom_name} ({tier_desc})"
         )
     
     # Check for pending construction contract in this kingdom
@@ -420,6 +421,20 @@ def purchase_land(
     actions_required = calculate_upgrade_actions_required(0, state.building_skill)
     property_id = str(uuid.uuid4())
     
+    # Create property immediately with tier=0 (under construction)
+    new_property = Property(
+        id=property_id,
+        kingdom_id=request.kingdom_id,
+        kingdom_name=request.kingdom_name,
+        owner_id=current_user.id,
+        owner_name=current_user.display_name,
+        tier=0,  # Under construction
+        location=request.location.lower(),
+        purchased_at=datetime.utcnow(),
+        last_upgraded=None
+    )
+    db.add(new_property)
+    
     # Create contract in unified_contracts
     contract = UnifiedContract(
         user_id=current_user.id,
@@ -428,15 +443,11 @@ def purchase_land(
         category='personal_property',
         type='property',
         tier=1,  # Building to tier 1
-        target_id=property_id,  # Store future property ID
+        target_id=property_id,  # Just the property ID, no encoding needed
         actions_required=actions_required,
         gold_paid=land_price
     )
     db.add(contract)
-    
-    # Store location in a simple way - we'll need it when creating the property
-    # We can use target_id to encode property_id|location
-    contract.target_id = f"{property_id}|{request.location.lower()}"
     
     state.gold -= land_price
     
