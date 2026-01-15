@@ -25,6 +25,7 @@ class KingdomAPIService: ObservableObject {
     let friends = FriendsService()
     let weather = WeatherAPI()
     let hunts: HuntAPI
+    let trades = TradesAPI()
     
     // MARK: - Shared Client
     private let client = APIClient.shared

@@ -4,6 +4,11 @@ import SwiftUI
 import Combine
 import CoreLocation
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let playerStateDidChange = Notification.Name("playerStateDidChange")
+}
+
 @MainActor
 class MapViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -91,6 +96,13 @@ class MapViewModel: ObservableObject {
         
         // Monitor war state changes for music
         setupWarStateMonitoring()
+        
+        // Listen for player state refresh requests (e.g., after trades)
+        NotificationCenter.default.addObserver(forName: .playerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refreshPlayerFromBackend()
+            }
+        }
     }
     
     /// Setup continuous monitoring of war state for music transitions

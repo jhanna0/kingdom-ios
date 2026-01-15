@@ -12,6 +12,12 @@ class FriendsViewModel: ObservableObject {
     @Published var friendActivities: [ActivityLogEntry] = []
     @Published var errorMessage: String?
     
+    // Trade offers
+    @Published var incomingTrades: [TradeOffer] = []
+    @Published var outgoingTrades: [TradeOffer] = []
+    @Published var pendingTradeCount: Int = 0
+    @Published var hasMerchantSkill: Bool = false
+    
     private let api = KingdomAPIService.shared
     
     func loadFriends() async {
@@ -83,6 +89,66 @@ class FriendsViewModel: ObservableObject {
         } catch {
             print("❌ Failed to load friend activity: \(error)")
             // Don't show error to user for activity, just fail silently
+        }
+    }
+    
+    // MARK: - Trade Functions
+    
+    func loadTrades() async {
+        do {
+            let response = try await api.trades.listTrades()
+            incomingTrades = response.incoming
+            outgoingTrades = response.outgoing
+            pendingTradeCount = response.incoming.count
+            hasMerchantSkill = true
+            print("✅ Loaded \(incomingTrades.count) incoming, \(outgoingTrades.count) outgoing trades")
+        } catch {
+            // Merchant skill not available or other error
+            print("❌ Failed to load trades: \(error)")
+            hasMerchantSkill = false
+        }
+    }
+    
+    func loadPendingTradeCount() async {
+        do {
+            let response = try await api.trades.getPendingCount()
+            pendingTradeCount = response.count
+            hasMerchantSkill = response.hasMerchantSkill
+        } catch {
+            print("❌ Failed to load trade count: \(error)")
+        }
+    }
+    
+    func acceptTrade(_ offerId: Int) async {
+        do {
+            let response = try await api.trades.acceptOffer(offerId: offerId)
+            print("✅ Accepted trade: \(response.message)")
+            await loadTrades()
+        } catch {
+            print("❌ Failed to accept trade: \(error)")
+            errorMessage = "Failed to accept trade"
+        }
+    }
+    
+    func declineTrade(_ offerId: Int) async {
+        do {
+            _ = try await api.trades.declineOffer(offerId: offerId)
+            print("✅ Declined trade")
+            await loadTrades()
+        } catch {
+            print("❌ Failed to decline trade: \(error)")
+            errorMessage = "Failed to decline trade"
+        }
+    }
+    
+    func cancelTrade(_ offerId: Int) async {
+        do {
+            _ = try await api.trades.cancelOffer(offerId: offerId)
+            print("✅ Cancelled trade")
+            await loadTrades()
+        } catch {
+            print("❌ Failed to cancel trade: \(error)")
+            errorMessage = "Failed to cancel trade"
         }
     }
 }

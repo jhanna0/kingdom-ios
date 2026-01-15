@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -180,6 +180,7 @@ async def startup_event():
         print("🏹 Hunts: /hunts (Group hunting)")
         print("🕵️ Incidents: /incidents (Covert operations)")
         print("📖 Tutorial: /tutorial (Help content)")
+        print("🤝 Trades: /trades (Player-to-player trading)")
         print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
@@ -224,6 +225,7 @@ app.include_router(incidents.router)
 app.include_router(battles.router)  # Unified battle system (coups + invasions)
 app.include_router(tutorial.router)  # Help/tutorial content
 app.include_router(duels.router)  # PvP Arena duels in Town Hall
+app.include_router(trades.router)  # Player-to-player trading (Merchant skill)
 
 
 # ===== WebSocket Endpoint (Local Development) =====

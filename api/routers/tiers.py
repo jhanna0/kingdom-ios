@@ -533,9 +533,9 @@ SKILLS = {
         "description": "Unlocks trading capabilities and market advantages",
         "benefits": {
             1: ["Unlocks player-to-player trading"],
-            2: ["Keep excess gold when your buy offer is higher than the seller's price (otherwise goes to kingdom treasury)"],
+            2: ["Keep excess gold when your market buy offer is higher than the seller's price (otherwise goes to kingdom treasury)"],
             3: ["Access markets in foreign kingdoms (not just your home kingdom)"],
-            4: ["Receive bonus gold when buyers pay more than your asking price (otherwise goes to kingdom treasury)"],
+            4: ["Receive bonus gold when market buyers pay more than your asking price (otherwise goes to kingdom treasury)"],
             5: ["50% reduced taxes on all market transactions"]
         }
     }

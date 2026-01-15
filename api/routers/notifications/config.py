@@ -132,6 +132,20 @@ NOTIFICATION_TYPES = {
         "icon": "scroll.fill",
         "color": "inkMedium"
     },
+    
+    # Trade notifications (Merchant skill)
+    "trade_offer_received": {
+        "icon": "person.2.fill",
+        "color": "buttonPrimary"
+    },
+    "trade_offer_accepted": {
+        "icon": "checkmark.circle.fill",
+        "color": "buttonSuccess"
+    },
+    "trade_offer_declined": {
+        "icon": "xmark.circle.fill",
+        "color": "inkMedium"
+    },
 }
 
 # Priority configurations

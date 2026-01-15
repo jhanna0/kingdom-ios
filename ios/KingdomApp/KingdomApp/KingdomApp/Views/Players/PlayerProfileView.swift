@@ -7,6 +7,7 @@ struct PlayerProfileView: View {
     @State private var profile: PlayerPublicProfile?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var showTradeSheet = false
     
     var body: some View {
         Group {
@@ -62,6 +63,9 @@ struct PlayerProfileView: View {
         .task {
             await loadProfile()
         }
+        .sheet(isPresented: $showTradeSheet) {
+            TradeOfferView(recipientId: userId, recipientName: profile?.display_name ?? "Player")
+        }
     }
     
     private func profileContent(_ profile: PlayerPublicProfile) -> some View {
@@ -86,9 +90,67 @@ struct PlayerProfileView: View {
                 
                 // Achievements
                 achievementsCard(profile)
+                
+                // Actions (Trade button)
+                actionsCard(profile)
             }
             .padding()
         }
+    }
+    
+    private func actionsCard(_ profile: PlayerPublicProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "hand.raised.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Actions")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Trade Button (requires Merchant skill)
+            Button(action: { showTradeSheet = true }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(FontStyles.iconMedium)
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                            cornerRadius: 10,
+                            shadowOffset: 2,
+                            borderWidth: 2
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Trade")
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text("Send items or gold (Merchant T1 required)")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
+                .padding()
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     private func currentActivityCard(_ profile: PlayerPublicProfile) -> some View {

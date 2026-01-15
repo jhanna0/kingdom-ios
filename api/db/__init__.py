@@ -40,6 +40,8 @@ from .models import (
     Item,
     HuntSession,
     Friend,
+    TradeOffer,
+    TradeOfferStatus,
 )
 
 __all__ = [
@@ -85,5 +87,7 @@ __all__ = [
     "Item",
     "HuntSession",
     "Friend",
+    "TradeOffer",
+    "TradeOfferStatus",
 ]
 
