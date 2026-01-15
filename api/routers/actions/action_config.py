@@ -50,25 +50,6 @@ ACTION_TYPES = {
             "gold": 10  # Base reward
         }
     },
-    "chop_wood": {
-        "display_name": "Chop Wood",
-        "icon": "tree.fill",
-        "description": "Gather wood from the lumbermill",
-        "category": "beneficial",
-        "cooldown_minutes": 10,
-        "theme_color": "buttonSuccess",
-        "display_order": 35,
-        "endpoint": "/actions/chop-wood",
-        "always_unlocked": False,
-        "requirements": {
-            "building": "lumbermill",
-            "building_level": 1,
-            "requirement_text": "Kingdom must have a Lumbermill"
-        },
-        "rewards": {
-            "wood": "varies_by_lumbermill_level"
-        }
-    },
     "scout": {
         "display_name": "Infiltrate",
         "icon": "eye.fill",
@@ -187,7 +168,6 @@ ACTION_SLOTS = {
     
     # ECONOMY SLOT - Resource gathering
     "farm": "economy",
-    "chop_wood": "economy",
     
     # SECURITY SLOT - Defense and reconnaissance
     "patrol": "security",

@@ -137,11 +137,6 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
                 type="working",
                 details="Farming for gold"
             )
-        elif most_recent_active == "chop_wood":
-            return PlayerActivity(
-                type="working",
-                details="Chopping wood"
-            )
     
     # Default to idle only if no actions are on cooldown
     return PlayerActivity(type="idle")

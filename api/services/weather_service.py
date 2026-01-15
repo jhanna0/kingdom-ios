@@ -36,7 +36,6 @@ WEATHER_EFFECTS = {
     WeatherCondition.CLEAR: {
         "farming_gold": 1.15,  # +15% farming gold (sunny crops)
         "patrol_effectiveness": 1.10,  # +10% patrol
-        "wood_chopping": 0.95,  # -5% wood (hot, tiring)
         "scouting_success": 1.05,  # +5% scouting (good visibility)
         "description": "Clear skies and sunshine",
         "flavor_text": "Perfect weather for outdoor work!"
@@ -44,7 +43,6 @@ WEATHER_EFFECTS = {
     
     WeatherCondition.RAIN: {
         "farming_gold": 0.80,  # -20% farming (muddy fields)
-        "wood_chopping": 1.20,  # +20% wood (softer, easier to chop)
         "vault_heist_success": 1.10,  # +10% heist (guards distracted)
         "scouting_success": 0.90,  # -10% scouting (poor visibility)
         "contract_work_speed": 0.90,  # -10% work speed (wet conditions)
@@ -54,7 +52,6 @@ WEATHER_EFFECTS = {
     
     WeatherCondition.SNOW: {
         "farming_gold": 0.60,  # -40% farming (frozen ground)
-        "wood_chopping": 0.70,  # -30% wood (cold, difficult)
         "training_effectiveness": 1.25,  # +25% indoor training (everyone inside)
         "vault_defense": 1.30,  # +30% vault defense (tracks in snow)
         "contract_work_speed": 0.85,  # -15% work speed (cold)
@@ -92,7 +89,6 @@ WEATHER_EFFECTS = {
     
     WeatherCondition.EXTREME: {
         "farming_gold": 0.0,  # Cannot farm
-        "wood_chopping": 0.0,  # Cannot chop
         "patrol_effectiveness": 0.50,  # -50% patrol (emergency mode)
         "contract_work_speed": 0.50,  # -50% work (emergency)
         "kingdom_damage": 100,  # Kingdom takes damage (gold cost to repair)
@@ -120,7 +116,6 @@ async def get_weather_for_kingdom(
             "icon": "10d",
             "effects": {
                 "farming_gold": 0.8,
-                "wood_chopping": 1.2,
                 ...
             },
             "flavor_text": "The rain makes outdoor work difficult.",
@@ -328,7 +323,7 @@ def get_weather_modifier(weather_data: Optional[dict], modifier_key: str) -> flo
     
     Args:
         weather_data: Weather data dict from get_weather_for_kingdom
-        modifier_key: Key like "farming_gold", "wood_chopping", etc.
+        modifier_key: Key like "farming_gold", "patrol_effectiveness", etc.
     
     Returns:
         Multiplier value (1.0 = no change)
@@ -346,7 +341,7 @@ def apply_weather_to_gold_reward(base_gold: int, weather_data: Optional[dict], a
     Args:
         base_gold: Base gold amount
         weather_data: Weather data from get_weather_for_kingdom
-        action_type: "farming", "wood_chopping", etc.
+        action_type: "farming", "patrol", etc.
     
     Returns:
         (modified_gold, multiplier_used)

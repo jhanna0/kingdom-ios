@@ -195,11 +195,10 @@ def get_action_status(
         "training": training_cooldown,
         "crafting": work_cooldown,  # Uses building skill
         "scout": sabotage_cooldown,
-        "chop_wood": farm_cooldown,
     }
     
     slot_cooldowns = {}
-    action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout", "chop_wood"]
+    action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout"]
     
     for action_type in action_types_to_check:
         slot = get_action_slot(action_type)
@@ -320,48 +319,8 @@ def get_action_status(
         "endpoint": "/actions/farm"
     }
     
-    # Chop Wood - Available if kingdom has lumbermill
+    # Get kingdom for coup eligibility checks
     kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
-    lumbermill_level = kingdom.lumbermill_level if kingdom and hasattr(kingdom, 'lumbermill_level') else 0
-    
-    if lumbermill_level > 0:
-        wood_per_action = {0: 0, 1: 10, 2: 20, 3: 35, 4: 50, 5: 75}.get(lumbermill_level, 0)
-        wood_bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
-        wood_gross = int(wood_per_action * wood_bonus_multiplier)
-        
-        actions["chop_wood"] = {
-            **check_cooldown_from_table(db, current_user.id, "chop_wood", 60),
-            "cooldown_minutes": 60,
-            "expected_reward": {
-                "wood": wood_gross,
-                "lumbermill_level": lumbermill_level,
-                "building_skill": state.building_skill
-            },
-            "unlocked": True,
-            "action_type": "chop_wood",
-            "title": "Chop Wood",
-            "icon": "tree.fill",
-            "description": f"Gather wood at the lumbermill (Level {lumbermill_level})",
-            "category": "beneficial",
-            "theme_color": "buttonSuccess",
-            "display_order": 35,
-            "endpoint": "/actions/chop-wood"
-        }
-    else:
-        actions["chop_wood"] = {
-            "ready": False,
-            "seconds_remaining": 0,
-            "unlocked": False,
-            "action_type": "chop_wood",
-            "requirements_met": False,
-            "requirement_description": "Kingdom needs a lumbermill",
-            "title": "Chop Wood",
-            "icon": "tree.fill",
-            "description": "Gather wood for construction",
-            "category": "beneficial",
-            "theme_color": "buttonSuccess",
-            "display_order": 35
-        }
     
     actions["training"] = {
         **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),

@@ -181,7 +181,7 @@ def check_global_action_cooldown_from_table(
     
     Parallel action system - actions in different slots can run simultaneously!
     - building slot: work, property_upgrade
-    - economy slot: farm, chop_wood
+    - economy slot: farm
     - security slot: patrol
     - intelligence slot: scout
     - personal slot: training, crafting

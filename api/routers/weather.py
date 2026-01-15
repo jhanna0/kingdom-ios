@@ -37,7 +37,6 @@ async def get_kingdom_weather(
                 "icon": "10d",
                 "effects": {
                     "farming_gold": 0.8,
-                    "wood_chopping": 1.2,
                     ...
                 },
                 "display_description": "🌧️ Rain showers",
