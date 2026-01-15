@@ -462,11 +462,15 @@ SKILLS = {
         "category": "economy",
         "description": "Improves construction and resource gathering",
         "benefits": {
-            1: ["-5% action cooldowns", "-5% property upgrade costs", "Work on contracts & properties"],
-            2: ["-10% action cooldowns", "-10% property upgrade costs", "+10% gold from building contracts"],
-            3: ["-14% action cooldowns", "-15% property upgrade costs", "+20% gold from contracts", "+1 daily Assist action"],
-            4: ["-19% action cooldowns", "-20% property upgrade costs", "+30% gold from contracts", "10% chance to refund action cooldown"],
-            5: ["-23% action cooldowns", "-25% property upgrade costs", "+40% gold from contracts", "25% chance to double contract progress"]
+            1: ["-5% action cooldowns"],
+            2: ["-8% action cooldowns"],
+            3: ["-12% action cooldowns"],
+            4: ["-15% action cooldowns", "5% chance to refund action cooldown"],
+            5: ["-18% action cooldowns", "10% chance to refund action cooldown"]
+        },
+        "mechanics": {
+            "cooldown_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
+            "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
     "intelligence": {
@@ -487,14 +491,18 @@ SKILLS = {
         "display_name": "Science",
         "stat_attribute": "science",
         "icon": "flask.fill",
-        "category": "enhancement",
-        "description": "Enhances equipment effectiveness",
+        "category": "education",
+        "description": "Improves training efficiency and skill development",
         "benefits": {
-            1: ["+1 to all equipped weapon/armor stats"],
-            2: ["+2 to all equipped weapon/armor stats", "10% chance equipment doesn't break on death"],
-            3: ["+3 to all equipped weapon/armor stats", "Your weapons deal +1 extra damage in battle"],
-            4: ["+4 to all equipped weapon/armor stats", "Your armor blocks +1 extra damage"],
-            5: ["+5 to all equipped weapon/armor stats", "Weapons and armor 50% more effective"]
+            1: ["-5% training actions required"],
+            2: ["-8% training actions required"],
+            3: ["-12% training actions required"],
+            4: ["-15% training actions required", "5% chance to refund training cooldown"],
+            5: ["-18% training actions required", "10% chance to refund training cooldown"]
+        },
+        "mechanics": {
+            "training_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
+            "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
     "faith": {
@@ -603,6 +611,74 @@ def get_all_skill_values(state) -> dict:
         skill_type: get_stat_value(state, skill_type)
         for skill_type in SKILLS.keys()
     }
+
+
+def get_skill_mechanic(skill_type: str, mechanic_name: str, tier: int) -> float:
+    """Get a specific mechanic value for a skill at a given tier.
+    
+    Example: get_skill_mechanic("building", "cooldown_reduction", 3) -> 0.12
+    Example: get_skill_mechanic("science", "refund_chance", 5) -> 0.10
+    
+    Returns 0.0 if mechanic not found or tier not defined.
+    """
+    skill_data = SKILLS.get(skill_type, {})
+    mechanics = skill_data.get("mechanics", {})
+    mechanic_values = mechanics.get(mechanic_name, {})
+    return mechanic_values.get(tier, 0.0)
+
+
+def get_building_cooldown_reduction(tier: int) -> float:
+    """Get building skill cooldown reduction multiplier for a tier.
+    
+    Returns: multiplier to apply (e.g., 0.95 for 5% reduction)
+    """
+    reduction = get_skill_mechanic("building", "cooldown_reduction", tier)
+    return 1.0 - reduction
+
+
+def get_building_refund_chance(tier: int) -> float:
+    """Get building skill cooldown refund chance for a tier."""
+    return get_skill_mechanic("building", "refund_chance", tier)
+
+
+def get_science_training_reduction(tier: int) -> float:
+    """Get science skill training actions reduction multiplier for a tier.
+    
+    Returns: multiplier to apply (e.g., 0.95 for 5% reduction)
+    """
+    reduction = get_skill_mechanic("science", "training_reduction", tier)
+    return 1.0 - reduction
+
+
+def get_science_refund_chance(tier: int) -> float:
+    """Get science skill training cooldown refund chance for a tier."""
+    return get_skill_mechanic("science", "refund_chance", tier)
+
+
+def get_building_tier_value(building_type: str, tier: int, value_name: str, default: float = 0.0) -> float:
+    """Get a specific value from a building tier.
+    
+    Example: get_building_tier_value("education", 3, "reduction") -> 15
+    Example: get_building_tier_value("farm", 2, "reduction") -> 10
+    
+    Returns default if building/tier/value not found.
+    """
+    building_data = BUILDING_TYPES.get(building_type, {})
+    tiers = building_data.get("tiers", {})
+    tier_data = tiers.get(tier, {})
+    return tier_data.get(value_name, default)
+
+
+def get_education_training_reduction(education_level: int) -> float:
+    """Get education building training reduction multiplier.
+    
+    Returns: multiplier to apply (e.g., 0.95 for 5% reduction)
+    Values come from BUILDING_TYPES["education"]["tiers"][level]["reduction"]
+    """
+    if education_level <= 0:
+        return 1.0
+    reduction_percent = get_building_tier_value("education", education_level, "reduction", 0)
+    return 1.0 - (reduction_percent / 100.0)
 
 
 def get_skills_data_for_player(state, training_cost: int) -> list:

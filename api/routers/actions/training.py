@@ -6,11 +6,12 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import random
 
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, calculate_training_reduction
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -45,7 +46,7 @@ def calculate_training_cost(total_skill_points: int) -> int:
     return int(base_cost * cost_multiplier)
 
 
-def calculate_training_actions_required(stat_level: int, education_level: int = 0) -> int:
+def calculate_training_actions_required(stat_level: int, education_level: int = 0, science_level: int = 0) -> int:
     """Calculate how many actions required to complete training
     
     Formula: base_actions = 10 + (stat_level * 18) + (stat_level^2 * 3)
@@ -58,14 +59,23 @@ def calculate_training_actions_required(stat_level: int, education_level: int = 
     - Tier 5 (level 4 -> 5): 130 actions
     - ...scales up to tier 10
     
-    Education building can reduce this by up to 25% at max level.
+    Reductions (values from tiers.py):
+    - Education building (kingdom): from BUILDING_TYPES["education"]["tiers"]
+    - Science skill (personal): from SKILLS["science"]["mechanics"]["training_reduction"]
     """
+    from routers.tiers import get_education_training_reduction
+    
     # Exponential scaling formula
     base_actions = 10 + (stat_level * 18) + (stat_level ** 2 * 3)
     
-    # Education building reduces training time (max 25% reduction at level 5)
-    education_reduction = 1.0 - min(education_level * 0.05, 0.25)
-    reduced_actions = int(base_actions * education_reduction)
+    # Education building reduces training time (values from tiers.py)
+    education_multiplier = get_education_training_reduction(education_level)
+    
+    # Science skill reduces training actions required (values from tiers.py)
+    science_multiplier = calculate_training_reduction(science_level)
+    
+    # Apply both reductions (multiplicative)
+    reduced_actions = int(base_actions * education_multiplier * science_multiplier)
     return max(5, reduced_actions)
 
 
@@ -189,7 +199,10 @@ def purchase_training(
     # Calculate cost based on TOTAL SKILL POINTS across ALL skills
     total_skill_points = get_total_skill_points(state)
     training_cost = calculate_training_cost(total_skill_points)
-    actions_required = calculate_training_actions_required(current_stat, education_level)
+    
+    # Get player's science level for training reduction
+    science_level = state.science or 1
+    actions_required = calculate_training_actions_required(current_stat, education_level, science_level)
     
     if state.gold < training_cost:
         raise HTTPException(
@@ -328,6 +341,22 @@ def work_on_training(
         state.experience -= xp_needed
         state.gold += 50  # Level-up bonus
     
+    # Science skill: Chance to refund training cooldown (values from tiers.py)
+    from routers.tiers import get_science_refund_chance
+    science_level = state.science or 1
+    refund_chance = get_science_refund_chance(science_level)
+    cooldown_refunded = False
+    if refund_chance > 0 and random.random() < refund_chance:
+        cooldown_refunded = True
+        # Clear the cooldown by setting last_performed to a time in the past
+        from db import ActionCooldown
+        cooldown_record = db.query(ActionCooldown).filter(
+            ActionCooldown.user_id == current_user.id,
+            ActionCooldown.action_type == "training"
+        ).first()
+        if cooldown_record:
+            cooldown_record.last_performed = datetime.utcnow() - timedelta(hours=3)
+    
     db.commit()
     
     progress_percent = min(100, int((new_actions_completed / contract.actions_required) * 100))
@@ -335,7 +364,16 @@ def work_on_training(
     if is_complete:
         message = f"Training complete! {stat_name} increased to {new_value}"
     else:
-        message = f"You begin training!"
+        message = f"You trained!"
+    
+    if cooldown_refunded:
+        message += " Your scientific knowledge instantly refunded your training!"
+    
+    # Calculate next available time
+    if cooldown_refunded:
+        next_available = datetime.utcnow()
+    else:
+        next_available = datetime.utcnow() + timedelta(minutes=TRAINING_COOLDOWN)
     
     return {
         "success": True,
@@ -346,7 +384,8 @@ def work_on_training(
         "actions_required": contract.actions_required,
         "progress_percent": progress_percent,
         "is_complete": is_complete,
-        "next_train_available_at": format_datetime_iso(datetime.utcnow() + timedelta(hours=2)),
+        "cooldown_refunded": cooldown_refunded,
+        "next_train_available_at": format_datetime_iso(next_available),
         "rewards": {
             "gold": None,
             "reputation": None,

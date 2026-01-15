@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import random
 
 from db import get_db, User, PlayerState, Kingdom, Property, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
@@ -140,6 +141,22 @@ def work_on_contract(
                 current_level = getattr(kingdom, building_attr, 0)
                 setattr(kingdom, building_attr, current_level + 1)
     
+    # Building skill: Chance to refund cooldown (values from tiers.py)
+    from routers.tiers import get_building_refund_chance
+    building_level = state.building_skill or 1
+    refund_chance = get_building_refund_chance(building_level)
+    cooldown_refunded = False
+    if refund_chance > 0 and random.random() < refund_chance:
+        cooldown_refunded = True
+        # Clear the cooldown by setting last_performed to a time in the past
+        from db import ActionCooldown
+        cooldown_record = db.query(ActionCooldown).filter(
+            ActionCooldown.user_id == current_user.id,
+            ActionCooldown.action_type == "work"
+        ).first()
+        if cooldown_record:
+            cooldown_record.last_performed = datetime.utcnow() - timedelta(hours=3)
+    
     db.commit()
     
     progress_percent = int((new_actions_completed / contract.actions_required) * 100)
@@ -157,6 +174,15 @@ def work_on_contract(
     else:
         message = f"You helped build the {building_name}!"
     
+    if cooldown_refunded:
+        message += " Your building expertise refunded the cooldown!"
+    
+    # Calculate next available time
+    if cooldown_refunded:
+        next_available = datetime.utcnow()
+    else:
+        next_available = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
     return {
         "success": True,
         "message": message,
@@ -166,7 +192,8 @@ def work_on_contract(
         "progress_percent": progress_percent,
         "your_contribution": user_contribution,
         "is_complete": is_complete,
-        "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
+        "cooldown_refunded": cooldown_refunded,
+        "next_work_available_at": format_datetime_iso(next_available),
         "rewards": {
             "gold": int(net_income),
             "gold_before_tax": int(gross_income),
