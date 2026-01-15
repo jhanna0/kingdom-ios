@@ -144,14 +144,19 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
             detail=f"Display name '{display_name}' is already taken"
         )
     
-    # Check for existing account on same device (soft warning, not blocking)
+    # SECURITY: Block account creation if device already has an account
+    # This prevents users from creating multiple accounts on the same phone
     if apple_data.device_id:
         existing_device_user = db.query(User).filter(
             User.device_id == apple_data.device_id,
             User.is_active == True
         ).first()
         if existing_device_user:
-            print(f"⚠️ [SIGNUP] MULTI-ACCOUNT WARNING: Device {apple_data.device_id} already has account user_id={existing_device_user.id} ({existing_device_user.display_name})")
+            print(f"🚫 [SIGNUP] BLOCKED: Device {apple_data.device_id} already has account user_id={existing_device_user.id} ({existing_device_user.display_name})")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This device already has an account ({existing_device_user.display_name}). Only one account is allowed per device."
+            )
     
     # Create new user - PostgreSQL will auto-generate the ID
     # SECURITY: Use verified apple_user_id and email, not client-provided values
