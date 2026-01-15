@@ -34,6 +34,7 @@ struct APIBuildingData: Codable {
     let description: String  // Building description
     let level: Int  // Current building level
     let max_level: Int  // Maximum level
+    let sort_order: Int?  // Display order (lower = first)
     let upgrade_cost: APIBuildingUpgradeCost?  // Cost to upgrade (nil if at max)
     
     // Click action - what happens when building is tapped (nil = not clickable)

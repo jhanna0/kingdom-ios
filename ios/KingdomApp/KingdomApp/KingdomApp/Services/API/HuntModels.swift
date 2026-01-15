@@ -599,3 +599,46 @@ enum AnyCodableValue: Codable {
     }
 }
 
+// MARK: - Leaderboard Models
+
+struct CreatureInfo: Codable {
+    let name: String
+    let icon: String
+}
+
+struct HuntLeaderboardEntry: Codable, Identifiable {
+    let rank: Int
+    let userId: Int
+    let displayName: String
+    let avatarUrl: String?
+    let huntsCompleted: Int
+    let creatureKills: [String: Int]
+    
+    var id: Int { rank }
+    
+    var totalKills: Int {
+        creatureKills.values.reduce(0, +)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case rank
+        case userId = "user_id"
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+        case huntsCompleted = "hunts_completed"
+        case creatureKills = "creature_kills"
+    }
+}
+
+struct HuntLeaderboardResponse: Codable {
+    let kingdomId: String
+    let creatures: [String: CreatureInfo]
+    let leaderboard: [HuntLeaderboardEntry]
+    
+    enum CodingKeys: String, CodingKey {
+        case kingdomId = "kingdom_id"
+        case creatures
+        case leaderboard
+    }
+}
+

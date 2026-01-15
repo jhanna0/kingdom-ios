@@ -180,6 +180,7 @@ class CityAPI {
                         description: building.description,
                         level: building.level,
                         maxLevel: building.max_level,
+                        sortOrder: building.sort_order ?? 100,
                         upgradeCost: upgradeCost,
                         clickAction: clickAction,
                         tierName: building.tier_name,

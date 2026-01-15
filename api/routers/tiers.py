@@ -147,6 +147,7 @@ BUILDING_TYPES = {
         "category": "defense",
         "description": "Defensive walls protect against coups and invasions",
         "max_tier": 5,
+        "sort_order": 20,
         "benefit_formula": "+{level * 2} defenders in battles",
         "tiers": {
             1: {"name": "Wooden Palisade", "benefit": "+2 defenders", "description": "Basic wooden wall"},
@@ -162,6 +163,7 @@ BUILDING_TYPES = {
         "category": "defense",
         "description": "Protects treasury gold from looting",
         "max_tier": 5,
+        "sort_order": 30,
         "benefit_formula": "{level * 20}% treasury protected",
         "tiers": {
             1: {"name": "Small Chest", "benefit": "20% protected", "description": "Basic storage"},
@@ -177,6 +179,7 @@ BUILDING_TYPES = {
         "category": "economy",
         "description": "Produces resources and passive income",
         "max_tier": 5,
+        "sort_order": 40,
         "benefit_formula": "Unlocks resources at each level",
         "click_action": {"type": "gathering", "resource": "iron"},
         "tiers": {
@@ -193,6 +196,7 @@ BUILDING_TYPES = {
         "category": "economy",
         "description": "Enables trading and generates income",
         "max_tier": 5,
+        "sort_order": 50,
         "benefit_formula": "Trading unlocks and citizen income",
         "click_action": {"type": "market"},
         "tiers": {
@@ -209,6 +213,7 @@ BUILDING_TYPES = {
         "category": "economy",
         "description": "Speeds up contract completion",
         "max_tier": 5,
+        "sort_order": 60,
         "benefit_formula": "Contracts complete {reduction}% faster",
         "tiers": {
             1: {"name": "Garden", "benefit": "Contracts 5% faster", "reduction": 5, "description": "Small farm plots"},
@@ -224,6 +229,7 @@ BUILDING_TYPES = {
         "category": "civic",
         "description": "Reduces training time for citizens",
         "max_tier": 5,
+        "sort_order": 70,
         "benefit_formula": "Citizens train skills {level * 5}% faster",
         "tiers": {
             1: {"name": "School", "benefit": "Train 5% faster", "reduction": 5, "description": "Basic education"},
@@ -239,6 +245,7 @@ BUILDING_TYPES = {
         "category": "economy",
         "description": "Produces wood resources for construction",
         "max_tier": 5,
+        "sort_order": 80,
         "benefit_formula": "Unlocks wood gathering at each level",
         "click_action": {"type": "gathering", "resource": "wood"},
         "tiers": {
@@ -255,6 +262,7 @@ BUILDING_TYPES = {
         "category": "civic",
         "description": "Community center that unlocks group activities",
         "max_tier": 5,
+        "sort_order": 0,
         "benefit_formula": "Unlocks group hunting and social features",
         "click_action": {"type": "townhall"},
         "tiers": {

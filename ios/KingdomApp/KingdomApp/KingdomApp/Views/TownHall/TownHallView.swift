@@ -63,6 +63,19 @@ struct TownHallView: View {
                             badge: nil
                         )
                     }
+
+                                        // Hunt Leaderboard
+                    NavigationLink {
+                        HuntLeaderboardView(kingdomId: kingdom.id, kingdomName: kingdom.name)
+                    } label: {
+                        TownHallActivityCard(
+                            icon: "trophy.fill",
+                            title: "Hunt Leaderboard",
+                            description: "Top hunters and creatures killed",
+                            color: KingdomTheme.Colors.buttonWarning,
+                            badge: nil
+                        )
+                    }
                     
                     // PvP Arena
                     // NavigationLink {
@@ -83,6 +96,7 @@ struct TownHallView: View {
                             description: "Duel friends in 1v1 combat"
                         )
                     }
+                    
                     
                     // Coming Soon Activities
                     VStack(spacing: KingdomTheme.Spacing.small) {

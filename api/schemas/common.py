@@ -69,6 +69,7 @@ class BuildingData(BaseModel):
     description: str  # Building description
     level: int  # Current building level
     max_level: int  # Maximum level
+    sort_order: int = 100  # Display order (lower = first)
     upgrade_cost: Optional['BuildingUpgradeCost'] = None  # Cost to upgrade to next level (None if max)
     
     # Click action - what happens when building is tapped (None = not clickable)

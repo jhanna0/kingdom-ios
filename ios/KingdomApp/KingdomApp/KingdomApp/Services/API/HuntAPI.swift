@@ -104,4 +104,12 @@ class HuntAPI {
         let request = client.request(endpoint: "/hunts/config", method: "GET")
         return try await client.execute(request)
     }
+    
+    // MARK: - Leaderboard
+    
+    /// Get hunt leaderboard for a kingdom
+    func getLeaderboard(kingdomId: String) async throws -> HuntLeaderboardResponse {
+        let request = client.request(endpoint: "/hunts/leaderboard/\(kingdomId)", method: "GET")
+        return try await client.execute(request)
+    }
 }

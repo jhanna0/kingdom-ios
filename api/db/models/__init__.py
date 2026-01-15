@@ -42,6 +42,7 @@ from .action_cooldown import ActionCooldown
 from .inventory import PlayerInventory
 from .item import Item
 from .hunt_session import HuntSession
+from .hunt_stats import HuntStats
 from .trade_offer import TradeOffer, TradeOfferStatus
 
 # PvP Arena Duels
@@ -110,6 +111,7 @@ __all__ = [
     "PlayerInventory",
     "Item",
     "HuntSession",
+    "HuntStats",
     # Player Trading
     "TradeOffer",
     "TradeOfferStatus",

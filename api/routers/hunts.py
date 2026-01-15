@@ -101,6 +101,8 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
     Hunts award MEAT + GOLD (equal amounts) and sinew (rare) for bow crafting.
     Gold is taxed by the kingdom where the hunt takes place.
     Uses proper inventory table, not columns per item type!
+    
+    Note: Leaderboard stats are derived directly from hunt_sessions table.
     """
     kingdom_id = hunt.get("kingdom_id")
     
@@ -153,6 +155,84 @@ def get_hunt_preview(
     return {
         "player_stats": stats,
         **preview,
+    }
+
+
+@router.get("/leaderboard/{kingdom_id}")
+def get_hunt_leaderboard(
+    kingdom_id: str,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    """
+    Get hunt leaderboard for a kingdom.
+    
+    Queries hunt_sessions directly - no separate stats table needed.
+    Returns top hunters sorted by hunts completed, with per-creature kill counts.
+    """
+    from systems.hunting.config import ANIMALS
+    from db.models import HuntSession as HuntSessionModel
+    from sqlalchemy import text
+    
+    # Query completed hunts from hunt_sessions, aggregate by participant
+    # session_data contains: animal_id (string), participants (dict)
+    query = text("""
+        WITH hunt_participants AS (
+            SELECT 
+                (p.value->>'player_id')::bigint as player_id,
+                session_data->>'animal_id' as animal_id
+            FROM hunt_sessions,
+            jsonb_each(session_data->'participants') as p
+            WHERE kingdom_id = :kingdom_id
+            AND status = 'completed'
+            AND session_data->>'animal_id' IS NOT NULL
+            AND session_data->>'animal_id' != ''
+        ),
+        creature_counts AS (
+            SELECT 
+                player_id,
+                animal_id,
+                COUNT(*) as animal_count
+            FROM hunt_participants
+            GROUP BY player_id, animal_id
+        ),
+        player_totals AS (
+            SELECT 
+                player_id,
+                SUM(animal_count) as hunts_completed,
+                jsonb_object_agg(animal_id, animal_count) as creature_kills
+            FROM creature_counts
+            GROUP BY player_id
+        )
+        SELECT * FROM player_totals
+        ORDER BY hunts_completed DESC
+        LIMIT :limit
+    """)
+    
+    results = db.execute(query, {"kingdom_id": kingdom_id, "limit": limit}).fetchall()
+    
+    # Build creature info for frontend
+    creatures = {
+        creature_id: {"name": data["name"], "icon": data["icon"]}
+        for creature_id, data in ANIMALS.items()
+    }
+    
+    leaderboard = []
+    for rank, row in enumerate(results, start=1):
+        user = db.query(User).filter(User.id == row.player_id).first()
+        leaderboard.append({
+            "rank": rank,
+            "user_id": row.player_id,
+            "display_name": user.display_name if user else f"Player {row.player_id}",
+            "avatar_url": user.avatar_url if user else None,
+            "hunts_completed": row.hunts_completed,
+            "creature_kills": row.creature_kills or {},
+        })
+    
+    return {
+        "kingdom_id": kingdom_id,
+        "creatures": creatures,
+        "leaderboard": leaderboard,
     }
 
 

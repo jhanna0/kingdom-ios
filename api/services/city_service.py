@@ -278,6 +278,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 description=building_meta["description"],
                 level=level,
                 max_level=max_level,
+                sort_order=building_meta.get("sort_order", 100),
                 upgrade_cost=upgrade_cost,
                 click_action=click_action,
                 tier_name=tier_name,

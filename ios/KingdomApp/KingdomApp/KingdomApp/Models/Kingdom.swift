@@ -36,18 +36,19 @@ struct BuildingMetadata: Hashable {
     let description: String
     let level: Int
     let maxLevel: Int
+    let sortOrder: Int  // Display order (lower = first)
     let upgradeCost: BuildingUpgradeCost?  // Cost to upgrade (nil if at max)
-    
+
     // Click action - what happens when building is tapped (nil = not clickable)
     let clickAction: BuildingClickAction?
-    
+
     // Current tier info
     let tierName: String  // Name of current tier (e.g. "Stone Wall")
     let tierBenefit: String  // Benefit of current tier (e.g. "+4 defenders")
-    
+
     // All tiers info - for detail view to show all levels
     let allTiers: [BuildingTierInfo]
-    
+
     // Computed: is this building clickable?
     var isClickable: Bool {
         clickAction != nil && level > 0
@@ -143,11 +144,15 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         return Array(buildingMetadata.keys).sorted()
     }
     
-    // Get sorted buildings for display (built buildings first, then alphabetical)
+    // Get sorted buildings for display (by backend sort_order, then built first, then alphabetical)
     func sortedBuildings() -> [BuildingMetadata] {
         return buildingMetadata.values.sorted { a, b in
+            // Primary: backend-controlled sort order
+            if a.sortOrder != b.sortOrder { return a.sortOrder < b.sortOrder }
+            // Secondary: built buildings first
             if a.level > 0 && b.level <= 0 { return true }
             if a.level <= 0 && b.level > 0 { return false }
+            // Tertiary: alphabetical
             return a.displayName < b.displayName
         }
     }
