@@ -415,9 +415,6 @@ def add_experience(db: Session, user_id: int, exp_amount: int) -> User:
         state.level += 1
         state.experience -= required_exp
         required_exp = state.level * 100
-        
-        # Give rewards on level up
-        state.gold += 50 * state.level
     
     db.commit()
     db.refresh(user)

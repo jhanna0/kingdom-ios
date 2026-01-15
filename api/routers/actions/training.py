@@ -339,7 +339,6 @@ def work_on_training(
         state.level += 1
         state.skill_points += 3
         state.experience -= xp_needed
-        state.gold += 50  # Level-up bonus
     
     # Science skill: Chance to refund training cooldown (values from tiers.py)
     from routers.tiers import get_science_refund_chance

@@ -751,7 +751,6 @@ def add_experience(
             state.experience -= xp_needed
             state.level += 1
             state.skill_points += 3  # 3 skill points per level
-            state.gold += 50  # Level up bonus
             levels_gained += 1
         else:
             break
@@ -972,7 +971,6 @@ def dev_boost(
             state.experience -= xp_needed
             state.level += 1
             state.skill_points += 3
-            state.gold += 50
             levels_gained += 1
         else:
             break
