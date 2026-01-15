@@ -57,6 +57,10 @@ class PlayerPublicProfile(BaseModel):
     current_kingdom_name: Optional[str] = None
     hometown_kingdom_id: Optional[str] = None
     
+    # Ruled kingdom (first one if multiple)
+    ruled_kingdom_id: Optional[str] = None
+    ruled_kingdom_name: Optional[str] = None
+    
     # Stats (public)
     level: int
     reputation: int

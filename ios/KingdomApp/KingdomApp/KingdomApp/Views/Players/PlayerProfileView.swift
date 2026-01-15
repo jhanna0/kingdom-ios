@@ -76,7 +76,7 @@ struct PlayerProfileView: View {
                     displayName: profile.display_name,
                     level: profile.level,
                     gold: nil,  // Don't show other players' gold
-                    rulerOf: profile.kingdoms_ruled > 0 ? profile.current_kingdom_name : nil
+                    rulerOf: profile.ruled_kingdom_name  // Backend returns actual ruled kingdom
                 )
                 
                 // Current Activity

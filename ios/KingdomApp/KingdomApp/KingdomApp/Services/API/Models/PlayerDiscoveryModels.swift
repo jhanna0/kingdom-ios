@@ -114,6 +114,10 @@ struct PlayerPublicProfile: Codable, Identifiable {
     let current_kingdom_name: String?
     let hometown_kingdom_id: String?
     
+    // Ruled kingdom (first one if multiple)
+    let ruled_kingdom_id: String?
+    let ruled_kingdom_name: String?
+    
     // Stats
     let level: Int
     let reputation: Int

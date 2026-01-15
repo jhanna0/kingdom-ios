@@ -469,10 +469,15 @@ def get_player_profile(
     
     # Compute stats from other tables
     
-    # Count kingdoms ruled
-    kingdoms_ruled = db.query(func.count(Kingdom.id)).filter(
+    # Get kingdoms ruled (fetch first one for display, count for stats)
+    ruled_kingdoms = db.query(Kingdom).filter(
         Kingdom.ruler_id == user.id
-    ).scalar() or 0
+    ).all()
+    kingdoms_ruled = len(ruled_kingdoms)
+    
+    # Get first ruled kingdom for display
+    ruled_kingdom_id = ruled_kingdoms[0].id if ruled_kingdoms else None
+    ruled_kingdom_name = ruled_kingdoms[0].name if ruled_kingdoms else None
     
     # Count coups won
     from db.models import CoupEvent
@@ -505,6 +510,8 @@ def get_player_profile(
         current_kingdom_id=state.current_kingdom_id,
         current_kingdom_name=current_kingdom_name,
         hometown_kingdom_id=state.hometown_kingdom_id,
+        ruled_kingdom_id=ruled_kingdom_id,
+        ruled_kingdom_name=ruled_kingdom_name,
         level=state.level,
         reputation=reputation,
         attack_power=state.attack_power,
