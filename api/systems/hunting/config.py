@@ -62,6 +62,7 @@ ANIMALS = {
         "danger": 0,
         "meat": 2,                # Level 1: drops 1-2 meat
         "description": "Fast but fragile. Common in meadows.",
+        "rare_items": ["lucky_rabbits_foot"],
     },
     "deer": {
         "name": "Deer",

@@ -91,6 +91,17 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "inventory",
     },
+    "lucky_rabbits_foot": {
+        "display_name": "Rabbit Foot",
+        "icon": "hare.fill",
+        "color": "purple",
+        "description": "A lucky charm from the hunt. Increases tracking success chance by 10%.",
+        "category": "trinket",
+        "display_order": 7,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+        "tracking_hit_chance_bonus": 0.10,  # +10% tracking hit chance
+    },
 }
 
 

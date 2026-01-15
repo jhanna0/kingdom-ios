@@ -78,6 +78,7 @@ class Player: ObservableObject {
         let colorName: String     // Theme color name
         let category: String      // "currency", "material", etc.
         let displayOrder: Int     // Sort order
+        let description: String   // Description for tooltip/toast
         
         var id: String { key }
     }
@@ -763,7 +764,8 @@ class Player: ObservableObject {
                         icon: apiResource.icon,
                         colorName: apiResource.color,
                         category: apiResource.category,
-                        displayOrder: apiResource.display_order
+                        displayOrder: apiResource.display_order,
+                        description: apiResource.description ?? ""
                     )
                 }
             print("📦 Loaded \(resourcesData.count) resources from backend dynamically!")

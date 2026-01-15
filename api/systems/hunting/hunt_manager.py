@@ -391,6 +391,17 @@ class HuntSession:
                     "rarity": loot_tier_name,
                 })
         
+        # Animal-specific rare items (e.g. rabbit's foot from rabbit)
+        for item_id in self.animal_data.get("rare_items", []):
+            item_config = RESOURCES.get(item_id, {})
+            potential_drops.append({
+                "item_id": item_id,
+                "item_name": item_config.get("display_name", item_id.title()),
+                "item_icon": item_config.get("icon", "cube.fill"),
+                "item_color": item_config.get("color", "gray"),
+                "rarity": "rare",
+            })
+        
         # Keep rare_drop for backwards compatibility (first item from "rare" tier)
         rare_drop = None
         rare_config = LOOT_TIERS.get("rare", {})
@@ -634,8 +645,13 @@ class HuntManager:
             state.drop_table_slots = BLESSING_DROP_TABLE.copy()
             
             # Remove impossible drops FIRST (before adjustments)
+            # BUT keep "rare" if animal has rare_items (e.g. rabbit's foot)
+            animal_rare_items = session.animal_data.get("rare_items", []) if session.animal_data else []
             for loot_tier_name, loot_tier_config in LOOT_TIERS.items():
                 min_tier = loot_tier_config.get("min_animal_tier", 0)
+                # Keep rare tier if animal has its own rare_items
+                if loot_tier_name == "rare" and animal_rare_items:
+                    continue
                 if animal_tier < min_tier and loot_tier_name in state.drop_table_slots:
                     # Move slots to "common" and DELETE the tier entirely
                     impossible_slots = state.drop_table_slots[loot_tier_name]
@@ -684,10 +700,18 @@ class HuntManager:
         # NEW SYSTEM: Flat hit chance, not scaled by stat!
         # Stat level determines NUMBER of rolls, not success chance
         roll_value = self.rng.random()
-        is_success = roll_value < ROLL_HIT_CHANCE
+        
+        # Calculate effective hit chance (base + item bonuses)
+        effective_hit_chance = ROLL_HIT_CHANCE
+        
+        # Check for item bonuses during tracking phase
+        if state.phase == HuntPhase.TRACK:
+            effective_hit_chance += self._get_tracking_bonus_from_items(db, player_id)
+        
+        is_success = roll_value < effective_hit_chance
         
         # Critical: top 25% of successes are critical (extra shift!)
-        is_critical = is_success and roll_value < (ROLL_HIT_CHANCE * 0.25)
+        is_critical = is_success and roll_value < (effective_hit_chance * 0.25)
         
         # Contribution for tracking purposes
         contribution = 1.5 if is_critical else (1.0 if is_success else 0.0)
@@ -730,6 +754,7 @@ class HuntManager:
             "phase_state": state.to_dict(),
             "phase_update": phase_update,
             "hunt": session.to_dict(),
+            "effective_hit_chance": int(effective_hit_chance * 100),  # Player's actual hit chance with bonuses
         }
     
     def _get_roll_message(self, roll_result, config: dict) -> str:
@@ -752,6 +777,35 @@ class HuntManager:
         else:
             return config.get("failure_effect", "Miss!")
     
+    def _get_tracking_bonus_from_items(self, db, player_id: int) -> float:
+        """
+        Check player inventory for items that boost tracking hit chance.
+        
+        Returns:
+            Float bonus to add to base hit chance (e.g., 0.10 for +10%)
+        """
+        from db.models.inventory import PlayerInventory
+        from routers.resources import RESOURCES
+        
+        # Get item IDs that have tracking bonus
+        bonus_items = {
+            item_id: config.get("tracking_hit_chance_bonus", 0)
+            for item_id, config in RESOURCES.items()
+            if config.get("tracking_hit_chance_bonus", 0) > 0
+        }
+        
+        if not bonus_items:
+            return 0.0
+        
+        # Query only for those items
+        owned = db.query(PlayerInventory).filter(
+            PlayerInventory.user_id == player_id,
+            PlayerInventory.item_id.in_(bonus_items.keys()),
+            PlayerInventory.quantity > 0
+        ).all()
+        
+        return sum(bonus_items[entry.item_id] for entry in owned)
+
     def _apply_roll_to_phase(
         self, 
         session: HuntSession, 
@@ -1385,6 +1439,10 @@ class HuntManager:
             session.items_dropped.extend(items)
         else:
             session.bonus_meat = 0
+        
+        # Animal-specific rare items (e.g. rabbit's foot from rabbit)
+        if loot_tier == "rare":
+            session.items_dropped.extend(animal.get("rare_items", []))
         
         # Distribute meat among participants
         party_size = len(session.participants)

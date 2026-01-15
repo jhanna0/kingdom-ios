@@ -145,6 +145,7 @@ struct APIPlayerState: Codable {
         let color: String
         let category: String
         let display_order: Int
+        let description: String?
         
         var id: String { key }
     }

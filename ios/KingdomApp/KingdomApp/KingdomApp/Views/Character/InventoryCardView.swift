@@ -8,6 +8,7 @@ struct ResourceItem: Identifiable {
     let icon: String
     let color: Color
     let amount: Int
+    let description: String
 }
 
 // MARK: - Color Mapping Helper
@@ -70,11 +71,9 @@ extension Int {
 struct InventoryCardView: View {
     @ObservedObject var player: Player
     
-    /// FULLY DYNAMIC: Get resources from backend player state - NO HARDCODING!
-    /// Backend sends complete resource data with amounts - frontend just renders
-    /// Adding new resources only requires backend changes, NO iOS REDEPLOYMENT!
+    @State private var selectedItem: ResourceItem? = nil
+    
     private var resources: [ResourceItem] {
-        // Use dynamic resources_data from backend (preferred)
         if !player.resourcesData.isEmpty {
             return player.resourcesData.map { resource in
                 ResourceItem(
@@ -82,12 +81,12 @@ struct InventoryCardView: View {
                     displayName: resource.displayName,
                     icon: resource.icon,
                     color: mapColorName(resource.colorName),
-                    amount: resource.amount
+                    amount: resource.amount,
+                    description: resource.description
                 )
             }
         }
         
-        // Fallback to TierManager + KeyPath mapping (legacy, for old API responses)
         return TierManager.shared.getAllResources().compactMap { item in
             guard let amount = getPlayerAmountFallback(for: item.key) else { return nil }
             return ResourceItem(
@@ -95,13 +94,12 @@ struct InventoryCardView: View {
                 displayName: item.info.displayName,
                 icon: item.info.icon,
                 color: mapColorName(item.info.colorName),
-                amount: amount
+                amount: amount,
+                description: ""
             )
         }
     }
     
-    /// FALLBACK ONLY: Get resource amount using KeyPath mapping
-    /// Used only when resources_data is not available (old API responses)
     private func getPlayerAmountFallback(for resourceKey: String) -> Int? {
         let resourceMap: [String: KeyPath<Player, Int>] = [
             "gold": \.gold,
@@ -131,7 +129,6 @@ struct InventoryCardView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // DYNAMIC: Render all resources from backend config in 5-column grid
             let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
             
             LazyVGrid(columns: columns, spacing: 8) {
@@ -142,11 +139,29 @@ struct InventoryCardView: View {
                         name: resource.displayName,
                         amount: resource.amount
                     )
+                    .onTapGesture {
+                        print("🔥 TAPPED: \(resource.displayName), description: '\(resource.description)'")
+                        selectedItem = resource
+                        print("🔥 selectedItem set to: \(selectedItem?.displayName ?? "nil")")
+                    }
                 }
             }
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .onAppear {
+            print("🔥 InventoryCardView appeared, resources count: \(resources.count)")
+            for r in resources {
+                print("🔥 Resource: \(r.displayName), desc: '\(r.description)'")
+            }
+        }
+        .alert(item: $selectedItem) { item in
+            Alert(
+                title: Text(item.displayName),
+                message: Text(item.description),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 }
 
@@ -161,7 +176,6 @@ struct InventoryGridItem: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                // Icon background
                 Image(systemName: icon)
                     .font(.system(size: 18))
                     .foregroundColor(.white)
@@ -173,7 +187,6 @@ struct InventoryGridItem: View {
                         borderWidth: 2
                     )
                 
-                // Amount badge with Runescape-style colors
                 Text(amount.abbreviated())
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(amount.valueColor())
@@ -199,4 +212,3 @@ struct InventoryGridItem: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
     }
 }
-

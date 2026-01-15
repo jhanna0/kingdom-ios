@@ -277,6 +277,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
             "color": resource_config["color"],
             "category": resource_config["category"],
             "display_order": resource_config["display_order"],
+            "description": resource_config.get("description", ""),
         })
     
     # Sort by display order
