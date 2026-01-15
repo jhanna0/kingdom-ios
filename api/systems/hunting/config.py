@@ -114,12 +114,12 @@ ANIMALS = {
 # --- TRACKING: Which creature will you find? ---
 # ALL outcomes must be ON THE BAR! Including "no trail" (failure)
 TRACK_DROP_TABLE = {
-    "no_trail": 40,   # FAILURE - no creature found! Start with big fail section
-    "squirrel": 25,   # Common - 25 slots
-    "rabbit": 20,     # Common - 20 slots  
-    "deer": 10,       # Uncommon - 10 slots
+    "no_trail": 30,   # FAILURE - no creature found! Reduced from 40
+    "squirrel": 28,   # Common - 28 slots (was 25)
+    "rabbit": 24,     # Common - 24 slots (was 20)
+    "deer": 12,       # Uncommon - 12 slots (was 10)
     "boar": 4,        # Rare - 4 slots
-    "bear": 1,        # Very Rare - 1 slot
+    "bear": 2,        # Very Rare - 2 slots (was 1)
     "moose": 0,       # Legendary - 0 slots (must earn it!)
 }  # Total: 100 slots
 
@@ -153,9 +153,10 @@ ATTACK_DROP_TABLE_DISPLAY = [
 ]
 
 BLESSING_DROP_TABLE_DISPLAY = [
-    {"key": "nothing", "icon": "●", "name": "Nothing", "color": "#6B5344"},  # Dark brown - no loot
-    {"key": "common", "icon": "●", "name": "Meat", "color": "#A0826D"},      # Warm taupe - basic
-    {"key": "rare", "icon": "●", "name": "Sinew!", "color": "#8B5A8B"},      # Plum purple - rare!
+    {"key": "nothing", "icon": "●", "name": "Nothing", "color": "#6B5344"},    # Dark brown - no loot
+    {"key": "common", "icon": "●", "name": "Meat", "color": "#A0826D"},        # Warm taupe - basic
+    {"key": "uncommon", "icon": "●", "name": "Fur!", "color": "#D2691E"},      # Chocolate orange - uncommon!
+    {"key": "rare", "icon": "●", "name": "Sinew!", "color": "#8B5A8B"},        # Plum purple - rare!
 ]
 
 # --- ATTACK: Three sections - Scare / Miss / Hit ---
@@ -186,40 +187,44 @@ ATTACK_SHIFT_PER_SUCCESS = {
 # 3 successes: 65% hit
 # 5 successes (max): 85% hit
 
-# --- BLESSING: Nothing vs Common vs Rare loot ---
-# Three-tier system: prayers shift odds from nothing → meat → sinew
+# --- BLESSING: Nothing vs Common vs Uncommon vs Rare loot ---
+# Four-tier system: prayers shift odds from nothing → meat → fur → sinew
 # Common creatures (tier 0-1) have higher chance of no loot
 # Rare creatures (tier 3-4) are almost guaranteed loot
 BLESSING_DROP_TABLE = {
-    "nothing": 35,    # No loot at all - risk for common prey
+    "nothing": 25,    # No loot at all
     "common": 62,     # Just meat
-    "rare": 3,        # Meat + sinew - ultra rare base chance!
+    "uncommon": 8,    # Meat + fur - slightly more than sinew
+    "rare": 5,        # Meat + sinew
 }  # Total: 100 slots
 
 BLESSING_SHIFT_PER_SUCCESS = {
-    "nothing": -10,   # Each success: shrink nothing zone significantly
-    "common": +2,     # Each success: slight gain to common
-    "rare": +8,       # Each success: gain 8 rare slots
+    "nothing": -8,    # Each success: shrink nothing zone
+    "common": -2,     # Each success: slight loss from common
+    "uncommon": +5,   # Each success: gain fur slots
+    "rare": +5,       # Each success: gain sinew slots
 }
-# 0 successes: 35% nothing, 62% meat, 3% sinew
-# 1 success: 25% nothing, 64% meat, 11% sinew  
-# 2 successes: 15% nothing, 66% meat, 19% sinew
-# 3 successes: 5% nothing, 68% meat, 27% sinew (almost guaranteed some loot)
+# 0 successes: 25% nothing, 62% meat, 8% fur, 5% sinew
+# 1 success: 17% nothing, 60% meat, 13% fur, 10% sinew  
+# 2 successes: 9% nothing, 58% meat, 18% fur, 15% sinew
+# 3 successes: 1% nothing, 56% meat, 23% fur, 20% sinew
 
 # Animal tier modifies the base drop table before blessing starts
 # Higher tier = less "nothing" slots, more guaranteed loot
+# Fur only drops from tier 1+ (deer and up - small game has no good pelts)
 BLESSING_TIER_ADJUSTMENTS = {
-    0: {"nothing": +10, "common": -10, "rare": 0},   # Squirrel: 45% nothing (risky!)
-    1: {"nothing": +5, "common": -5, "rare": 0},     # Rabbit/Deer: 40% nothing
-    2: {"nothing": 0, "common": 0, "rare": 0},       # Boar: base rates
-    3: {"nothing": -15, "common": +10, "rare": +5},  # Bear: 20% nothing, better odds
-    4: {"nothing": -25, "common": +15, "rare": +10}, # Moose: 10% nothing, much better!
+    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel: 30% nothing, no fur
+    1: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: 20% nothing
+    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": +6},     # Boar: 13% nothing
+    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +13},  # Bear: 7% nothing
+    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +18}, # Moose: 2% nothing (almost guaranteed!)
 }
 
 # Legacy - kept for backwards compatibility but not used
 BLESSING_BONUS = {
     "common": 0.0,
-    "rare": 1.0,  # Guarantees sinew drop
+    "uncommon": 0.5,  # Guarantees fur drop
+    "rare": 1.0,      # Guarantees sinew drop
 }
 
 # Legacy aliases for backwards compatibility
@@ -251,18 +256,27 @@ ANIMAL_WEIGHTS_BY_TIER = {
 # Gold drops equal to meat earned (gold is taxed by kingdom).
 
 # What drops for each loot tier (applied after blessing resolution)
+# min_animal_tier: minimum animal tier required for items to actually drop
 LOOT_TIERS = {
     "nothing": {
         "meat_multiplier": 0,  # No meat!
         "items": [],
+        "min_animal_tier": 0,
     },
     "common": {
         "meat_multiplier": 1,  # Full meat
         "items": [],
+        "min_animal_tier": 0,
+    },
+    "uncommon": {
+        "meat_multiplier": 1,  # Full meat
+        "items": ["fur"],      # Fur drops!
+        "min_animal_tier": 1,  # Deer and up (small game has no good pelts)
     },
     "rare": {
         "meat_multiplier": 1,  # Full meat
         "items": ["sinew"],    # Sinew drops!
+        "min_animal_tier": 2,  # Boar and up
     },
 }
 
@@ -376,7 +390,9 @@ PHASE_CONFIG = {
         "drop_table_title_resolving": "REVEALING LOOT",
         "drop_table_display_type": "blessing",
         "master_roll_icon": "sparkles",
-        # Rare loot display info - sent to frontend (matches resources.py!)
+        # Loot display info - sent to frontend (matches resources.py!)
+        "uncommon_item_name": "Fur",
+        "uncommon_item_icon": "square.stack.3d.up.fill",
         "rare_item_name": "Sinew",
         "rare_item_icon": "line.diagonal",
         # Roll configuration

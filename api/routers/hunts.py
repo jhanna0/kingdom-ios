@@ -238,8 +238,9 @@ def get_hunt_config():
             "blessing": BLESSING_DROP_TABLE_DISPLAY,
         },
         "notes": {
-            "rewards": "Hunts drop MEAT + GOLD (equal, taxed) + sinew (rare)",
-            "sinew": "Rarer from small game, more common from big game",
+            "rewards": "Hunts drop MEAT + GOLD (equal, taxed) + fur (uncommon) + sinew (rare)",
+            "fur": "Drops from deer and larger game - used to craft defense armor",
+            "sinew": "Rarer drop from boar and larger game - used to craft hunting bow",
             "bow": "Craft hunting bow with 10 wood + 3 sinew for +2 attack in hunts",
         },
     }

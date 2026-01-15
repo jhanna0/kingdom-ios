@@ -104,9 +104,14 @@ struct CreatureRevealOverlay: View {
                         HStack(spacing: 16) {
                             CreatureStatBadge(icon: "heart.fill", value: "\(animal.hp ?? 1) HP", color: KingdomTheme.Colors.buttonDanger)
                             CreatureStatBadge(icon: "flame.fill", value: "\(animal.meat ?? 0) Meat", color: KingdomTheme.Colors.buttonSuccess)
-                            // Rare drop from backend - same style as InventoryGridItem
-                            if let rareDrop = animal.rare_drop {
-                                RareDropBadge(icon: rareDrop.item_icon, name: rareDrop.item_name)
+                        }
+                        
+                        // Potential drops from backend - fully dynamic!
+                        if let drops = animal.potential_drops, !drops.isEmpty {
+                            HStack(spacing: 12) {
+                                ForEach(drops) { drop in
+                                    PotentialDropBadge(drop: drop)
+                                }
                             }
                         }
                     }
@@ -239,28 +244,32 @@ private struct CreatureStatBadge: View {
     }
 }
 
-// MARK: - Rare Drop Badge (same style as InventoryGridItem)
-private struct RareDropBadge: View {
-    let icon: String
-    let name: String
+// MARK: - Potential Drop Badge (fully dynamic from backend)
+private struct PotentialDropBadge: View {
+    let drop: PotentialDropInfo
     
     var body: some View {
         VStack(spacing: 4) {
-            Image(systemName: icon)
+            Image(systemName: drop.item_icon)
                 .font(.system(size: 16))
                 .foregroundColor(.white)
                 .frame(width: 32, height: 32)
                 .brutalistBadge(
-                    backgroundColor: .brown,
+                    backgroundColor: badgeColor,
                     cornerRadius: 8,
                     shadowOffset: 2,
                     borderWidth: 2
                 )
             
-            Text(name)
+            Text(drop.item_name)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .lineLimit(1)
+            
+            // Rarity label
+            Text(drop.rarity?.uppercased() ?? "")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(badgeColor)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -277,5 +286,20 @@ private struct RareDropBadge: View {
                     )
             }
         )
+    }
+    
+    /// Color from backend config
+    private var badgeColor: Color {
+        guard let colorName = drop.item_color else { return .gray }
+        switch colorName.lowercased() {
+        case "orange": return .orange
+        case "brown": return .brown
+        case "purple": return KingdomTheme.Colors.regalPurple
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "gray", "grey": return .gray
+        default: return .gray
+        }
     }
 }

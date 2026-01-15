@@ -38,6 +38,7 @@ from .config import (
     BLESSING_DROP_TABLE,
     BLESSING_SHIFT_PER_SUCCESS,
     BLESSING_DROP_TABLE_DISPLAY,
+    BLESSING_TIER_ADJUSTMENTS,
     LOOT_TIERS,
     get_max_tier_from_track_score,
 )
@@ -362,17 +363,39 @@ class HuntSession:
         ]
     
     def _build_animal_dict(self) -> Optional[dict]:
-        """Build animal dict with rare_drop info for tier 2+ animals."""
+        """Build animal dict with potential drops based on tier - ALL FROM CONFIG."""
         if not self.animal_data:
             return None
         
-        # Get rare drop info (same logic as /hunts/config endpoint)
-        rare_drop = None
+        from routers.resources import RESOURCES
+        
         tier = self.animal_data.get("tier", 0)
-        if tier >= 2:
-            # Import RESOURCES here to avoid circular import
-            from routers.resources import RESOURCES
-            rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
+        potential_drops = []
+        
+        # Build potential drops from LOOT_TIERS config - fully dynamic!
+        for loot_tier_name, loot_tier_config in LOOT_TIERS.items():
+            min_tier = loot_tier_config.get("min_animal_tier", 0)
+            items = loot_tier_config.get("items", [])
+            
+            # Skip if animal tier is too low or no items in this tier
+            if tier < min_tier or not items:
+                continue
+            
+            for item_id in items:
+                item_config = RESOURCES.get(item_id, {})
+                potential_drops.append({
+                    "item_id": item_id,
+                    "item_name": item_config.get("display_name", item_id.title()),
+                    "item_icon": item_config.get("icon", "cube.fill"),
+                    "item_color": item_config.get("color", "gray"),
+                    "rarity": loot_tier_name,
+                })
+        
+        # Keep rare_drop for backwards compatibility (first item from "rare" tier)
+        rare_drop = None
+        rare_config = LOOT_TIERS.get("rare", {})
+        if tier >= rare_config.get("min_animal_tier", 0):
+            rare_items = rare_config.get("items", [])
             if rare_items:
                 item_id = rare_items[0]
                 item_config = RESOURCES.get(item_id, {})
@@ -389,8 +412,24 @@ class HuntSession:
             "tier": tier,
             "hp": self.animal_data.get("hp"),
             "meat": self.animal_data.get("meat"),
-            "rare_drop": rare_drop,
+            "rare_drop": rare_drop,  # Backwards compat
+            "potential_drops": potential_drops,  # All possible drops from config
         }
+    
+    def _get_item_details(self) -> List[dict]:
+        """Get full item details from RESOURCES config for dropped items."""
+        from routers.resources import RESOURCES
+        
+        details = []
+        for item_id in self.items_dropped:
+            item_config = RESOURCES.get(item_id, {})
+            details.append({
+                "id": item_id,
+                "display_name": item_config.get("display_name", item_id.replace("_", " ").title()),
+                "icon": item_config.get("icon", "cube.fill"),
+                "color": item_config.get("color", "gray"),
+            })
+        return details
     
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dict."""
@@ -417,6 +456,7 @@ class HuntSession:
                 "total_meat": self.total_meat + self.bonus_meat,
                 "meat_market_value": (self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE,
                 "items": self.items_dropped,
+                "item_details": self._get_item_details(),
             },
             "party_size": len(self.participants),
             "created_at": _format_datetime_iso(self.created_at) if self.created_at else None,
@@ -589,8 +629,24 @@ class HuntManager:
             tier = session.animal_data.get("tier", 0) if session.animal_data else 0
             state.drop_table_slots = ATTACK_DROP_TABLE_BY_TIER.get(tier, ATTACK_DROP_TABLE).copy()
         elif phase == HuntPhase.BLESSING:
-            # Loot bonus drop table
+            # Loot bonus drop table - adjusted by animal tier!
+            animal_tier = session.animal_data.get("tier", 0) if session.animal_data else 0
             state.drop_table_slots = BLESSING_DROP_TABLE.copy()
+            
+            # Remove impossible drops FIRST (before adjustments)
+            for loot_tier_name, loot_tier_config in LOOT_TIERS.items():
+                min_tier = loot_tier_config.get("min_animal_tier", 0)
+                if animal_tier < min_tier and loot_tier_name in state.drop_table_slots:
+                    # Move slots to "common" and DELETE the tier entirely
+                    impossible_slots = state.drop_table_slots[loot_tier_name]
+                    state.drop_table_slots["common"] = state.drop_table_slots.get("common", 0) + impossible_slots
+                    del state.drop_table_slots[loot_tier_name]
+            
+            # Apply tier adjustments (higher tier = less "nothing", more rare)
+            tier_adjustments = BLESSING_TIER_ADJUSTMENTS.get(animal_tier, {})
+            for slot_key, adjustment in tier_adjustments.items():
+                if slot_key in state.drop_table_slots:
+                    state.drop_table_slots[slot_key] = max(0, state.drop_table_slots[slot_key] + adjustment)
         
         # Convert slots to probabilities for UI
         state.creature_probabilities = state.get_probabilities()
@@ -759,12 +815,11 @@ class HuntManager:
         else:
             return
         
-        # Apply shifts
+        # Apply shifts - simple, no special cases
         for outcome_key, shift in shift_config.items():
             if outcome_key in state.drop_table_slots:
                 state.drop_table_slots[outcome_key] += shift * multiplier
-                # Never go below 1 slot (always possible, just unlikely)
-                state.drop_table_slots[outcome_key] = max(1, state.drop_table_slots[outcome_key])
+                state.drop_table_slots[outcome_key] = max(0, state.drop_table_slots[outcome_key])
         
         # Update probabilities for UI
         state.creature_probabilities = state.get_probabilities()
@@ -1011,6 +1066,9 @@ class HuntManager:
         elif loot_tier == "rare":
             items_str = ", ".join(session.items_dropped) if session.items_dropped else "Sinew"
             message = f"RARE LOOT! You found: {items_str}!"
+        elif loot_tier == "uncommon":
+            items_str = ", ".join(session.items_dropped) if session.items_dropped else "Fur"
+            message = f"Nice find! You got: {items_str}!"
         else:
             message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
@@ -1208,13 +1266,23 @@ class HuntManager:
         
         elif phase == HuntPhase.BLESSING:
             # Legacy single-roll blessing - use success count to determine loot tier
-            # More successes = higher chance of rare
-            rare_chance = 0.03 + (group_roll.success_count * 0.08) + (group_roll.critical_count * 0.16)
-            rare_chance = min(0.5, rare_chance)  # Cap at 50%
+            # More successes = higher chance of rare/uncommon
+            rare_chance = 0.05 + (group_roll.success_count * 0.06) + (group_roll.critical_count * 0.12)
+            rare_chance = min(0.4, rare_chance)  # Cap at 40%
+            uncommon_chance = 0.15 + (group_roll.success_count * 0.05) + (group_roll.critical_count * 0.10)
+            uncommon_chance = min(0.5, uncommon_chance)  # Cap at 50%
             
-            loot_tier = "rare" if self.rng.random() < rare_chance else "common"
+            roll = self.rng.random()
+            if roll < rare_chance:
+                loot_tier = "rare"
+            elif roll < rare_chance + uncommon_chance:
+                loot_tier = "uncommon"
+            else:
+                loot_tier = "common"
+            
             effects["loot_tier"] = loot_tier
             effects["rare_chance"] = round(rare_chance, 3)
+            effects["uncommon_chance"] = round(uncommon_chance, 3)
             
             # Apply loot
             if not session.animal_escaped and session.animal_data:
@@ -1229,6 +1297,10 @@ class HuntManager:
             if loot_tier == "rare":
                 item_names = [item.replace("_", " ").title() for item in session.items_dropped]
                 outcome_message = f"RARE LOOT! You found: {', '.join(item_names)}!"
+                effects["loot_success"] = True
+            elif loot_tier == "uncommon":
+                item_names = [item.replace("_", " ").title() for item in session.items_dropped]
+                outcome_message = f"Nice find! You got: {', '.join(item_names)}!"
                 effects["loot_success"] = True
             else:
                 outcome_message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
@@ -1270,20 +1342,20 @@ class HuntManager:
                 break
     
     def _calculate_loot(self, session: HuntSession, loot_tier: str) -> None:
-        """Calculate and assign loot based on hunt results.
+        """Calculate and assign loot based on hunt results - ALL FROM CONFIG.
 
-        Three-tier system:
-        - NOTHING: No loot at all!
-        - COMMON: Just meat
-        - RARE: Meat + Sinew (only for tier 2+ animals: boar, bear, moose)
-
+        Loot tiers and their requirements come from LOOT_TIERS config.
         Gold drops equal to meat earned (taxed by kingdom).
         """
         if not session.animal_data:
             return
 
-        # NOTHING tier = no loot at all!
-        if loot_tier == "nothing":
+        # Get loot tier config
+        tier_config = LOOT_TIERS.get(loot_tier, {})
+        
+        # Check meat multiplier (nothing tier = 0)
+        meat_multiplier = tier_config.get("meat_multiplier", 1)
+        if meat_multiplier == 0:
             session.total_meat = 0
             session.bonus_meat = 0
             return
@@ -1298,13 +1370,19 @@ class HuntManager:
         max_meat = animal_level * 2
         session.total_meat = random.randint(min_meat, max_meat)
 
-        # Rare tier gives bonus meat too!
+        # Bonus meat based on loot tier rarity
         if loot_tier == "rare":
-            session.bonus_meat = int(session.total_meat * 0.25)  # +25% bonus meat for rare
-            # Sinew only drops from tier 2+ animals (boar, bear, moose)
-            if animal_tier >= 2:
-                rare_items = LOOT_TIERS.get("rare", {}).get("items", [])
-                session.items_dropped.extend(rare_items)
+            session.bonus_meat = int(session.total_meat * 0.25)
+        elif loot_tier == "uncommon":
+            session.bonus_meat = int(session.total_meat * 0.15)
+        else:
+            session.bonus_meat = 0
+        
+        # Drop items if animal meets minimum tier requirement - FROM CONFIG
+        min_animal_tier = tier_config.get("min_animal_tier", 0)
+        if animal_tier >= min_animal_tier:
+            items = tier_config.get("items", [])
+            session.items_dropped.extend(items)
         else:
             session.bonus_meat = 0
         

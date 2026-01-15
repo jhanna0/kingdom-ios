@@ -81,6 +81,16 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "inventory",
     },
+    "fur": {
+        "display_name": "Fur",
+        "icon": "rectangle.portrait.fill",
+        "color": "orange",
+        "description": "Animal fur. I can craft this into some armor.",
+        "category": "crafting",
+        "display_order": 6,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
 }
 
 

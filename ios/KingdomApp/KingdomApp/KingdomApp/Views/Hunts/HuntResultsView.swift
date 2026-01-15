@@ -117,17 +117,31 @@ struct HuntResultsView: View {
                     }
                 }
                 
-                // Special items
-                if !rewards.items.isEmpty {
+                // Special items - use item_details from backend if available
+                if let itemDetails = rewards.item_details, !itemDetails.isEmpty {
                     VStack(spacing: 8) {
                         Text("RARE LOOT")
                             .font(.system(size: 10, weight: .bold))
                             .tracking(2)
-                            .foregroundColor(KingdomTheme.Colors.regalPurple)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        HStack(spacing: 10) {
+                            ForEach(itemDetails, id: \.id) { item in
+                                itemBadge(item: item)
+                            }
+                        }
+                    }
+                } else if !rewards.items.isEmpty {
+                    // Fallback to legacy string array (backwards compat)
+                    VStack(spacing: 8) {
+                        Text("RARE LOOT")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(2)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         HStack(spacing: 10) {
                             ForEach(rewards.items, id: \.self) { item in
-                                rareItemBadge(item: item)
+                                legacyItemBadge(itemId: item)
                             }
                         }
                     }
@@ -182,12 +196,53 @@ struct HuntResultsView: View {
         )
     }
     
-    private func rareItemBadge(item: String) -> some View {
-        let displayName = item.replacingOccurrences(of: "_", with: " ").capitalized
-        let icon = item == "sinew" ? "waveform.path" : "cube.fill"
+    /// Dynamic item badge using full item details from backend
+    /// Always uses purple background for that sweet rare drop effect
+    private func itemBadge(item: ItemDetail) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: item.icon)
+                .font(.system(size: 14, weight: .bold))
+            Text(item.display_name)
+                .font(.system(size: 13, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            ZStack {
+                Capsule()
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                Capsule()
+                    .fill(KingdomTheme.Colors.regalPurple)
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
+    /// Convert color string from backend to SwiftUI Color
+    private func colorFromString(_ colorName: String) -> Color {
+        switch colorName.lowercased() {
+        case "orange": return .orange
+        case "brown": return .brown
+        case "purple", "regalpurple": return KingdomTheme.Colors.regalPurple
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "gray", "grey": return .gray
+        default: return KingdomTheme.Colors.regalPurple
+        }
+    }
+    
+    /// Legacy fallback for backwards compatibility (item IDs only)
+    private func legacyItemBadge(itemId: String) -> some View {
+        let displayName = itemId.replacingOccurrences(of: "_", with: " ").capitalized
         
         return HStack(spacing: 6) {
-            Image(systemName: icon)
+            Image(systemName: "cube.fill")
                 .font(.system(size: 14, weight: .bold))
             Text(displayName)
                 .font(.system(size: 13, weight: .bold))

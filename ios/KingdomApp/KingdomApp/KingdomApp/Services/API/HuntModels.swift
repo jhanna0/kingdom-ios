@@ -164,7 +164,8 @@ struct HuntAnimal: Codable {
     let tier: Int?
     let hp: Int?
     let meat: Int?
-    let rare_drop: RareDropInfo?  // Backend tells us what rare item this animal can drop (nil if none)
+    let rare_drop: RareDropInfo?  // Backwards compat - first rare item
+    let potential_drops: [PotentialDropInfo]?  // All possible drops for this animal
 }
 
 // Rare drop info from backend - comes from RESOURCES config
@@ -172,6 +173,17 @@ struct RareDropInfo: Codable {
     let item_id: String
     let item_name: String
     let item_icon: String
+}
+
+// Potential drop info - includes rarity tier
+struct PotentialDropInfo: Codable, Identifiable {
+    let item_id: String
+    let item_name: String
+    let item_icon: String
+    let item_color: String?
+    let rarity: String?  // "uncommon" or "rare"
+    
+    var id: String { item_id }
 }
 
 // MARK: - Phase State (Multi-Roll System)
@@ -287,11 +299,19 @@ struct PhaseState: Codable {
 
 // MARK: - Rewards
 
+struct ItemDetail: Codable {
+    let id: String
+    let display_name: String
+    let icon: String
+    let color: String
+}
+
 struct HuntRewards: Codable {
     let meat: Int
     let bonus_meat: Int
     let total_meat: Int
     let items: [String]
+    let item_details: [ItemDetail]?  // Full item config from backend!
 }
 
 // MARK: - Hunt Session
