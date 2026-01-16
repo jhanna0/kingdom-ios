@@ -103,6 +103,17 @@ RESOURCES = {
         "storage_type": "inventory",
         "tracking_hit_chance_bonus": 0.10,  # +10% tracking hit chance
     },
+    # ===== FISHING RESOURCES =====
+    "pet_fish": {
+        "display_name": "Pet Fish",
+        "icon": "fish.circle.fill",
+        "color": "cyan",
+        "description": "A rare companion fish. Decorative trophy from fishing.",
+        "category": "trinket",
+        "display_order": 8,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
 }
 
 
