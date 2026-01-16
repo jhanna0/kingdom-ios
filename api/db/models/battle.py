@@ -211,16 +211,12 @@ class Battle(Base):
     
     def get_attacker_ids(self) -> List[int]:
         """Get attacker user IDs from participants table."""
-        if self.participants:
-            return [p.user_id for p in self.participants if p.side == "attackers"]
-        return self.attackers if self.attackers else []
-    
+        return [p.user_id for p in self.participants if p.side == "attackers"]
+
     def get_defender_ids(self) -> List[int]:
         """Get defender user IDs from participants table."""
-        if self.participants:
-            return [p.user_id for p in self.participants if p.side == "defenders"]
-        return self.defenders if self.defenders else []
-    
+        return [p.user_id for p in self.participants if p.side == "defenders"]
+
     def add_participant(self, player_id: int, side: str) -> None:
         """Add a participant to the battle."""
         for p in self.participants:
@@ -233,18 +229,6 @@ class Battle(Base):
             side=side
         )
         self.participants.append(participant)
-        
-        # Also update legacy JSONB for backward compat
-        if side == "attackers":
-            if not self.attackers:
-                self.attackers = []
-            if player_id not in self.attackers:
-                self.attackers = self.attackers + [player_id]
-        else:
-            if not self.defenders:
-                self.defenders = []
-            if player_id not in self.defenders:
-                self.defenders = self.defenders + [player_id]
     
     def add_attacker(self, player_id: int) -> None:
         self.add_participant(player_id, "attackers")

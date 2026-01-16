@@ -17,7 +17,7 @@ from db import get_db, User, PlayerState, Kingdom, ActionCooldown
 from db.models import (
     Battle, BattleType, BattleParticipant, BattleTerritory,
     BattleAction, BattleInjury, FightSession, BattleRollOutcome,
-    KingdomHistory, CheckInHistory, UserKingdom,
+    KingdomHistory, UserKingdom,
 )
 from systems.battle.config import (
     # Timing
@@ -108,13 +108,10 @@ def _get_kingdom_reputation(db: Session, user_id: int, kingdom_id: str) -> int:
     return user_kingdom.local_reputation if user_kingdom else 0
 
 
-def _has_visited_kingdom(db: Session, user_id: int, kingdom_id: str) -> bool:
-    """Check if player has ever checked into a kingdom"""
-    visit = db.query(CheckInHistory).filter(
-        CheckInHistory.user_id == user_id,
-        CheckInHistory.kingdom_id == kingdom_id
-    ).first()
-    return visit is not None
+def _is_at_kingdom(db: Session, user_id: int, kingdom_id: str) -> bool:
+    """Check if player is currently at the kingdom"""
+    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+    return state is not None and state.current_kingdom_id == kingdom_id
 
 
 def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> Optional[InitiatorStats]:
@@ -1048,7 +1045,7 @@ def _build_battle_response(
             rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
             can_join_battle = rep >= COUP_JOIN_REPUTATION_REQUIREMENT
         else:
-            can_join_battle = _has_visited_kingdom(db, current_user.id, battle.kingdom_id)
+            can_join_battle = _is_at_kingdom(db, current_user.id, battle.kingdom_id)
     
     initiator_stats = _get_initiator_stats(db, battle.initiator_id, battle.kingdom_id)
     
@@ -1211,9 +1208,7 @@ def initiate_coup(
         initiator_id=current_user.id,
         initiator_name=current_user.display_name,
         start_time=now,
-        pledge_end_time=pledge_end_time,
-        attackers=[current_user.id],
-        defenders=[]
+        pledge_end_time=pledge_end_time
     )
     
     db.add(battle)
@@ -1297,9 +1292,7 @@ def declare_invasion(
         initiator_id=current_user.id,
         initiator_name=current_user.display_name,
         start_time=now,
-        pledge_end_time=pledge_end_time,
-        attackers=[current_user.id],
-        defenders=[]
+        pledge_end_time=pledge_end_time
     )
     
     db.add(battle)
@@ -1307,6 +1300,9 @@ def declare_invasion(
     db.refresh(battle)
     
     battle.add_attacker(current_user.id)
+    # Auto-add ruler as defender
+    if target_kingdom.ruler_id:
+        battle.add_defender(target_kingdom.ruler_id)
     db.commit()
     
     return BattleInitiateResponse(
@@ -1356,10 +1352,10 @@ def join_battle(
                 detail=f"Need {COUP_JOIN_REPUTATION_REQUIREMENT} reputation in this kingdom to join (you have {rep})"
             )
     else:  # Invasion
-        if not _has_visited_kingdom(db, current_user.id, battle.kingdom_id):
+        if not _is_at_kingdom(db, current_user.id, battle.kingdom_id):
             raise HTTPException(
                 status_code=400,
-                detail="You must have visited this kingdom at least once to join"
+                detail="You must be at this kingdom to join"
             )
     
     if request.side == 'attackers':
@@ -1530,10 +1526,10 @@ def check_battle_eligibility(
             else:
                 join_reason = f"Need {COUP_JOIN_REPUTATION_REQUIREMENT} reputation"
         else:
-            if _has_visited_kingdom(db, current_user.id, kingdom_id):
+            if _is_at_kingdom(db, current_user.id, kingdom_id):
                 can_join = True
             else:
-                join_reason = "Must have visited this kingdom"
+                join_reason = "Must be at this kingdom"
     
     return BattleEligibilityResponse(
         can_initiate_coup=can_coup,
