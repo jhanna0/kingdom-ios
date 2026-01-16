@@ -54,12 +54,12 @@ struct BattleView: View {
     
     @ViewBuilder
     private func phaseContent(battle: BattleEventResponse) -> some View {
-        switch battle.status {
-        case "pledge":
+        // Show pledge view during pledge phase OR if user can still join during battle phase
+        if battle.status == "pledge" || (battle.userSide == nil && battle.canJoin) {
             BattlePledgeView(battle: battle, onDismiss: onDismiss) { side in
                 viewModel.pledge(side: side)
             }
-        case "battle":
+        } else if battle.status == "battle" {
             BattlePhaseView(battle: battle, onDismiss: onDismiss) { territoryName in
                 // Find the territory and navigate to fight view
                 if let territory = battle.territories?.first(where: { $0.name == territoryName }) {
@@ -67,9 +67,9 @@ struct BattleView: View {
                     showFightView = true
                 }
             }
-        case "resolved":
+        } else if battle.status == "resolved" {
             resolvedView(battle: battle)
-        default:
+        } else {
             Text("Unknown battle status")
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
