@@ -81,7 +81,7 @@ from schemas.battle import (
     HowItWorksStep,
 )
 from routers.auth import get_current_user
-from routers.actions.utils import format_datetime_iso
+from routers.actions.utils import format_datetime_iso, log_activity
 
 router = APIRouter(prefix="/battles", tags=["Battles"])
 
@@ -1240,6 +1240,24 @@ def initiate_coup(
         battle.add_defender(kingdom.ruler_id)
     db.commit()
     
+    # Log activity: "Declared Coup against X"
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="coup_initiated",
+        action_category="combat",
+        description=f"Declared Coup against {kingdom.name}",
+        kingdom_id=kingdom.id,
+        details={
+            "battle_id": battle.id,
+            "target_kingdom_id": kingdom.id,
+            "target_kingdom_name": kingdom.name,
+            "ruler_id": kingdom.ruler_id,
+        },
+        visibility="public"
+    )
+    db.commit()
+    
     return BattleInitiateResponse(
         success=True,
         message=f"Coup initiated in {kingdom.name}! Citizens have {COUP_PLEDGE_DURATION_HOURS} hours to choose sides.",
@@ -1326,6 +1344,25 @@ def declare_invasion(
         battle.add_defender(target_kingdom.ruler_id)
     db.commit()
     
+    # Log activity: "Declared Invasion against X"
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="invasion_declared",
+        action_category="combat",
+        description=f"Declared Invasion against {target_kingdom.name}",
+        kingdom_id=target_kingdom.id,
+        details={
+            "battle_id": battle.id,
+            "target_kingdom_id": target_kingdom.id,
+            "target_kingdom_name": target_kingdom.name,
+            "attacking_from_kingdom_id": attacking_from_id,
+            "attacking_from_kingdom_name": attacking_kingdom.name,
+        },
+        visibility="public"
+    )
+    db.commit()
+    
     return BattleInitiateResponse(
         success=True,
         message=f"Invasion declared! {attacking_kingdom.name} will attack {target_kingdom.name} in {INVASION_DECLARATION_HOURS} hours.",
@@ -1407,6 +1444,31 @@ def join_battle(
     
     db.commit()
     db.refresh(battle)
+    
+    # Get kingdom name for the activity log
+    kingdom = db.query(Kingdom).filter(Kingdom.id == battle.kingdom_id).first()
+    kingdom_name = kingdom.name if kingdom else battle.kingdom_id
+    
+    # Log activity: "Pledged to attackers/defenders in Coup/Invasion"
+    battle_type_name = "Coup" if battle.is_coup else "Invasion"
+    side_label = "Attackers" if request.side == "attackers" else "Defenders"
+    
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="battle_joined",
+        action_category="combat",
+        description=f"Pledged to {side_label} in {battle_type_name} at {kingdom_name}",
+        kingdom_id=battle.kingdom_id,
+        details={
+            "battle_id": battle.id,
+            "battle_type": battle.type,
+            "side": request.side,
+            "kingdom_name": kingdom_name,
+        },
+        visibility="friends"
+    )
+    db.commit()
     
     return BattleJoinResponse(
         success=True,
@@ -1906,12 +1968,49 @@ def resolve_fight_session(
     # Save session data before deleting
     session_rolls = session.rolls or []
     session_rolls_completed = session.rolls_completed
+    session_side = session.side
+    session_territory = session.territory_name
     
     db.delete(session)
     db.commit()
     
     # Refresh territory to get current state
     db.refresh(territory)
+    
+    # Log activity: "Fought in Coup" or "Defended/Attacked in Invasion"
+    kingdom = db.query(Kingdom).filter(Kingdom.id == battle.kingdom_id).first()
+    kingdom_name = kingdom.name if kingdom else battle.kingdom_id
+    
+    if battle.is_coup:
+        fight_description = f"Fought in Coup at {kingdom_name}"
+        action_type = "coup_fought"
+    else:
+        # For invasions, show whether they attacked or defended
+        if session_side == "attackers":
+            fight_description = f"Attacked in Invasion of {kingdom_name}"
+        else:
+            fight_description = f"Defended in Invasion of {kingdom_name}"
+        action_type = "invasion_fought"
+    
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type=action_type,
+        action_category="combat",
+        description=fight_description,
+        kingdom_id=battle.kingdom_id,
+        details={
+            "battle_id": battle.id,
+            "battle_type": battle.type,
+            "side": session_side,
+            "territory": session_territory,
+            "best_outcome": best_outcome,
+            "push_amount": round(push_amount, 2),
+            "newly_captured": newly_captured,
+        },
+        visibility="friends"
+    )
+    db.commit()
     
     # Build message
     if battle_won:
