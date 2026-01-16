@@ -258,13 +258,7 @@ def get_player_pets(db: Session, user_id: int) -> list:
 
 
 @router.get("/pets/config")
-def get_pets_config():
+def get_pets_config_endpoint():
     """Get all pet configurations for frontend rendering"""
-    return {
-        "pets": PETS,
-        "notes": {
-            "storage": "Pets are stored in player_inventory table",
-            "sources": "Currently only pet_fish from rare fishing catches",
-        }
-    }
+    return get_pets_config()
 

@@ -88,10 +88,8 @@ struct PlayerProfileView: View {
                 // Equipment
                 equipmentCard(profile)
                 
-                // Pets (only shows if player has pets)
-                if let pets = profile.pets, !pets.isEmpty {
-                    ProfilePetsCard(pets: pets)
-                }
+                // Pets
+                ProfilePetsCard(pets: profile.pets ?? [], showEmpty: true)
                 
                 // Achievements
                 achievementsCard(profile)

@@ -93,7 +93,6 @@ class Player: ObservableObject {
     
     // Pets - companion creatures collected from activities
     @Published var pets: [PlayerPet] = []
-    @Published var petsEmptyState: PetsEmptyState = PetsEmptyState()
     
     /// Pet data from backend
     struct PlayerPet: Identifiable {
@@ -104,13 +103,6 @@ class Player: ObservableObject {
         let colorName: String
         let description: String
         let source: String?
-    }
-    
-    /// Empty state config from backend - NO HARDCODING!
-    struct PetsEmptyState {
-        var title: String = "No pets yet"
-        var message: String = "Complete activities to find companions!"
-        var icon: String = "pawprint.circle"
     }
     
     // Properties (land ownership)
@@ -811,14 +803,6 @@ class Player: ObservableObject {
             }
         }
         
-        // Pets config (empty state text from backend)
-        if let config = apiState.pets_config {
-            petsEmptyState = PetsEmptyState(
-                title: config.empty_state.title,
-                message: config.empty_state.message,
-                icon: config.empty_state.icon
-            )
-        }
         
         // Equipment
         if let weaponData = apiState.equipped_weapon {

@@ -18,18 +18,9 @@ router = APIRouter(prefix="/player", tags=["player"])
 
 
 def get_player_pets_data(db: Session, user_id: int) -> list:
-    """
-    Get all pets owned by a player for API responses.
-    Returns list of pet data with quantities, icons, etc.
-    """
+    """Get all pets owned by a player."""
     from routers.resources import get_player_pets
     return get_player_pets(db, user_id)
-
-
-def get_pets_config_data() -> dict:
-    """Get pets UI configuration including empty state."""
-    from routers.resources import get_pets_config
-    return get_pets_config()
 
 
 def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dict:
@@ -418,7 +409,6 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         resources_data=resources_data,
         inventory=inventory,
         pets=get_player_pets_data(db, user.id),
-        pets_config=get_pets_config_data(),
     )
 
 

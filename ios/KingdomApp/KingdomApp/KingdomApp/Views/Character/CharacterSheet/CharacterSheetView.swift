@@ -40,7 +40,7 @@ struct CharacterSheetView: View {
                 InventoryCardView(player: player)
                 
                 // Pets section
-                PetsCard(pets: player.pets, showEmpty: true, emptyState: player.petsEmptyState)
+                PetsCard(pets: player.pets, showEmpty: true)
                 
                 // Crafting section
                 CraftingInfoCard(

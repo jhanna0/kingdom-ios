@@ -24,8 +24,7 @@ private func mapColorName(_ colorName: String) -> Color {
 struct PetsCard: View {
     let pets: [Player.PlayerPet]
     var title: String = "Pets"
-    var showEmpty: Bool = false  // Whether to show card when no pets
-    var emptyState: Player.PetsEmptyState = Player.PetsEmptyState()  // From backend
+    var showEmpty: Bool = false
     
     @State private var selectedPet: Player.PlayerPet? = nil
     
@@ -66,17 +65,17 @@ struct PetsCard: View {
                     .frame(height: 2)
                 
                 if pets.isEmpty {
-                    // Empty state - text from backend config
+                    // Empty state
                     VStack(spacing: 12) {
-                        Image(systemName: emptyState.icon)
+                        Image(systemName: "pawprint.circle")
                             .font(.system(size: 36))
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                         
-                        Text(emptyState.title)
+                        Text("No pets yet")
                             .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
-                        Text(emptyState.message)
+                        Text("Complete activities to find companions!")
                             .font(FontStyles.labelSmall)
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
@@ -164,11 +163,12 @@ struct PetGridItem: View {
 struct ProfilePetsCard: View {
     let pets: [PetData]
     var title: String = "Pets"
+    var showEmpty: Bool = false
     
     @State private var selectedPet: PetData? = nil
     
     var body: some View {
-        if !pets.isEmpty {
+        if !pets.isEmpty || showEmpty {
             VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
                 HStack {
                     Image(systemName: "pawprint.fill")
@@ -202,15 +202,30 @@ struct ProfilePetsCard: View {
                     .fill(Color.black)
                     .frame(height: 2)
                 
-                // Pets grid
-                let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
-                
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(pets) { pet in
-                        ProfilePetGridItem(pet: pet)
-                            .onTapGesture {
-                                selectedPet = pet
-                            }
+                if pets.isEmpty {
+                    // Empty state
+                    VStack(spacing: 12) {
+                        Image(systemName: "pawprint.circle")
+                            .font(.system(size: 36))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                        
+                        Text("No pets yet")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                } else {
+                    // Pets grid
+                    let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+                    
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(pets) { pet in
+                            ProfilePetGridItem(pet: pet)
+                                .onTapGesture {
+                                    selectedPet = pet
+                                }
+                        }
                     }
                 }
             }

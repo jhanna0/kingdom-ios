@@ -91,7 +91,6 @@ struct APIPlayerState: Codable {
     let resources_data: [ResourceData]?
     let inventory: [InventoryItem]?
     let pets: [PetData]?
-    let pets_config: PetsConfig?
     
     struct TrainingCostsFromAPI: Codable {
         let attack: Int
@@ -169,15 +168,6 @@ struct APIPlayerState: Codable {
         let source: String?
     }
     
-    struct PetsConfig: Codable {
-        let empty_state: PetsEmptyState
-        
-        struct PetsEmptyState: Codable {
-            let title: String
-            let message: String
-            let icon: String
-        }
-    }
 }
 
 struct APIEquipmentItem: Codable {

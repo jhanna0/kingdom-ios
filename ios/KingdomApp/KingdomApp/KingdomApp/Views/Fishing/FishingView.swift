@@ -159,7 +159,7 @@ struct FishingView: View {
                         .font(.system(size: mainFont, weight: .black, design: .monospaced))
                         .foregroundColor(rollColor)
                     
-                    Text(roll.is_critical ? "CRIT!" : (roll.is_success ? "HIT" : "MISS"))
+                    Text(roll.is_critical ? "CRIT!" : (roll.is_success ? "BITE!" : "NOTHING"))
                         .font(.system(size: subFont, weight: .black))
                         .foregroundColor(rollColor)
                 }
@@ -388,7 +388,7 @@ struct FishingView: View {
     private var rollHistoryCard: some View {
         ZStack {
             if viewModel.currentRolls.isEmpty {
-                Text("No rolls yet")
+                Text("Cast your line")
                     .font(.system(size: 13, weight: .medium, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(maxWidth: .infinity)
@@ -484,7 +484,7 @@ struct FishingView: View {
                         ProgressView()
                             .scaleEffect(1.1)
                             .tint(KingdomTheme.Colors.gold)
-                        Text("Rolling...")
+                        Text("Cleaning...")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
