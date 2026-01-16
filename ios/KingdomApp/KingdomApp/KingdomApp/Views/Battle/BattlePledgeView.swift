@@ -145,26 +145,38 @@ struct BattlePledgeView: View {
     
     // MARK: - Pledge Buttons (no card wrapper!)
     
+    private var canJoinAttackers: Bool {
+        battle.joinableSides?.contains("attackers") ?? true
+    }
+    
+    private var canJoinDefenders: Bool {
+        battle.joinableSides?.contains("defenders") ?? true
+    }
+    
     private var pledgeButtons: some View {
         VStack(spacing: 10) {
-            // Two big choice buttons
-            BattlePledgeChoiceCard(
-                title: attackerTitle,
-                subtitle: attackerSubtitle,
-                icon: "figure.fencing",
-                tint: KingdomTheme.Colors.buttonDanger,
-                isSelected: selectedSide == "attackers",
-                onTap: { selectedSide = "attackers" }
-            )
+            // Only show buttons for valid sides
+            if canJoinAttackers {
+                BattlePledgeChoiceCard(
+                    title: attackerTitle,
+                    subtitle: attackerSubtitle,
+                    icon: "figure.fencing",
+                    tint: KingdomTheme.Colors.buttonDanger,
+                    isSelected: selectedSide == "attackers",
+                    onTap: { selectedSide = "attackers" }
+                )
+            }
             
-            BattlePledgeChoiceCard(
-                title: defenderTitle,
-                subtitle: defenderSubtitle,
-                icon: "shield.fill",
-                tint: KingdomTheme.Colors.royalBlue,
-                isSelected: selectedSide == "defenders",
-                onTap: { selectedSide = "defenders" }
-            )
+            if canJoinDefenders {
+                BattlePledgeChoiceCard(
+                    title: defenderTitle,
+                    subtitle: defenderSubtitle,
+                    icon: "shield.fill",
+                    tint: KingdomTheme.Colors.royalBlue,
+                    isSelected: selectedSide == "defenders",
+                    onTap: { selectedSide = "defenders" }
+                )
+            }
             
             // Confirm button appears after selection
             if let side = selectedSide {

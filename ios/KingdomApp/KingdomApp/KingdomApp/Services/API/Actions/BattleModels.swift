@@ -235,6 +235,7 @@ struct BattleEventResponse: Codable, Identifiable {
     // User participation
     let userSide: String?
     let canJoin: Bool
+    let joinableSides: [String]?
     
     // Battle phase data
     let territories: [BattleTerritory]?
@@ -278,6 +279,7 @@ struct BattleEventResponse: Codable, Identifiable {
         case defenderCount = "defender_count"
         case userSide = "user_side"
         case canJoin = "can_join"
+        case joinableSides = "joinable_sides"
         case territories
         case battleCooldownSeconds = "battle_cooldown_seconds"
         case isInjured = "is_injured"

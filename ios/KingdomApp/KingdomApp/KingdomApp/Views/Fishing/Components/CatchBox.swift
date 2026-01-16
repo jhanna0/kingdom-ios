@@ -19,31 +19,31 @@ struct CatchBox: View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
             // Fish caught tally
             ZStack {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "fish.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
                     
                     Text("\(fishCaught)")
-                        .font(.system(size: 18, weight: .black, design: .monospaced))
+                        .font(.system(size: 24, weight: .black, design: .monospaced))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Text("caught")
-                        .font(.system(size: 12, weight: .medium, design: .serif))
+                        .font(.system(size: 14, weight: .medium, design: .serif))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
                 .brutalistBadge(
                     backgroundColor: KingdomTheme.Colors.parchmentLight,
-                    cornerRadius: 10,
-                    borderWidth: 2
+                    cornerRadius: 12,
+                    borderWidth: 2.5
                 )
                 
                 // "+1" animation overlay
                 if showPlusOne {
                     Text("+1")
-                        .font(.system(size: 14, weight: .black))
+                        .font(.system(size: 18, weight: .black))
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                         .offset(y: plusOneOffset)
                         .opacity(plusOneOpacity)
@@ -54,28 +54,40 @@ struct CatchBox: View {
             
             // Pet fish (rare drop!)
             if petFishDropped {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Image(systemName: "fish.circle.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(red: 0.0, green: 0.8, blue: 0.8))
-                        .shadow(color: KingdomTheme.Colors.gold.opacity(0.6), radius: 4)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.0, green: 0.9, blue: 0.9),
+                                    Color(red: 0.0, green: 0.6, blue: 0.8)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .shadow(color: KingdomTheme.Colors.gold.opacity(0.5), radius: 4)
                     
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 10, weight: .bold))
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.gold)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
                 .brutalistBadge(
                     backgroundColor: KingdomTheme.Colors.parchmentRich,
-                    cornerRadius: 10,
-                    borderWidth: 2
+                    cornerRadius: 12,
+                    borderWidth: 2.5
                 )
-                .transition(.scale.combined(with: .opacity))
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.5).combined(with: .opacity),
+                    removal: .opacity
+                ))
             }
         }
-        .padding(.horizontal, KingdomTheme.Spacing.medium)
-        .padding(.vertical, KingdomTheme.Spacing.small)
+        .padding(.horizontal, KingdomTheme.Spacing.large)
+        .padding(.vertical, KingdomTheme.Spacing.medium)
         .background(KingdomTheme.Colors.parchment.opacity(0.95))
         .onChange(of: fishCaught) { oldValue, newValue in
             if newValue > oldValue {
@@ -94,14 +106,14 @@ struct CatchBox: View {
         plusOneOffset = 0
         plusOneOpacity = 1
         
-        // Animate up and fade
-        withAnimation(.easeOut(duration: 0.8)) {
-            plusOneOffset = -30
+        // Animate up and fade - slower, more satisfying
+        withAnimation(.easeOut(duration: 1.2)) {
+            plusOneOffset = -35
             plusOneOpacity = 0
         }
         
         // Hide after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
             showPlusOne = false
             plusOneOffset = 0
             plusOneOpacity = 1
@@ -133,7 +145,16 @@ struct CompactCatchBox: View {
             if petFishDropped {
                 Image(systemName: "fish.circle.fill")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(red: 0.0, green: 0.8, blue: 0.8))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.0, green: 0.9, blue: 0.9),
+                                Color(red: 0.0, green: 0.6, blue: 0.8)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             }
         }
         .padding(.horizontal, 12)

@@ -20,7 +20,7 @@ from .config import (
     CAST_DROP_TABLE,
     CAST_SHIFT_PER_SUCCESS,
     CAST_DROP_TABLE_DISPLAY,
-    REEL_DROP_TABLE,
+    get_reel_drop_table,
     REEL_SHIFT_PER_SUCCESS,
     REEL_DROP_TABLE_DISPLAY,
     ROLL_HIT_CHANCE,
@@ -29,6 +29,8 @@ from .config import (
     FishingPhase,
     get_fish_meat_reward,
     should_drop_pet_fish,
+    get_fish_with_loot_preview,
+    get_loot_config_for_fish,
 )
 
 
@@ -110,7 +112,7 @@ class FishingSession:
             "fish_caught": self.fish_caught,
             "pet_fish_dropped": self.pet_fish_dropped,
             "current_fish": self.current_fish,
-            "current_fish_data": FISH.get(self.current_fish) if self.current_fish else None,
+            "current_fish_data": get_fish_with_loot_preview(self.current_fish) if self.current_fish else None,
             "stats": {
                 "casts_attempted": self.casts_attempted,
                 "successful_catches": self.successful_catches,
@@ -250,9 +252,12 @@ class FishingManager:
         # Number of rolls = 1 + stat level
         num_rolls = 1 + defense_stat
         
+        # Get reel odds based on fish difficulty (rarer = harder)
+        reel_table = get_reel_drop_table(fish_id)
+        
         # Save base slots BEFORE any shifts (for animation start point)
-        base_slots = REEL_DROP_TABLE.copy()
-        slots = REEL_DROP_TABLE.copy()
+        base_slots = reel_table.copy()
+        slots = reel_table.copy()
         
         # Pre-calculate all rolls
         rolls = []
@@ -308,12 +313,38 @@ class FishingManager:
             session.successful_catches += 1
             
             # Check for pet fish drop
-            if should_drop_pet_fish(fish_id):
+            pet_dropped = should_drop_pet_fish(fish_id)
+            if pet_dropped:
                 session.pet_fish_dropped = True
             
             outcome_display["meat_earned"] = meat
             outcome_display["fish_data"] = fish_data
-            outcome_display["pet_fish_dropped"] = session.pet_fish_dropped
+            outcome_display["rare_loot_dropped"] = pet_dropped  # Generic name
+            
+            # Include loot bar display data - all from backend config
+            loot_config = get_loot_config_for_fish(fish_id)
+            loot_drop_table = loot_config["drop_table"]
+            total_slots = sum(loot_drop_table.values())
+            
+            # Calculate where the roll landed based on outcome
+            if pet_dropped:
+                # Landed in rare zone (top of bar)
+                rare_slots = loot_drop_table.get("rare_loot", 0)
+                loot_roll = total_slots - (rare_slots // 2)  # Middle of rare zone
+            else:
+                # Landed in meat zone
+                meat_slots = loot_drop_table.get("meat", total_slots)
+                loot_roll = meat_slots // 2  # Middle of meat zone
+            
+            outcome_display["loot"] = {
+                "drop_table": loot_drop_table,
+                "drop_table_display": loot_config["drop_table_display"],
+                "bar_title": loot_config["bar_title"],  # Dynamic from backend
+                "rare_loot_name": loot_config["rare_loot_name"],
+                "meat_earned": meat,
+                "rare_loot_dropped": pet_dropped,
+                "master_roll": loot_roll,
+            }
         else:
             # Escaped
             session.fish_escaped += 1

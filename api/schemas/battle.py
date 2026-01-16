@@ -245,6 +245,7 @@ class BattleEventResponse(BaseModel):
     # User's participation
     user_side: Optional[str] = None
     can_join: bool
+    joinable_sides: List[str] = []  # ["attackers"], ["defenders"], or ["attackers", "defenders"]
     
     # Battle phase data
     territories: List[BattleTerritoryResponse] = []

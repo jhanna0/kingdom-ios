@@ -2,7 +2,8 @@ import SwiftUI
 import Combine
 
 // MARK: - Fishing View Model
-// Handles session state, roll animations, and auto-advancing phases
+// Simple state machine for fishing minigame
+// 3 bars: Cast (fish odds) → Reel (catch odds) → Loot (rewards)
 
 @MainActor
 class FishingViewModel: ObservableObject {
@@ -13,18 +14,31 @@ class FishingViewModel: ObservableObject {
         case loading
         case idle                    // Ready to cast
         case casting                 // Animating cast rolls
-        case fishFound               // Fish on the line! Brief pause
+        case fishFound               // Fish on the line! Waiting for reel
         case reeling                 // Animating reel rolls
-        case caught                  // Fish caught! Brief celebration
+        case caught                  // Fish caught! Press Loot to roll
+        case looting                 // Animating loot roll
+        case lootResult              // Loot done - press Collect
         case escaped                 // Fish escaped! Brief feedback
         case masterRollAnimation     // Animating the final roll
         case error(String)
     }
     
+    // Which bar are we showing?
+    enum BarType: Equatable { case cast, reel, loot }
+    
+    // MARK: - Published State
+    
     @Published var uiState: UIState = .loading
     @Published var session: FishingSession?
     @Published var config: FishingSessionConfig?
     @Published var playerStats: FishingPlayerStats?
+    
+    // Current bar - set in cast(), reel(), and after catch
+    @Published var currentBarType: BarType = .cast
+    
+    // Loot result (after successful catch) - from backend
+    @Published var currentLootResult: FishingLootResult?
     
     // Roll animation state
     @Published var currentRolls: [FishingRollResult] = []
@@ -40,19 +54,24 @@ class FishingViewModel: ObservableObject {
     @Published var castDropTableDisplay: [FishingDropTableItem] = []
     @Published var reelDropTableDisplay: [FishingDropTableItem] = []
     
-    // Base slots for each phase (for resetting)
+    // Phase configs (from backend)
+    @Published var castPhaseConfig: FishingPhaseConfig?
+    @Published var reelPhaseConfig: FishingPhaseConfig?
+    @Published var lootPhaseConfig: FishingPhaseConfig?
+    
+    // Base slots for each phase
     private var baseCastSlots: [String: Int] = [:]
     private var baseReelSlots: [String: Int] = [:]
     
-    // Animation timing - frontend controls this for chill experience
-    private let rollAnimationDelay: UInt64 = 1_200_000_000  // 1.2 seconds per roll
-    private let masterRollDelay: UInt64 = 800_000_000       // 0.8 seconds before master roll
-    private let feedbackDelay: UInt64 = 2_000_000_000       // 2 seconds to show outcome
+    // Animation timing
+    private let rollAnimationDelay: UInt64 = 1_600_000_000
+    private let masterRollDelay: UInt64 = 1_000_000_000
+    private let feedbackDelay: UInt64 = 2_000_000_000
     
     // API
     private var fishingAPI: FishingAPI?
     
-    // MARK: - Computed Properties
+    // MARK: - Simple Computed Properties
     
     var totalMeat: Int { session?.total_meat ?? 0 }
     var fishCaught: Int { session?.fish_caught ?? 0 }
@@ -81,6 +100,117 @@ class FishingViewModel: ObservableObject {
         uiState == .fishFound && currentFish != nil
     }
     
+    // Bar-related properties based on currentBarType
+    
+    var currentDropTableDisplay: [FishingDropTableItem] {
+        switch currentBarType {
+        case .cast: return castDropTableDisplay
+        case .reel: return reelDropTableDisplay
+        case .loot: return currentLootResult?.drop_table_display ?? []
+        }
+    }
+    
+    var currentPhaseConfig: FishingPhaseConfig? {
+        switch currentBarType {
+        case .cast: return castPhaseConfig
+        case .reel: return reelPhaseConfig
+        case .loot: return lootPhaseConfig
+        }
+    }
+    
+    var currentRollCount: Int {
+        switch currentBarType {
+        case .cast: return castRolls
+        case .reel: return reelRolls
+        case .loot: return 0  // No rolls in loot phase
+        }
+    }
+    
+    var currentStatName: String {
+        currentPhaseConfig?.stat_display_name ?? "Skill"
+    }
+    
+    var currentStatIcon: String {
+        currentPhaseConfig?.stat_icon ?? "star.fill"
+    }
+    
+    var mainOutcomePercentage: Int {
+        // For loot phase, don't show percentage
+        if currentBarType == .loot { return 0 }
+        
+        let total = currentSlots.values.reduce(0, +)
+        guard total > 0 else { return 0 }
+        
+        let display = currentDropTableDisplay
+        if currentBarType == .reel {
+            if let goodKey = display.last?.key {
+                let good = currentSlots[goodKey] ?? 0
+                return Int((Double(good) / Double(total)) * 100)
+            }
+        } else {
+            if let badKey = display.first?.key {
+                let bad = currentSlots[badKey] ?? 0
+                let good = total - bad
+                return Int((Double(good) / Double(total)) * 100)
+            }
+        }
+        return 0
+    }
+    
+    var phaseColor: Color {
+        switch uiState {
+        case .fishFound: return KingdomTheme.Colors.gold
+        case .caught, .looting, .lootResult: return KingdomTheme.Colors.gold
+        case .escaped: return KingdomTheme.Colors.inkMedium
+        default:
+            if let colorName = currentPhaseConfig?.phase_color {
+                return KingdomTheme.Colors.color(fromThemeName: colorName)
+            }
+            return KingdomTheme.Colors.royalBlue
+        }
+    }
+    
+    var currentBarTitle: String {
+        // For loot phase: use bar_title from backend
+        if currentBarType == .loot {
+            return currentLootResult?.bar_title ?? "LOOT"
+        }
+        return currentPhaseConfig?.drop_table_title ?? "ODDS"
+    }
+    
+    var currentMarkerIcon: String {
+        currentPhaseConfig?.roll_button_icon ?? "scope"
+    }
+    
+    var statusMessage: String {
+        switch uiState {
+        case .loading: return "Preparing..."
+        case .idle: return "Cast your line"
+        case .casting: return currentRoll?.message ?? "Waiting..."
+        case .fishFound:
+            if let fish = currentFishData {
+                return "\(fish.icon ?? "🐟") \(fish.name ?? "Fish") on the line!"
+            }
+            return "Fish on the line!"
+        case .reeling: return currentRoll?.message ?? "Reeling..."
+        case .caught:
+            return "Caught! Roll for loot..."
+        case .looting:
+            return "Rolling..."
+        case .lootResult:
+            if let loot = currentLootResult {
+                if loot.rare_loot_dropped, let rareName = loot.rare_loot_name {
+                    return "🎉 \(rareName) + \(loot.meat_earned) meat!"
+                }
+                return "+\(loot.meat_earned) meat!"
+            }
+            return "Collect your loot!"
+        case .escaped: return "It got away..."
+        case .masterRollAnimation: return "..."
+        case .error(let msg): return msg
+        }
+    }
+    
     // MARK: - Initialization
     
     func configure(with client: APIClient) {
@@ -95,26 +225,26 @@ class FishingViewModel: ObservableObject {
         uiState = .loading
         
         do {
-            // Load config first
             let fishingConfig = try await api.getConfig()
             castDropTableDisplay = fishingConfig.phases["cast"]?.drop_table_display ?? []
             reelDropTableDisplay = fishingConfig.phases["reel"]?.drop_table_display ?? []
-            
-            // Store base slots for each phase (for smooth transitions)
+            castPhaseConfig = fishingConfig.phases["cast"]
+            reelPhaseConfig = fishingConfig.phases["reel"]
+            lootPhaseConfig = fishingConfig.phases["loot"]
             baseCastSlots = fishingConfig.phases["cast"]?.drop_table ?? [:]
             baseReelSlots = fishingConfig.phases["reel"]?.drop_table ?? [:]
             
-            // Start session
             let response = try await api.startFishing()
             session = response.session
             config = response.config
             playerStats = response.player_stats
             
-            // Check if resuming with a fish already hooked
             if response.session.current_fish != nil {
+                currentBarType = .reel
                 currentSlots = baseReelSlots
                 uiState = .fishFound
             } else {
+                currentBarType = .cast
                 currentSlots = baseCastSlots
                 uiState = .idle
             }
@@ -128,10 +258,7 @@ class FishingViewModel: ObservableObject {
         
         do {
             let response = try await api.endFishing()
-            // Could show rewards summary here
             print("Fishing complete! Meat: \(response.rewards.total_meat), Fish: \(response.rewards.fish_caught)")
-            
-            // Reset state
             session = nil
             uiState = .idle
         } catch {
@@ -144,24 +271,23 @@ class FishingViewModel: ObservableObject {
     func cast() async {
         guard let api = fishingAPI, canCast else { return }
         
-        // Reset animation state for new cast
+        currentBarType = .cast
+        currentSlots = baseCastSlots
         masterRollValue = 0
         shouldAnimateMasterRoll = false
+        currentPhaseResult = nil
+        currentLootResult = nil
         
         do {
             let response = try await api.cast()
             session = response.session
             currentPhaseResult = response.result
-            
-            // Setup roll animation - start with BASE slots, no roll visible yet
             currentRolls = response.result.rolls
-            currentRollIndex = -1  // No roll shown yet
+            currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            // Start animating rolls
             uiState = .casting
-            await animateRolls(phase: .casting)
-            
+            await animateRolls()
         } catch {
             uiState = .error("Cast failed: \(error.localizedDescription)")
         }
@@ -170,58 +296,87 @@ class FishingViewModel: ObservableObject {
     func reel() async {
         guard let api = fishingAPI, canReel else { return }
         
-        // Reset animation state for new reel
+        currentBarType = .reel
+        currentSlots = baseReelSlots
         masterRollValue = 0
         shouldAnimateMasterRoll = false
+        currentPhaseResult = nil
         
         do {
             let response = try await api.reel()
             session = response.session
             currentPhaseResult = response.result
-            
-            // Setup roll animation - start with BASE slots, no roll visible yet
             currentRolls = response.result.rolls
-            currentRollIndex = -1  // No roll shown yet
+            currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            // Start animating rolls
             uiState = .reeling
-            await animateRolls(phase: .reeling)
-            
+            await animateRolls()
         } catch {
             uiState = .error("Reel failed: \(error.localizedDescription)")
         }
     }
     
+    /// User presses Loot button - animate the loot roll
+    func loot() {
+        guard uiState == .caught, let lootResult = currentLootResult else { return }
+        
+        // Switch to loot bar
+        currentBarType = .loot
+        currentSlots = lootResult.drop_table
+        masterRollValue = 0
+        
+        // Start loot animation
+        uiState = .looting
+        
+        // Animate to result
+        Task {
+            try? await Task.sleep(nanoseconds: 800_000_000) // Brief pause
+            masterRollValue = lootResult.master_roll
+            shouldAnimateMasterRoll = true
+        }
+    }
+    
+    /// Called when loot roll animation completes
+    func onLootAnimationComplete() {
+        shouldAnimateMasterRoll = false
+        uiState = .lootResult
+    }
+    
+    /// Collect loot and go back to idle
+    func collect() {
+        currentLootResult = nil
+        masterRollValue = 0
+        currentBarType = .cast
+        currentSlots = baseCastSlots
+        uiState = .idle
+    }
+    
     // MARK: - Roll Animation
     
-    private func animateRolls(phase: FishingPhase) async {
+    private func animateRolls() async {
         guard let result = currentPhaseResult else { return }
         
-        // Start with base slots (before any rolls) and no roll shown yet
         if let baseSlots = result.base_slots {
-            currentSlots = baseSlots
+            withAnimation(.easeInOut(duration: 0.4)) {
+                currentSlots = baseSlots
+            }
         }
-        currentRollIndex = -1  // No roll shown yet
+        currentRollIndex = -1
         
-        // Animate through each roll with delays
         for (index, roll) in currentRolls.enumerated() {
-            // Wait first (let user see current state)
             try? await Task.sleep(nanoseconds: rollAnimationDelay)
-            
-            // NOW show this roll
             currentRollIndex = index
             
-            // Update slots if this roll shifted them (bar animates smoothly)
-            if let slotsAfter = roll.slots_after {
-                currentSlots = slotsAfter
+            if let slotsAfter = roll.slots_after, roll.is_success {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    currentSlots = slotsAfter
+                }
             }
         }
         
-        // Brief pause to see final roll before master roll
         try? await Task.sleep(nanoseconds: masterRollDelay)
         
-        // Now do master roll animation
         uiState = .masterRollAnimation
         masterRollValue = result.master_roll
         shouldAnimateMasterRoll = true
@@ -230,104 +385,46 @@ class FishingViewModel: ObservableObject {
     func onMasterRollAnimationComplete() {
         shouldAnimateMasterRoll = false
         
+        // If animating loot roll, go to loot result
+        if uiState == .looting {
+            uiState = .lootResult
+            return
+        }
+        
         guard let result = currentPhaseResult else {
             uiState = .idle
             return
         }
         
-        // Handle outcome
         if result.phase == "cast" {
             if result.outcome == "no_bite" {
-                // No fish - back to idle, can cast again
-                // Reset to cast slots for next attempt
-                currentSlots = baseCastSlots
-                showBriefFeedback(state: .idle)
+                showFeedback(state: .idle, thenLoot: false)
             } else {
-                // Fish found! Switch to reel phase slots BEFORE showing fishFound
-                currentSlots = baseReelSlots
-                showBriefFeedback(state: .fishFound)
+                showFeedback(state: .fishFound, thenLoot: false)
             }
-        } else if result.phase == "reel" {
+        } else {
+            // Reel phase
             if result.outcome == "caught" {
-                // Caught! Show celebration briefly
-                showBriefFeedback(state: .caught)
+                // Store loot result from backend
+                currentLootResult = result.outcome_display.loot
+                showFeedback(state: .caught, thenLoot: false)
             } else {
-                // Escaped - show briefly
-                showBriefFeedback(state: .escaped)
+                showFeedback(state: .escaped, thenLoot: false)
             }
         }
     }
     
-    private func showBriefFeedback(state: UIState) {
+    private func showFeedback(state: UIState, thenLoot: Bool) {
         uiState = state
         
-        // Brief pause then transition
-        Task {
-            try? await Task.sleep(nanoseconds: feedbackDelay)
-            
-            // After caught/escaped/idle, reset to cast phase for next attempt
-            if state == .caught || state == .escaped || state == .idle {
-                currentSlots = baseCastSlots
+        if state == .escaped || state == .idle {
+            Task {
+                try? await Task.sleep(nanoseconds: feedbackDelay)
+                masterRollValue = 0
                 uiState = .idle
             }
-            // fishFound state stays until user taps reel (slots already set to reel)
         }
-    }
-    
-    // MARK: - Helpers
-    
-    var currentDropTableDisplay: [FishingDropTableItem] {
-        switch uiState {
-        case .casting, .masterRollAnimation:
-            if currentPhaseResult?.phase == "reel" {
-                return reelDropTableDisplay
-            }
-            return castDropTableDisplay
-        case .reeling:
-            return reelDropTableDisplay
-        case .fishFound:
-            return reelDropTableDisplay
-        default:
-            return castDropTableDisplay
-        }
-    }
-    
-    var phaseColor: Color {
-        switch uiState {
-        case .reeling, .fishFound:
-            return KingdomTheme.Colors.buttonSuccess
-        case .caught:
-            return KingdomTheme.Colors.gold
-        case .escaped:
-            return KingdomTheme.Colors.buttonDanger
-        default:
-            return KingdomTheme.Colors.royalBlue
-        }
-    }
-    
-    var statusMessage: String {
-        switch uiState {
-        case .loading:
-            return "Preparing..."
-        case .idle:
-            return "Cast your line"
-        case .casting:
-            return currentRoll?.message ?? "Waiting..."
-        case .fishFound:
-            if let fish = currentFishData {
-                return "\(fish.icon ?? "🐟") \(fish.name ?? "Fish") on the line!"
-            }
-            return "Fish on the line!"
-        case .reeling:
-            return currentRoll?.message ?? "Reeling..."
-        case .caught:
-            return "Caught it!"
-        case .escaped:
-            return "It got away..."
-        case .masterRollAnimation:
-            return "..."
-        case .error(let msg):
-            return msg
-        }
+        // caught stays until user presses Loot
+        // fishFound stays until user presses Reel
     }
 }

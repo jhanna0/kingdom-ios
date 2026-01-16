@@ -11,7 +11,7 @@ from .config import (
     FISH,
     CAST_DROP_TABLE,
     CAST_SHIFT_PER_SUCCESS,
-    REEL_DROP_TABLE,
+    get_reel_drop_table,
     REEL_SHIFT_PER_SUCCESS,
     FishingPhase,
 )

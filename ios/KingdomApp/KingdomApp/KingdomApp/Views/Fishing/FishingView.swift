@@ -2,38 +2,40 @@ import SwiftUI
 
 // MARK: - Fishing View
 // Single-screen, chill fishing minigame
-// Layout: Catch box at top, bobber + vertical bar in center, action button at bottom
 
 struct FishingView: View {
     @StateObject private var viewModel = FishingViewModel()
     @Environment(\.dismiss) private var dismiss
     
-    // Injected API client
     let apiClient: APIClient
     
-    // Local master roll animation state (like hunting)
+    // Master roll animation state
     @State private var masterRollDisplayValue: Int = 0
     @State private var showMasterRollMarker: Bool = false
     @State private var masterRollAnimationStarted: Bool = false
     
+    // Pet fish celebration
+    @State private var showPetFishCelebration: Bool = false
+    @State private var lastPetFishState: Bool = false
+    
+    // Shift glow effect
+    @State private var showBarShiftGlow: Bool = false
+    
     var body: some View {
         ZStack {
-            // Background
             KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Top bar with catch box and done button
-                topBar
-                
-                // Main fishing area
-                fishingArea
-                    .padding(.horizontal, KingdomTheme.Spacing.large)
-                
+                topSection
                 Spacer()
-                
-                // Bottom action button
-                bottomButton
+                fishingArea
+                Spacer()
+                bottomSection
+            }
+            
+            if showPetFishCelebration {
+                petFishCelebrationOverlay
             }
         }
         .navigationBarHidden(true)
@@ -41,27 +43,31 @@ struct FishingView: View {
             viewModel.configure(with: apiClient)
             await viewModel.startSession()
         }
+        .onChange(of: viewModel.petFishDropped) { _, newValue in
+            if newValue && !lastPetFishState {
+                triggerPetFishCelebration()
+            }
+            lastPetFishState = newValue
+        }
     }
     
-    // MARK: - Top Bar
+    // MARK: - Top Section
     
-    private var topBar: some View {
+    private var topSection: some View {
         VStack(spacing: 0) {
             HStack {
-                // Title
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "figure.fishing")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
                     
                     Text("FISHING")
-                        .font(.system(size: 14, weight: .black, design: .serif))
+                        .font(.system(size: 18, weight: .black, design: .serif))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
                 
                 Spacer()
                 
-                // Done button
                 Button {
                     Task {
                         await viewModel.endSession()
@@ -69,21 +75,19 @@ struct FishingView: View {
                     }
                 } label: {
                     Text("Done")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
             .padding(.horizontal, KingdomTheme.Spacing.large)
             .padding(.vertical, KingdomTheme.Spacing.medium)
             
-            // Catch box
             CatchBox(
                 meatCount: viewModel.totalMeat,
                 fishCaught: viewModel.fishCaught,
                 petFishDropped: viewModel.petFishDropped
             )
             
-            // Divider
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 3)
@@ -94,226 +98,203 @@ struct FishingView: View {
     // MARK: - Fishing Area
     
     private var fishingArea: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            HStack(spacing: KingdomTheme.Spacing.large) {
-                // Left side: Bobber display
-                bobberDisplay
-                
-                // Right side: Vertical probability bar
-                probabilityBar
-            }
+        GeometryReader { geo in
+            let availableHeight = geo.size.height
+            let bobberSize = min(availableHeight * 0.45, 200)
+            let barHeight = min(availableHeight * 0.65, 280)
+            let barWidth = barHeight * 0.28
             
-            // Roll history (like hunting)
-            rollHistoryCard
-        }
-        .padding(.top, KingdomTheme.Spacing.large)
-    }
-    
-    // MARK: - Roll History Card
-    
-    private var rollHistoryCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("ROLLS")
-                .font(.system(size: 9, weight: .bold, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 10)
-            
-            ZStack {
-                if viewModel.currentRolls.isEmpty {
-                    Text("No rolls yet")
-                        .font(.system(size: 12, weight: .medium, design: .serif))
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(Array(viewModel.currentRolls.enumerated()), id: \.offset) { index, roll in
-                                // Only show rolls that have been revealed
-                                if index <= viewModel.currentRollIndex {
-                                    FishingRollCard(roll: roll, index: index + 1)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.currentRollIndex)
-                    }
-                }
+            HStack(alignment: .center, spacing: 28) {
+                bobberDisplay(size: bobberSize)
+                probabilityBar(width: barWidth, height: barHeight)
             }
-            .frame(height: 60)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: 90)  // FIXED HEIGHT including title
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+        .padding(.horizontal, KingdomTheme.Spacing.large)
     }
     
     // MARK: - Bobber Display
     
-    private var bobberDisplay: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Status message - FIXED HEIGHT
-            Text(viewModel.statusMessage)
-                .font(.system(size: 12, weight: .medium, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .multilineTextAlignment(.center)
-                .frame(height: 36)
-                .frame(maxWidth: .infinity)
-            
-            // Bobber / Roll value
+    private func bobberDisplay(size: CGFloat) -> some View {
+        VStack(spacing: 12) {
             ZStack {
-                // Bobber circle background
                 Circle()
-                    .fill(viewModel.phaseColor.opacity(0.15))
-                    .frame(width: 140, height: 140)
+                    .fill(viewModel.phaseColor.opacity(0.12))
                 
                 Circle()
-                    .stroke(viewModel.phaseColor, lineWidth: 4)
-                    .frame(width: 140, height: 140)
+                    .stroke(viewModel.phaseColor, lineWidth: 3)
                 
-                // Content based on state
-                if viewModel.isAnimatingRolls {
-                    if let roll = viewModel.currentRoll {
-                        // Show roll value
-                        VStack(spacing: 4) {
-                            Text("\(roll.roll)")
-                                .font(.system(size: 48, weight: .black, design: .monospaced))
-                                .foregroundColor(roll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
-                            
-                            // Success/fail indicator
-                            HStack(spacing: 4) {
-                                Image(systemName: roll.is_success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text(roll.is_critical ? "CRIT!" : (roll.is_success ? "HIT" : "MISS"))
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundColor(roll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                        }
-                        .transition(.scale.combined(with: .opacity))
+                bobberContent(size: size)
+            }
+            .frame(width: size, height: size)
+            
+            // Keep space but hide content for loot phases - not skill based
+            VStack(spacing: 4) {
+                Text(viewModel.currentStatName)
+                    .font(.system(size: 11, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                rollCountIndicator
+            }
+            .opacity(viewModel.session != nil && viewModel.uiState != .caught && viewModel.uiState != .looting && viewModel.uiState != .lootResult ? 1 : 0)
+        }
+        .frame(width: size)
+    }
+    
+    @ViewBuilder
+    private func bobberContent(size: CGFloat) -> some View {
+        let mainFont = size * 0.32
+        let subFont = size * 0.09
+        let iconFont = size * 0.35
+        
+        let hitColor = KingdomTheme.Colors.royalBlue
+        let critColor = KingdomTheme.Colors.gold
+        let missColor = KingdomTheme.Colors.inkMedium
+        
+        if viewModel.isAnimatingRolls {
+            if let roll = viewModel.currentRoll {
+                let rollColor = roll.is_critical ? critColor : (roll.is_success ? hitColor : missColor)
+                VStack(spacing: 4) {
+                    Text("\(roll.roll)")
+                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                        .foregroundColor(rollColor)
+                    
+                    Text(roll.is_critical ? "CRIT!" : (roll.is_success ? "HIT" : "MISS"))
+                        .font(.system(size: subFont, weight: .black))
+                        .foregroundColor(rollColor)
+                }
+            } else {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .tint(viewModel.phaseColor)
+            }
+        } else if viewModel.uiState == .masterRollAnimation || masterRollAnimationStarted {
+            Text("\(masterRollDisplayValue)")
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(viewModel.phaseColor)
+        } else if viewModel.uiState == .fishFound, let fish = viewModel.currentFishData {
+            VStack(spacing: 4) {
+                Text(fish.icon ?? "🐟")
+                    .font(.system(size: iconFont))
+                Text(fish.name ?? "Fish")
+                    .font(.system(size: subFont, weight: .bold, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        } else if viewModel.uiState == .caught {
+            VStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: mainFont, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                Text("CAUGHT!")
+                    .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.gold)
+            }
+        } else if viewModel.uiState == .looting {
+            VStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .tint(KingdomTheme.Colors.gold)
+                Text("...")
+                    .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+        } else if viewModel.uiState == .lootResult {
+            VStack(spacing: 4) {
+                if let loot = viewModel.currentLootResult {
+                    if loot.rare_loot_dropped {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: mainFont, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Text(loot.rare_loot_name ?? "RARE!")
+                            .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
+                            .foregroundColor(KingdomTheme.Colors.gold)
                     } else {
-                        // Waiting for first roll
-                        VStack(spacing: 8) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .tint(viewModel.phaseColor)
-                            Text("Rolling...")
-                                .font(.system(size: 12, weight: .medium, design: .serif))
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                    }
-                } else if viewModel.uiState == .masterRollAnimation || masterRollAnimationStarted {
-                    // Master roll value - use local animated display value
-                    Text("\(masterRollDisplayValue)")
-                        .font(.system(size: 48, weight: .black, design: .monospaced))
-                        .foregroundColor(viewModel.phaseColor)
-                } else if viewModel.uiState == .fishFound, let fish = viewModel.currentFishData {
-                    // Fish icon
-                    VStack(spacing: 4) {
-                        Text(fish.icon ?? "🐟")
-                            .font(.system(size: 48))
-                        Text(fish.name ?? "Fish")
-                            .font(.system(size: 12, weight: .bold, design: .serif))
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: mainFont, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                        Text("+\(loot.meat_earned)")
+                            .font(.system(size: subFont * 1.5, weight: .black, design: .monospaced))
                             .foregroundColor(KingdomTheme.Colors.inkDark)
-                    }
-                } else if viewModel.uiState == .caught {
-                    // Celebration
-                    VStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                        Text("CAUGHT!")
-                            .font(.system(size: 14, weight: .black, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                    }
-                } else if viewModel.uiState == .escaped {
-                    // Escaped
-                    VStack(spacing: 4) {
-                        Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                        Text("ESCAPED")
-                            .font(.system(size: 14, weight: .black, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                    }
-                } else {
-                    // Idle - show bobber icon
-                    VStack(spacing: 8) {
-                        Image(systemName: "water.waves")
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundColor(viewModel.phaseColor)
-                        
-                        Text("\(viewModel.hitChance)%")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
             }
-            
-            // Roll count indicator - always show placeholder to maintain height
-            rollCountIndicator
-                .opacity(viewModel.session != nil ? 1 : 0)
+        } else if viewModel.uiState == .escaped {
+            VStack(spacing: 4) {
+                Image(systemName: "arrow.uturn.backward.circle.fill")
+                    .font(.system(size: mainFont, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text("ESCAPED")
+                    .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+        } else {
+            VStack(spacing: 8) {
+                Image(systemName: "water.waves")
+                    .font(.system(size: iconFont * 0.8, weight: .bold))
+                    .foregroundColor(viewModel.phaseColor)
+                
+                Text("\(viewModel.hitChance)%")
+                    .font(.system(size: subFont * 1.3, weight: .bold, design: .monospaced))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
         }
-        .frame(width: 160, height: 280)  // FIXED SIZE
     }
     
     // MARK: - Roll Count Indicator
     
     private var rollCountIndicator: some View {
-        let maxRolls = viewModel.uiState == .reeling || viewModel.uiState == .fishFound 
-            ? viewModel.reelRolls 
-            : viewModel.castRolls
-        // Handle index -1 (no roll shown yet) = 0 completed
+        let maxRolls = viewModel.currentRollCount
         let completed = max(0, viewModel.currentRollIndex + 1)
         let isAnimating = viewModel.isAnimatingRolls
         
-        return VStack(spacing: 4) {
-            Text(viewModel.uiState == .reeling || viewModel.uiState == .fishFound ? "DEFENSE" : "BUILDING")
-                .font(.system(size: 9, weight: .bold, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            HStack(spacing: 4) {
-                ForEach(0..<maxRolls, id: \.self) { i in
-                    Circle()
-                        .fill(
-                            i < completed
-                                ? viewModel.phaseColor
-                                : (isAnimating ? Color.black.opacity(0.2) : viewModel.phaseColor.opacity(0.3))
-                        )
-                        .frame(width: 8, height: 8)
-                        .animation(.easeInOut(duration: 0.3), value: completed)
-                }
+        return HStack(spacing: 5) {
+            ForEach(0..<maxRolls, id: \.self) { i in
+                Circle()
+                    .fill(
+                        i < completed
+                            ? viewModel.phaseColor
+                            : (isAnimating ? Color.black.opacity(0.2) : viewModel.phaseColor.opacity(0.3))
+                    )
+                    .frame(width: 8, height: 8)
+                    .animation(.easeInOut(duration: 0.3), value: completed)
             }
-            
-            Text("\(maxRolls) rolls")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(KingdomTheme.Colors.inkLight)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .brutalistBadge(
             backgroundColor: KingdomTheme.Colors.parchmentLight,
-            cornerRadius: 8,
+            cornerRadius: 6,
             borderWidth: 2
         )
     }
     
     // MARK: - Probability Bar
     
-    private var probabilityBar: some View {
-        VStack(spacing: 8) {
-            // Title - shows ROLLING during animation
-            Text(masterRollAnimationStarted ? "ROLLING" : (viewModel.uiState == .reeling || viewModel.uiState == .fishFound ? "CATCH ODDS" : "FISH ODDS"))
-                .font(.system(size: 10, weight: .bold, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+    private func probabilityBar(width: CGFloat, height: CGFloat) -> some View {
+        let barTitle = viewModel.currentBarTitle
+        let markerIcon = viewModel.currentMarkerIcon
+        
+        return VStack(spacing: 8) {
+            Text(showBarShiftGlow ? "NICE!" : barTitle)
+                .font(.system(size: 11, weight: .bold, design: .serif))
+                .foregroundColor(showBarShiftGlow ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium)
+                .frame(height: 16)
             
-            // Vertical bar - always visible, stable, FIXED SIZE
+            // Same bar for all phases - just different data
             VerticalRollBar(
                 items: viewModel.currentDropTableDisplay,
                 slots: viewModel.currentSlots,
                 markerValue: masterRollDisplayValue,
                 showMarker: showMasterRollMarker,
-                markerIcon: viewModel.uiState == .reeling || viewModel.uiState == .fishFound ? "arrow.up" : "water.waves"
+                markerIcon: markerIcon
             )
-            .frame(width: 60, height: 280)
+            .frame(width: width, height: height)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
+                    .opacity(showBarShiftGlow ? 0.8 : 0)
+                    .blur(radius: showBarShiftGlow ? 3 : 0)
+            )
             .onChange(of: viewModel.shouldAnimateMasterRoll) { _, shouldAnimate in
                 if shouldAnimate && !masterRollAnimationStarted {
                     masterRollAnimationStarted = true
@@ -329,8 +310,37 @@ struct FishingView: View {
                     masterRollAnimationStarted = false
                 }
             }
+            .onChange(of: viewModel.currentRollIndex) { _, newIndex in
+                if newIndex >= 0 && newIndex < viewModel.currentRolls.count {
+                    let roll = viewModel.currentRolls[newIndex]
+                    if roll.is_success {
+                        triggerBarShiftGlow()
+                    }
+                }
+            }
+            
+            // Show percentage for cast/reel, loot result for loot
+            if viewModel.currentBarType == .loot {
+                if let loot = viewModel.currentLootResult {
+                    Text(loot.rare_loot_dropped ? "✨" : "+\(loot.meat_earned)")
+                        .font(.system(size: 16, weight: .black, design: .monospaced))
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                }
+            } else {
+                Text("\(viewModel.mainOutcomePercentage)%")
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
         }
-        .frame(width: 80, height: 320)  // FIXED SIZE
+        .frame(width: max(width, 60))
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.currentBarType)
+    }
+    
+    private func triggerBarShiftGlow() {
+        showBarShiftGlow = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            showBarShiftGlow = false
+        }
     }
     
     @MainActor
@@ -338,7 +348,6 @@ struct FishingView: View {
         let finalValue = viewModel.masterRollValue
         guard finalValue > 0 else { return }
         
-        // Build sweep path: up to 100, then back down to final
         var positions = Array(stride(from: 1, through: 100, by: 3))
         if finalValue < 100 {
             positions.append(contentsOf: stride(from: 97, through: max(1, finalValue), by: -3))
@@ -351,22 +360,61 @@ struct FishingView: View {
         
         for pos in positions {
             masterRollDisplayValue = pos
-            try? await Task.sleep(nanoseconds: 30_000_000)  // 30ms per step
+            try? await Task.sleep(nanoseconds: 30_000_000)
         }
         
         masterRollDisplayValue = finalValue
         viewModel.onMasterRollAnimationComplete()
     }
     
-    // MARK: - Bottom Button
+    // MARK: - Bottom Section
     
-    private var bottomButton: some View {
+    private var bottomSection: some View {
         VStack(spacing: 0) {
+            rollHistoryCard
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.bottom, KingdomTheme.Spacing.medium)
+            
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 3)
             
-            // FIXED HEIGHT container - no jumping
+            actionButton
+        }
+    }
+    
+    // MARK: - Roll History Card
+    
+    private var rollHistoryCard: some View {
+        ZStack {
+            if viewModel.currentRolls.isEmpty {
+                Text("No rolls yet")
+                    .font(.system(size: 13, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(maxWidth: .infinity)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(viewModel.currentRolls.enumerated()), id: \.offset) { index, roll in
+                            if index <= viewModel.currentRollIndex {
+                                FishingRollCard(roll: roll, index: index + 1)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .frame(height: 68)
+        .frame(maxWidth: .infinity)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+    }
+    
+    // MARK: - Action Button
+    
+    private var actionButton: some View {
+        VStack(spacing: 0) {
             ZStack {
                 switch viewModel.uiState {
                 case .loading:
@@ -400,32 +448,75 @@ struct FishingView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.brutalist(
-                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        backgroundColor: KingdomTheme.Colors.gold,
                         foregroundColor: .white,
                         fullWidth: true
                     ))
                     
                 case .casting, .reeling, .masterRollAnimation:
-                    HStack {
+                    HStack(spacing: 10) {
                         ProgressView()
+                            .scaleEffect(1.1)
                             .tint(viewModel.phaseColor)
-                        Text(viewModel.uiState == .casting ? "Waiting..." : "Pulling...")
-                            .font(.system(size: 14, weight: .bold))
+                        Text(viewModel.uiState == .casting ? "Casting..." : "Reeling in...")
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
-                case .caught, .escaped:
-                    Text(viewModel.uiState == .caught ? "Nice catch!" : "Better luck next time...")
-                        .font(.system(size: 14, weight: .bold, design: .serif))
-                        .foregroundColor(viewModel.uiState == .caught ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
+                case .caught:
+                    Button {
+                        viewModel.loot()
+                    } label: {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text("Loot!")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.brutalist(
+                        backgroundColor: KingdomTheme.Colors.gold,
+                        foregroundColor: .white,
+                        fullWidth: true
+                    ))
+                    
+                case .looting:
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .scaleEffect(1.1)
+                            .tint(KingdomTheme.Colors.gold)
+                        Text("Rolling...")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                    
+                case .lootResult:
+                    Button {
+                        viewModel.collect()
+                    } label: {
+                        HStack {
+                            Image(systemName: "archivebox.fill")
+                            Text("Collect")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.brutalist(
+                        backgroundColor: KingdomTheme.Colors.gold,
+                        foregroundColor: .white,
+                        fullWidth: true
+                    ))
+                    
+                case .escaped:
+                    Text("It got away...")
+                        .font(.system(size: 16, weight: .bold, design: .serif))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                 case .error(let message):
                     Text(message)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(KingdomTheme.Colors.buttonDanger)
                 }
             }
-            .frame(height: 50)  // FIXED HEIGHT
+            .frame(height: 50)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, KingdomTheme.Spacing.large)
             .padding(.vertical, KingdomTheme.Spacing.medium)
@@ -433,6 +524,81 @@ struct FishingView: View {
         .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
     }
     
+    // MARK: - Pet Fish Celebration
+    
+    private var petFishCelebrationOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showPetFishCelebration = false
+                    }
+                }
+            
+            VStack(spacing: 20) {
+                ZStack {
+                    ForEach(0..<6, id: \.self) { i in
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .offset(
+                                x: CGFloat.random(in: -60...60),
+                                y: CGFloat.random(in: -60...60)
+                            )
+                            .opacity(0.8)
+                    }
+                    
+                    Image(systemName: "fish.circle.fill")
+                        .font(.system(size: 80, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.0, green: 0.9, blue: 0.9),
+                                    Color(red: 0.0, green: 0.6, blue: 0.8)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .shadow(color: KingdomTheme.Colors.gold.opacity(0.6), radius: 12)
+                }
+                
+                Text("PET FISH!")
+                    .font(.system(size: 24, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                
+                Text("A rare companion has joined you!")
+                    .font(.system(size: 14, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .multilineTextAlignment(.center)
+                
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showPetFishCelebration = false
+                    }
+                } label: {
+                    Text("Amazing!")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.brutalist(
+                    backgroundColor: KingdomTheme.Colors.gold,
+                    foregroundColor: .white,
+                    fullWidth: true
+                ))
+            }
+            .padding(28)
+            .frame(maxWidth: 300)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 20)
+            .transition(.scale(scale: 0.8).combined(with: .opacity))
+        }
+    }
+    
+    private func triggerPetFishCelebration() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            showPetFishCelebration = true
+        }
+    }
 }
 
 // MARK: - Fishing Roll Card
@@ -442,35 +608,58 @@ struct FishingRollCard: View {
     let index: Int
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Roll number badge
-            Text("#\(index)")
-                .font(.system(size: 8, weight: .bold, design: .serif))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black)
+                .offset(x: 2, y: 2)
             
-            // Roll value
+            RoundedRectangle(cornerRadius: 8)
+                .fill(cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(cardBorder, lineWidth: 2)
+                )
+            
             Text("\(roll.roll)")
-                .font(.system(size: 18, weight: .black, design: .monospaced))
-                .foregroundColor(roll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
-            
-            // Hit/miss indicator
-            Image(systemName: roll.is_success ? "checkmark.circle.fill" : "xmark.circle")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(roll.is_success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                .font(.system(size: 22, weight: .black, design: .monospaced))
+                .foregroundColor(textColor)
         }
-        .frame(width: 44, height: 44)
-        .brutalistBadge(
-            backgroundColor: roll.is_success ? KingdomTheme.Colors.buttonSuccess.opacity(0.15) : KingdomTheme.Colors.parchment,
-            cornerRadius: 8,
-            borderWidth: roll.is_success ? 2 : 1
-        )
+        .frame(width: 48, height: 48)
+    }
+    
+    private var cardBackground: Color {
+        if roll.is_critical && roll.is_success {
+            return Color(red: 0.95, green: 0.88, blue: 0.65)
+        } else if roll.is_success {
+            return Color(red: 0.85, green: 0.90, blue: 0.95)
+        } else if roll.is_critical {
+            return Color(red: 0.95, green: 0.88, blue: 0.65)
+        } else {
+            return KingdomTheme.Colors.parchment
+        }
+    }
+    
+    private var cardBorder: Color {
+        if roll.is_critical {
+            return KingdomTheme.Colors.gold
+        } else if roll.is_success {
+            return KingdomTheme.Colors.royalBlue
+        }
+        return Color.black
+    }
+    
+    private var textColor: Color {
+        if roll.is_critical {
+            return KingdomTheme.Colors.gold
+        } else if roll.is_success {
+            return KingdomTheme.Colors.royalBlue
+        } else {
+            return KingdomTheme.Colors.inkMedium
+        }
     }
 }
 
-// MARK: - Preview
-
 #Preview {
-    // Mock preview - won't work without real API client
     NavigationStack {
         Text("Fishing View Preview")
             .font(.title)

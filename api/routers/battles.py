@@ -1038,18 +1038,31 @@ def _build_battle_response(
     elif current_user.id in defender_ids:
         user_side = 'defenders'
     
-    # Check if user can join
+    # Check if user can join and which sides they can join
     can_join_battle = False
+    joinable_sides = []
+    
     if battle.can_join and current_user.id not in attacker_ids and current_user.id not in defender_ids:
         # Must be at the kingdom to join any battle
-        if not _is_at_kingdom(db, current_user.id, battle.kingdom_id):
-            can_join_battle = False
-        elif battle.is_coup:
-            # Coups also require reputation
-            rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
-            can_join_battle = rep >= COUP_JOIN_REPUTATION_REQUIREMENT
-        else:
-            can_join_battle = True
+        if _is_at_kingdom(db, current_user.id, battle.kingdom_id):
+            if battle.is_coup:
+                # COUP: Must be from this kingdom, can pick either side
+                if state.hometown_kingdom_id == battle.kingdom_id:
+                    rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
+                    if rep >= COUP_JOIN_REPUTATION_REQUIREMENT:
+                        can_join_battle = True
+                        joinable_sides = ['attackers', 'defenders']
+            else:
+                # INVASION: Can only join your home kingdom's side
+                if state.hometown_kingdom_id == battle.attacking_from_kingdom_id:
+                    # User is from attacking kingdom - can only join attackers
+                    can_join_battle = True
+                    joinable_sides = ['attackers']
+                elif state.hometown_kingdom_id == battle.kingdom_id:
+                    # User is from defending kingdom - can only join defenders
+                    can_join_battle = True
+                    joinable_sides = ['defenders']
+                # TODO: Add ally logic here in the future
     
     initiator_stats = _get_initiator_stats(db, battle.initiator_id, battle.kingdom_id)
     
@@ -1126,6 +1139,7 @@ def _build_battle_response(
         defender_count=len(defender_ids),
         user_side=user_side,
         can_join=can_join_battle,
+        joinable_sides=joinable_sides,
         territories=territories,
         battle_cooldown_seconds=battle_cooldown_seconds,
         is_injured=is_injured,
@@ -1358,14 +1372,33 @@ def join_battle(
             detail="You must be at this kingdom to join"
         )
     
-    # Coups also require reputation
     if battle.is_coup:
+        # COUP: Must be from this kingdom + have reputation. Can pick either side.
+        if state.hometown_kingdom_id != battle.kingdom_id:
+            raise HTTPException(
+                status_code=400,
+                detail="You must be from this kingdom to join the coup"
+            )
         rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
         if rep < COUP_JOIN_REPUTATION_REQUIREMENT:
             raise HTTPException(
                 status_code=400,
                 detail=f"Need {COUP_JOIN_REPUTATION_REQUIREMENT} reputation in this kingdom to join (you have {rep})"
             )
+    else:
+        # INVASION: Can only join your home kingdom's side
+        if request.side == 'attackers':
+            if state.hometown_kingdom_id != battle.attacking_from_kingdom_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="You must be from the attacking kingdom to join attackers"
+                )
+        else:
+            if state.hometown_kingdom_id != battle.kingdom_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="You must be from this kingdom to join defenders"
+                )
     
     if request.side == 'attackers':
         battle.add_attacker(current_user.id)

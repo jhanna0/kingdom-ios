@@ -7,6 +7,7 @@ Adjust these to balance the game - NO magic numbers elsewhere!
 PHASES:
 1. CAST (Building) - Multiple rolls shift odds toward finding better fish
 2. REEL (Defense) - Multiple rolls shift odds toward successfully landing the fish
+3. LOOT (Faith) - Multiple rolls shift odds toward better loot (more meat, pet fish)
 
 KEY DESIGN: Backend pre-calculates ALL rolls, frontend animates them slowly.
 This creates a chill, AFK-friendly experience.
@@ -120,33 +121,77 @@ CAST_DROP_TABLE_DISPLAY = [
 
 
 # --- REEL PHASE: Will you land the fish? (Defense stat) ---
-# Simple two-outcome: escaped vs caught
-REEL_DROP_TABLE = {
-    "escaped": 40,           # Fish gets away
-    "caught": 60,            # Successfully landed!
-}  # Total: 100 slots
+# Catch difficulty scales with fish tier!
+# Rarer fish = harder to land = more rolls needed
+
+# Base reel odds (before fish difficulty applied)
+REEL_BASE_CAUGHT = 50
+REEL_BASE_ESCAPED = 50
+
+# Difficulty modifier per fish tier (reduces "caught" slots)
+# Higher tier = harder to catch
+REEL_DIFFICULTY_BY_TIER = {
+    0: 0,    # Minnow: no penalty (50/50)
+    1: 5,    # Bass: -5 caught (45/55)
+    2: 10,   # Salmon: -10 caught (40/60)
+    3: 15,   # Catfish: -15 caught (35/65)
+    4: 25,   # Legendary: -25 caught (25/75) - HARD!
+}
+
+def get_reel_drop_table(fish_id: str) -> dict:
+    """Get reel drop table adjusted for fish difficulty."""
+    fish = FISH.get(fish_id, {})
+    tier = fish.get("tier", 0)
+    difficulty = REEL_DIFFICULTY_BY_TIER.get(tier, 0)
+    
+    caught = max(10, REEL_BASE_CAUGHT - difficulty)  # Min 10%
+    escaped = 100 - caught
+    
+    return {"escaped": escaped, "caught": caught}
 
 REEL_SHIFT_PER_SUCCESS = {
-    "escaped": -12,          # Each success: shrink escape zone
-    "caught": +12,           # Each success: grow catch zone
+    "escaped": -8,           # Each success: shrink escape zone
+    "caught": +8,            # Each success: grow catch zone
 }
 
 # DISPLAY CONFIG for reel drop table
+# Using cohesive fishing colors (not harsh red/green)
 REEL_DROP_TABLE_DISPLAY = [
-    {"key": "escaped", "icon": "arrow.uturn.backward", "name": "Escaped", "color": "buttonDanger"},
-    {"key": "caught", "icon": "checkmark.circle.fill", "name": "Caught!", "color": "buttonSuccess"},
+    {"key": "escaped", "icon": "arrow.uturn.backward", "name": "Escaped", "color": "inkMedium"},
+    {"key": "caught", "icon": "checkmark.circle.fill", "name": "Caught!", "color": "territoryAllied"},
 ]
 
 
 # ============================================================
-# RARE DROP CONFIGURATION
+# LOOT DROP TABLE - Simple, no adjustments
+# ============================================================
+# Backend rolls once after catch. Frontend displays result.
+# Two outcomes: meat (always) and rare_loot (pet fish for rare fish)
+
+LOOT_DROP_TABLE = {
+    "meat": 100,      # Always get meat
+}
+
+# For rare-eligible fish, this is the rare loot section
+# Backend calculates based on fish tier
+LOOT_DROP_TABLE_DISPLAY = [
+    {"key": "meat", "icon": "flame.fill", "name": "Meat", "color": "territoryAllied"},
+    {"key": "rare_loot", "icon": "sparkles", "name": "Rare!", "color": "gold"},
+]
+
+
+# ============================================================
+# PET FISH CONFIGURATION
 # ============================================================
 
-# Chance of pet_fish drop on ANY successful catch
-PET_FISH_DROP_CHANCE = 0.01  # 1%
+# Pet fish ONLY drops from rare fish (catfish and legendary_carp)
+PET_FISH_ELIGIBLE = ["catfish", "legendary_carp"]
 
-# Bonus chance for legendary fish
-PET_FISH_LEGENDARY_BONUS = 0.01  # +1% (total 2% for legendary)
+# Chance of pet_fish drop when catching an eligible fish
+PET_FISH_DROP_CHANCE = {
+    "catfish": 0.02,          # 2% chance from catfish
+    "legendary_carp": 0.05,   # 5% chance from legendary
+}
 
 
 # ============================================================
@@ -157,6 +202,7 @@ class FishingPhase(Enum):
     IDLE = "idle"
     CASTING = "casting"
     REELING = "reeling"
+    LOOTING = "looting"
 
 
 PHASE_CONFIG = {
@@ -196,6 +242,38 @@ PHASE_CONFIG = {
         "drop_table_title": "CATCH ODDS",
         "min_rolls": 1,
     },
+    FishingPhase.LOOTING: {
+        "name": "Loot",
+        "display_name": "Loot",
+        "stat": None,  # Not skill based
+        "stat_display_name": None,
+        "icon": "sparkles",
+        "description": "Collect your rewards!",
+        "success_effect": "Nice find!",
+        "failure_effect": "Just meat.",
+        "critical_effect": "Jackpot!",
+        # DISPLAY CONFIG
+        "stat_icon": None,  # No stat for loot
+        "roll_button_label": "Collect",
+        "roll_button_icon": "archivebox.fill",
+        "phase_color": "gold",
+        "drop_table_title": "LOOT",
+        "min_rolls": 0,  # No rolls - just display result
+    },
+}
+
+
+# ============================================================
+# TIER DISPLAY CONFIG - sent to frontend for loot bar
+# ============================================================
+# Maps fish tier to display color (same colors as CAST_DROP_TABLE_DISPLAY)
+
+TIER_DISPLAY = {
+    0: {"color": "disabled", "name": "Common"},
+    1: {"color": "territoryNeutral1", "name": "Common"},
+    2: {"color": "territoryAllied", "name": "Uncommon"},
+    3: {"color": "royalBlue", "name": "Rare"},
+    4: {"color": "gold", "name": "Legendary"},
 }
 
 
@@ -213,9 +291,131 @@ def get_fish_meat_reward(fish_id: str) -> int:
 
 
 def should_drop_pet_fish(fish_id: str) -> bool:
-    """Roll for pet fish drop."""
+    """Roll for pet fish drop. Only rare fish can become pets!"""
     import random
-    chance = PET_FISH_DROP_CHANCE
-    if fish_id == "legendary_carp":
-        chance += PET_FISH_LEGENDARY_BONUS
+    if fish_id not in PET_FISH_ELIGIBLE:
+        return False  # Common fish can't be pets
+    chance = PET_FISH_DROP_CHANCE.get(fish_id, 0)
     return random.random() < chance
+
+
+def get_loot_drop_table_for_fish(fish_id: str) -> dict:
+    """
+    Get the loot drop table slots for a specific fish.
+    
+    For rare-eligible fish: shows meat section + rare_loot section
+    For other fish: shows only meat section
+    
+    Returns slots dict for the loot bar display.
+    """
+    fish = FISH.get(fish_id, {})
+    meat_min = fish.get("meat_min", 1)
+    meat_max = fish.get("meat_max", 2)
+    
+    # Meat section size based on meat range (visual only)
+    meat_slots = (meat_min + meat_max) * 10  # Scales with meat value
+    
+    if fish_id in PET_FISH_ELIGIBLE:
+        # Rare eligible: show rare_loot section
+        rare_chance = PET_FISH_DROP_CHANCE.get(fish_id, 0)
+        rare_slots = int(rare_chance * 100)  # e.g., 2% = 2 slots
+        return {
+            "meat": meat_slots,
+            "rare_loot": rare_slots,
+        }
+    else:
+        # Not rare eligible: just meat
+        return {
+            "meat": 100,
+        }
+
+
+def get_loot_config_for_fish(fish_id: str) -> dict:
+    """
+    Get full loot configuration for a fish.
+    
+    Returns:
+        - drop_table: slot sizes
+        - drop_table_display: display items
+        - bar_title: what to show at top of bar
+        - rare_loot_name: what the rare drop is called (if any)
+    """
+    fish = FISH.get(fish_id, {})
+    tier = fish.get("tier", 0)
+    tier_display = TIER_DISPLAY.get(tier, TIER_DISPLAY[0])
+    meat_min = fish.get("meat_min", 1)
+    meat_max = fish.get("meat_max", 2)
+    
+    display = [
+        {
+            "key": "meat",
+            "icon": "flame.fill",
+            "name": f"{meat_min}-{meat_max} Meat",
+            "color": tier_display["color"],
+        },
+    ]
+    
+    has_rare = fish_id in PET_FISH_ELIGIBLE
+    rare_loot_name = None
+    bar_title = "LOOT"
+    
+    if has_rare:
+        rare_chance = int(PET_FISH_DROP_CHANCE.get(fish_id, 0) * 100)
+        rare_loot_name = "Pet Fish"
+        bar_title = "PET FISH"  # Dynamic title from backend
+        display.append({
+            "key": "rare_loot",
+            "icon": "fish.circle.fill",
+            "name": f"{rare_chance}% {rare_loot_name}",
+            "color": "gold",
+        })
+    
+    return {
+        "drop_table": get_loot_drop_table_for_fish(fish_id),
+        "drop_table_display": display,
+        "bar_title": bar_title,
+        "rare_loot_name": rare_loot_name,
+        "has_rare": has_rare,
+    }
+
+
+def get_fish_with_loot_preview(fish_id: str) -> Optional[dict]:
+    """
+    Get complete fish data with loot preview info for frontend.
+    
+    TEMPLATE SYSTEM: Backend sends ALL display data!
+    Frontend is a dumb template - no hardcoded values.
+    
+    Returns dict with:
+    - All base fish data (name, tier, icon, meat_min, meat_max, description)
+    - Loot preview (pet_fish_chance, can_drop_pet, tier_color, tier_name)
+    """
+    fish = FISH.get(fish_id)
+    if not fish:
+        return None
+    
+    tier = fish.get("tier", 0)
+    tier_display = TIER_DISPLAY.get(tier, TIER_DISPLAY[0])
+    
+    # Pet fish eligibility and chance
+    can_drop_pet = fish_id in PET_FISH_ELIGIBLE
+    pet_fish_chance = PET_FISH_DROP_CHANCE.get(fish_id, 0) if can_drop_pet else 0
+    
+    return {
+        # Base fish data
+        "name": fish.get("name"),
+        "tier": tier,
+        "icon": fish.get("icon"),
+        "meat_min": fish.get("meat_min"),
+        "meat_max": fish.get("meat_max"),
+        "description": fish.get("description"),
+        # Loot preview - ALL display data from backend!
+        "loot_preview": {
+            "meat_min": fish.get("meat_min"),
+            "meat_max": fish.get("meat_max"),
+            "can_drop_pet": can_drop_pet,
+            "pet_fish_chance": int(pet_fish_chance * 100),  # As percentage
+            "tier_color": tier_display["color"],
+            "tier_name": tier_display["name"],
+        },
+    }

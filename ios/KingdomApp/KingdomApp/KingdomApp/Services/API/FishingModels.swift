@@ -49,6 +49,17 @@ struct FishingDropTableItem: Codable {
     let color: String  // Theme color name (e.g., "royalBlue", "buttonSuccess")
 }
 
+// MARK: - Fish Loot Preview (from backend - NO hardcoded values!)
+
+struct FishLootPreview: Codable {
+    let meat_min: Int
+    let meat_max: Int
+    let can_drop_pet: Bool
+    let pet_fish_chance: Int  // As percentage (0-100)
+    let tier_color: String    // Theme color name from backend
+    let tier_name: String     // "Common", "Rare", "Legendary" etc
+}
+
 // MARK: - Fish Data
 
 struct FishData: Codable {
@@ -58,6 +69,19 @@ struct FishData: Codable {
     let meat_min: Int?
     let meat_max: Int?
     let description: String?
+    let loot_preview: FishLootPreview?  // Complete loot display data from backend
+}
+
+// MARK: - Loot Result (from backend after catch)
+
+struct FishingLootResult: Codable {
+    let drop_table: [String: Int]
+    let drop_table_display: [FishingDropTableItem]
+    let bar_title: String              // Dynamic from backend
+    let rare_loot_name: String?        // What the rare drop is called (nil if none)
+    let meat_earned: Int
+    let rare_loot_dropped: Bool        // Generic - could be pet fish, could be anything
+    let master_roll: Int               // Where the roll landed - from backend
 }
 
 // MARK: - Outcome Display
@@ -69,7 +93,8 @@ struct FishingOutcomeDisplay: Codable {
     let color: String
     let fish_data: FishData?
     let meat_earned: Int?
-    let pet_fish_dropped: Bool?
+    let rare_loot_dropped: Bool?  // Generic - could be pet fish, could be anything
+    let loot: FishingLootResult?  // Loot bar data (only on catch)
 }
 
 // MARK: - Phase Result (Pre-calculated rolls)
@@ -115,14 +140,14 @@ struct FishingSession: Codable {
 struct FishingPhaseConfig: Codable {
     let name: String
     let display_name: String
-    let stat: String
-    let stat_display_name: String
+    let stat: String?              // Null for loot phase (not skill based)
+    let stat_display_name: String? // Null for loot phase
     let icon: String
     let description: String
     let success_effect: String
     let failure_effect: String
     let critical_effect: String
-    let stat_icon: String
+    let stat_icon: String?         // Null for loot phase
     let roll_button_label: String
     let roll_button_icon: String
     let phase_color: String

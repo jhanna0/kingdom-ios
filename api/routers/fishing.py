@@ -19,14 +19,18 @@ import time
 from db import get_db
 from db.models import PlayerState, User
 from db.models.inventory import PlayerInventory
+from routers.actions.utils import log_activity
 from routers.auth import get_current_user
 from systems.fishing import FishingManager, FishingSession
 from systems.fishing.config import (
     FISH,
     CAST_DROP_TABLE,
     CAST_DROP_TABLE_DISPLAY,
-    REEL_DROP_TABLE,
+    REEL_BASE_CAUGHT,
+    REEL_BASE_ESCAPED,
     REEL_DROP_TABLE_DISPLAY,
+    LOOT_DROP_TABLE,
+    LOOT_DROP_TABLE_DISPLAY,
     PHASE_CONFIG,
     FishingPhase,
     ROLL_HIT_CHANCE,
@@ -85,7 +89,12 @@ def get_player_stats(db: Session, player_id: int) -> dict:
 
 
 def add_rewards_to_inventory(db: Session, player_id: int, session: FishingSession) -> None:
-    """Add fishing rewards to player's inventory."""
+    """
+    Add fishing rewards to player's inventory.
+    
+    Note: Pet fish are added immediately when caught (in reel endpoint),
+    so we only add meat here at session end.
+    """
     # Add meat
     if session.total_meat > 0:
         meat_entry = db.query(PlayerInventory).filter(
@@ -103,24 +112,31 @@ def add_rewards_to_inventory(db: Session, player_id: int, session: FishingSessio
             )
             db.add(meat_entry)
     
-    # Add pet fish if dropped
-    if session.pet_fish_dropped:
-        pet_entry = db.query(PlayerInventory).filter(
-            PlayerInventory.user_id == player_id,
-            PlayerInventory.item_id == "pet_fish"
-        ).first()
-        
-        if pet_entry:
-            pet_entry.quantity += 1
-        else:
-            pet_entry = PlayerInventory(
-                user_id=player_id,
-                item_id="pet_fish",
-                quantity=1
-            )
-            db.add(pet_entry)
+    # Pet fish already added in reel endpoint when caught - don't double add!
     
     db.commit()
+
+
+def broadcast_rare_loot(db: Session, player_id: int) -> None:
+    """
+    Broadcast pet fish drop to activity feed.
+    This shows up in friends' activity feeds!
+    """
+    log_activity(
+        db=db,
+        user_id=player_id,
+        action_type="rare_loot",
+        action_category="fishing",
+        description="Caught a Pet Fish! 🐟",
+        kingdom_id=None,
+        amount=None,
+        details={
+            "item_id": "pet_fish",
+            "item_name": "Pet Fish",
+            "item_icon": "fish.circle.fill",
+        },
+        visibility="friends"
+    )
 
 
 # ============================================================
@@ -144,8 +160,13 @@ def get_fishing_config():
             },
             "reel": {
                 **PHASE_CONFIG[FishingPhase.REELING],
-                "drop_table": REEL_DROP_TABLE,
+                "drop_table": {"escaped": REEL_BASE_ESCAPED, "caught": REEL_BASE_CAUGHT},
                 "drop_table_display": REEL_DROP_TABLE_DISPLAY,
+            },
+            "loot": {
+                **PHASE_CONFIG[FishingPhase.LOOTING],
+                "drop_table": LOOT_DROP_TABLE,
+                "drop_table_display": LOOT_DROP_TABLE_DISPLAY,
             },
         },
         "roll_hit_chance": int(ROLL_HIT_CHANCE * 100),
@@ -250,6 +271,8 @@ def reel_in(
     
     Returns ALL roll results pre-calculated.
     Frontend animates through them for a chill experience.
+    
+    If rare loot drops (pet fish), broadcasts to friends and adds to inventory immediately!
     """
     player_id = user.id
     
@@ -265,6 +288,29 @@ def reel_in(
     
     # Execute reel with all rolls pre-calculated
     result = _manager.execute_reel(session, stats["defense"])
+    
+    # If caught and pet fish dropped, broadcast and add to inventory NOW
+    if result.outcome == "caught" and result.outcome_display.get("rare_loot_dropped"):
+        # Add pet fish to inventory immediately
+        pet_entry = db.query(PlayerInventory).filter(
+            PlayerInventory.user_id == player_id,
+            PlayerInventory.item_id == "pet_fish"
+        ).first()
+        
+        if pet_entry:
+            pet_entry.quantity += 1
+        else:
+            pet_entry = PlayerInventory(
+                user_id=player_id,
+                item_id="pet_fish",
+                quantity=1
+            )
+            db.add(pet_entry)
+        
+        db.commit()
+        
+        # Broadcast to friends
+        broadcast_rare_loot(db, player_id)
     
     return {
         "success": True,
