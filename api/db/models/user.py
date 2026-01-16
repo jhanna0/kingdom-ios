@@ -27,7 +27,7 @@ class User(Base):
     display_name = Column(String, nullable=False, unique=True, index=True)
     avatar_url = Column(String, nullable=True)
     
-    # Device tracking (for multi-account detection)
+    # Device tracking - one account per device at a time
     device_id = Column(String, nullable=True, index=True)
     
     # Account status

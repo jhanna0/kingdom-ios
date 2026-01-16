@@ -104,10 +104,26 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     
     if existing_user:
         print(f"✅ [SIGNUP] Existing user found: user_id={existing_user.id}, display_name={existing_user.display_name}")
-        # Update last login and device_id (device may have changed)
+        
+        # SECURITY: Block if this device belongs to a DIFFERENT account
+        if apple_data.device_id:
+            device_owner = db.query(User).filter(
+                User.device_id == apple_data.device_id,
+                User.is_active == True
+            ).first()
+            
+            if device_owner and device_owner.id != existing_user.id:
+                print(f"🚫 [LOGIN] BLOCKED: Device {apple_data.device_id} belongs to user_id={device_owner.id} ({device_owner.display_name})")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"This device is linked to another account ({device_owner.display_name}). One account per device."
+                )
+        
+        # Update last login and device_id
         existing_user.last_login = datetime.utcnow()
         if apple_data.device_id:
             existing_user.device_id = apple_data.device_id
+        
         db.commit()
         db.refresh(existing_user)
         
@@ -144,15 +160,14 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
             detail=f"Display name '{display_name}' is already taken"
         )
     
-    # SECURITY: Block account creation if device already has an account
-    # This prevents users from creating multiple accounts on the same phone
+    # SECURITY: Block if device already has an account
     if apple_data.device_id:
         existing_device_user = db.query(User).filter(
             User.device_id == apple_data.device_id,
             User.is_active == True
         ).first()
         if existing_device_user:
-            print(f"🚫 [SIGNUP] BLOCKED: Device {apple_data.device_id} already has account user_id={existing_device_user.id} ({existing_device_user.display_name})")
+            print(f"🚫 [SIGNUP] BLOCKED: Device {apple_data.device_id} has account user_id={existing_device_user.id} ({existing_device_user.display_name})")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"This device already has an account ({existing_device_user.display_name}). Only one account is allowed per device."
@@ -164,7 +179,7 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
         email=email,  # Verified from Apple token (or client fallback in dev)
         apple_user_id=apple_user_id,  # Verified from Apple token
         display_name=display_name,
-        device_id=apple_data.device_id,  # For multi-account detection
+        device_id=apple_data.device_id,
     )
     
     db.add(user)
