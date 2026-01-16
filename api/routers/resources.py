@@ -109,11 +109,34 @@ RESOURCES = {
         "icon": "fish.circle.fill",
         "color": "cyan",
         "description": "A rare companion fish. Decorative trophy from fishing.",
-        "category": "trinket",
+        "category": "pet",  # Pets have their own category!
         "display_order": 8,
         "is_tradeable": True,
         "storage_type": "inventory",
+        "is_pet": True,  # Flag to identify pets
     },
+}
+
+
+# ===== PETS - Companion creatures collected from activities =====
+# Pets are a special category shown in their own UI card
+# They're stored in player_inventory like other items
+
+PETS = {
+    "pet_fish": {
+        "display_name": "Pet Fish",
+        "icon": "fish.circle.fill",
+        "color": "cyan",
+        "description": "A rare companion fish caught while fishing. Shows your mastery of the waters!",
+        "source": "Rare drop from Catfish and Legendary Carp",
+    },
+}
+
+# Empty state config for pets card - sent to frontend
+PETS_EMPTY_STATE = {
+    "title": "No pets yet",
+    "message": "Complete activities to find rare companions!",
+    "icon": "pawprint.circle",
 }
 
 
@@ -193,5 +216,55 @@ def get_resource_config(resource_id: str):
     return {
         "resource_id": resource_id,
         **RESOURCES[resource_id]
+    }
+
+
+def get_pets_config() -> dict:
+    """Get pets configuration including empty state for frontend."""
+    return {
+        "pets": PETS,
+        "empty_state": PETS_EMPTY_STATE,
+    }
+
+
+def get_player_pets(db: Session, user_id: int) -> list:
+    """
+    Get all pets owned by a player.
+    Returns list of pet data with quantities.
+    """
+    from db.models.inventory import PlayerInventory
+    
+    pets_data = []
+    for pet_id, pet_config in PETS.items():
+        # Query inventory for this pet
+        inv = db.query(PlayerInventory).filter(
+            PlayerInventory.user_id == user_id,
+            PlayerInventory.item_id == pet_id
+        ).first()
+        
+        quantity = inv.quantity if inv else 0
+        if quantity > 0:
+            pets_data.append({
+                "id": pet_id,
+                "quantity": quantity,
+                "display_name": pet_config["display_name"],
+                "icon": pet_config["icon"],
+                "color": pet_config["color"],
+                "description": pet_config["description"],
+                "source": pet_config.get("source", ""),
+            })
+    
+    return pets_data
+
+
+@router.get("/pets/config")
+def get_pets_config():
+    """Get all pet configurations for frontend rendering"""
+    return {
+        "pets": PETS,
+        "notes": {
+            "storage": "Pets are stored in player_inventory table",
+            "sources": "Currently only pet_fish from rare fishing catches",
+        }
     }
 

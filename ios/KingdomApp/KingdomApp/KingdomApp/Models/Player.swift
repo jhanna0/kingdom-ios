@@ -91,6 +91,28 @@ class Player: ObservableObject {
     @Published var equippedArmor: EquipmentData?
     @Published var inventory: [EquipmentData] = []
     
+    // Pets - companion creatures collected from activities
+    @Published var pets: [PlayerPet] = []
+    @Published var petsEmptyState: PetsEmptyState = PetsEmptyState()
+    
+    /// Pet data from backend
+    struct PlayerPet: Identifiable {
+        let id: String        // e.g., "pet_fish"
+        let quantity: Int
+        let displayName: String
+        let icon: String
+        let colorName: String
+        let description: String
+        let source: String?
+    }
+    
+    /// Empty state config from backend - NO HARDCODING!
+    struct PetsEmptyState {
+        var title: String = "No pets yet"
+        var message: String = "Complete activities to find companions!"
+        var icon: String = "pawprint.circle"
+    }
+    
     // Properties (land ownership)
     @Published var ownedProperties: [PlayerProperty] = []
     
@@ -769,6 +791,33 @@ class Player: ObservableObject {
                     )
                 }
             print("📦 Loaded \(resourcesData.count) resources from backend dynamically!")
+        }
+        
+        // PETS - companion creatures from backend
+        if let apiPets = apiState.pets {
+            pets = apiPets.map { pet in
+                PlayerPet(
+                    id: pet.id,
+                    quantity: pet.quantity,
+                    displayName: pet.display_name,
+                    icon: pet.icon,
+                    colorName: pet.color,
+                    description: pet.description,
+                    source: pet.source
+                )
+            }
+            if !pets.isEmpty {
+                print("🐟 Loaded \(pets.count) pet type(s) from backend!")
+            }
+        }
+        
+        // Pets config (empty state text from backend)
+        if let config = apiState.pets_config {
+            petsEmptyState = PetsEmptyState(
+                title: config.empty_state.title,
+                message: config.empty_state.message,
+                icon: config.empty_state.icon
+            )
         }
         
         // Equipment

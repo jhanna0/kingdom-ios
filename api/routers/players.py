@@ -503,6 +503,10 @@ def get_player_profile(
         KingdomHistory.event_type.in_(['coup', 'invasion', 'reconquest'])
     ).scalar() or 0
     
+    # Get pets
+    from routers.resources import get_player_pets
+    pets = get_player_pets(db, user.id)
+    
     return PlayerPublicProfile(
         id=user.id,
         display_name=user.display_name,
@@ -522,6 +526,7 @@ def get_player_profile(
         science=state.science,
         faith=state.faith,
         equipment=equipment,
+        pets=pets,
         total_checkins=total_checkins,
         total_conquests=total_conquests,
         kingdoms_ruled=kingdoms_ruled,

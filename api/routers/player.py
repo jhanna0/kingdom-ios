@@ -17,6 +17,21 @@ from routers.actions.utils import get_equipped_items, get_inventory, log_activit
 router = APIRouter(prefix="/player", tags=["player"])
 
 
+def get_player_pets_data(db: Session, user_id: int) -> list:
+    """
+    Get all pets owned by a player for API responses.
+    Returns list of pet data with quantities, icons, etc.
+    """
+    from routers.resources import get_player_pets
+    return get_player_pets(db, user_id)
+
+
+def get_pets_config_data() -> dict:
+    """Get pets UI configuration including empty state."""
+    from routers.resources import get_pets_config
+    return get_pets_config()
+
+
 def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dict:
     """Calculate all active perks/bonuses for a player"""
     perks = {
@@ -266,6 +281,10 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     
     resources_data = []
     for resource_key, resource_config in RESOURCES.items():
+        # Skip pets - they show in the Pets card, NOT inventory
+        if resource_config.get("is_pet"):
+            continue
+            
         # First check if it's a column resource (gold, iron, steel, wood)
         # Then check if it's in the inventory table (meat, sinew, etc.)
         amount = resource_column_map.get(resource_key, inventory_map.get(resource_key, 0))
@@ -398,6 +417,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         skills_data=skills_data,
         resources_data=resources_data,
         inventory=inventory,
+        pets=get_player_pets_data(db, user.id),
+        pets_config=get_pets_config_data(),
     )
 
 

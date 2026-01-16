@@ -373,9 +373,9 @@ def get_friend_activities(
     db: Session = Depends(get_db)
 ):
     """
-    Get activity feed for all my friends
+    Get activity feed for all my friends AND my own broadcasts
     
-    Shows combined activity from all accepted friends
+    Shows combined activity from all accepted friends plus the current user's activities
     
     Parameters:
     - limit: Max activities to return (default 50)
@@ -400,42 +400,38 @@ def get_friend_activities(
         friend_id = friendship.friend_user_id if friendship.user_id == user_id else friendship.user_id
         friend_ids.append(friend_id)
     
-    if not friend_ids:
-        return PlayerActivityResponse(
-            success=True,
-            total=0,
-            activities=[]
-        )
+    # Include the current user's own activities too
+    all_user_ids = friend_ids + [user_id]
     
-    # Collect activities from all friends
+    # Collect activities from all users (friends + self)
     all_activities = []
     
-    for friend_id in friend_ids:
-        # Get friend info
-        friend_user = db.query(User).filter(User.id == friend_id).first()
-        if not friend_user:
+    for uid in all_user_ids:
+        # Get user info
+        the_user = db.query(User).filter(User.id == uid).first()
+        if not the_user:
             continue
         
-        friend_state = db.query(PlayerState).filter(PlayerState.user_id == friend_id).first()
-        if not friend_state:
+        user_state = db.query(PlayerState).filter(PlayerState.user_id == uid).first()
+        if not user_state:
             continue
         
         # Get activities from different sources
-        friend_activities = []
-        friend_activities.extend(_get_contract_activities(db, friend_id, 20))
-        friend_activities.extend(_get_coup_activities(db, friend_id, 20))
-        friend_activities.extend(_get_invasion_activities(db, friend_id, 20))
-        friend_activities.extend(_get_property_activities(db, friend_id, 20))
-        friend_activities.extend(_get_training_activities(db, friend_id, friend_state, 10))
-        friend_activities.extend(_get_action_log_activities(db, friend_id, 20))
+        user_activities = []
+        user_activities.extend(_get_contract_activities(db, uid, 20))
+        user_activities.extend(_get_coup_activities(db, uid, 20))
+        user_activities.extend(_get_invasion_activities(db, uid, 20))
+        user_activities.extend(_get_property_activities(db, uid, 20))
+        user_activities.extend(_get_training_activities(db, uid, user_state, 10))
+        user_activities.extend(_get_action_log_activities(db, uid, 20))
         
         # Add user info to activities
-        for activity in friend_activities:
-            activity.username = friend_user.display_name
-            activity.display_name = friend_user.display_name
-            activity.user_level = friend_state.level
+        for activity in user_activities:
+            activity.username = the_user.display_name
+            activity.display_name = the_user.display_name
+            activity.user_level = user_state.level
         
-        all_activities.extend(friend_activities)
+        all_activities.extend(user_activities)
     
     # Filter by date if specified
     if days and days > 0:

@@ -134,6 +134,9 @@ struct PlayerPublicProfile: Codable, Identifiable {
     // Equipment
     let equipment: PlayerEquipmentData
     
+    // Pets
+    let pets: [PetData]?
+    
     // Achievements
     let total_checkins: Int
     let total_conquests: Int
@@ -196,5 +199,17 @@ struct ActivePlayersResponse: Codable {
     let players: [PlayerInKingdom]
 }
 
+
+// MARK: - Pet Data
+
+struct PetData: Codable, Identifiable {
+    let id: String  // e.g., "pet_fish"
+    let quantity: Int
+    let display_name: String
+    let icon: String
+    let color: String
+    let description: String
+    let source: String?
+}
 
 

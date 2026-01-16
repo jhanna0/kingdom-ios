@@ -77,6 +77,9 @@ class PlayerPublicProfile(BaseModel):
     # Equipment
     equipment: PlayerEquipment
     
+    # Pets
+    pets: list = []  # Pet companions owned by this player
+    
     # Achievements
     total_checkins: int
     total_conquests: int

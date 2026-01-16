@@ -110,6 +110,8 @@ class PlayerState(BaseModel):
     skills_data: Optional[list] = None
     resources_data: Optional[list] = None  # Includes inventory items
     inventory: Optional[list] = None  # From player_inventory table
+    pets: Optional[list] = None  # Pet companions from player_inventory
+    pets_config: Optional[dict] = None  # Pets UI config including empty state
     
     @field_serializer('debuff_expires_at', 'created_at', 'updated_at', 'last_login')
     def serialize_timestamps(self, dt: Optional[datetime]) -> Optional[str]:
