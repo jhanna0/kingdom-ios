@@ -51,6 +51,19 @@ struct TownHallView: View {
                         )
                     }
                     
+                    // Fishing
+                    NavigationLink {
+                        FishingView(apiClient: APIClient.shared)
+                    } label: {
+                        TownHallActivityCard(
+                            icon: "fish.fill",
+                            title: "Fishing",
+                            description: "Relax and catch some fish",
+                            color: KingdomTheme.Colors.royalBlue,
+                            badge: nil
+                        )
+                    }
+                    
                     // Town Pub
                     NavigationLink {
                         TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)
