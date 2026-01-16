@@ -13,7 +13,7 @@ provider:
   stackName: kingdom-api-stack
   environment:
     RDS_SECRET_NAME: rds!db-5465f705-3666-44af-b197-39944abad239
-    RDS_ENDPOINT: kingdom-test-1.cnodr6ou015k.us-east-1.rds.amazonaws.com
+    RDS_ENDPOINT: !GetAtt RDSProxy.Endpoint
     RDS_PORT: '5432'
     RDS_DATABASE: postgres
     JWT_SECRET_KEY: ${ssm:/kingdom/jwt-secret-key}
@@ -168,6 +168,67 @@ resources:
           AttributeName: ttl
           Enabled: true
 
+    # ===== RDS Proxy for Connection Pooling =====
+    RDSProxy:
+      Type: AWS::RDS::DBProxy
+      Properties:
+        DBProxyName: ${self:service}-proxy-${sls:stage}
+        EngineFamily: POSTGRESQL
+        Auth:
+          - AuthScheme: SECRETS
+            SecretArn: arn:aws:secretsmanager:us-east-1:${aws:accountId}:secret:rds!db-5465f705-3666-44af-b197-39944abad239
+            IAMAuth: DISABLED
+        RoleArn: !GetAtt RDSProxyRole.Arn
+        VpcSubnetIds:
+          - subnet-7547d013
+          - subnet-98cd50b9
+        VpcSecurityGroupIds:
+          - sg-62aae569
+        RequireTLS: false
+
+    RDSProxyTargetGroup:
+      Type: AWS::RDS::DBProxyTargetGroup
+      Properties:
+        DBProxyName: !Ref RDSProxy
+        TargetGroupName: default
+        DBInstanceIdentifiers:
+          - kingdom-test-1
+        ConnectionPoolConfig:
+          MaxConnectionsPercent: 100
+          MaxIdleConnectionsPercent: 50
+          ConnectionBorrowTimeout: 120
+
+    RDSProxyRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-proxy-role-${sls:stage}
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: rds.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: RDSProxySecretsAccess
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:GetSecretValue
+                    - secretsmanager:GetResourcePolicy
+                    - secretsmanager:DescribeSecret
+                    - secretsmanager:ListSecretVersionIds
+                  Resource: arn:aws:secretsmanager:us-east-1:*:secret:rds!db-5465f705-3666-44af-b197-39944abad239-*
+                - Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                  Resource: '*'
+                  Condition:
+                    StringEquals:
+                      kms:ViaService: secretsmanager.us-east-1.amazonaws.com
+
   Outputs:
     WebSocketApiEndpoint:
       Description: "WebSocket API endpoint URL"
@@ -176,3 +237,6 @@ resources:
     ConnectionsTableName:
       Description: "DynamoDB table for WebSocket connections"
       Value: !Ref ConnectionsTable
+    RDSProxyEndpoint:
+      Description: "RDS Proxy endpoint for database connections"
+      Value: !GetAtt RDSProxy.Endpoint
