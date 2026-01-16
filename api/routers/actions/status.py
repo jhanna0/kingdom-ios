@@ -95,8 +95,11 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
-def get_property_contracts_for_status(db: Session, user_id: int) -> list:
+def get_property_contracts_for_status(db: Session, user_id: int, player_state) -> list:
     """Get property contracts from unified_contracts table for status endpoint"""
+    from routers.tiers import PROPERTY_TIERS
+    from routers.resources import RESOURCES
+    
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property',
@@ -113,6 +116,26 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
         target_parts = contract.target_id.split("|") if contract.target_id else []
         property_id = target_parts[0] if target_parts else contract.target_id
         
+        # Get per-action costs from tier config
+        tier_data = PROPERTY_TIERS.get(contract.tier or 1, {})
+        raw_per_action = tier_data.get("per_action_costs", [])
+        
+        # Enrich with display info and check affordability
+        per_action_costs = []
+        can_afford = True
+        for cost in raw_per_action:
+            resource_info = RESOURCES.get(cost["resource"], {})
+            player_has = getattr(player_state, cost["resource"], 0) or 0
+            has_enough = player_has >= cost["amount"]
+            if not has_enough:
+                can_afford = False
+            per_action_costs.append({
+                "resource": cost["resource"],
+                "amount": cost["amount"],
+                "display_name": resource_info.get("display_name", cost["resource"].capitalize()),
+                "icon": resource_info.get("icon", "questionmark.circle")
+            })
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": property_id,
@@ -126,7 +149,9 @@ def get_property_contracts_for_status(db: Session, user_id: int) -> list:
             "cost": contract.gold_paid,
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
-            "endpoint": f"/actions/work-property/{contract.id}"
+            "endpoint": f"/actions/work-property/{contract.id}",
+            "per_action_costs": per_action_costs,
+            "can_afford": can_afford  # Can player afford the per-action costs?
         })
     
     return result
@@ -252,7 +277,7 @@ def get_action_status(
         }
     
     # Load property upgrade contracts from unified_contracts table
-    property_contracts = get_property_contracts_for_status(db, current_user.id)
+    property_contracts = get_property_contracts_for_status(db, current_user.id, state)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward

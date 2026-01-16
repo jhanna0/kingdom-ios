@@ -184,21 +184,71 @@ struct PropertyDetailView: View {
                 }
                 
                 Spacer()
-                
-                // FULLY DYNAMIC - iterate over all resource costs from backend
-                if let status = upgradeStatus {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        ForEach(status.resource_costs, id: \.resource) { cost in
-                            HStack(spacing: 4) {
-                                Image(systemName: cost.icon)
-                                    .font(.system(size: 12))
-                                Text("\(cost.amount) \(cost.display_name)")
-                                    .font(FontStyles.labelMedium)
+            }
+            
+            // Cost breakdown from backend
+            if let status = upgradeStatus {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Gold cost (paid upfront to start)
+                    if let goldCost = status.gold_cost, goldCost > 0 {
+                        HStack(spacing: 8) {
+                            Text("To start:")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            HStack(spacing: 2) {
+                                Image(systemName: "g.circle.fill")
+                                    .font(.system(size: 11))
+                                Text("\(goldCost)")
+                                    .font(FontStyles.labelBold)
                             }
-                            .foregroundColor((cost.has_enough ?? true) ? KingdomTheme.Colors.inkMedium : .red)
+                            .foregroundColor(status.can_afford ? KingdomTheme.Colors.inkDark : .red)
+                        }
+                    }
+                    
+                    // Per-action costs (required during each work action)
+                    if let perActionCosts = status.per_action_costs, !perActionCosts.isEmpty {
+                        HStack(spacing: 8) {
+                            Text("Per action:")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            ForEach(perActionCosts, id: \.resource) { cost in
+                                HStack(spacing: 2) {
+                                    Image(systemName: cost.icon)
+                                        .font(.system(size: 11))
+                                    Text("\(cost.amount)")
+                                        .font(FontStyles.labelBold)
+                                }
+                                .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            }
+                            
+                            Text("(\(status.actions_required) actions)")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                    }
+                    
+                    // Total resources needed (for reference)
+                    if let totalCosts = status.total_costs, !totalCosts.isEmpty {
+                        HStack(spacing: 8) {
+                            Text("Total resources:")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            
+                            ForEach(totalCosts, id: \.resource) { cost in
+                                HStack(spacing: 2) {
+                                    Image(systemName: cost.icon)
+                                        .font(.system(size: 11))
+                                    Text("\(cost.total_amount)")
+                                        .font(FontStyles.labelBold)
+                                }
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            }
                         }
                     }
                 }
+                .padding(.vertical, 4)
             }
             
             // Show active contract if one exists
@@ -310,12 +360,13 @@ struct PropertyDetailView: View {
                     ProgressView()
                         .padding()
                 } else if let status = upgradeStatus {
-                    // FULLY DYNAMIC button text
+                    // Button shows gold cost
+                    let goldCost = status.gold_cost ?? 0
                     Button(action: purchaseUpgrade) {
                         HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
                                 .font(.system(size: 14, weight: .bold))
-                            Text("Start Upgrade (\(formatResourceCosts(status.resource_costs)))")
+                            Text("Start Upgrade (\(goldCost)g)")
                                 .font(.system(size: 14, weight: .bold))
                         }
                     }
@@ -327,21 +378,27 @@ struct PropertyDetailView: View {
                     .disabled(!status.can_afford || hasAnyPropertyUpgradeInProgress)
                     .transition(.opacity)
                     
-                    Text("Like training, upgrades require work actions to complete")
-                        .font(FontStyles.labelMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    // Explain the per-action resource system
+                    if let perActionCosts = status.per_action_costs, !perActionCosts.isEmpty {
+                        let perActionStr = perActionCosts.map { "\($0.amount) \($0.display_name.lowercased())" }.joined(separator: ", ")
+                        Text("Each work action will require \(perActionStr)")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    } else {
+                        Text("Complete work actions in the Actions page to finish")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
                     
-                    // FULLY DYNAMIC - show missing resources from backend
-                    if let missing = status.missing_resources, !missing.isEmpty {
-                        ForEach(missing, id: \.resource) { item in
-                            HStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .font(FontStyles.iconMini)
-                                Text("Need \(item.needed) more \(item.resource)")
-                                    .font(FontStyles.labelSmall)
-                            }
-                            .foregroundColor(.red)
+                    // Show if not enough gold
+                    if !status.can_afford {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(FontStyles.iconMini)
+                            Text("Need \(goldCost - (status.player_gold ?? 0)) more gold")
+                                .font(FontStyles.labelSmall)
                         }
+                        .foregroundColor(.red)
                     }
                     
                     if hasAnyPropertyUpgradeInProgress {
@@ -518,17 +575,6 @@ struct PropertyDetailView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    /// Format resource costs for button display - FULLY DYNAMIC
-    private func formatResourceCosts(_ costs: [PropertyAPI.ResourceCost]) -> String {
-        costs.map { cost in
-            if cost.resource == "gold" {
-                return "\(cost.amount)g"
-            } else {
-                return "\(cost.amount) \(cost.display_name.lowercased())"
-            }
-        }.joined(separator: ", ")
     }
 }
 

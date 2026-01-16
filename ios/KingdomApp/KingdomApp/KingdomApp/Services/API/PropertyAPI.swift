@@ -50,15 +50,16 @@ class PropertyAPI {
         let propertyId: String
         let fromTier: Int
         let toTier: Int
-        let cost: Int
+        let goldCost: Int
         let actionsRequired: Int
-        
+
         enum CodingKeys: String, CodingKey {
-            case success, message, cost
+            case success, message
             case contractId = "contract_id"
             case propertyId = "property_id"
             case fromTier = "from_tier"
             case toTier = "to_tier"
+            case goldCost = "gold_cost"
             case actionsRequired = "actions_required"
         }
     }
@@ -130,6 +131,7 @@ class PropertyAPI {
         let cost: Int
         let status: String
         let started_at: String
+        let per_action_costs: [ResourceCost]?  // Resources consumed per work action
     }
     
     struct CurrentKingdomInfo: Codable {
@@ -191,12 +193,27 @@ class PropertyAPI {
         let current_tier: Int
         let max_tier: Int
         let can_upgrade: Bool
-        let resource_costs: [ResourceCost]  // Dynamic list of ALL costs!
+        // Gold paid upfront to start
+        let gold_cost: Int?
+        // Resources required per action (wood, iron, etc.)
+        let per_action_costs: [ResourceCost]?
+        // Total resources needed over all actions (for display)
+        let total_costs: [TotalResourceCost]?
         let actions_required: Int
-        let can_afford: Bool
-        let missing_resources: [MissingResource]?
+        let can_afford: Bool  // Can afford gold to START
+        let player_gold: Int?
         let active_contract: ActiveUpgradeContract?
         let player_building_skill: Int
+    }
+    
+    /// Total resource cost over all actions (for display like "280 wood total")
+    struct TotalResourceCost: Codable {
+        let resource: String
+        let amount: Int  // Per-action amount
+        let total_amount: Int  // Total over all actions
+        let per_action_amount: Int  // Same as amount, for clarity
+        let display_name: String
+        let icon: String
     }
     
     struct ActiveUpgradeContract: Codable {
@@ -206,6 +223,7 @@ class PropertyAPI {
         let actions_required: Int
         let actions_completed: Int
         let status: String
+        let per_action_costs: [ResourceCost]?  // What each action costs
     }
     
     func getPropertyUpgradeStatus(propertyId: String) async throws -> PropertyUpgradeStatus {

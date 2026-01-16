@@ -65,42 +65,75 @@ def get_tier_name(tier: int) -> str:
     return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
 
 
-def get_upgrade_resource_costs(current_tier: int, population: int = 0) -> list:
+def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_required: int = None) -> dict:
     """
-    Get upgrade costs for next tier - FULLY DYNAMIC from PROPERTY_TIERS!
-    Returns list of {resource, amount, display_name, icon}
+    Get ALL upgrade costs for next tier - FULLY DYNAMIC from PROPERTY_TIERS!
+    Returns dict with:
+      - gold_cost: Gold paid UPFRONT to start the contract
+      - per_action_costs: List of {resource, amount, display_name, icon} - required each action
+      - total_costs: Total resources needed over all actions (for display)
     """
     from routers.tiers import PROPERTY_TIERS, get_property_max_tier
     from routers.resources import RESOURCES
     
     next_tier = current_tier + 1
     if current_tier >= get_property_max_tier():
-        return []
+        return {"gold_cost": 0, "per_action_costs": [], "total_costs": []}
     
     tier_data = PROPERTY_TIERS.get(next_tier, {})
-    base_costs = tier_data.get("upgrade_costs", [])
+    gold_cost = tier_data.get("gold_cost", 0)
+    base_per_action = tier_data.get("per_action_costs", [])
+    base_actions = tier_data.get("base_actions", 5)
     
-    result = []
-    for cost in base_costs:
+    # Use provided actions_required or default to base
+    total_actions = actions_required or base_actions
+    
+    def enrich_cost(cost):
+        """Add display info from RESOURCES"""
         resource_id = cost["resource"]
         amount = cost["amount"]
-        
-        # Special case: T1 land price scales with population
-        if next_tier == 1 and resource_id == "gold" and population > 0:
-            population_multiplier = 1.0 + (population / 50.0)
-            amount = int(amount * population_multiplier)
-        
-        # Get display info from RESOURCES
         resource_info = RESOURCES.get(resource_id, {})
-        
-        result.append({
+        return {
             "resource": resource_id,
             "amount": amount,
             "display_name": resource_info.get("display_name", resource_id.capitalize()),
             "icon": resource_info.get("icon", "questionmark.circle")
+        }
+    
+    per_action_costs = [enrich_cost(c) for c in base_per_action]
+    
+    # Calculate total costs (for display: "280 wood total over 7 actions")
+    total_costs = []
+    for cost in per_action_costs:
+        total_costs.append({
+            **cost,
+            "total_amount": cost["amount"] * total_actions,
+            "per_action_amount": cost["amount"]
         })
     
-    return result
+    return {
+        "gold_cost": gold_cost,
+        "per_action_costs": per_action_costs,
+        "total_costs": total_costs
+    }
+
+
+def get_upgrade_resource_costs(current_tier: int, population: int = 0) -> list:
+    """
+    Get TOTAL upgrade costs for display.
+    Returns list with total amounts needed.
+    """
+    costs = get_upgrade_costs_full(current_tier, population)
+    
+    return [
+        {
+            "resource": cost["resource"],
+            "amount": cost["total_amount"],
+            "display_name": cost["display_name"],
+            "icon": cost["icon"]
+        }
+        for cost in costs["total_costs"]
+    ]
 
 
 def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 0) -> int:
@@ -169,7 +202,7 @@ def property_to_response(prop: Property) -> PropertyResponse:
 
 
 def get_property_contracts_for_user(db: Session, user_id: int) -> list:
-    """Get property contracts from unified_contracts table"""
+    """Get property contracts from unified_contracts table - FULLY DYNAMIC"""
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property'
@@ -181,12 +214,16 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
+        from_tier = (contract.tier or 1) - 1
+        all_costs = get_upgrade_costs_full(from_tier, actions_required=contract.actions_required)
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": contract.target_id,
             "kingdom_id": contract.kingdom_id,
             "kingdom_name": contract.kingdom_name,
-            "from_tier": (contract.tier or 1) - 1,  # tier is target, from_tier = tier - 1
+            "from_tier": from_tier,
             "to_tier": contract.tier or 1,
             "target_tier_name": get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
@@ -194,7 +231,10 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "cost": contract.gold_paid,
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
-            "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None
+            "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None,
+            # NEW: Per-action resource costs (required during work)
+            "per_action_costs": all_costs["per_action_costs"],
+            "endpoint": f"/actions/work-property/{contract.id}" if not contract.completed_at else None
         })
     
     return result
@@ -473,7 +513,9 @@ def start_property_upgrade(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Purchase property upgrade contract"""
+    """Purchase property upgrade contract.
+    Gold paid UPFRONT to start. Resources required per action during work.
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -516,23 +558,20 @@ def start_property_upgrade(
             detail="You already have a property upgrade in progress. Complete it first."
         )
     
-    # Get dynamic resource costs
-    resource_costs = get_upgrade_resource_costs(property.tier)
-    affordability = check_player_can_afford(state, resource_costs)
-    
-    if not affordability["can_afford"]:
-        missing = affordability["missing"]
-        missing_str = ", ".join([f"{m['needed']} more {m['resource']}" for m in missing])
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough resources. Need: {missing_str}"
-        )
-    
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill)
     next_tier = property.tier + 1
     
-    # Calculate total gold for contract record (for backwards compat)
-    gold_paid = next((c["amount"] for c in resource_costs if c["resource"] == "gold"), 0)
+    # Get cost breakdown from tiers
+    all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required)
+    gold_cost = all_costs["gold_cost"]
+    per_action_costs = all_costs["per_action_costs"]
+    
+    # Check if player can afford GOLD upfront
+    if state.gold < gold_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {gold_cost}g, have {int(state.gold)}g"
+        )
     
     # Create contract
     contract = UnifiedContract(
@@ -544,26 +583,34 @@ def start_property_upgrade(
         tier=next_tier,
         target_id=property_id,
         actions_required=actions_required,
-        gold_paid=gold_paid
+        gold_paid=gold_cost
     )
     db.add(contract)
     
-    # Deduct ALL resources dynamically
-    deduct_resource_costs(state, resource_costs)
+    # Deduct GOLD upfront (per-action costs deducted during work)
+    state.gold -= gold_cost
     
     db.commit()
     db.refresh(contract)
     
     tier_name = get_tier_name(next_tier)
     
+    # Build warning message about per-action costs
+    per_action_warning = ""
+    if per_action_costs:
+        per_action_str = ", ".join([f"{c['amount']} {c['display_name']}" for c in per_action_costs])
+        per_action_warning = f" Each action requires: {per_action_str}."
+    
     return {
         "success": True,
-        "message": f"Started upgrade to {tier_name}! Complete {actions_required} actions to finish.",
+        "message": f"Started upgrade to {tier_name}! Complete {actions_required} actions to finish.{per_action_warning}",
         "contract_id": str(contract.id),
         "property_id": property_id,
         "from_tier": property.tier,
         "to_tier": next_tier,
-        "resource_costs": resource_costs,  # Return what was spent
+        "gold_cost": gold_cost,  # What was paid upfront
+        "per_action_costs": per_action_costs,  # What each action will cost
+        "total_costs": all_costs["total_costs"],  # Total resources over all actions
         "actions_required": actions_required
     }
 
@@ -595,7 +642,7 @@ def get_property_upgrade_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current upgrade contract status for a property"""
+    """Get current upgrade contract status for a property - FULLY DYNAMIC"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -614,6 +661,10 @@ def get_property_upgrade_status(
             detail="Property not found or not owned by you"
         )
     
+    from routers.tiers import get_property_max_tier
+    max_tier = get_property_max_tier()
+    actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < max_tier else 0
+    
     # Find active upgrade contract
     active_contract_data = None
     contract = db.query(UnifiedContract).filter(
@@ -628,32 +679,48 @@ def get_property_upgrade_status(
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Get per-action costs for this tier (for display on contract card)
+        contract_costs = get_upgrade_costs_full(contract.tier - 1, actions_required=contract.actions_required)
+        
         active_contract_data = {
             "contract_id": str(contract.id),
             "property_id": property_id,
             "to_tier": contract.tier or 1,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "status": "completed" if contract.completed_at else "in_progress"
+            "status": "completed" if contract.completed_at else "in_progress",
+            "per_action_costs": contract_costs["per_action_costs"]  # What each action costs
         }
     
-    # FULLY DYNAMIC resource costs
-    from routers.tiers import get_property_max_tier
-    max_tier = get_property_max_tier()
-    
-    resource_costs = get_upgrade_resource_costs(property.tier) if property.tier < max_tier else []
-    affordability = check_player_can_afford(state, resource_costs) if resource_costs else {"can_afford": False, "missing": []}
-    actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < max_tier else 0
+    # FULLY DYNAMIC costs
+    if property.tier < max_tier:
+        all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required)
+        gold_cost = all_costs["gold_cost"]
+        per_action_costs = all_costs["per_action_costs"]
+        total_costs = all_costs["total_costs"]
+        
+        # Check if player can afford gold upfront
+        can_afford_gold = state.gold >= gold_cost
+    else:
+        gold_cost = 0
+        per_action_costs = []
+        total_costs = []
+        can_afford_gold = False
     
     return {
         "property_id": property_id,
         "current_tier": property.tier,
         "max_tier": max_tier,
         "can_upgrade": property.tier < max_tier,
-        "resource_costs": resource_costs,  # Dynamic list of all costs!
+        # Gold paid upfront to start
+        "gold_cost": gold_cost,
+        # Resources required per action
+        "per_action_costs": per_action_costs,
+        # Total resources needed (for display)
+        "total_costs": total_costs,
         "actions_required": actions_required,
-        "can_afford": affordability["can_afford"],
-        "missing_resources": affordability["missing"],
+        "can_afford": can_afford_gold,  # Can afford gold to START
+        "player_gold": int(state.gold),
         "active_contract": active_contract_data,
         "player_building_skill": state.building_skill
     }

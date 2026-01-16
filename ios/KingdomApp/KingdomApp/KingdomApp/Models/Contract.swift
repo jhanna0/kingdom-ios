@@ -3,6 +3,14 @@ import Foundation
 // MARK: - Contract System
 // EVE Online-inspired contracts for kingdom building
 
+/// Per-action resource cost (used in kingdom building contracts)
+struct ContractPerActionCost: Codable, Hashable {
+    let resource: String
+    let amount: Int
+    let displayName: String
+    let icon: String
+}
+
 struct Contract: Identifiable, Codable, Hashable {
     let id: String  // String to match backend contract endpoints
     let kingdomId: String
@@ -29,6 +37,9 @@ struct Contract: Identifiable, Codable, Hashable {
     let constructionCost: Int? // What ruler paid upfront to START building (kingdom contracts only)
     let rewardPool: Int // Total gold to distribute to workers
     let actionReward: Int // Gold per action (ruler-set)
+    
+    // Per-action resource costs (NEW - resources required each work action)
+    let perActionCosts: [ContractPerActionCost]?
     
     // Status
     let createdBy: Int // Ruler's player ID (PostgreSQL auto-generated)
@@ -170,6 +181,7 @@ struct Contract: Identifiable, Codable, Hashable {
             constructionCost: upfrontCost,
             rewardPool: upfrontCost,
             actionReward: actionReward,
+            perActionCosts: nil,  // Will be populated from API
             createdBy: createdBy,
             createdAt: Date(),
             completedAt: nil,

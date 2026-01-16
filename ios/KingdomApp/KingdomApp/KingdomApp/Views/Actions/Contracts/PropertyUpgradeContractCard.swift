@@ -12,7 +12,11 @@ struct PropertyUpgradeContractCard: View {
     let onAction: () -> Void
     
     var isReady: Bool {
-        return !globalCooldownActive
+        return !globalCooldownActive && (contract.canAfford ?? true)
+    }
+    
+    var canAfford: Bool {
+        return contract.canAfford ?? true
     }
     
     var iconName: String {
@@ -55,6 +59,28 @@ struct PropertyUpgradeContractCard: View {
                         
                         // Cooldown time with hourglass (2 hours for property upgrades)
                         cooldownBadge(minutes: 120)
+                        
+                        // Per-action resource costs as badges
+                        if let costs = contract.perActionCosts {
+                            ForEach(costs, id: \.resource) { cost in
+                                HStack(spacing: 4) {
+                                    Image(systemName: cost.icon)
+                                        .font(FontStyles.iconMini)
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    Text("\(cost.amount)")
+                                        .font(FontStyles.labelBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .brutalistBadge(
+                                    backgroundColor: KingdomTheme.Colors.parchment,
+                                    cornerRadius: 6,
+                                    shadowOffset: 1,
+                                    borderWidth: 1.5
+                                )
+                            }
+                        }
                     }
                     
                     HStack(spacing: 4) {
@@ -115,11 +141,19 @@ struct PropertyUpgradeContractCard: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            } else if !canAfford {
+                Text("Need resources")
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if isReady {
                 Button(action: onAction) {
                     HStack {
-                        Image(systemName: "play.fill")
-                        Text("Start")
+                        Image(systemName: "hammer.fill")
+                        Text("Work on Property")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))

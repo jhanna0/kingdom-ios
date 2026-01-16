@@ -746,7 +746,17 @@ extension ActionsView {
             
             await MainActor.run {
                 viewModel.availableContracts = status.contracts.compactMap { apiContract in
-                    Contract(
+                    // Convert per-action costs from API format
+                    let perActionCosts = apiContract.per_action_costs?.map { apiCost in
+                        ContractPerActionCost(
+                            resource: apiCost.resource,
+                            amount: apiCost.amount,
+                            displayName: apiCost.display_name,
+                            icon: apiCost.icon
+                        )
+                    }
+                    
+                    return Contract(
                         id: apiContract.id,
                         kingdomId: apiContract.kingdom_id,
                         kingdomName: apiContract.kingdom_name,
@@ -764,6 +774,7 @@ extension ActionsView {
                         constructionCost: apiContract.construction_cost ?? 0,  // Default to 0 for old contracts
                         rewardPool: apiContract.reward_pool,
                         actionReward: apiContract.action_reward,
+                        perActionCosts: perActionCosts,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },

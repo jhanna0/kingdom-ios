@@ -22,6 +22,7 @@ struct WorkContractCard: View {
         return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
+    
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
@@ -66,6 +67,28 @@ struct WorkContractCard: View {
                             shadowOffset: 1,
                             borderWidth: 1.5
                         )
+                        
+                        // Per-action resource costs as badges
+                        if let costs = contract.perActionCosts {
+                            ForEach(costs, id: \.resource) { cost in
+                                HStack(spacing: 4) {
+                                    Image(systemName: cost.icon)
+                                        .font(FontStyles.iconMini)
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    Text("\(cost.amount)")
+                                        .font(FontStyles.labelBold)
+                                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .brutalistBadge(
+                                    backgroundColor: KingdomTheme.Colors.parchment,
+                                    cornerRadius: 6,
+                                    shadowOffset: 1,
+                                    borderWidth: 1.5
+                                )
+                            }
+                        }
                     }
                     
                     if let benefit = contract.buildingBenefit {
@@ -136,7 +159,7 @@ struct WorkContractCard: View {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Start")
+                        Text("Work on This")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))

@@ -2,6 +2,14 @@ import Foundation
 
 // MARK: - Contract Models
 
+/// Per-action resource cost for building contracts
+struct APIPerActionCost: Codable {
+    let resource: String
+    let amount: Int
+    let display_name: String
+    let icon: String
+}
+
 struct APIContract: Codable {
     let id: String  // String to match all other contract endpoints
     let kingdom_id: String
@@ -28,6 +36,9 @@ struct APIContract: Codable {
     let created_at: String
     let completed_at: String?
     let status: String  // open, in_progress, completed, cancelled
+    
+    // Per-action resource costs (NEW - required during each work action)
+    let per_action_costs: [APIPerActionCost]?
 }
 
 struct ContractCreateRequest: Codable {

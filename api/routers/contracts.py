@@ -53,12 +53,28 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
     building_benefit = None
     building_icon = None
     building_display_name = None
+    per_action_costs = []
+    
     if contract.type in BUILDING_TYPES:
         building_data = BUILDING_TYPES[contract.type]
         building_display_name = building_data.get("display_name")
         building_icon = building_data.get("icon")
         tier_data = building_data.get("tiers", {}).get(contract.tier, {})
         building_benefit = tier_data.get("benefit")
+        
+        # Get per-action costs for this tier (DYNAMIC)
+        raw_per_action_costs = tier_data.get("per_action_costs", [])
+        if raw_per_action_costs:
+            from routers.resources import RESOURCES
+            for cost in raw_per_action_costs:
+                resource_id = cost["resource"]
+                resource_info = RESOURCES.get(resource_id, {})
+                per_action_costs.append({
+                    "resource": resource_id,
+                    "amount": cost["amount"],
+                    "display_name": resource_info.get("display_name", resource_id.capitalize()),
+                    "icon": resource_info.get("icon", "questionmark.circle")
+                })
     
     # Derive status from completion state (for backwards compatibility with clients)
     status = "completed" if contract.completed_at else "open"
@@ -84,7 +100,8 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "created_by": contract.user_id,  # The ruler who created it
         "created_at": contract.created_at,
         "completed_at": contract.completed_at,
-        "status": status  # Computed from completed_at, not stored in DB
+        "status": status,  # Computed from completed_at, not stored in DB
+        "per_action_costs": per_action_costs  # NEW: Resources required per work action
     }
 
 

@@ -21,7 +21,8 @@ BUILDING_POPULATION_ACTIONS_DIVISOR = 30
 
 # ===== PROPERTY TIERS - FULLY DYNAMIC =====
 # Add new tiers here and they'll appear in iOS automatically!
-# upgrade_costs: Resources required to upgrade TO this tier (from previous tier)
+# gold_cost: Gold paid UPFRONT to start the contract
+# per_action_costs: Resources required PER WORK ACTION (wood, iron, etc.)
 # base_actions: Base actions required (reduced by building skill)
 
 PROPERTY_TIERS = {
@@ -32,9 +33,8 @@ PROPERTY_TIERS = {
         "benefits": [
             "Free travel to this kingdom"
         ],
-        "upgrade_costs": [
-            {"resource": "gold", "amount": 500}  # Base price, modified by population
-        ],
+        "gold_cost": 500,
+        "per_action_costs": [],  # No per-action costs for basic land
         "base_actions": 5
     },
     2: {
@@ -45,8 +45,8 @@ PROPERTY_TIERS = {
             "All Land benefits",
             "Ability to train skills in this kingdom"
         ],
-        "upgrade_costs": [
-            {"resource": "gold", "amount": 500},
+        "gold_cost": 500,
+        "per_action_costs": [
             {"resource": "wood", "amount": 40}
         ],
         "base_actions": 7
@@ -59,9 +59,9 @@ PROPERTY_TIERS = {
             "All House benefits",
             "Allows crafting of weapons and armor"
         ],
-        "upgrade_costs": [
-            {"resource": "gold", "amount": 1000},
-            {"resource": "wood", "amount": 80},
+        "gold_cost": 1000,
+        "per_action_costs": [
+            {"resource": "wood", "amount": 50},
             {"resource": "iron", "amount": 50}
         ],
         "base_actions": 9
@@ -74,9 +74,10 @@ PROPERTY_TIERS = {
             "All Workshop benefits",
             "Pay 50% less tax on all income"
         ],
-        "upgrade_costs": [
-            {"resource": "gold", "amount": 2000},
-            {"resource": "wood", "amount": 160}
+        "gold_cost": 2000,
+        "per_action_costs": [
+            {"resource": "wood", "amount": 75},
+            {"resource": "iron", "amount": 75}
         ],
         "base_actions": 11
     },
@@ -88,9 +89,9 @@ PROPERTY_TIERS = {
             "All Beautiful Property benefits",
             "If your kingdom is invaded, a 50% less chance your property gets destroyed"
         ],
-        "upgrade_costs": [
-            {"resource": "gold", "amount": 4000},
-            {"resource": "wood", "amount": 320},
+        "gold_cost": 4000,
+        "per_action_costs": [
+            {"resource": "wood", "amount": 100},
             {"resource": "iron", "amount": 100}
         ],
         "base_actions": 13
@@ -103,10 +104,16 @@ def get_property_max_tier() -> int:
     return max(PROPERTY_TIERS.keys())
 
 
-def get_property_upgrade_costs(to_tier: int) -> list:
-    """Get upgrade costs for a specific tier"""
+def get_property_gold_cost(to_tier: int) -> int:
+    """Get gold cost paid UPFRONT to start the upgrade"""
     tier_data = PROPERTY_TIERS.get(to_tier, {})
-    return tier_data.get("upgrade_costs", [])
+    return tier_data.get("gold_cost", 0)
+
+
+def get_property_per_action_costs(to_tier: int) -> list:
+    """Get per-action costs required during each work action"""
+    tier_data = PROPERTY_TIERS.get(to_tier, {})
+    return tier_data.get("per_action_costs", [])
 
 
 def get_property_base_actions(to_tier: int) -> int:
@@ -151,8 +158,18 @@ BUILDING_TYPES = {
         "benefit_formula": "+{level * 2} defenders in battles",
         "tiers": {
             1: {"name": "Wooden Palisade", "benefit": "+2 defenders", "description": "Basic wooden wall"},
-            2: {"name": "Stone Wall", "benefit": "+4 defenders", "description": "Sturdy stone fortification"},
-            3: {"name": "Reinforced Wall", "benefit": "+6 defenders", "description": "Reinforced stone wall"},
+            2: {
+                "name": "Soft Wood Wall",
+                "benefit": "+4 defenders",
+                "description": "Pine and cedar fortification",
+                "per_action_costs": [{"resource": "wood", "amount": 50}]
+            },
+            3: {
+                "name": "Hardened Wooden Wall",
+                "benefit": "+6 defenders",
+                "description": "Oak and ironwood fortification",
+                "per_action_costs": [{"resource": "wood", "amount": 100}]
+            },
             4: {"name": "Fortress Wall", "benefit": "+8 defenders", "description": "Imposing fortress wall"},
             5: {"name": "Castle Wall", "benefit": "+10 defenders, max fortification", "description": "Massive castle wall"},
         }
@@ -675,6 +692,19 @@ def get_building_tier_value(building_type: str, tier: int, value_name: str, defa
     tiers = building_data.get("tiers", {})
     tier_data = tiers.get(tier, {})
     return tier_data.get(value_name, default)
+
+
+def get_building_per_action_costs(building_type: str, tier: int) -> list:
+    """Get per-action resource costs for a building tier.
+    
+    Example: get_building_per_action_costs("wall", 2) -> [{"resource": "wood", "amount": 50}]
+    
+    Returns empty list if no per-action costs defined.
+    """
+    building_data = BUILDING_TYPES.get(building_type, {})
+    tiers = building_data.get("tiers", {})
+    tier_data = tiers.get(tier, {})
+    return tier_data.get("per_action_costs", [])
 
 
 def get_education_training_reduction(education_level: int) -> float:
