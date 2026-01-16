@@ -10,16 +10,16 @@ from ..base import Base
 
 class OrderType(str, enum.Enum):
     """Order type - buy or sell"""
-    BUY = "buy"
-    SELL = "sell"
+    buy = "buy"
+    sell = "sell"
 
 
 class OrderStatus(str, enum.Enum):
     """Order status"""
-    ACTIVE = "active"          # Order is in the order book
-    FILLED = "filled"          # Order completely filled
-    PARTIALLY_FILLED = "partially_filled"  # Some quantity filled
-    CANCELLED = "cancelled"    # Cancelled by player
+    active = "active"          # Order is in the order book
+    filled = "filled"          # Order completely filled
+    partially_filled = "partially_filled"  # Some quantity filled
+    cancelled = "cancelled"    # Cancelled by player
 
 
 class MarketOrder(Base):
@@ -46,7 +46,7 @@ class MarketOrder(Base):
     quantity_original = Column(Integer, nullable=False)   # Original order size
     
     # Status
-    status = Column(SQLEnum(OrderStatus), nullable=False, default=OrderStatus.ACTIVE, index=True)
+    status = Column(SQLEnum(OrderStatus), nullable=False, default=OrderStatus.active, index=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

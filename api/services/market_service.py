@@ -68,7 +68,7 @@ class MarketMatchingEngine:
         state = player.player_state
         
         # Validate and lock resources
-        if order_type == OrderType.BUY:
+        if order_type == OrderType.buy:
             total_cost = price_per_unit * quantity
             if state.gold < total_cost:
                 raise ValueError(f"Not enough gold. Need {total_cost}g, have {state.gold}g")
@@ -90,7 +90,7 @@ class MarketMatchingEngine:
             price_per_unit=price_per_unit,
             quantity_remaining=quantity,
             quantity_original=quantity,
-            status=OrderStatus.ACTIVE
+            status=OrderStatus.active
         )
         self.db.add(order)
         self.db.flush()  # Get the order ID
@@ -99,14 +99,14 @@ class MarketMatchingEngine:
         transactions = []
         remaining_quantity = quantity
         
-        if order_type == OrderType.BUY:
+        if order_type == OrderType.buy:
             # Match against sell orders (lowest price first, then FIFO)
             matching_orders = self.db.query(MarketOrder).filter(
                 and_(
                     MarketOrder.kingdom_id == kingdom_id,
                     MarketOrder.item_type == item_type,
-                    MarketOrder.order_type == OrderType.SELL,
-                    MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED]),
+                    MarketOrder.order_type == OrderType.sell,
+                    MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled]),
                     MarketOrder.price_per_unit <= price_per_unit,  # Willing to pay this much
                     MarketOrder.id != order.id  # Don't match with self
                 )
@@ -139,10 +139,10 @@ class MarketMatchingEngine:
                 # Update sell order
                 sell_order.quantity_remaining -= match_quantity
                 if sell_order.quantity_remaining == 0:
-                    sell_order.status = OrderStatus.FILLED
+                    sell_order.status = OrderStatus.filled
                     sell_order.filled_at = datetime.utcnow()
                 elif sell_order.quantity_remaining < sell_order.quantity_original:
-                    sell_order.status = OrderStatus.PARTIALLY_FILLED
+                    sell_order.status = OrderStatus.partially_filled
                 
                 remaining_quantity -= match_quantity
                 
@@ -167,8 +167,8 @@ class MarketMatchingEngine:
                 and_(
                     MarketOrder.kingdom_id == kingdom_id,
                     MarketOrder.item_type == item_type,
-                    MarketOrder.order_type == OrderType.BUY,
-                    MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED]),
+                    MarketOrder.order_type == OrderType.buy,
+                    MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled]),
                     MarketOrder.price_per_unit >= price_per_unit,  # Willing to accept this much
                     MarketOrder.id != order.id  # Don't match with self
                 )
@@ -201,10 +201,10 @@ class MarketMatchingEngine:
                 # Update buy order
                 buy_order.quantity_remaining -= match_quantity
                 if buy_order.quantity_remaining == 0:
-                    buy_order.status = OrderStatus.FILLED
+                    buy_order.status = OrderStatus.filled
                     buy_order.filled_at = datetime.utcnow()
                 elif buy_order.quantity_remaining < buy_order.quantity_original:
-                    buy_order.status = OrderStatus.PARTIALLY_FILLED
+                    buy_order.status = OrderStatus.partially_filled
                 
                 remaining_quantity -= match_quantity
                 
@@ -237,10 +237,10 @@ class MarketMatchingEngine:
         # Update our order's remaining quantity and status
         order.quantity_remaining = remaining_quantity
         if remaining_quantity == 0:
-            order.status = OrderStatus.FILLED
+            order.status = OrderStatus.filled
             order.filled_at = datetime.utcnow()
         elif remaining_quantity < quantity:
-            order.status = OrderStatus.PARTIALLY_FILLED
+            order.status = OrderStatus.partially_filled
         
         self.db.commit()
         
@@ -261,7 +261,7 @@ class MarketMatchingEngine:
         if not order:
             raise ValueError("Order not found")
         
-        if order.status not in [OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED]:
+        if order.status not in [OrderStatus.active, OrderStatus.partially_filled]:
             raise ValueError("Order cannot be cancelled")
         
         # Get player state
@@ -272,7 +272,7 @@ class MarketMatchingEngine:
         state = player.player_state
         
         # Refund locked resources
-        if order.order_type == OrderType.BUY:
+        if order.order_type == OrderType.buy:
             # Refund locked gold
             refund_gold = order.price_per_unit * order.quantity_remaining
             state.gold += refund_gold
@@ -281,7 +281,7 @@ class MarketMatchingEngine:
             self._modify_player_resource(state, order.item_type, order.quantity_remaining)
         
         # Update order status
-        order.status = OrderStatus.CANCELLED
+        order.status = OrderStatus.cancelled
         order.filled_at = datetime.utcnow()
         
         self.db.commit()

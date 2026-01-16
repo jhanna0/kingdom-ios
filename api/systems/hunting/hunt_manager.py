@@ -644,20 +644,6 @@ class HuntManager:
             animal_tier = session.animal_data.get("tier", 0) if session.animal_data else 0
             state.drop_table_slots = BLESSING_DROP_TABLE.copy()
             
-            # Remove impossible drops FIRST (before adjustments)
-            # BUT keep "rare" if animal has rare_items (e.g. rabbit's foot)
-            animal_rare_items = session.animal_data.get("rare_items", []) if session.animal_data else []
-            for loot_tier_name, loot_tier_config in LOOT_TIERS.items():
-                min_tier = loot_tier_config.get("min_animal_tier", 0)
-                # Keep rare tier if animal has its own rare_items
-                if loot_tier_name == "rare" and animal_rare_items:
-                    continue
-                if animal_tier < min_tier and loot_tier_name in state.drop_table_slots:
-                    # Move slots to "common" and DELETE the tier entirely
-                    impossible_slots = state.drop_table_slots[loot_tier_name]
-                    state.drop_table_slots["common"] = state.drop_table_slots.get("common", 0) + impossible_slots
-                    del state.drop_table_slots[loot_tier_name]
-            
             # Apply tier adjustments (higher tier = less "nothing", more rare)
             tier_adjustments = BLESSING_TIER_ADJUSTMENTS.get(animal_tier, {})
             for slot_key, adjustment in tier_adjustments.items():
@@ -1438,15 +1424,10 @@ class HuntManager:
         else:
             session.bonus_meat = 0
         
-        # Drop items if animal meets minimum tier requirement - FROM CONFIG
-        min_animal_tier = tier_config.get("min_animal_tier", 0)
-        if animal_tier >= min_animal_tier:
-            items = tier_config.get("items", [])
-            session.items_dropped.extend(items)
-        else:
-            session.bonus_meat = 0
-        
-        # Animal-specific rare items (e.g. rabbit's foot from rabbit)
+        # Drop items from animal's rare_items config - ONLY on rare rolls
+        # Rabbit: lucky_rabbits_foot
+        # Deer/Boar: fur
+        # Bear/Moose: sinew
         if loot_tier == "rare":
             session.items_dropped.extend(animal.get("rare_items", []))
         

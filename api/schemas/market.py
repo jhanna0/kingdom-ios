@@ -24,16 +24,16 @@ def serialize_datetime_with_z(dt: Optional[datetime]) -> Optional[str]:
 
 class OrderType(str, Enum):
     """Order type"""
-    BUY = "buy"
-    SELL = "sell"
+    buy = "buy"
+    sell = "sell"
 
 
 class OrderStatus(str, Enum):
     """Order status"""
-    ACTIVE = "active"
-    FILLED = "filled"
-    PARTIALLY_FILLED = "partially_filled"
-    CANCELLED = "cancelled"
+    active = "active"
+    filled = "filled"
+    partially_filled = "partially_filled"
+    cancelled = "cancelled"
 
 
 # ItemType is now a simple string validated against RESOURCES config

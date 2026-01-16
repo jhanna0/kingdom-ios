@@ -130,13 +130,13 @@ def create_order(
         )
     
     # Check buy order limit (20 per item type)
-    if request.order_type == OrderType.BUY:
+    if request.order_type == OrderType.buy:
         active_buy_orders_count = db.query(func.count(MarketOrder.id)).filter(
             and_(
                 MarketOrder.player_id == current_user.id,
                 MarketOrder.item_type == request.item_type,
-                MarketOrder.order_type == OrderType.BUY,
-                MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
+                MarketOrder.order_type == OrderType.buy,
+                MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled])
             )
         ).scalar() or 0
         
@@ -233,7 +233,7 @@ def cancel_order(
     refunded_items = None
     refunded_gold = None
     
-    if order.order_type == OrderType.SELL:
+    if order.order_type == OrderType.sell:
         refunded_items = order.quantity_remaining
     else:
         refunded_gold = order.price_per_unit * order.quantity_remaining
@@ -276,8 +276,8 @@ def get_order_book(
         and_(
             MarketOrder.kingdom_id == kingdom_id,
             MarketOrder.item_type == item_type,
-            MarketOrder.order_type == OrderType.BUY,
-            MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
+            MarketOrder.order_type == OrderType.buy,
+            MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled])
         )
     ).group_by(MarketOrder.price_per_unit).order_by(desc(MarketOrder.price_per_unit)).all()
     
@@ -290,8 +290,8 @@ def get_order_book(
         and_(
             MarketOrder.kingdom_id == kingdom_id,
             MarketOrder.item_type == item_type,
-            MarketOrder.order_type == OrderType.SELL,
-            MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
+            MarketOrder.order_type == OrderType.sell,
+            MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled])
         )
     ).group_by(MarketOrder.price_per_unit).order_by(MarketOrder.price_per_unit.asc()).all()
     
@@ -417,7 +417,7 @@ def get_my_orders(
     active_orders = db.query(MarketOrder).filter(
         and_(
             MarketOrder.player_id == current_user.id,
-            MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
+            MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled])
         )
     ).order_by(MarketOrder.created_at.desc()).all()
     
@@ -426,7 +426,7 @@ def get_my_orders(
     filled_orders = db.query(MarketOrder).filter(
         and_(
             MarketOrder.player_id == current_user.id,
-            MarketOrder.status.in_([OrderStatus.FILLED, OrderStatus.CANCELLED]),
+            MarketOrder.status.in_([OrderStatus.filled, OrderStatus.cancelled]),
             MarketOrder.filled_at >= cutoff_time
         )
     ).order_by(MarketOrder.filled_at.desc()).limit(50).all()
@@ -503,7 +503,7 @@ def get_market_info(
     total_active_orders = db.query(func.count(MarketOrder.id)).filter(
         and_(
             MarketOrder.kingdom_id == kingdom.id,
-            MarketOrder.status.in_([OrderStatus.ACTIVE, OrderStatus.PARTIALLY_FILLED])
+            MarketOrder.status.in_([OrderStatus.active, OrderStatus.partially_filled])
         )
     ).scalar()
     

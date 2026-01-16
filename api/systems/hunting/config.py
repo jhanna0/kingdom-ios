@@ -77,6 +77,7 @@ ANIMALS = {
         "danger": 1,
         "meat": 4,                # Level 2: drops 2-4 meat
         "description": "Graceful and alert. A worthy hunt.",
+        "rare_items": ["fur"],    # Deer drops fur
     },
     "boar": {
         "name": "Wild Boar",
@@ -87,6 +88,7 @@ ANIMALS = {
         "danger": 3,
         "meat": 6,                # Level 3: drops 3-6 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
+        "rare_items": ["fur"],    # Boar drops fur
     },
     "bear": {
         "name": "Bear",
@@ -97,6 +99,7 @@ ANIMALS = {
         "danger": 5,
         "meat": 8,                # Level 4: drops 4-8 meat
         "description": "The king of the forest. Approach with caution.",
+        "rare_items": ["sinew"],  # Bear drops sinew
     },
     "moose": {
         "name": "Moose",
@@ -107,6 +110,7 @@ ANIMALS = {
         "danger": 4,
         "meat": 10,               # Level 5: drops 5-10 meat
         "description": "Massive and unpredictable. Legendary game.",
+        "rare_items": ["sinew"],  # Moose drops sinew
     },
 }
 
@@ -221,13 +225,15 @@ BLESSING_SHIFT_PER_SUCCESS = {
 
 # Animal tier modifies the base drop table before blessing starts
 # Higher tier = less "nothing" slots, more guaranteed loot
-# Fur only drops from tier 1+ (deer and up - small game has no good pelts)
+# Rare item drops:
+#   - Deer/Boar (tier 1-2): fur
+#   - Bear/Moose (tier 3-4): sinew
 BLESSING_TIER_ADJUSTMENTS = {
-    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel: 30% nothing, no fur
-    1: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: 20% nothing
-    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": +6},     # Boar: 13% nothing
-    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +13},  # Bear: 7% nothing
-    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +18}, # Moose: 2% nothing (almost guaranteed!)
+    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel/Rabbit: no fur/sinew possible
+    1: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: fur possible
+    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": +6},     # Boar: fur possible
+    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +13},  # Bear: sinew possible
+    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +18}, # Moose: sinew possible
 }
 
 # Legacy - kept for backwards compatibility but not used
@@ -266,28 +272,12 @@ ANIMAL_WEIGHTS_BY_TIER = {
 # Gold drops equal to meat earned (gold is taxed by kingdom).
 
 # What drops for each loot tier (applied after blessing resolution)
-# min_animal_tier: minimum animal tier required for items to actually drop
+# Items come from animal's rare_items config (only on "rare" rolls)
 LOOT_TIERS = {
-    "nothing": {
-        "meat_multiplier": 0,  # No meat!
-        "items": [],
-        "min_animal_tier": 0,
-    },
-    "common": {
-        "meat_multiplier": 1,  # Full meat
-        "items": [],
-        "min_animal_tier": 0,
-    },
-    "uncommon": {
-        "meat_multiplier": 1,  # Full meat
-        "items": ["fur"],      # Fur drops!
-        "min_animal_tier": 1,  # Deer and up (small game has no good pelts)
-    },
-    "rare": {
-        "meat_multiplier": 1,  # Full meat
-        "items": ["sinew"],    # Sinew drops!
-        "min_animal_tier": 2,  # Boar and up
-    },
+    "nothing": {"meat_multiplier": 0},   # No meat
+    "common": {"meat_multiplier": 1},    # Meat only
+    "uncommon": {"meat_multiplier": 1},  # Meat + 15% bonus
+    "rare": {"meat_multiplier": 1},      # Meat + 25% bonus + animal's rare_items
 }
 
 # Legacy - kept for backwards compatibility
