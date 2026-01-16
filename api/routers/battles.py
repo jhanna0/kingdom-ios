@@ -1041,11 +1041,15 @@ def _build_battle_response(
     # Check if user can join
     can_join_battle = False
     if battle.can_join and current_user.id not in attacker_ids and current_user.id not in defender_ids:
-        if battle.is_coup:
+        # Must be at the kingdom to join any battle
+        if not _is_at_kingdom(db, current_user.id, battle.kingdom_id):
+            can_join_battle = False
+        elif battle.is_coup:
+            # Coups also require reputation
             rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
             can_join_battle = rep >= COUP_JOIN_REPUTATION_REQUIREMENT
         else:
-            can_join_battle = _is_at_kingdom(db, current_user.id, battle.kingdom_id)
+            can_join_battle = True
     
     initiator_stats = _get_initiator_stats(db, battle.initiator_id, battle.kingdom_id)
     
@@ -1215,8 +1219,11 @@ def initiate_coup(
     db.commit()
     db.refresh(battle)
     
-    # Add initiator as participant
+    # Add initiator as attacker
     battle.add_attacker(current_user.id)
+    # Auto-add ruler as defender
+    if kingdom.ruler_id:
+        battle.add_defender(kingdom.ruler_id)
     db.commit()
     
     return BattleInitiateResponse(
@@ -1344,18 +1351,20 @@ def join_battle(
         raise HTTPException(status_code=400, detail="Side must be 'attackers' or 'defenders'")
     
     # Check join requirements based on battle type
+    # Must be at the kingdom to join any battle
+    if not _is_at_kingdom(db, current_user.id, battle.kingdom_id):
+        raise HTTPException(
+            status_code=400,
+            detail="You must be at this kingdom to join"
+        )
+    
+    # Coups also require reputation
     if battle.is_coup:
         rep = _get_kingdom_reputation(db, current_user.id, battle.kingdom_id)
         if rep < COUP_JOIN_REPUTATION_REQUIREMENT:
             raise HTTPException(
                 status_code=400,
                 detail=f"Need {COUP_JOIN_REPUTATION_REQUIREMENT} reputation in this kingdom to join (you have {rep})"
-            )
-    else:  # Invasion
-        if not _is_at_kingdom(db, current_user.id, battle.kingdom_id):
-            raise HTTPException(
-                status_code=400,
-                detail="You must be at this kingdom to join"
             )
     
     if request.side == 'attackers':
@@ -1519,6 +1528,9 @@ def check_battle_eligibility(
         if current_user.id in attacker_ids or current_user.id in defender_ids:
             can_join = False
             join_reason = "Already joined"
+        elif not _is_at_kingdom(db, current_user.id, kingdom_id):
+            can_join = False
+            join_reason = "Must be at this kingdom"
         elif active_battle.is_coup:
             rep = _get_kingdom_reputation(db, current_user.id, kingdom_id)
             if rep >= COUP_JOIN_REPUTATION_REQUIREMENT:
@@ -1526,10 +1538,7 @@ def check_battle_eligibility(
             else:
                 join_reason = f"Need {COUP_JOIN_REPUTATION_REQUIREMENT} reputation"
         else:
-            if _is_at_kingdom(db, current_user.id, kingdom_id):
-                can_join = True
-            else:
-                join_reason = "Must be at this kingdom"
+            can_join = True
     
     return BattleEligibilityResponse(
         can_initiate_coup=can_coup,
