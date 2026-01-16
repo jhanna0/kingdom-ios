@@ -585,6 +585,11 @@ private struct EventHandlers: ViewModifier {
                 syncRuledKingdomsToPlayer()
                 await loadNotificationBadge()
                 viewModel.loadInitialCooldown()
+                
+                // Connect to game events WebSocket for real-time updates (duels, etc.)
+                if let token = APIClient.shared.authToken {
+                    GameEventManager.shared.connect(authToken: token)
+                }
             }
             .onChange(of: appInit.ruledKingdoms) { _, _ in
                 syncRuledKingdomsToPlayer()

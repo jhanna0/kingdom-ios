@@ -1,6 +1,11 @@
 import Foundation
 
 /// API service for PvP Arena duels
+/// 
+/// Simplified flow (like trades):
+/// 1. Challenge a friend directly (createDuel with opponentId)
+/// 2. Friend accepts/declines
+/// 3. Both players start fighting
 class DuelsAPI {
     private let client = APIClient.shared
     
@@ -8,44 +13,24 @@ class DuelsAPI {
     
     private struct CreateDuelRequest: Codable {
         let kingdom_id: String
+        let opponent_id: Int
         let wager_gold: Int
     }
     
-    private struct InviteFriendRequest: Codable {
-        let friend_user_id: Int
-    }
+    // MARK: - Challenge Creation
     
-    // MARK: - Match Creation
-    
-    /// Create a new duel match
-    func createDuel(kingdomId: String, wagerGold: Int = 0) async throws -> DuelResponse {
+    /// Challenge a friend to a duel
+    func createDuel(kingdomId: String, opponentId: Int, wagerGold: Int = 0) async throws -> DuelResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
-        let body = CreateDuelRequest(kingdom_id: kingdomId, wager_gold: wagerGold)
+        let body = CreateDuelRequest(kingdom_id: kingdomId, opponent_id: opponentId, wager_gold: wagerGold)
         let request = try client.request(endpoint: "/duels/create", method: "POST", body: body)
         return try await client.execute(request)
     }
     
-    /// Invite a friend to the duel
-    func inviteFriend(matchId: Int, friendUserId: Int) async throws -> DuelResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let body = InviteFriendRequest(friend_user_id: friendUserId)
-        let request = try client.request(endpoint: "/duels/\(matchId)/invite", method: "POST", body: body)
-        return try await client.execute(request)
-    }
+    // MARK: - Accepting/Declining Challenges
     
-    // MARK: - Joining
-    
-    /// Join a duel by match code
-    func joinByCode(_ code: String) async throws -> DuelResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let request = client.request(endpoint: "/duels/join/\(code.uppercased())", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    /// Accept a duel invitation
+    /// Accept a duel challenge
     func acceptInvitation(invitationId: Int) async throws -> DuelResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
@@ -53,7 +38,7 @@ class DuelsAPI {
         return try await client.execute(request)
     }
     
-    /// Decline a duel invitation
+    /// Decline a duel challenge
     func declineInvitation(invitationId: Int) async throws -> GenericResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
@@ -61,7 +46,7 @@ class DuelsAPI {
         return try await client.execute(request)
     }
     
-    /// Get pending duel invitations
+    /// Get pending duel challenges
     func getInvitations() async throws -> DuelInvitationsResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
@@ -69,25 +54,17 @@ class DuelsAPI {
         return try await client.execute(request)
     }
     
+    /// Get count of pending challenges (for badge display)
+    func getPendingCount() async throws -> DuelPendingCountResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let request = client.request(endpoint: "/duels/pending-count")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Match Flow
     
-    /// Confirm the opponent (challenger only) - after opponent joins
-    func confirmOpponent(matchId: Int) async throws -> DuelResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let request = client.request(endpoint: "/duels/\(matchId)/confirm", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    /// Decline the opponent (challenger only) - cancels match, no gold taken
-    func declineOpponent(matchId: Int) async throws -> DuelResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let request = client.request(endpoint: "/duels/\(matchId)/decline", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    /// Start the duel (after both players confirmed)
+    /// Start the duel (after opponent accepts)
     func startMatch(matchId: Int) async throws -> DuelResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
@@ -126,14 +103,6 @@ class DuelsAPI {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
         let request = client.request(endpoint: "/duels/\(matchId)")
-        return try await client.execute(request)
-    }
-    
-    /// Get match by code
-    func getMatchByCode(_ code: String) async throws -> DuelResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let request = client.request(endpoint: "/duels/code/\(code.uppercased())")
         return try await client.execute(request)
     }
     

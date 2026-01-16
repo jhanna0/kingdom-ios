@@ -231,9 +231,9 @@ BLESSING_SHIFT_PER_SUCCESS = {
 BLESSING_TIER_ADJUSTMENTS = {
     0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel/Rabbit: no fur/sinew possible
     1: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: fur possible
-    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": +6},     # Boar: fur possible
-    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +13},  # Bear: sinew possible
-    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +18}, # Moose: sinew possible
+    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": 3},     # Boar: fur possible
+    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +5},  # Bear: sinew possible
+    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +8}, # Moose: sinew possible
 }
 
 # Legacy - kept for backwards compatibility but not used

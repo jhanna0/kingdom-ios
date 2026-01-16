@@ -99,9 +99,16 @@ struct ArenaView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(match.statusText)
-                            .font(FontStyles.headingSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        // Show appropriate status text
+                        if match.isWaiting, match.challenger.id == playerId, let opponent = match.opponent {
+                            Text("Challenge Sent")
+                                .font(FontStyles.headingSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        } else {
+                            Text(match.statusText)
+                                .font(FontStyles.headingSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                         
                         if match.isFighting {
                             Circle()
@@ -111,13 +118,15 @@ struct ArenaView: View {
                     }
                     
                     if let opponent = match.opponent {
-                        Text("vs \(opponent.name ?? "???")")
-                            .font(FontStyles.bodySmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    } else {
-                        Text("Waiting for opponent...")
-                            .font(FontStyles.bodySmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        if match.isWaiting && match.challenger.id == playerId {
+                            Text("Waiting for \(opponent.name ?? "opponent") to accept")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else {
+                            Text("vs \(opponent.name ?? "???")")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
                     }
                 }
                 
@@ -151,7 +160,7 @@ struct ArenaView: View {
     
     private var invitationsSection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-            Text("Duel Invitations")
+            Text("Duel Challenges")
                 .font(FontStyles.headingSmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
@@ -165,13 +174,13 @@ struct ArenaView: View {
     
     private var actionsSection: some View {
         VStack(spacing: KingdomTheme.Spacing.small) {
-            // Create New Duel
+            // Challenge a Friend
             NavigationLink {
-                CreateDuelView(kingdomId: kingdomId, playerId: playerId, viewModel: viewModel)
+                ChallengeFriendView(kingdomId: kingdomId, playerId: playerId, viewModel: viewModel)
             } label: {
                 HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Create Duel")
+                    Image(systemName: "figure.fencing")
+                    Text("Challenge a Friend")
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
@@ -182,27 +191,6 @@ struct ArenaView: View {
                 .background(KingdomTheme.Colors.buttonSuccess)
                 .cornerRadius(10)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black, lineWidth: 2))
-            }
-            .disabled(viewModel.activeMatch != nil)
-            .opacity(viewModel.activeMatch != nil ? 0.5 : 1)
-            
-            // Join by Code
-            NavigationLink {
-                JoinByCodeView(viewModel: viewModel, playerId: playerId)
-            } label: {
-                HStack {
-                    Image(systemName: "ticket.fill")
-                    Text("Join by Code")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                }
-                .font(FontStyles.bodySmall)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(KingdomTheme.Colors.parchmentLight)
-                .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black, lineWidth: 1.5))
             }
             .disabled(viewModel.activeMatch != nil)
             .opacity(viewModel.activeMatch != nil ? 0.5 : 1)
@@ -345,6 +333,26 @@ struct InvitationCard: View {
                 Text("challenges you to a duel!")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                // Show challenger stats if available
+                if let stats = invitation.challengerStats {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "burst.fill")
+                                .font(.system(size: 9))
+                            Text("\(stats.attack)")
+                        }
+                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        
+                        HStack(spacing: 2) {
+                            Image(systemName: "shield.fill")
+                                .font(.system(size: 9))
+                            Text("\(stats.defense)")
+                        }
+                        .foregroundColor(KingdomTheme.Colors.royalBlue)
+                    }
+                    .font(FontStyles.labelTiny)
+                }
                 
                 if invitation.wagerGold > 0 {
                     HStack(spacing: 4) {
@@ -514,16 +522,22 @@ struct RecentMatchRow: View {
     }
 }
 
-// MARK: - Create Duel View
+// MARK: - Challenge Friend View
 
-struct CreateDuelView: View {
+struct ChallengeFriendView: View {
     let kingdomId: String
     let playerId: Int
     @ObservedObject var viewModel: ArenaViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @State private var friends: [Friend] = []
+    @State private var selectedFriend: Friend?
     @State private var wagerGold = 0
-    @State private var isCreating = false
+    @State private var isLoading = true
+    @State private var isSending = false
+    @State private var errorMessage: String?
+    
+    private let friendsService = FriendsService()
     
     var body: some View {
         ScrollView {
@@ -536,13 +550,66 @@ struct CreateDuelView: View {
                     .frame(width: 80, height: 80)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 16, shadowOffset: 4, borderWidth: 3)
                 
-                Text("Create a Duel")
+                Text("Challenge a Friend")
                     .font(FontStyles.displayMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                Text("Challenge your friends to battle!")
+                Text("Pick a friend to challenge to a duel")
                     .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                // Friend picker
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    Text("Select Opponent")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding()
+                            Spacer()
+                        }
+                    } else if friends.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "person.2.slash")
+                                .font(.system(size: 32))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                            Text("No friends available to challenge")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("Add some friends first!")
+                                .font(FontStyles.labelTiny)
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, KingdomTheme.Spacing.large)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(friends, id: \.id) { friend in
+                                FriendRow(
+                                    friend: friend,
+                                    isSelected: selectedFriend?.id == friend.id,
+                                    onSelect: { selectedFriend = friend }
+                                )
+                                
+                                if friend.id != friends.last?.id {
+                                    Divider()
+                                        .background(KingdomTheme.Colors.border)
+                                }
+                            }
+                        }
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10)
+                    }
+                }
+                .padding()
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+                
+                // Selected friend preview
+                if let friend = selectedFriend {
+                    selectedFriendCard(friend: friend)
+                }
                 
                 // Wager (optional)
                 VStack(alignment: .leading, spacing: 8) {
@@ -568,267 +635,155 @@ struct CreateDuelView: View {
                 .padding()
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                 
-                Spacer().frame(height: 40)
-                
-                Button {
-                    Task {
-                        isCreating = true
-                        if let _ = await viewModel.createDuel(kingdomId: kingdomId, wagerGold: wagerGold) {
-                            dismiss()
-                        }
-                        isCreating = false
+                // Error message
+                if let error = errorMessage {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        Text(error)
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
                     }
+                }
+                
+                Spacer().frame(height: 20)
+                
+                // Send challenge button
+                Button {
+                    Task { await sendChallenge() }
                 } label: {
                     HStack {
-                        if isCreating {
+                        if isSending {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Create Duel")
+                            Image(systemName: "paperplane.fill")
+                            Text("Send Challenge")
                                 .font(FontStyles.bodySmallBold)
                         }
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                .disabled(isCreating)
+                .buttonStyle(.brutalist(
+                    backgroundColor: selectedFriend != nil ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                    fullWidth: true
+                ))
+                .disabled(selectedFriend == nil || isSending)
             }
             .padding()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-        .navigationTitle("New Duel")
+        .navigationTitle("Challenge Friend")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
-    }
-}
-
-// MARK: - Join By Code View
-
-struct JoinByCodeView: View {
-    @ObservedObject var viewModel: ArenaViewModel
-    let playerId: Int
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var code = ""
-    @State private var isLookingUp = false
-    @State private var isJoining = false
-    @State private var errorMessage: String?
-    @State private var foundMatch: DuelMatch?
-    
-    private let api = DuelsAPI()
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                Spacer().frame(height: 20)
-                
-                Image(systemName: "ticket.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(.white)
-                    .frame(width: 80, height: 80)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalBlue, cornerRadius: 16, shadowOffset: 4, borderWidth: 3)
-                
-                Text("Join by Code")
-                    .font(FontStyles.displayMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("Enter the 6-character match code")
-                    .font(FontStyles.bodySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                // Code input card
-                VStack(spacing: 12) {
-                    TextField("ABC123", text: $code)
-                        .textInputAutocapitalization(.characters)
-                        .font(FontStyles.displayMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .multilineTextAlignment(.center)
-                        .padding(16)
-                        .background(KingdomTheme.Colors.parchmentLight)
-                        .cornerRadius(10)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(KingdomTheme.Colors.border, lineWidth: 2))
-                        .onChange(of: code) { _ in
-                            // Clear found match when code changes
-                            foundMatch = nil
-                            errorMessage = nil
-                        }
-                    
-                    if let error = errorMessage {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                            Text(error)
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                        }
-                    }
-                }
-                .padding()
-                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
-                
-                // Found match details
-                if let match = foundMatch {
-                    matchDetailsCard(match: match)
-                }
-                
-                Spacer().frame(height: 20)
-                
-                // Action button
-                if foundMatch == nil {
-                    // Lookup button
-                    Button {
-                        Task { await lookupMatch() }
-                    } label: {
-                        HStack {
-                            if isLookingUp {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "magnifyingglass")
-                                Text("Find Match")
-                                    .font(FontStyles.bodySmallBold)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(backgroundColor: code.count >= 6 ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled, fullWidth: true))
-                    .disabled(code.count < 6 || isLookingUp)
-                } else {
-                    // Join button
-                    Button {
-                        Task { await joinMatch() }
-                    } label: {
-                        HStack {
-                            if isJoining {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "figure.fencing")
-                                Text("Accept & Join Duel")
-                                    .font(FontStyles.bodySmallBold)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                    .disabled(isJoining)
-                }
-            }
-            .padding()
+        .task {
+            await loadFriends()
         }
-        .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-        .navigationTitle("Join Duel")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.light, for: .navigationBar)
     }
     
-    // Match details card showing challenger and wager
-    private func matchDetailsCard(match: DuelMatch) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
+    private func selectedFriendCard(friend: Friend) -> some View {
+        VStack(spacing: KingdomTheme.Spacing.small) {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                Text("MATCH FOUND")
+                Text("CHALLENGING")
                     .font(FontStyles.labelTiny)
                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                     .tracking(1)
             }
             
-            // Challenger info
-            VStack(spacing: 4) {
-                Text("Challenger")
-                    .font(FontStyles.labelTiny)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                Text(match.challenger.name ?? "Unknown")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if let stats = match.challenger.stats {
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "burst.fill")
-                                .font(.system(size: 10))
-                            Text("\(stats.attack)")
-                        }
-                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "shield.fill")
-                                .font(.system(size: 10))
-                            Text("\(stats.defense)")
-                        }
-                        .foregroundColor(KingdomTheme.Colors.royalBlue)
-                    }
-                    .font(FontStyles.labelSmall)
-                }
-            }
+            Text(friend.friendDisplayName)
+                .font(FontStyles.headingMedium)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            // Wager
-            if match.wagerGold > 0 {
-                Divider()
-                
-                VStack(spacing: 4) {
-                    Text("GOLD WAGER")
-                        .font(FontStyles.labelTiny)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        .tracking(1)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "bitcoinsign.circle.fill")
-                            .foregroundColor(KingdomTheme.Colors.imperialGold)
-                        Text("\(match.wagerGold)")
-                            .font(FontStyles.headingLarge)
-                            .foregroundColor(KingdomTheme.Colors.imperialGold)
-                    }
-                    
-                    Text("You must match this wager to join")
-                        .font(FontStyles.labelTiny)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
+            if let level = friend.level {
+                Text("Level \(level)")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
-        .padding(KingdomTheme.Spacing.large)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
+        .frame(maxWidth: .infinity)
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
     
-    private func lookupMatch() async {
-        isLookingUp = true
-        errorMessage = nil
+    private func loadFriends() async {
+        isLoading = true
         
         do {
-            let response = try await api.getMatchByCode(code)
-            if let match = response.match {
-                if match.canJoin {
-                    foundMatch = match
-                } else {
-                    errorMessage = "This match is no longer available"
-                }
-            } else {
-                errorMessage = "Match not found. Check the code."
-            }
+            let response = try await friendsService.listFriends()
+            // Only show accepted friends
+            friends = response.friends.filter { $0.isAccepted }
         } catch {
-            errorMessage = "Could not find match. Check the code."
+            errorMessage = "Could not load friends"
         }
         
-        isLookingUp = false
+        isLoading = false
     }
     
-    private func joinMatch() async {
-        isJoining = true
+    private func sendChallenge() async {
+        guard let friend = selectedFriend else { return }
+        
+        isSending = true
         errorMessage = nil
         
-        if let _ = await viewModel.joinByCode(code, playerId: playerId) {
+        if let _ = await viewModel.createDuel(kingdomId: kingdomId, opponentId: friend.friendUserId, wagerGold: wagerGold) {
             dismiss()
         } else {
-            errorMessage = viewModel.errorMessage ?? "Could not join. You may not have enough gold."
+            errorMessage = viewModel.errorMessage ?? "Could not send challenge"
         }
         
-        isJoining = false
+        isSending = false
+    }
+}
+
+// MARK: - Friend Row
+
+struct FriendRow: View {
+    let friend: Friend
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: KingdomTheme.Spacing.small) {
+                // Online indicator
+                Circle()
+                    .fill(friend.isOnline == true ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight)
+                    .frame(width: 8, height: 8)
+                
+                // Name
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(friend.friendDisplayName)
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    if let level = friend.level {
+                        Text("Level \(level)")
+                            .font(FontStyles.labelTiny)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+                
+                Spacer()
+                
+                // Selection indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        .font(FontStyles.iconMedium)
+                } else {
+                    Circle()
+                        .stroke(KingdomTheme.Colors.border, lineWidth: 2)
+                        .frame(width: 20, height: 20)
+                }
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.medium)
+            .padding(.vertical, KingdomTheme.Spacing.small)
+            .background(isSelected ? KingdomTheme.Colors.buttonSuccess.opacity(0.1) : Color.clear)
+        }
+        .buttonStyle(.plain)
     }
 }

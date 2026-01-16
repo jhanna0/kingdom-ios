@@ -3,9 +3,14 @@ DUEL MANAGER
 ============
 Orchestrates 1v1 PvP duels in the Town Hall arena.
 
+Simplified flow (like trades):
+1. Challenger picks a friend and creates challenge -> opponent gets notification
+2. Opponent accepts/declines
+3. Both players start fighting
+
 Handles:
-- Match creation and invitations
-- Opponent joining
+- Challenge creation (match + invitation atomically)
+- Opponent accepting/declining
 - Turn-based combat execution
 - Match resolution and rewards
 """
@@ -29,42 +34,54 @@ class DuelManager:
     """
     Manager for PvP duel matches.
     
-    Usage:
+    Simplified usage (like trades):
         manager = DuelManager()
-        match = manager.create_match(db, challenger_id, kingdom_id)
-        manager.invite_friend(db, match.id, friend_id)
-        manager.accept_invitation(db, match.id, opponent_id)
+        match, invitation = manager.create_challenge(db, challenger_id, opponent_id, kingdom_id)
+        # opponent receives notification, accepts:
+        match = manager.join_by_invitation(db, invitation.id, opponent_id)
+        # either player starts:
+        match = manager.start_match(db, match.id, player_id)
         result = manager.execute_attack(db, match.id, player_id)
     """
     
     def __init__(self):
         self.rng = random.Random()
     
-    # ===== Match Creation =====
+    # ===== Challenge Creation =====
     
-    def create_match(
+    def create_challenge(
         self,
         db: Session,
         challenger_id: int,
+        opponent_id: int,
         kingdom_id: str,
         wager_gold: int = 0
-    ) -> DuelMatch:
+    ) -> Tuple[DuelMatch, DuelInvitation]:
         """
-        Create a new duel match.
+        Create a duel challenge to a specific friend.
+        
+        Like trades: creates match + invitation atomically.
+        The opponent will receive a notification and can accept/decline.
         
         Args:
             db: Database session
-            challenger_id: ID of player creating the match
+            challenger_id: ID of player creating the challenge
+            opponent_id: ID of the friend being challenged
             kingdom_id: Town Hall location
             wager_gold: Optional gold wager (both players must match)
         
         Returns:
-            The created DuelMatch
+            Tuple of (DuelMatch, DuelInvitation)
         """
         # Get challenger info
-        user = db.query(User).filter(User.id == challenger_id).first()
-        if not user:
+        challenger = db.query(User).filter(User.id == challenger_id).first()
+        if not challenger:
             raise ValueError("Challenger not found")
+        
+        # Get opponent info
+        opponent = db.query(User).filter(User.id == opponent_id).first()
+        if not opponent:
+            raise ValueError("Opponent not found")
         
         # Validate wager
         wager_gold = min(max(0, wager_gold), DUEL_MAX_WAGER)
@@ -75,7 +92,7 @@ class DuelManager:
             if not state or state.gold < wager_gold:
                 raise ValueError(f"Insufficient gold for wager (need {wager_gold})")
         
-        # Generate unique match code
+        # Generate unique match code (kept for internal reference)
         max_attempts = 10
         for _ in range(max_attempts):
             code = generate_match_code()
@@ -85,26 +102,42 @@ class DuelManager:
         else:
             raise ValueError("Could not generate unique match code")
         
-        # Get challenger stats
+        # Get both players' stats
         challenger_stats = self._get_player_stats(db, challenger_id)
+        opponent_stats = self._get_player_stats(db, opponent_id)
         
-        # Create match
+        # Create match with opponent already set (waiting for their acceptance)
         match = DuelMatch(
             match_code=code,
             kingdom_id=kingdom_id,
             challenger_id=challenger_id,
-            challenger_name=user.display_name or f"Player {challenger_id}",
+            challenger_name=challenger.display_name or f"Player {challenger_id}",
             challenger_stats=challenger_stats,
+            opponent_id=opponent_id,
+            opponent_name=opponent.display_name or f"Player {opponent_id}",
+            opponent_stats=opponent_stats,
             wager_gold=wager_gold,
             status=DuelStatus.WAITING.value,
             expires_at=datetime.utcnow() + timedelta(minutes=DUEL_INVITATION_TIMEOUT_MINUTES),
         )
         
         db.add(match)
+        db.flush()  # Get match ID
+        
+        # Create invitation for the opponent
+        invitation = DuelInvitation(
+            match_id=match.id,
+            inviter_id=challenger_id,
+            invitee_id=opponent_id,
+            status="pending",
+        )
+        
+        db.add(invitation)
         db.commit()
         db.refresh(match)
+        db.refresh(invitation)
         
-        return match
+        return match, invitation
     
     def _get_player_stats(self, db: Session, user_id: int) -> Dict[str, int]:
         """Get player stats for duel combat including equipment bonuses"""
@@ -149,69 +182,8 @@ class DuelManager:
     
     # ===== Invitations =====
     
-    def invite_friend(
-        self,
-        db: Session,
-        match_id: int,
-        inviter_id: int,
-        friend_user_id: int
-    ) -> DuelInvitation:
-        """
-        Send a duel invitation to a friend.
-        
-        Args:
-            db: Database session
-            match_id: The duel match ID
-            inviter_id: ID of the challenger sending invite
-            friend_user_id: ID of the friend to invite
-        
-        Returns:
-            The created DuelInvitation
-        """
-        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
-        if not match:
-            raise ValueError("Match not found")
-        
-        if match.challenger_id != inviter_id:
-            raise ValueError("Only the challenger can send invitations")
-        
-        if not match.can_join:
-            raise ValueError("Match is not accepting opponents")
-        
-        # Verify they're actually friends
-        friendship = db.query(Friend).filter(
-            ((Friend.user_id == inviter_id) & (Friend.friend_user_id == friend_user_id)) |
-            ((Friend.user_id == friend_user_id) & (Friend.friend_user_id == inviter_id)),
-            Friend.status == "accepted"
-        ).first()
-        
-        if not friendship:
-            raise ValueError("You can only invite friends")
-        
-        # Check for existing invitation
-        existing = db.query(DuelInvitation).filter(
-            DuelInvitation.match_id == match_id,
-            DuelInvitation.invitee_id == friend_user_id
-        ).first()
-        
-        if existing:
-            raise ValueError("Already invited this friend")
-        
-        invitation = DuelInvitation(
-            match_id=match_id,
-            inviter_id=inviter_id,
-            invitee_id=friend_user_id,
-            status="pending",
-        )
-        
-        db.add(invitation)
-        db.commit()
-        db.refresh(invitation)
-        
-        return invitation
-    
     def get_pending_invitations(self, db: Session, user_id: int) -> List[Dict]:
-        """Get all pending duel invitations for a user"""
+        """Get all pending duel challenges for a user"""
         invitations = db.query(DuelInvitation).filter(
             DuelInvitation.invitee_id == user_id,
             DuelInvitation.status == "pending"
@@ -220,48 +192,22 @@ class DuelManager:
         result = []
         for inv in invitations:
             match = db.query(DuelMatch).filter(DuelMatch.id == inv.match_id).first()
-            if match and match.can_join:
+            if match and match.status == DuelStatus.WAITING.value:
                 inviter = db.query(User).filter(User.id == inv.inviter_id).first()
                 result.append({
                     "invitation_id": inv.id,
                     "match_id": match.id,
-                    "match_code": match.match_code,
                     "inviter_id": inv.inviter_id,
                     "inviter_name": inviter.display_name if inviter else "Unknown",
                     "wager_gold": match.wager_gold,
                     "kingdom_id": match.kingdom_id,
+                    "challenger_stats": match.challenger_stats,
                     "created_at": inv.created_at.isoformat() + "Z" if inv.created_at else None,
                 })
         
         return result
     
-    # ===== Joining =====
-    
-    def join_by_code(
-        self,
-        db: Session,
-        match_code: str,
-        opponent_id: int
-    ) -> DuelMatch:
-        """
-        Join a duel match using the match code.
-        
-        Args:
-            db: Database session
-            match_code: The 6-character match code
-            opponent_id: ID of the player joining
-        
-        Returns:
-            The updated DuelMatch
-        """
-        match = db.query(DuelMatch).filter(
-            DuelMatch.match_code == match_code.upper()
-        ).first()
-        
-        if not match:
-            raise ValueError("Match not found")
-        
-        return self._join_match(db, match, opponent_id)
+    # ===== Accepting/Declining Challenges =====
     
     def join_by_invitation(
         self,
@@ -270,7 +216,10 @@ class DuelManager:
         opponent_id: int
     ) -> DuelMatch:
         """
-        Accept an invitation and join the match.
+        Accept a duel challenge and join the match.
+        
+        With direct invites, accepting goes straight to READY status
+        (no need for challenger to confirm since they initiated).
         
         Args:
             db: Database session
@@ -278,82 +227,44 @@ class DuelManager:
             opponent_id: ID of the player accepting
         
         Returns:
-            The updated DuelMatch
+            The updated DuelMatch (now in READY state)
         """
         invitation = db.query(DuelInvitation).filter(
             DuelInvitation.id == invitation_id
         ).first()
         
         if not invitation:
-            raise ValueError("Invitation not found")
+            raise ValueError("Challenge not found")
         
         if invitation.invitee_id != opponent_id:
-            raise ValueError("This invitation is not for you")
+            raise ValueError("This challenge is not for you")
         
         if invitation.status != "pending":
-            raise ValueError(f"Invitation already {invitation.status}")
+            raise ValueError(f"Challenge already {invitation.status}")
         
         match = db.query(DuelMatch).filter(DuelMatch.id == invitation.match_id).first()
         if not match:
             raise ValueError("Match not found")
         
-        # Mark invitation as accepted
-        invitation.accept()
-        
-        return self._join_match(db, match, opponent_id)
-    
-    def _join_match(self, db: Session, match: DuelMatch, opponent_id: int) -> DuelMatch:
-        """Internal helper to join a match - sets to pending_acceptance for challenger to confirm"""
-        if not match.can_join:
-            raise ValueError("Match is not accepting opponents")
+        if match.status != DuelStatus.WAITING.value:
+            raise ValueError("Match is no longer available")
         
         if match.is_expired:
             match.expire()
+            invitation.status = "expired"
             db.commit()
-            raise ValueError("Match has expired")
+            raise ValueError("Challenge has expired")
         
-        if match.challenger_id == opponent_id:
-            raise ValueError("Cannot duel yourself")
-        
-        # Check wager affordability (don't deduct yet - wait for confirmation)
+        # Check wager affordability
         if match.wager_gold > 0:
             state = db.query(PlayerState).filter(PlayerState.user_id == opponent_id).first()
             if not state or state.gold < match.wager_gold:
                 raise ValueError(f"Insufficient gold for wager (need {match.wager_gold})")
         
-        # Get opponent info
-        user = db.query(User).filter(User.id == opponent_id).first()
-        if not user:
-            raise ValueError("Opponent not found")
+        # Mark invitation as accepted
+        invitation.accept()
         
-        # Set opponent - but status goes to pending_acceptance, not ready
-        # Challenger must confirm before match starts
-        match.opponent_id = opponent_id
-        match.opponent_name = user.display_name or f"Player {opponent_id}"
-        match.opponent_stats = self._get_player_stats(db, opponent_id)
-        match.status = DuelStatus.PENDING_ACCEPTANCE.value
-        
-        db.commit()
-        db.refresh(match)
-        
-        return match
-    
-    def confirm_opponent(self, db: Session, match_id: int, challenger_id: int) -> DuelMatch:
-        """
-        Challenger confirms they want to fight this opponent.
-        Match transitions to 'ready' state.
-        """
-        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
-        if not match:
-            raise ValueError("Match not found")
-        
-        if match.challenger_id != challenger_id:
-            raise ValueError("Only the challenger can confirm")
-        
-        if match.status != DuelStatus.PENDING_ACCEPTANCE.value:
-            raise ValueError(f"Match is {match.status}, not pending acceptance")
-        
-        # Move to ready state
+        # With direct invites, go straight to READY (challenger already chose this opponent)
         match.status = DuelStatus.READY.value
         
         db.commit()
@@ -361,44 +272,42 @@ class DuelManager:
         
         return match
     
-    def decline_opponent(self, db: Session, match_id: int, challenger_id: int) -> DuelMatch:
+    def decline_invitation(self, db: Session, invitation_id: int, user_id: int) -> Optional[DuelMatch]:
         """
-        Challenger declines this opponent.
-        Match is cancelled - no gold is deducted from anyone.
+        Decline a duel challenge - also cancels the associated match.
+        
+        Returns the cancelled match so the challenger can be notified.
         """
-        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
-        if not match:
-            raise ValueError("Match not found")
-        
-        if match.challenger_id != challenger_id:
-            raise ValueError("Only the challenger can decline")
-        
-        if match.status != DuelStatus.PENDING_ACCEPTANCE.value:
-            raise ValueError(f"Match is {match.status}, not pending acceptance")
-        
-        # Cancel/decline the match
-        match.status = DuelStatus.DECLINED.value
-        match.completed_at = datetime.utcnow()
-        
-        db.commit()
-        db.refresh(match)
-        
-        return match
-    
-    def decline_invitation(self, db: Session, invitation_id: int, user_id: int) -> None:
-        """Decline a duel invitation"""
         invitation = db.query(DuelInvitation).filter(
             DuelInvitation.id == invitation_id
         ).first()
         
         if not invitation:
-            raise ValueError("Invitation not found")
+            raise ValueError("Challenge not found")
         
         if invitation.invitee_id != user_id:
-            raise ValueError("This invitation is not for you")
+            raise ValueError("This challenge is not for you")
         
+        if invitation.status != "pending":
+            raise ValueError(f"Challenge already {invitation.status}")
+        
+        # Get the match to cancel it
+        match = db.query(DuelMatch).filter(DuelMatch.id == invitation.match_id).first()
+        
+        # Decline the invitation
         invitation.decline()
+        
+        # Cancel the associated match
+        if match and match.status == DuelStatus.WAITING.value:
+            match.status = DuelStatus.DECLINED.value
+            match.completed_at = datetime.utcnow()
+        
         db.commit()
+        
+        if match:
+            db.refresh(match)
+        
+        return match
     
     # ===== Match Start =====
     
@@ -569,10 +478,6 @@ class DuelManager:
     def get_match(self, db: Session, match_id: int) -> Optional[DuelMatch]:
         """Get a match by ID"""
         return db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
-    
-    def get_match_by_code(self, db: Session, code: str) -> Optional[DuelMatch]:
-        """Get a match by code"""
-        return db.query(DuelMatch).filter(DuelMatch.match_code == code.upper()).first()
     
     def get_active_match_for_player(self, db: Session, player_id: int) -> Optional[DuelMatch]:
         """Get a player's active match (if any)"""

@@ -231,37 +231,20 @@ struct DuelCombatView: View {
     private var statusLine: some View {
         VStack(spacing: 6) {
             if currentMatch.isWaiting {
-                HStack(spacing: 8) {
-                    Text("Match code:")
+                // With direct invites, waiting means the opponent hasn't accepted yet
+                if let opponent = currentMatch.opponent {
+                    Text("Waiting for \(opponent.name ?? "opponent") to accept your challenge…")
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    Text(currentMatch.matchCode)
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-
-                    Button {
-                        UIPasteboard.general.string = currentMatch.matchCode
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
-
-                    Spacer()
+                        .padding(.horizontal)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Waiting for opponent…")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .padding(.horizontal)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal)
-
-                Text("Waiting for an opponent to join…")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .padding(.horizontal)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if currentMatch.isPendingAcceptance {
-                Text(isChallenger ? "Opponent joined. Accept or decline below." : "Waiting for challenger to accept…")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .padding(.horizontal)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             } else if currentMatch.isReady {
                 Text("Both fighters are ready. Start the duel below.")
                     .font(FontStyles.labelSmall)
@@ -302,12 +285,19 @@ struct DuelCombatView: View {
 
             Group {
                 if currentMatch.isWaiting {
+                    // Waiting for opponent to accept the challenge
                     HStack {
                         ProgressView()
                             .tint(KingdomTheme.Colors.inkMedium)
-                        Text("Waiting for opponent…")
-                            .font(FontStyles.bodySmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        if let opponent = currentMatch.opponent {
+                            Text("Waiting for \(opponent.name ?? "opponent")…")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else {
+                            Text("Waiting for opponent…")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
                         Spacer()
                         Button("Cancel") {
                             Task {
@@ -318,8 +308,6 @@ struct DuelCombatView: View {
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.buttonDanger)
                     }
-                } else if currentMatch.isPendingAcceptance {
-                    pendingAcceptanceActions
                 } else if currentMatch.isReady {
                     Button {
                         Task { await viewModel.startMatch() }
@@ -350,55 +338,6 @@ struct DuelCombatView: View {
             }
             .padding(KingdomTheme.Spacing.medium)
             .background(KingdomTheme.Colors.parchmentDark)
-        }
-    }
-
-    @ViewBuilder
-    private var pendingAcceptanceActions: some View {
-        if isChallenger {
-            VStack(spacing: KingdomTheme.Spacing.small) {
-                Text("Opponent wants to duel.")
-                    .font(FontStyles.bodySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-
-                HStack(spacing: KingdomTheme.Spacing.medium) {
-                    Button {
-                        Task {
-                            await viewModel.declineOpponent()
-                            dismiss()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "xmark.circle.fill")
-                            Text("Decline")
-                                .font(FontStyles.bodySmallBold)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonDanger, fullWidth: true))
-
-                    Button {
-                        Task { await viewModel.confirmOpponent() }
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Accept")
-                                .font(FontStyles.bodySmallBold)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                }
-            }
-        } else {
-            HStack {
-                ProgressView()
-                    .tint(KingdomTheme.Colors.inkMedium)
-                Text("Waiting for challenger to accept…")
-                    .font(FontStyles.bodySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Spacer()
-            }
         }
     }
 
@@ -509,7 +448,7 @@ class DuelCombatViewModel: ObservableObject {
     private let api = DuelsAPI()
     private var matchId: Int?
     private var playerId: Int?
-    private var pollTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
     
     var isMyTurn: Bool {
         guard let match = match, let playerId = playerId else { return false }
@@ -521,61 +460,81 @@ class DuelCombatViewModel: ObservableObject {
         self.matchId = match.id
         self.playerId = playerId
         
+        // Get initial state from server
         await refresh()
-        startPolling()
+        
+        // Subscribe to WebSocket events for real-time updates
+        subscribeToEvents()
     }
     
-    private func startPolling() {
-        pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self, self.match?.isActive == true else {
-                    self?.stopPolling()
-                    return
-                }
-                await self.refresh()
+    /// Subscribe to duel events from WebSocket
+    private func subscribeToEvents() {
+        guard let matchId = matchId else { return }
+        
+        GameEventManager.shared.duelEventSubject
+            .receive(on: DispatchQueue.main)
+            .filter { [weak self] event in
+                // Only process events for this match
+                event.matchId == self?.matchId
             }
+            .sink { [weak self] event in
+                self?.handleDuelEvent(event)
+            }
+            .store(in: &cancellables)
+        
+        print("🎮 DuelCombatVM: Subscribed to events for match \(matchId)")
+    }
+    
+    /// Handle incoming WebSocket duel events
+    private func handleDuelEvent(_ event: DuelEvent) {
+        print("🎮 DuelCombatVM: Received \(event.eventType.rawValue)")
+        
+        switch event.eventType {
+        case .opponentJoined, .started, .turnChanged:
+            // Update match state from the event
+            if let newMatch = event.match {
+                match = newMatch
+            } else {
+                // Fallback: fetch fresh state
+                Task { await refresh() }
+            }
+            
+        case .attack:
+            // Opponent attacked - update match state
+            if let newMatch = event.match {
+                match = newMatch
+            }
+            // Note: We don't update lastAction for opponent's attacks
+            // since we only want to show our own roll results
+            
+        case .ended:
+            // Match complete
+            if let newMatch = event.match {
+                match = newMatch
+            }
+            
+        case .cancelled:
+            // Match was cancelled
+            if let newMatch = event.match {
+                match = newMatch
+            }
+            
+        case .invitation:
+            // Not relevant for combat view
+            break
         }
     }
     
-    private func stopPolling() {
-        pollTimer?.invalidate()
-        pollTimer = nil
-    }
-    
+    /// Fetch current match state from API (fallback/initial load)
     private func refresh() async {
         guard let matchId = matchId else { return }
         do {
             let response = try await api.getMatch(matchId: matchId)
             if let newMatch = response.match {
                 match = newMatch
-                if newMatch.isComplete { stopPolling() }
             }
         } catch {
             print("Failed to refresh: \(error)")
-        }
-    }
-    
-    func confirmOpponent() async {
-        guard let matchId = matchId else { return }
-        do {
-            let response = try await api.confirmOpponent(matchId: matchId)
-            if response.success { match = response.match }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-    
-    func declineOpponent() async {
-        guard let matchId = matchId else { return }
-        do {
-            let response = try await api.declineOpponent(matchId: matchId)
-            if response.success {
-                match = response.match
-                stopPolling()
-            }
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
     
@@ -606,7 +565,6 @@ class DuelCombatViewModel: ObservableObject {
                     ))
                 }
                 match = response.match
-                if match?.isComplete == true { stopPolling() }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -617,13 +575,12 @@ class DuelCombatViewModel: ObservableObject {
         guard let matchId = matchId else { return }
         do {
             _ = try await api.cancel(matchId: matchId)
-            stopPolling()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
     
     deinit {
-        pollTimer?.invalidate()
+        cancellables.removeAll()
     }
 }

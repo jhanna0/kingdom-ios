@@ -63,11 +63,26 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 """
 
     ),
+        TutorialSection(
+        id="getting_started",
+        title="Getting Started",
+        icon="hammer.fill",
+        order=2,
+        content="""
+Actions require **food** to perform.
+
+**To start playing:**
+- **Hunt** to get meat (and maybe some rare loot)
+- **Farm** to turn that meat into gold
+- **Patrol** to turn that meat into reputation and protect your city
+- **Train skills** using your gold
+"""
+    ),
     TutorialSection(
         id="becoming_ruler",
         title="Becoming a Ruler",
         icon="person.crop.circle.badge.checkmark",
-        order=2,
+        order=3,
         content="""
 **"I'm visiting a town with no ruler. Can I claim it?"**
 
@@ -89,7 +104,7 @@ No. Invasions need a defender. Unruled towns can only be claimed by locals.
         id="location",
         title="Location Matters",
         icon="location.fill",
-        order=3,
+        order=4,
         content="""
 Where you physically are determines what you can do.
 
@@ -104,7 +119,7 @@ Your actions matter where you actually are.
         id="gold",
         title="Gold & Treasury",
         icon="g.circle.fill",
-        order=4,
+        order=5,
         content="""
 Every coin in circulation was earned or traded.
 
@@ -121,7 +136,7 @@ Build a **Vault** or enemies can heist your treasury.
         id="skills",
         title="Skills & Training",
         icon="figure.strengthtraining.traditional",
-        order=5,
+        order=6,
         content="""
 Train skills to get stronger. Check your profile for available skills.
 
@@ -138,7 +153,7 @@ Skills unlock new content and give your character powerful perks.
         id="buildings",
         title="Buildings",
         icon="building.2.fill",
-        order=6,
+        order=7,
         content="""
 Kingdoms construct buildings for permanent bonuses. These are citizen wide.
 Citizen perform the actions to build. Number of actions required for a building scales to the population of a kingdom.
@@ -157,7 +172,7 @@ Contributing as often as possible to kingdom buildings is recommended for optimi
         id="coups",
         title="Coups",
         icon="flame.fill",
-        order=7,
+        order=8,
         content="""
 Don't like your ruler? Overthrow them.
 
@@ -176,7 +191,7 @@ The best coups are coordinated. Communicate often with your team.
         id="invasions",
         title="Invasions",
         icon="shield.lefthalf.filled",
-        order=8,
+        order=9,
         content="""
 Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
@@ -197,7 +212,7 @@ A kingdom can only be attacked once every 30 days.
         id="sabotage",
         title="Intelligence & Sabotage",
         icon="eye.fill",
-        order=9,
+        order=10,
         content="""
 Can't invade yet? Disrupt them anyway.
 
@@ -220,7 +235,7 @@ Coordinate with your allies. Good intel wins wars before they start.
         id="battles",
         title="Battle System",
         icon="burst.fill",
-        order=10,
+        order=11,
         content="""
 **The "300" problem**
 
@@ -246,7 +261,7 @@ Try the **Battle Simulator** to see it in action.
         id="notifications",
         title="Notifications",
         icon="bell.fill",
-        order=11,
+        order=12,
         content="""
 **Settings → Action Notifications → Allow**
 

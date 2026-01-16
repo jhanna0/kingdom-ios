@@ -3,17 +3,21 @@ DUEL API ROUTER
 ===============
 Endpoints for PvP Arena duels in the Town Hall.
 
+Simplified flow (like trades):
+1. Challenger picks a friend and creates duel -> friend gets notification
+2. Friend accepts/declines
+3. Both players start fighting
+
 Endpoints:
-- POST /duels/create - Create a new duel match
-- POST /duels/{match_id}/invite - Invite a friend
-- GET /duels/invitations - Get pending invitations
-- POST /duels/join/{code} - Join by match code
-- POST /duels/invitations/{invitation_id}/accept - Accept invitation
-- POST /duels/invitations/{invitation_id}/decline - Decline invitation
+- POST /duels/create - Challenge a friend to a duel
+- GET /duels/invitations - Get pending duel challenges
+- GET /duels/pending-count - Get count of pending challenges (for badge)
+- POST /duels/invitations/{invitation_id}/accept - Accept a challenge
+- POST /duels/invitations/{invitation_id}/decline - Decline a challenge
 - POST /duels/{match_id}/start - Start the match
 - POST /duels/{match_id}/attack - Execute an attack
 - POST /duels/{match_id}/forfeit - Forfeit the match
-- POST /duels/{match_id}/cancel - Cancel (only if waiting)
+- POST /duels/{match_id}/cancel - Cancel (only if pending)
 - GET /duels/{match_id} - Get match status
 - GET /duels/active - Get player's active match
 - GET /duels/stats - Get player's duel stats
@@ -27,10 +31,11 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 from db import get_db
-from db.models import User, PlayerState
+from db.models import User, PlayerState, Friend, DuelMatch, DuelInvitation, DuelStatus
 from routers.auth import get_current_user
 from systems.duel import DuelManager
 from websocket.broadcast import broadcast_duel_event, DuelEvents
+from sqlalchemy import or_, and_
 
 router = APIRouter(prefix="/duels", tags=["duels"])
 
@@ -47,16 +52,10 @@ def get_duel_manager() -> DuelManager:
 # ============================================================
 
 class CreateDuelRequest(BaseModel):
+    """Challenge a friend to a duel"""
     kingdom_id: str
+    opponent_id: int  # Required: friend to challenge
     wager_gold: int = 0
-
-
-class InviteFriendRequest(BaseModel):
-    friend_user_id: int
-
-
-class JoinByCodeRequest(BaseModel):
-    match_code: str
 
 
 class DuelResponse(BaseModel):
@@ -165,9 +164,35 @@ def get_recent_matches(
     return {"success": True, "matches": matches}
 
 
+@router.get("/pending-count")
+def get_pending_duel_count(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get count of pending duel invitations (for badge display)"""
+    count = db.query(DuelInvitation).filter(
+        DuelInvitation.invitee_id == user.id,
+        DuelInvitation.status == "pending"
+    ).count()
+    
+    return {"count": count}
+
+
 # ============================================================
 # MATCH CREATION AND INVITATIONS
 # ============================================================
+
+def are_friends(db: Session, user_id_1: int, user_id_2: int) -> bool:
+    """Check if two users are friends (accepted friendship)"""
+    friendship = db.query(Friend).filter(
+        or_(
+            and_(Friend.user_id == user_id_1, Friend.friend_user_id == user_id_2),
+            and_(Friend.user_id == user_id_2, Friend.friend_user_id == user_id_1)
+        ),
+        Friend.status == 'accepted'
+    ).first()
+    return friendship is not None
+
 
 @router.post("/create", response_model=DuelResponse)
 def create_duel(
@@ -177,10 +202,15 @@ def create_duel(
     manager: DuelManager = Depends(get_duel_manager),
 ):
     """
-    Create a new duel match in the Town Hall arena.
+    Challenge a friend to a duel.
     
-    Returns a match_code that can be shared with friends.
+    Like trades: picks a friend directly and sends them a challenge.
+    The friend will see the invitation and can accept/decline.
     """
+    # Can't challenge yourself
+    if request.opponent_id == user.id:
+        return DuelResponse(success=False, message="You cannot challenge yourself")
+    
     # Check if player already has an active match
     existing = manager.get_active_match_for_player(db, user.id)
     if existing:
@@ -190,84 +220,48 @@ def create_duel(
             match=existing.to_dict()
         )
     
+    # Check opponent exists
+    opponent = db.query(User).filter(User.id == request.opponent_id).first()
+    if not opponent:
+        return DuelResponse(success=False, message="Opponent not found")
+    
+    # Check they're friends
+    if not are_friends(db, user.id, request.opponent_id):
+        return DuelResponse(success=False, message="You can only challenge friends to duels")
+    
+    # Check opponent doesn't have an active match
+    opponent_match = manager.get_active_match_for_player(db, request.opponent_id)
+    if opponent_match:
+        return DuelResponse(
+            success=False,
+            message=f"{opponent.display_name} is already in a duel"
+        )
+    
     try:
-        match = manager.create_match(
+        # Create match with opponent already set (pending their acceptance)
+        match, invitation = manager.create_challenge(
             db=db,
             challenger_id=user.id,
+            opponent_id=request.opponent_id,
             kingdom_id=request.kingdom_id,
             wager_gold=request.wager_gold
         )
         
-        return DuelResponse(
-            success=True,
-            message=f"Duel created! Share code: {match.match_code}",
-            match=match.to_dict()
-        )
-    except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
-
-
-@router.post("/{match_id}/invite", response_model=DuelResponse)
-def invite_friend(
-    match_id: int,
-    request: InviteFriendRequest,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """Invite a friend to the duel"""
-    try:
-        invitation = manager.invite_friend(
-            db=db,
-            match_id=match_id,
-            inviter_id=user.id,
-            friend_user_id=request.friend_user_id
-        )
-        
-        match = manager.get_match(db, match_id)
-        
-        # Notify the invited friend via WebSocket
+        # Notify the opponent via WebSocket
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_INVITATION,
             match=match.to_dict() if match else None,
-            target_user_ids=[request.friend_user_id],
+            target_user_ids=[request.opponent_id],
             data={
                 "inviter_name": user.display_name,
                 "invitation_id": invitation.id,
+                "wager_gold": request.wager_gold,
             }
         )
         
         return DuelResponse(
             success=True,
-            message="Invitation sent!",
-            match=match.to_dict() if match else None
-        )
-    except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
-
-
-@router.post("/join/{code}", response_model=DuelResponse)
-def join_by_code(
-    code: str,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """Join a duel match using the match code"""
-    try:
-        match = manager.join_by_code(db, code, user.id)
-        
-        # Notify the challenger
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_OPPONENT_JOINED,
-            match=match.to_dict(),
-            target_user_ids=[match.challenger_id],
-            data={"opponent_name": user.display_name}
-        )
-        
-        return DuelResponse(
-            success=True,
-            message="Joined the duel!",
+            message=f"Challenge sent to {opponent.display_name}!",
             match=match.to_dict()
         )
     except ValueError as e:
@@ -309,10 +303,20 @@ def decline_invitation(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Decline a duel invitation"""
+    """Decline a duel challenge - cancels the associated match"""
     try:
-        manager.decline_invitation(db, invitation_id, user.id)
-        return {"success": True, "message": "Invitation declined"}
+        match = manager.decline_invitation(db, invitation_id, user.id)
+        
+        # Notify the challenger that their challenge was declined
+        if match:
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_CANCELLED,
+                match=match.to_dict() if match else None,
+                target_user_ids=[match.challenger_id],
+                data={"message": f"{user.display_name} declined your duel challenge."}
+            )
+        
+        return {"success": True, "message": "Challenge declined"}
     except ValueError as e:
         return {"success": False, "message": str(e)}
 
@@ -320,68 +324,6 @@ def decline_invitation(
 # ============================================================
 # MATCH FLOW
 # ============================================================
-
-@router.post("/{match_id}/confirm", response_model=DuelResponse)
-def confirm_opponent(
-    match_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """
-    Challenger confirms they want to fight the opponent.
-    Call this after opponent joins and match is 'pending_acceptance'.
-    """
-    try:
-        match = manager.confirm_opponent(db, match_id, user.id)
-
-        # Notify opponent that they've been accepted
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_UPDATED,
-            match=match.to_dict(),
-            target_user_ids=[match.opponent_id],
-            data={"message": "Your challenge was accepted! Ready to fight."}
-        )
-
-        return DuelResponse(
-            success=True,
-            message="Opponent confirmed. Ready to fight!",
-            match=match.to_dict()
-        )
-    except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
-
-
-@router.post("/{match_id}/decline", response_model=DuelResponse)
-def decline_opponent(
-    match_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """
-    Challenger declines the opponent.
-    Match is cancelled, no gold is taken from either player.
-    """
-    try:
-        match = manager.decline_opponent(db, match_id, user.id)
-
-        # Notify opponent they were declined
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_CANCELLED,
-            match=match.to_dict(),
-            target_user_ids=[match.opponent_id],
-            data={"message": "The challenger declined your request."}
-        )
-
-        return DuelResponse(
-            success=True,
-            message="Opponent declined. Match cancelled.",
-            match=match.to_dict()
-        )
-    except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
-
 
 @router.post("/{match_id}/start", response_model=DuelResponse)
 def start_match(
@@ -537,22 +479,4 @@ def get_match(
         success=True,
         message="Match found",
         match=match.to_dict(include_actions=True)
-    )
-
-
-@router.get("/code/{code}", response_model=DuelResponse)
-def get_match_by_code(
-    code: str,
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """Get match status by code"""
-    match = manager.get_match_by_code(db, code)
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    
-    return DuelResponse(
-        success=True,
-        message="Match found",
-        match=match.to_dict()
     )

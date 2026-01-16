@@ -251,15 +251,15 @@ struct DuelMatch: Codable, Identifiable {
     }
 }
 
-/// Duel invitation from another player
+/// Duel challenge from another player
 struct DuelInvitation: Codable, Identifiable {
     let invitationId: Int
     let matchId: Int
-    let matchCode: String
     let inviterId: Int
     let inviterName: String
     let wagerGold: Int
     let kingdomId: String
+    let challengerStats: DuelPlayerStats?
     let createdAt: String?
     
     var id: Int { invitationId }
@@ -267,11 +267,11 @@ struct DuelInvitation: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case invitationId = "invitation_id"
         case matchId = "match_id"
-        case matchCode = "match_code"
         case inviterId = "inviter_id"
         case inviterName = "inviter_name"
         case wagerGold = "wager_gold"
         case kingdomId = "kingdom_id"
+        case challengerStats = "challenger_stats"
         case createdAt = "created_at"
     }
 }
@@ -390,4 +390,8 @@ struct DuelLeaderboardResponse: Codable {
 struct DuelRecentMatchesResponse: Codable {
     let success: Bool
     let matches: [DuelMatch]
+}
+
+struct DuelPendingCountResponse: Codable {
+    let count: Int
 }

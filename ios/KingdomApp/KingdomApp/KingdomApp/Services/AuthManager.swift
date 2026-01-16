@@ -152,6 +152,9 @@ class AuthManager: ObservableObject {
         hasCriticalError = false
         criticalErrorMessage = nil
         deleteToken()
+        
+        // Disconnect from game events WebSocket
+        GameEventManager.shared.disconnect()
     }
     
     @MainActor
