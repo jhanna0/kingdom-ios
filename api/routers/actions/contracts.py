@@ -15,7 +15,8 @@ from .utils import (
     calculate_cooldown, 
     check_and_set_slot_cooldown_atomic, 
     format_datetime_iso,
-    set_cooldown
+    set_cooldown,
+    check_and_deduct_food_cost
 )
 from .constants import WORK_BASE_COOLDOWN
 from .tax_utils import apply_kingdom_tax_with_bonus
@@ -109,6 +110,14 @@ def work_on_contract(
     # Calculate skill-adjusted cooldown ONCE - used for both check and display
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
+    # Check and deduct food cost BEFORE cooldown check (building contracts)
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "building work")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
+        )
     
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
@@ -250,6 +259,8 @@ def work_on_contract(
         "is_complete": is_complete,
         "cooldown_refunded": cooldown_refunded,
         "next_work_available_at": format_datetime_iso(next_available),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         "rewards": {
             "gold": int(net_income),
             "gold_before_tax": int(gross_income),
@@ -343,6 +354,14 @@ def work_on_property_upgrade(
     # Calculate skill-adjusted cooldown ONCE - used for both check and display
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
+    # Check and deduct food cost BEFORE cooldown check (property upgrades)
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "property work")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
+        )
     
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
@@ -441,6 +460,8 @@ def work_on_property_upgrade(
         "is_complete": is_complete,
         "new_tier": contract.tier if is_complete else None,
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         # NEW: Resources required this action (frontend can show)
         "resources_required": resources_required,
         "per_action_costs": enriched_costs  # What future actions will cost

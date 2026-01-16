@@ -38,6 +38,7 @@ class PlayerState(Base):
     iron = Column(Integer, default=0)
     steel = Column(Integer, default=0)
     wood = Column(Integer, default=0)
+    # Food is tracked via player_inventory (meat, etc.) - items with is_food=True in RESOURCES
     
     # Progression
     level = Column(Integer, default=1)

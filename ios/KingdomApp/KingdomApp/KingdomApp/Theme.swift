@@ -294,27 +294,22 @@ struct KingdomTheme {
 
 // MARK: - View Modifiers
 
-/// Brutalist badge/pill style with offset shadow
+/// Brutalist badge/pill style (no shadow, just border)
 struct BrutalistBadgeStyle: ViewModifier {
     var backgroundColor: Color
     var cornerRadius: CGFloat = 8
-    var shadowOffset: CGFloat = 2
+    var shadowOffset: CGFloat = 2  // Kept for API compatibility but unused
     var borderWidth: CGFloat = 2
-    
+
     func body(content: Content) -> some View {
         content
             .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(Color.black)
-                        .offset(x: shadowOffset, y: shadowOffset)
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(backgroundColor)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cornerRadius)
-                                .stroke(Color.black, lineWidth: borderWidth)
-                        )
-                }
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(Color.black, lineWidth: borderWidth)
+                    )
             )
     }
 }

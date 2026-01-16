@@ -101,11 +101,8 @@ class ActionsAPI {
     }
     
     // MARK: - Property Upgrades
-    
-    func workOnPropertyUpgrade(contractId: String) async throws -> PropertyUpgradeActionResponse {
-        let request = client.request(endpoint: "/actions/work-property/\(contractId)", method: "POST")
-        return try await client.execute(request)
-    }
+    // NOTE: Property upgrades use performGenericAction() with the dynamic endpoint from the contract
+    // The endpoint comes from PropertyUpgradeContract.endpoint (e.g., "/actions/work-property/{contract_id}")
     
     // MARK: - Coups
     

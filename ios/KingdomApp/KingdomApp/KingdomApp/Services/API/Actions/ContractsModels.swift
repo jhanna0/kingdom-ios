@@ -57,6 +57,8 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let endpoint: String?  // Dynamic endpoint from backend
     let perActionCosts: [PerActionResourceCost]?  // Resources required per work action
     let canAfford: Bool?  // Can player afford the per-action costs?
+    let foodCost: Int?  // Food cost per action (0.5 per minute of cooldown)
+    let canAffordFood: Bool?  // Can player afford the food cost?
     
     var id: String { contractId }
     
@@ -74,6 +76,8 @@ struct PropertyUpgradeContract: Codable, Identifiable {
         case endpoint
         case perActionCosts = "per_action_costs"
         case canAfford = "can_afford"
+        case foodCost = "food_cost"
+        case canAffordFood = "can_afford_food"
     }
     
     var progress: Double {

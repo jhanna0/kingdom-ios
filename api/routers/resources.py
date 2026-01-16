@@ -65,11 +65,12 @@ RESOURCES = {
         "display_name": "Meat",
         "icon": "flame.fill",
         "color": "red",
-        "description": "Fresh game meat from hunting. Sell at market or use for food.",
+        "description": "Fresh game meat from hunting. Used for actions.",
         "category": "consumable",
         "display_order": 4,
         "is_tradeable": True,
         "storage_type": "inventory",
+        "is_food": True,  # Can be consumed to pay action food costs
     },
     "sinew": {
         "display_name": "Sinew",

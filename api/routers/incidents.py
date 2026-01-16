@@ -23,7 +23,7 @@ from db import get_db
 from db.models import User, PlayerState, Kingdom
 from db.models.action_cooldown import ActionCooldown
 from routers.auth import get_current_user
-from routers.actions.utils import set_cooldown
+from routers.actions.utils import set_cooldown, check_and_deduct_food_cost
 from systems.incidents import IncidentManager, IncidentConfig
 from websocket.broadcast import notify_kingdom
 
@@ -230,6 +230,14 @@ def trigger_incident(
             detail=f"Insufficient gold. Need {IncidentConfig.COST}g"
         )
     
+    # Check and deduct food cost (30 minute cooldown = 15 food)
+    food_result = check_and_deduct_food_cost(db, user.id, 30, "infiltration")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=food_result["error"]
+        )
+    
     # Deduct gold (paid upfront, win or lose!)
     state.gold -= IncidentConfig.COST
     
@@ -278,10 +286,16 @@ def trigger_incident(
             }
         )
     
+    # Add food info to the response by extending the incident dict
+    response_incident = result.get("incident")
+    if response_incident:
+        response_incident["food_cost"] = food_result["food_cost"]
+        response_incident["food_remaining"] = food_result["food_remaining"]
+    
     return IncidentResponse(
         success=result.get("success", False),
         message=result["message"],
-        incident=result.get("incident"),
+        incident=response_incident,
         triggered=result.get("triggered"),
         success_chance=result.get("success_chance"),
         roll=result.get("roll"),

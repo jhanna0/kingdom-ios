@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, PlayerItem, Property
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -250,10 +250,19 @@ def work_on_craft(
             detail="Player state not found"
         )
     
-    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
+    # Calculate skill-adjusted cooldown
     cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
+    # Check and deduct food cost BEFORE cooldown check
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "crafting")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
+        )
+    
+    # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     if not DEV_MODE:
         cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
@@ -371,6 +380,8 @@ def work_on_craft(
         "progress_percent": int((new_actions_completed / contract.actions_required) * 100),
         "is_complete": is_complete,
         "next_craft_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         "rewards": {
             "xp": xp_earned,
             "equipment": {

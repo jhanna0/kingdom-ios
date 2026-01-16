@@ -11,9 +11,9 @@ from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractCon
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
-from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso
+from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
 from .training import calculate_training_cost, TRAINING_TYPES
-from routers.tiers import get_total_skill_points, SKILL_TYPES
+from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost
 
 
 def _get_training_costs_dict(state) -> dict:
@@ -290,13 +290,20 @@ def get_action_status(
     
     # Work reward (need to calculate per contract, so we'll add it to each contract object)
     
+    # Get player's current food total (from inventory items with is_food=True)
+    player_food_total = get_player_food_total(db, current_user.id)
+    
     # Build list of ALL possible actions dynamically
     actions = {}
     
     # ALWAYS AVAILABLE ACTIONS - API defines ALL metadata
+    # Food costs are calculated from cooldown: 0.5 food per minute
+    work_food_cost = calculate_food_cost(work_cooldown)
     actions["work"] = {
         **check_cooldown_from_table(db, current_user.id, "work", work_cooldown),
         "cooldown_minutes": work_cooldown,
+        "food_cost": work_food_cost,
+        "can_afford_food": player_food_total >= work_food_cost,
         "unlocked": True,
         "action_type": "work",
         "title": "Work on Contract",
@@ -307,9 +314,14 @@ def get_action_status(
         "display_order": 10
     }
     
+    # Patrol uses duration (10 min) for food cost, not cooldown
+    from .constants import PATROL_DURATION_MINUTES
+    patrol_food_cost = calculate_food_cost(PATROL_DURATION_MINUTES)
     actions["patrol"] = {
         **check_cooldown_from_table(db, current_user.id, "patrol", patrol_cooldown),
         "cooldown_minutes": patrol_cooldown,
+        "food_cost": patrol_food_cost,
+        "can_afford_food": player_food_total >= patrol_food_cost,
         "is_patrolling": is_patrolling(db, current_user.id),
         "active_patrollers": active_patrollers,
         "expected_reward": {
@@ -326,9 +338,12 @@ def get_action_status(
         "endpoint": "/actions/patrol"
     }
     
+    farm_food_cost = calculate_food_cost(farm_cooldown)
     actions["farm"] = {
         **check_cooldown_from_table(db, current_user.id, "farm", farm_cooldown),
         "cooldown_minutes": farm_cooldown,
+        "food_cost": farm_food_cost,
+        "can_afford_food": player_food_total >= farm_food_cost,
         "expected_reward": {
             "gold_gross": farm_gross,
             "gold_bonus_multiplier": farm_bonus_multiplier,
@@ -348,9 +363,12 @@ def get_action_status(
     # Get kingdom for coup eligibility checks
     kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
     
+    training_food_cost = calculate_food_cost(training_cooldown)
     actions["training"] = {
         **check_cooldown_from_table(db, current_user.id, "training", training_cooldown),
         "cooldown_minutes": training_cooldown,
+        "food_cost": training_food_cost,
+        "can_afford_food": player_food_total >= training_food_cost,
         "unlocked": True,
         "action_type": "training",
         "title": "Training",
@@ -361,9 +379,12 @@ def get_action_status(
         "display_order": 10
     }
     
+    crafting_food_cost = calculate_food_cost(work_cooldown)  # Uses building skill cooldown
     actions["crafting"] = {
         **check_cooldown_from_table(db, current_user.id, "crafting", work_cooldown),
         "cooldown_minutes": work_cooldown,
+        "food_cost": crafting_food_cost,
+        "can_afford_food": player_food_total >= crafting_food_cost,
         "unlocked": True,
         "action_type": "crafting",
         "title": "Crafting",
@@ -402,6 +423,7 @@ def get_action_status(
         locked_outcomes.append("Sabotage (T5)")
         locked_outcomes.append("Vault Heist (T5)")
     
+    scout_food_cost = calculate_food_cost(SCOUT_COOLDOWN)
     if state.intelligence >= 1:
         # ONLY show what they CAN do - no locked outcomes
         description = f"Outcomes: {', '.join(current_outcomes)}"
@@ -409,6 +431,8 @@ def get_action_status(
         actions["scout"] = {
             **check_cooldown_from_table(db, current_user.id, "scout", SCOUT_COOLDOWN),
             "cooldown_minutes": SCOUT_COOLDOWN,
+            "food_cost": scout_food_cost,
+            "can_afford_food": player_food_total >= scout_food_cost,
             "unlocked": True,
             "action_type": "scout",
             "requirements_met": True,
@@ -768,12 +792,20 @@ def get_action_status(
             "actions": slot_actions,
         })
     
+    # Add food cost to property contracts
+    for contract in property_contracts:
+        contract["food_cost"] = work_food_cost  # Property work uses building slot cooldown
+        contract["can_afford_food"] = player_food_total >= work_food_cost
+    
     return {
         "parallel_actions_enabled": True,  # NEW: Signals to frontend that parallel actions are supported
         "slot_cooldowns": slot_cooldowns,  # NEW: Per-slot cooldown status
         "slots": slots,  # NEW: Full slot metadata for frontend rendering (no hardcoding!)
         "global_cooldown": slot_cooldowns.get("building", {"ready": True, "seconds_remaining": 0}),  # For old clients
         "actions": actions,  # DYNAMIC ACTION LIST
+        # Food system - actions cost food based on cooldown (0.5 food per minute)
+        "player_food_total": player_food_total,
+        "food_cost_per_minute": 0.5,  # For frontend to calculate costs dynamically
         # Legacy structure for backward compatibility
         "work": actions["work"],
         "patrol": actions["patrol"],

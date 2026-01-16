@@ -29,7 +29,7 @@ Implemented a two-step training system where users purchase training sessions wi
   - `POST /actions/train/leadership/purchase`
   - `POST /actions/train/building/purchase`
   
-- **Training Action Endpoints** (consumes session, has cooldown):
+- **Training Action Endpoints** (requires session, has cooldown):
   - `POST /actions/train/attack`
   - `POST /actions/train/defense`
   - `POST /actions/train/leadership`

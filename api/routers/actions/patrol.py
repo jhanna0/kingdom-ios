@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity, get_cooldown, set_cooldown
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity, get_cooldown, set_cooldown, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD, PATROL_COOLDOWN
 
 
@@ -35,6 +35,14 @@ def start_patrol(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must be checked into a kingdom to patrol"
+        )
+    
+    # Check and deduct food cost (based on patrol duration, not cooldown)
+    food_result = check_and_deduct_food_cost(db, current_user.id, PATROL_DURATION_MINUTES, "patrolling")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
         )
     
     now = datetime.utcnow()
@@ -121,6 +129,8 @@ def start_patrol(
         "success": True,
         "message": f"You're on patrol for {PATROL_DURATION_MINUTES} minutes",
         "expires_at": format_datetime_iso(patrol_end),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         "rewards": {
             "gold": None,
             "reputation": PATROL_REPUTATION_REWARD,

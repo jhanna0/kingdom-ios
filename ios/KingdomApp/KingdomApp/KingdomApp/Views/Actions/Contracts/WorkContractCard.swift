@@ -19,12 +19,57 @@ struct WorkContractCard: View {
     }
     
     var isReady: Bool {
-        return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
+        let canAffordFood = status.canAffordFood ?? true
+        return !globalCooldownActive && canAffordFood && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
+    // Build cost items for this contract (food + resources)
+    private func buildCostItems() -> [CostItem] {
+        var items: [CostItem] = []
+        
+        // Food cost from status
+        if let food = status.foodCost, food > 0 {
+            items.append(CostItem(
+                icon: "fork.knife",
+                amount: food,
+                color: KingdomTheme.Colors.buttonWarning,
+                canAfford: status.canAffordFood ?? true
+            ))
+        }
+        
+        // Per-action resource costs from contract
+        if let costs = contract.perActionCosts {
+            for cost in costs {
+                items.append(CostItem(
+                    icon: cost.icon,
+                    amount: cost.amount,
+                    color: KingdomTheme.Colors.buttonWarning,
+                    canAfford: true  // Resource affordability checked elsewhere
+                ))
+            }
+        }
+        
+        return items
+    }
+    
+    // Build reward items for this contract (gold per action)
+    private func buildRewardItems() -> [RewardItem] {
+        var items: [RewardItem] = []
+        
+        if contract.actionReward > 0 {
+            items.append(RewardItem(
+                icon: "g.circle.fill",
+                amount: contract.actionReward,
+                color: KingdomTheme.Colors.goldLight
+            ))
+        }
+        
+        return items
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Header: Icon + Title + Cooldown
             HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
                 // Icon in brutalist badge
                 Image(systemName: "hammer.fill")
@@ -50,45 +95,6 @@ struct WorkContractCard: View {
                         if let cooldownMinutes = status.cooldownMinutes {
                             cooldownBadge(minutes: cooldownMinutes)
                         }
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "g.circle.fill")
-                                .font(FontStyles.iconMini)
-                                .foregroundColor(KingdomTheme.Colors.goldLight)
-                            Text("\(contract.actionReward)")
-                                .font(FontStyles.labelBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .brutalistBadge(
-                            backgroundColor: KingdomTheme.Colors.parchment,
-                            cornerRadius: 6,
-                            shadowOffset: 1,
-                            borderWidth: 1.5
-                        )
-                        
-                        // Per-action resource costs as badges
-                        if let costs = contract.perActionCosts {
-                            ForEach(costs, id: \.resource) { cost in
-                                HStack(spacing: 4) {
-                                    Image(systemName: cost.icon)
-                                        .font(FontStyles.iconMini)
-                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                                    Text("\(cost.amount)")
-                                        .font(FontStyles.labelBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .brutalistBadge(
-                                    backgroundColor: KingdomTheme.Colors.parchment,
-                                    cornerRadius: 6,
-                                    shadowOffset: 1,
-                                    borderWidth: 1.5
-                                )
-                            }
-                        }
                     }
                     
                     if let benefit = contract.buildingBenefit {
@@ -112,6 +118,9 @@ struct WorkContractCard: View {
                     }
                 }
             }
+            
+            // Cost and Reward Row (wraps if needed)
+            ActionCostRewardRow(costs: buildCostItems(), rewards: buildRewardItems())
             
             // Progress bar - brutalist style
             GeometryReader { geometry in
@@ -149,6 +158,14 @@ struct WorkContractCard: View {
                 let seconds = remaining % 60
                 
                 Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            } else if !(status.canAffordFood ?? true) {
+                Text("Need food")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)

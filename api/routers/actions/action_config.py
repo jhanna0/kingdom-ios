@@ -334,6 +334,22 @@ def get_action_cooldown(action_type: str) -> float:
     return config.get("cooldown_minutes", 120)  # Default 2 hours
 
 
+def get_action_food_cost(action_type: str, cooldown_minutes: float = None) -> int:
+    """Get food cost for an action based on its cooldown.
+    
+    If cooldown_minutes is provided, uses that (for skill-adjusted cooldowns).
+    Otherwise uses base cooldown from config.
+    
+    Food cost = cooldown_minutes * 0.5 (from tiers.FOOD_COST_PER_COOLDOWN_MINUTE)
+    """
+    from routers.tiers import calculate_food_cost
+    
+    if cooldown_minutes is None:
+        cooldown_minutes = get_action_cooldown(action_type)
+    
+    return calculate_food_cost(cooldown_minutes)
+
+
 def get_actions_by_category(category: str) -> dict:
     """Get all actions of a specific category"""
     return {

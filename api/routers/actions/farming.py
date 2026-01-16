@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, FARM_COOLDOWN, FARM_GOLD_REWARD
 from .tax_utils import apply_kingdom_tax_with_bonus
 
@@ -56,6 +56,14 @@ def perform_farming(
             detail="Must be checked into a kingdom to farm"
         )
     
+    # Check and deduct food cost
+    food_result = check_and_deduct_food_cost(db, current_user.id, FARM_COOLDOWN, "farming")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
+        )
+    
     # Calculate base gold reward
     base_gold = FARM_GOLD_REWARD
     
@@ -98,6 +106,8 @@ def perform_farming(
         "success": True,
         "message": "You worked the farm",
         "next_farm_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=FARM_COOLDOWN)),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         "rewards": {
             "gold": int(net_income),
             "gold_before_tax": int(gross_income),

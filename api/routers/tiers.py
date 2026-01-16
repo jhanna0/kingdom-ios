@@ -12,6 +12,28 @@ router = APIRouter(prefix="/tiers", tags=["tiers"])
 # Kingdom building contract costs scale with level and population
 
 BUILDING_BASE_CONSTRUCTION_COST = 1000
+
+# ===== FOOD COST SYSTEM =====
+# Actions cost food based on their cooldown duration
+# This gives food a meaningful purpose and creates resource trade-offs
+
+FOOD_COST_PER_COOLDOWN_MINUTE = 0.5  # 0.5 food per minute of cooldown
+
+
+def calculate_food_cost(cooldown_minutes: float) -> int:
+    """Calculate food cost for an action based on its cooldown duration.
+    
+    Formula: cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE
+    
+    Examples (at 0.5 food/min):
+    - 10 min cooldown (farm, patrol): 5 food
+    - 30 min cooldown (scout): 15 food  
+    - 120 min cooldown (work, training, crafting): 60 food
+    
+    Returns integer (rounded up to ensure non-zero cost for any action with cooldown)
+    """
+    import math
+    return max(1, math.ceil(cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE))
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
 BUILDING_BASE_ACTIONS_REQUIRED = 100

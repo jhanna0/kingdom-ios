@@ -332,6 +332,103 @@ def check_and_set_slot_cooldown_atomic(
     return {"ready": True, "seconds_remaining": 0, "blocking_action": None, "blocking_slot": None}
 
 
+def get_food_items() -> list:
+    """Get list of item_ids that count as food from RESOURCES config."""
+    from routers.resources import RESOURCES
+    return [item_id for item_id, config in RESOURCES.items() if config.get("is_food", False)]
+
+
+def get_player_food_total(db: Session, user_id: int) -> int:
+    """Get total food available for a player from inventory."""
+    from db.models.inventory import PlayerInventory
+    
+    food_item_ids = get_food_items()
+    if not food_item_ids:
+        return 0
+    
+    food_items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id.in_(food_item_ids)
+    ).all()
+    
+    return sum(item.quantity for item in food_items)
+
+
+def check_and_deduct_food_cost(
+    db: Session,
+    user_id: int,
+    cooldown_minutes: float,
+    action_name: str = "action"
+) -> Dict:
+    """
+    Check if player has enough food for an action and deduct it from inventory.
+    
+    Food cost = cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE (default 0.5)
+    Food items are defined in RESOURCES with is_food=True (currently: meat)
+    
+    Args:
+        db: Database session
+        user_id: The user's ID
+        cooldown_minutes: The action's cooldown in minutes (skill-adjusted)
+        action_name: Human-readable action name for error messages
+        
+    Returns:
+        {"success": True, "food_cost": N, "food_remaining": N} if player has enough food
+        {"success": False, "error": str, "food_cost": N, "food_have": N} if not enough food
+    """
+    from routers.tiers import calculate_food_cost
+    from db.models.inventory import PlayerInventory
+    
+    food_cost = calculate_food_cost(cooldown_minutes)
+    food_item_ids = get_food_items()
+    
+    if not food_item_ids:
+        # No food items defined - skip food check (shouldn't happen in production)
+        return {
+            "success": True,
+            "food_cost": 0,
+            "food_remaining": 0
+        }
+    
+    # Get all food items for this player, ordered by quantity (deduct from largest first)
+    food_items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id.in_(food_item_ids)
+    ).order_by(PlayerInventory.quantity.desc()).all()
+    
+    total_food = sum(item.quantity for item in food_items)
+    
+    if total_food < food_cost:
+        return {
+            "success": False,
+            "error": f"Not enough food for {action_name}. Need {food_cost}, have {total_food}.",
+            "food_cost": food_cost,
+            "food_have": total_food
+        }
+    
+    # Deduct food from inventory (largest stacks first)
+    remaining_cost = food_cost
+    for item in food_items:
+        if remaining_cost <= 0:
+            break
+        
+        deduct_amount = min(item.quantity, remaining_cost)
+        item.quantity -= deduct_amount
+        remaining_cost -= deduct_amount
+        
+        # Remove empty stacks
+        if item.quantity <= 0:
+            db.delete(item)
+    
+    new_total = total_food - food_cost
+    
+    return {
+        "success": True,
+        "food_cost": food_cost,
+        "food_remaining": new_total
+    }
+
+
 def get_equipped_items(db: Session, user_id: int) -> Dict:
     """Get all equipped items for a user from player_items table"""
     equipped = db.query(PlayerItem).filter(

@@ -11,7 +11,7 @@ import random
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, calculate_training_reduction
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, calculate_training_reduction, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -252,6 +252,14 @@ def work_on_training(
             detail="Player state not found"
         )
     
+    # Check and deduct food cost BEFORE cooldown check
+    food_result = check_and_deduct_food_cost(db, current_user.id, TRAINING_COOLDOWN, "training")
+    if not food_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=food_result["error"]
+        )
+    
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
     cooldown_expires = datetime.utcnow() + timedelta(minutes=TRAINING_COOLDOWN)
     if not DEV_MODE:
@@ -385,6 +393,8 @@ def work_on_training(
         "is_complete": is_complete,
         "cooldown_refunded": cooldown_refunded,
         "next_train_available_at": format_datetime_iso(next_available),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
         "rewards": {
             "gold": None,
             "reputation": None,

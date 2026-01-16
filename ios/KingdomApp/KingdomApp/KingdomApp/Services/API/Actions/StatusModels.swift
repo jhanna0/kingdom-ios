@@ -94,6 +94,11 @@ struct ActionStatus: Codable {
     let purchaseCost: Int?
     let expectedReward: ExpectedReward?
     
+    // Food cost system - actions cost food based on cooldown duration
+    let foodCost: Int?          // Food required for this action
+    let canAffordFood: Bool?    // Does player have enough food?
+    let cost: Int?              // Gold cost (for scout/infiltrate)
+    
     // Action metadata (ALL from API - frontend is dumb renderer!)
     let unlocked: Bool?
     let actionType: String?
@@ -137,6 +142,10 @@ struct ActionStatus: Codable {
         case sessionsAvailable = "sessions_available"
         case purchaseCost = "purchase_cost"
         case expectedReward = "expected_reward"
+        // Food cost system
+        case foodCost = "food_cost"
+        case canAffordFood = "can_afford_food"
+        case cost
         case unlocked
         case actionType = "action_type"
         case requirementsMet = "requirements_met"
@@ -177,6 +186,10 @@ struct AllActionStatus: Codable {
     let globalCooldown: GlobalCooldown
     let actions: [String: ActionStatus]  // DYNAMIC - API decides what actions are available
     
+    // Food system - player's total food and cost rate
+    let playerFoodTotal: Int?
+    let foodCostPerMinute: Double?
+    
     // Legacy fields for backward compatibility
     let work: ActionStatus
     let patrol: ActionStatus
@@ -211,6 +224,9 @@ struct AllActionStatus: Codable {
         case slots  // NEW: Slot definitions from backend
         case globalCooldown = "global_cooldown"
         case actions
+        // Food system
+        case playerFoodTotal = "player_food_total"
+        case foodCostPerMinute = "food_cost_per_minute"
         case work, patrol, farm, sabotage, scout, training, crafting, contracts
         case vaultHeist = "vault_heist"
         case trainingContracts = "training_contracts"
