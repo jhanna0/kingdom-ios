@@ -56,10 +56,6 @@ struct PropertyTiersView: View {
                     Text(tierName(tier))
                         .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Tier \(tier)")
-                        .font(FontStyles.labelMedium)
-                        .foregroundColor(tierColor(tier))
                 }
                 
                 Spacer()
@@ -201,7 +197,7 @@ struct PropertyTiersView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 13, weight: .medium))
-                    Text(currentTier == 0 ? "Purchase land first" : "Complete Tier \(currentTier + 1) first")
+                    Text(currentTier == 0 ? "Purchase land first" : "Build \(tierName(currentTier + 1)) first")
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
