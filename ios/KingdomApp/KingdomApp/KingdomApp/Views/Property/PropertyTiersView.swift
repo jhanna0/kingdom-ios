@@ -120,7 +120,7 @@ struct PropertyTiersView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "g.circle.fill")
                                 .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             Text("\(cost)g")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -133,7 +133,7 @@ struct PropertyTiersView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "hammer.fill")
                                 .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
                             Text("\(actions) actions")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)

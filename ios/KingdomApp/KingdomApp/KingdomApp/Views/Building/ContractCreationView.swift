@@ -170,7 +170,7 @@ struct ContractCreationView: View {
                                     .foregroundColor(KingdomTheme.Colors.inkLight)
                                 Text("\(kingdom.treasuryGold)g")
                                     .font(.system(size: 24, weight: .black, design: .rounded))
-                                    .foregroundColor(upfrontCost <= kingdom.treasuryGold ? KingdomTheme.Colors.inkDark : .red)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                             }
                         }
                         

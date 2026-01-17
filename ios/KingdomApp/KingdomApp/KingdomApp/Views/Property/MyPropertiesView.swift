@@ -437,12 +437,14 @@ struct MyPropertiesView: View {
     private func buildUpgradeCostItems(status: PropertyAPI.PropertyUpgradeStatus) -> [CostItem] {
         var items: [CostItem] = []
         
+        // If can't afford overall, all icons go red
+        let canAfford = status.can_afford
+        
         if let goldCost = status.gold_cost, goldCost > 0 {
             items.append(CostItem(
                 icon: "g.circle.fill",
                 amount: goldCost,
-                color: KingdomTheme.Colors.goldLight,
-                canAfford: status.can_afford
+                canAfford: canAfford
             ))
         }
         
@@ -450,8 +452,7 @@ struct MyPropertiesView: View {
             items.append(CostItem(
                 icon: "hammer.fill",
                 amount: status.actions_required,
-                color: KingdomTheme.Colors.buttonSuccess,
-                canAfford: true
+                canAfford: canAfford
             ))
         }
         
@@ -460,8 +461,7 @@ struct MyPropertiesView: View {
                 items.append(CostItem(
                     icon: cost.icon,
                     amount: cost.amount,
-                    color: KingdomTheme.Colors.buttonWarning,
-                    canAfford: cost.has_enough ?? true
+                    canAfford: canAfford
                 ))
             }
         }
