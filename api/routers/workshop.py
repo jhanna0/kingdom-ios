@@ -223,20 +223,24 @@ def get_workshop_status(
     
     # Build list of craftable items with recipe status
     craftable_items = []
+    # Common resources everyone has - don't use these to decide if recipe should show
+    COMMON_MATERIALS = {"wood", "iron", "gold", "steel"}
+    
     if has_workshop:
         for item_id, item_config in CRAFTABLE_ITEMS.items():
             recipe = item_config["recipe"]
             can_craft = blueprint_count > 0 and active_contract is None  # Can't start new if one is active
             materials_status = []
-            has_any_material = False
+            has_rare_material = False
             
             for mat_id, required in recipe.items():
                 player_has = get_player_material_count(db, current_user.id, mat_id)
                 has_enough = player_has >= required
                 can_craft = can_craft and has_enough
                 
-                if player_has > 0:
-                    has_any_material = True
+                # Only show recipe if player has a RARE material (not common shit like wood)
+                if player_has > 0 and mat_id not in COMMON_MATERIALS:
+                    has_rare_material = True
                 
                 mat_info = RESOURCES.get(mat_id, {})
                 
@@ -250,7 +254,7 @@ def get_workshop_status(
                     "has_enough": has_enough,
                 })
             
-            if has_any_material:
+            if has_rare_material:
                 craftable_items.append({
                     "id": item_id,
                     "display_name": item_config["display_name"],
