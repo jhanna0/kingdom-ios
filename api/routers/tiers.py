@@ -52,70 +52,45 @@ PROPERTY_TIERS = {
         "name": "Land",
         "icon": "square.dashed",
         "description": "Cleared land with travel benefits",
-        "benefits": [
-            "Free travel to this kingdom"
-        ],
+        "benefits": ["Free travel to this kingdom"],
         "gold_cost": 500,
-        "per_action_costs": [],  # No per-action costs for basic land
+        "per_action_costs": [],
         "base_actions": 5
     },
     2: {
         "name": "House",
         "icon": "house.fill",
         "description": "Basic dwelling",
-        "benefits": [
-            "All Land benefits",
-            "Ability to train skills in this kingdom"
-        ],
+        "benefits": ["All Land benefits", "Ability to train skills in this kingdom"],
         "gold_cost": 500,
-        "per_action_costs": [
-            {"resource": "wood", "amount": 40}
-        ],
+        "per_action_costs": [{"resource": "wood", "amount": 40}],
         "base_actions": 7
     },
     3: {
         "name": "Workshop",
         "icon": "hammer.fill",
         "description": "Crafting workshop",
-        "benefits": [
-            "All House benefits",
-            "Allows crafting of weapons and armor"
-        ],
+        "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
         "gold_cost": 1000,
-        "per_action_costs": [
-            {"resource": "wood", "amount": 50},
-            {"resource": "iron", "amount": 50}
-        ],
+        "per_action_costs": [{"resource": "wood", "amount": 50}, {"resource": "iron", "amount": 50}],
         "base_actions": 9
     },
     4: {
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
         "description": "Luxurious property",
-        "benefits": [
-            "All Workshop benefits",
-            "Pay 50% less tax on all income"
-        ],
+        "benefits": ["All Workshop benefits", "Pay 50% less tax on all income"],
         "gold_cost": 2000,
-        "per_action_costs": [
-            {"resource": "wood", "amount": 75},
-            {"resource": "iron", "amount": 75}
-        ],
+        "per_action_costs": [{"resource": "wood", "amount": 75}, {"resource": "iron", "amount": 75}],
         "base_actions": 11
     },
     5: {
         "name": "Defensive Walls",
         "icon": "shield.fill",
         "description": "Grand estate",
-        "benefits": [
-            "All Beautiful Property benefits",
-            "If your kingdom is invaded, a 50% less chance your property gets destroyed"
-        ],
+        "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
         "gold_cost": 4000,
-        "per_action_costs": [
-            {"resource": "wood", "amount": 100},
-            {"resource": "iron", "amount": 100}
-        ],
+        "per_action_costs": [{"resource": "wood", "amount": 100}, {"resource": "iron", "amount": 100}],
         "base_actions": 13
     }
 }
@@ -509,11 +484,11 @@ SKILLS = {
         "category": "economy",
         "description": "Improves construction and resource gathering",
         "benefits": {
-            1: ["-5% action cooldowns"],
-            2: ["-8% action cooldowns"],
-            3: ["-12% action cooldowns"],
-            4: ["-15% action cooldowns", "10% chance to refund action cooldown"],
-            5: ["-18% action cooldowns", "Ability to build two actions at once"]
+            1: ["-5% building action cooldowns"],
+            2: ["-8% building action cooldowns"],
+            3: ["-12% building action cooldowns"],
+            4: ["-15% building action cooldowns", "10% chance to refund building action cooldown"],
+            5: ["-18% building action cooldowns", "Ability to build two projects at once"]
         },
         "mechanics": {
             "cooldown_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
@@ -853,11 +828,11 @@ def get_property_tiers():
         tiers_dict[str(tier)] = {
             "tier": tier,
             "name": info["name"],
+            "icon": info.get("icon", "house.fill"),
             "description": info["description"],
             "benefits": info["benefits"],
             "base_gold_cost": base_cost,
             "base_actions_required": base_actions,
-            "unlocks_crafting": tier >= 3
         }
     
     return {

@@ -48,17 +48,9 @@ struct Property: Identifiable, Codable, Hashable {
     
     // TODO: Define T2 house benefit
     
-    // MARK: - T3: Workshop Benefits
-    
-    var canCraft: Bool {
-        // T3+: Can craft weapons and armor
-        return tier >= 3
-    }
-    
-    var craftingSpeedBonus: Double {
-        // T3+: Faster crafting
-        return tier >= 3 ? 0.15 : 0  // 15% faster crafting
-    }
+    // MARK: - T2: Workshop Benefits
+    // Workshop access is controlled by backend via /workshop/status
+    // No hardcoded tier checks here!
     
     // MARK: - T4: Beautiful Property Benefits
     

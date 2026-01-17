@@ -11,6 +11,7 @@ struct PropertyDetailView: View {
     @State private var isLoadingContracts = true
     @State private var upgradeStatus: PropertyAPI.PropertyUpgradeStatus?
     @State private var isLoadingUpgradeStatus = true
+    @State private var availableRooms: [PropertyAPI.PropertyRoom] = []
     @Environment(\.dismiss) var dismiss
     
     private let propertyAPI = PropertyAPI()
@@ -41,6 +42,11 @@ struct PropertyDetailView: View {
                 // Location info
                 locationCard
                 
+                // Available rooms (DYNAMIC from backend - no hardcoded tier checks!)
+                ForEach(availableRooms, id: \.id) { room in
+                    roomCard(for: room)
+                }
+                
                 // Upgrade section
                 if property.tier < TierManager.shared.propertyMaxTier {
                     upgradeCard
@@ -57,11 +63,13 @@ struct PropertyDetailView: View {
         .task {
             await loadPropertyContracts()
             await loadUpgradeStatus()
+            await loadAvailableRooms()
         }
         .refreshable {
             await loadPropertyContracts()
             await refreshProperty()
             await loadUpgradeStatus()
+            await loadAvailableRooms()
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -167,6 +175,59 @@ struct PropertyDetailView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
+    // MARK: - Room Card (DYNAMIC - backend tells us what rooms are available!)
+    
+    @ViewBuilder
+    private func roomCard(for room: PropertyAPI.PropertyRoom) -> some View {
+        // Route to the appropriate view based on room.route
+        if room.route == "/workshop" {
+            NavigationLink(destination: WorkshopView()) {
+                roomCardContent(for: room)
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Future rooms can be added here
+            roomCardContent(for: room)
+        }
+    }
+    
+    private func roomCardContent(for room: PropertyAPI.PropertyRoom) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: room.icon)
+                .font(FontStyles.iconMedium)
+                .foregroundColor(.white)
+                .frame(width: 40, height: 40)
+                .brutalistBadge(backgroundColor: colorFromString(room.color), cornerRadius: 10)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(room.name)
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text(room.description)
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private func colorFromString(_ colorName: String) -> Color {
+        switch colorName {
+        case "buttonPrimary": return KingdomTheme.Colors.buttonPrimary
+        case "buttonSuccess": return KingdomTheme.Colors.buttonSuccess
+        case "buttonDanger": return KingdomTheme.Colors.buttonDanger
+        case "buttonWarning": return KingdomTheme.Colors.buttonWarning
+        default: return KingdomTheme.Colors.buttonPrimary
+        }
+    }
     
     // MARK: - Upgrade Card
     
@@ -497,6 +558,20 @@ struct PropertyDetailView: View {
             }
         } catch {
             print("Failed to refresh property: \(error)")
+        }
+    }
+    
+    private func loadAvailableRooms() async {
+        do {
+            let status = try await propertyAPI.getPropertyStatus()
+            await MainActor.run {
+                // Find this property in the status response and extract its available_rooms
+                if let propertyResponse = status.properties.first(where: { $0.id == property.id }) {
+                    availableRooms = propertyResponse.available_rooms ?? []
+                }
+            }
+        } catch {
+            print("Failed to load available rooms: \(error)")
         }
     }
     

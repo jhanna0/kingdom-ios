@@ -115,6 +115,17 @@ RESOURCES = {
         "storage_type": "inventory",
         "is_pet": True,  # Flag to identify pets
     },
+    # ===== BLUEPRINT - Generic crafting token =====
+    "blueprint": {
+        "display_name": "Blueprint",
+        "icon": "scroll.fill",
+        "color": "inkMedium",
+        "description": "A crafting blueprint. Take to your Workshop to craft items.",
+        "category": "crafting",
+        "display_order": 20,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
 }
 
 

@@ -186,6 +186,28 @@ def deduct_resource_costs(state, resource_costs: list):
         setattr(state, resource_id, current - amount)
 
 
+def get_available_rooms(tier: int) -> list:
+    """Get list of rooms/features available for a property tier"""
+    rooms = []
+    
+    # Tier 3+: Workshop
+    if tier >= 3:
+        rooms.append({
+            "id": "workshop",
+            "name": "Workshop",
+            "icon": "hammer.fill",
+            "color": "buttonPrimary",
+            "description": "Craft items from blueprints",
+            "route": "/workshop"
+        })
+    
+    # Future rooms can be added here:
+    # if tier >= 4:
+    #     rooms.append({"id": "library", ...})
+    
+    return rooms
+
+
 def property_to_response(prop: Property) -> PropertyResponse:
     """Convert Property model to response"""
     return PropertyResponse(
@@ -259,7 +281,13 @@ def get_property_status(
     properties = db.query(Property).filter(
         Property.owner_id == current_user.id
     ).all()
-    properties_list = [property_to_response(p) for p in properties]
+    
+    # Convert properties to response format and add available rooms
+    properties_list = []
+    for p in properties:
+        prop_dict = property_to_response(p).model_dump()
+        prop_dict["available_rooms"] = get_available_rooms(p.tier)
+        properties_list.append(prop_dict)
     
     # Get property contracts from unified_contracts
     property_contracts = get_property_contracts_for_user(db, current_user.id)

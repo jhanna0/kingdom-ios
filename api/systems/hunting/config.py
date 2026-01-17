@@ -174,7 +174,7 @@ BLESSING_DROP_TABLE_DISPLAY = [
 
 # Base tables by animal tier
 ATTACK_DROP_TABLE_BY_TIER = {
-    0: {"scare": 20, "miss": 20, "hit": 60},   # Squirrel/Rabbit - 60% hit
+    0: {"scare": 40, "miss": 40, "hit": 40},   # Squirrel/Rabbit - 20% hit
     1: {"scare": 25, "miss": 30, "hit": 45},   # Deer - 45% hit
     2: {"scare": 30, "miss": 35, "hit": 35},   # Boar - 35% hit
     3: {"scare": 35, "miss": 40, "hit": 25},   # Bear - 25% hit

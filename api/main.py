@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -228,6 +228,7 @@ app.include_router(tutorial.router)  # Help/tutorial content
 app.include_router(duels.router)  # PvP Arena duels in Town Hall
 app.include_router(trades.router)  # Player-to-player trading (Merchant skill)
 app.include_router(fishing.router)  # Chill fishing minigame
+app.include_router(workshop.router)  # Blueprint-based crafting at Workshop (Property T3+)
 
 
 # ===== WebSocket Endpoint (Local Development) =====

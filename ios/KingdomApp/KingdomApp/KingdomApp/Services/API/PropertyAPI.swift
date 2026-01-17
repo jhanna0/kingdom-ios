@@ -7,6 +7,15 @@ class PropertyAPI {
     
     // MARK: - Response Models
     
+    struct PropertyRoom: Codable {
+        let id: String
+        let name: String
+        let icon: String
+        let color: String
+        let description: String
+        let route: String
+    }
+    
     struct PropertyResponse: Codable {
         let id: String
         let kingdom_id: String
@@ -17,6 +26,7 @@ class PropertyAPI {
         let location: String?
         let purchased_at: String
         let last_upgraded: String?
+        let available_rooms: [PropertyRoom]?
         
         // Convert to Property model
         func toProperty() -> Property {
