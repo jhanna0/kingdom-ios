@@ -133,7 +133,7 @@ struct MyPropertiesView: View {
                 
                 // Property name floating
                 VStack(spacing: 4) {
-                    Text(property.tierName)
+                    Text(property.tier >= 2 ? "My House" : property.tierName)
                         .font(.system(size: 28, weight: .black))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     

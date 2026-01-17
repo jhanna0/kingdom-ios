@@ -6,7 +6,6 @@ struct WorkshopView: View {
     @State private var status: WorkshopStatusResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedItem: CraftableItem?
     @State private var showCraftResult = false
     @State private var craftResultMessage = ""
     @State private var craftResultSuccess = false
@@ -14,19 +13,19 @@ struct WorkshopView: View {
     private let workshopAPI = WorkshopAPI()
     
     var body: some View {
-        ZStack {
-            KingdomTheme.Colors.parchment
-                .ignoresSafeArea()
-            
+        ScrollView {
+            VStack(spacing: KingdomTheme.Spacing.large) {
             if isLoading {
-                ProgressView()
-                    .tint(KingdomTheme.Colors.loadingTint)
+                    loadingView
             } else if let error = errorMessage {
                 errorView(error)
             } else if let status = status {
                 workshopContent(status: status)
             }
         }
+            .padding()
+        }
+        .parchmentBackground()
         .navigationTitle("Workshop")
         .navigationBarTitleDisplayMode(.inline)
         .parchmentNavigationBar()
@@ -35,16 +34,6 @@ struct WorkshopView: View {
         }
         .refreshable {
             await loadWorkshopStatus()
-        }
-        .sheet(item: $selectedItem) { item in
-            CraftDetailSheet(
-                item: item,
-                blueprintCount: status?.blueprintCount ?? 0,
-                hasWorkshop: status?.hasWorkshop ?? false,
-                onCraft: { await craftItem(itemId: item.id) }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
         .overlay {
             if showCraftResult {
@@ -58,39 +47,50 @@ struct WorkshopView: View {
         }
     }
     
+    // MARK: - Loading View
+    
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(KingdomTheme.Colors.loadingTint)
+            Text("Loading workshop...")
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+    
     // MARK: - Content
     
     @ViewBuilder
     private func workshopContent(status: WorkshopStatusResponse) -> some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                // Workshop header with blueprint count
-                workshopHeader(status: status)
-                
-                // Craftable items list
+        // Workshop Header Card
+        workshopHeaderCard(status: status)
+        
+        // Craftable items section
                 if status.craftableItems.isEmpty {
-                    emptyState
+            emptyRecipesCard
                 } else {
-                    craftableItemsList(items: status.craftableItems, status: status)
-                }
-            }
-            .padding()
+            craftableItemsSection(items: status.craftableItems, status: status)
         }
     }
     
-    // MARK: - Workshop Header
+    // MARK: - Workshop Header Card
     
-    private func workshopHeader(status: WorkshopStatusResponse) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            HStack(spacing: KingdomTheme.Spacing.medium) {
+    private func workshopHeaderCard(status: WorkshopStatusResponse) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Header row: Icon + Title + Blueprint count
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
                 // Workshop icon
                 Image(systemName: "hammer.fill")
-                    .font(.title)
+                    .font(FontStyles.iconLarge)
                     .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 48, height: 48)
                     .brutalistBadge(
                         backgroundColor: status.hasWorkshop ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled,
-                        cornerRadius: 14,
+                        cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
                     )
@@ -103,105 +103,160 @@ struct WorkshopView: View {
                     if status.hasWorkshop {
                         HStack(spacing: 4) {
                             Image(systemName: "scroll.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMini)
                             Text("\(status.blueprintCount) blueprint\(status.blueprintCount == 1 ? "" : "s")")
-                                .font(FontStyles.bodySmall)
+                                .font(FontStyles.labelMedium)
                         }
                         .foregroundColor(status.blueprintCount > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
                     } else {
                         Text(status.workshopRequirement)
-                            .font(FontStyles.bodySmall)
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
                 Spacer()
             }
             
-            // No blueprints warning
+            // Warning banner if no blueprints
             if status.hasWorkshop && status.blueprintCount == 0 {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
+                        .font(FontStyles.iconSmall)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                    
                     Text("You need blueprints to craft. Find them through science discoveries!")
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, 4)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(KingdomTheme.Colors.buttonWarning.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(KingdomTheme.Colors.buttonWarning.opacity(0.3), lineWidth: 1)
+                        )
+                )
             }
         }
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Craftable Items List
+    // MARK: - Craftable Items Section
     
-    private func craftableItemsList(items: [CraftableItem], status: WorkshopStatusResponse) -> some View {
+    private func craftableItemsSection(items: [CraftableItem], status: WorkshopStatusResponse) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Section header
-            HStack {
-                Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.headline)
+            HStack(spacing: 8) {
+                Image(systemName: "scroll.fill")
+                    .font(FontStyles.iconMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
-                Text("Craftable Items")
+                Text("Recipes")
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Spacer()
+                
+                Text("\(items.count) available")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
-            // Item cards
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Item cards as NavigationLinks
             ForEach(items) { item in
-                CraftableItemCard(
+                NavigationLink {
+                    CraftDetailView(
+                        item: item,
+                        blueprintCount: status.blueprintCount,
+                        hasWorkshop: status.hasWorkshop,
+                        onCraft: { await craftItem(itemId: item.id) }
+                    )
+                } label: {
+                    CraftableItemRow(
                     item: item,
                     hasBlueprint: status.blueprintCount > 0,
-                    hasWorkshop: status.hasWorkshop,
-                    onTap: { selectedItem = item }
+                        hasWorkshop: status.hasWorkshop
                 )
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Empty State
+    // MARK: - Empty Recipes Card
     
-    private var emptyState: some View {
+    private var emptyRecipesCard: some View {
         VStack(spacing: KingdomTheme.Spacing.large) {
-            Image(systemName: "hammer")
-                .font(.system(size: 48))
-                .foregroundColor(KingdomTheme.Colors.disabled)
+            Image(systemName: "scroll")
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 80, height: 80)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.disabled,
+                    cornerRadius: 20,
+                    shadowOffset: 4,
+                    borderWidth: 3
+                )
             
-            Text("No Recipes")
+            Text("No Recipes Available")
                 .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            Text("No craftable items available yet.")
+            Text("Discover blueprints through science to unlock crafting recipes.")
                 .font(FontStyles.bodySmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+        .padding(.horizontal)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Error View
     
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
+        VStack(spacing: KingdomTheme.Spacing.large) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.largeTitle)
-                .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 80, height: 80)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonDanger,
+                    cornerRadius: 20,
+                    shadowOffset: 4,
+                    borderWidth: 3
+                )
+            
+            Text("Something went wrong")
+                .font(FontStyles.headingMedium)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text(message)
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .font(FontStyles.bodySmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
             
-            Button("Retry") {
+            Button("Try Again") {
                 Task { await loadWorkshopStatus() }
             }
             .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
         }
-        .padding()
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .padding(.horizontal)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - API Calls
@@ -229,10 +284,13 @@ struct WorkshopView: View {
             await loadWorkshopStatus()
             
             await MainActor.run {
-                selectedItem = nil
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     showCraftResult = true
                 }
+                
+                // Haptic feedback
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(response.success ? .success : .error)
             }
         } catch {
             await MainActor.run {
@@ -241,59 +299,61 @@ struct WorkshopView: View {
                 withAnimation {
                     showCraftResult = true
                 }
+                
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
             }
         }
     }
 }
 
-// MARK: - Craftable Item Card
+// MARK: - Craftable Item Row
 
-struct CraftableItemCard: View {
+struct CraftableItemRow: View {
     let item: CraftableItem
     let hasBlueprint: Bool
     let hasWorkshop: Bool
-    let onTap: () -> Void
     
     private var canCraft: Bool {
         item.canCraft && hasBlueprint && hasWorkshop
     }
     
     var body: some View {
-        Button(action: onTap) {
             HStack(spacing: KingdomTheme.Spacing.medium) {
-                // Item icon
+            // Item icon with brutalist badge
                 Image(systemName: item.icon)
-                    .font(.title2)
+                .font(FontStyles.iconLarge)
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
                         backgroundColor: KingdomTheme.Colors.color(fromThemeName: item.color),
                         cornerRadius: 12,
+                    shadowOffset: 3,
                         borderWidth: 2
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.displayName)
-                        .font(FontStyles.bodyMediumBold)
+                    .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     // Stats preview
-                    HStack(spacing: 8) {
+                HStack(spacing: 12) {
                         if item.attackBonus > 0 {
-                            HStack(spacing: 2) {
+                        HStack(spacing: 4) {
                                 Image(systemName: "bolt.fill")
-                                    .font(.caption2)
+                                .font(FontStyles.iconMini)
                                 Text("+\(item.attackBonus)")
-                                    .font(FontStyles.bodySmall)
+                                .font(FontStyles.labelBold)
                             }
                             .foregroundColor(KingdomTheme.Colors.buttonDanger)
                         }
                         if item.defenseBonus > 0 {
-                            HStack(spacing: 2) {
+                        HStack(spacing: 4) {
                                 Image(systemName: "shield.fill")
-                                    .font(.caption2)
+                                .font(FontStyles.iconMini)
                                 Text("+\(item.defenseBonus)")
-                                    .font(FontStyles.bodySmall)
+                                .font(FontStyles.labelBold)
                             }
                             .foregroundColor(KingdomTheme.Colors.royalBlue)
                         }
@@ -302,32 +362,54 @@ struct CraftableItemCard: View {
                 
                 Spacer()
                 
-                // Status indicator
-                VStack {
+            // Status badge
+            HStack(spacing: 6) {
                     if canCraft {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                    Text("Ready")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.black)
+                                    .offset(x: 1, y: 1)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(KingdomTheme.Colors.buttonSuccess)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.black, lineWidth: 1.5)
+                            }
+                        )
                     } else {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(KingdomTheme.Colors.disabled)
-                    }
+                    Image(systemName: "lock.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
                 }
-                .font(.title3)
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
-            .padding(KingdomTheme.Spacing.medium)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         }
-        .buttonStyle(.plain)
+        .padding(KingdomTheme.Spacing.medium)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchment)
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.black, lineWidth: 1.5)
+            }
+        )
     }
 }
 
-// MARK: - Craft Detail Sheet
+// MARK: - Craft Detail View (Full page, not sheet)
 
-struct CraftDetailSheet: View {
+struct CraftDetailView: View {
     let item: CraftableItem
     let blueprintCount: Int
     let hasWorkshop: Bool
@@ -341,162 +423,199 @@ struct CraftDetailSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
             ScrollView {
                 VStack(spacing: KingdomTheme.Spacing.large) {
-                    // Item preview
-                    itemPreview
-                    
-                    // Blueprint cost
-                    blueprintCost
-                    
-                    // Recipe ingredients
-                    recipeSection
-                    
-                    // Craft button
-                    craftButton
+                // Item hero card
+                itemHeroCard
+                
+                // Requirements card
+                requirementsCard
+                
+                // Craft button section
+                craftActionSection
                 }
                 .padding()
             }
-            .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-            .navigationTitle("Craft Item")
+        .parchmentBackground()
+        .navigationTitle(item.displayName)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { dismiss() }
-                        .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                }
-            }
-        }
+        .parchmentNavigationBar()
     }
     
-    // MARK: - Item Preview
+    // MARK: - Item Hero Card
     
-    private var itemPreview: some View {
+    private var itemHeroCard: some View {
         VStack(spacing: KingdomTheme.Spacing.medium) {
-            // Item icon
+            // Large item icon
             Image(systemName: item.icon)
-                .font(.system(size: 48))
+                .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
-                .frame(width: 80, height: 80)
+                .frame(width: 100, height: 100)
                 .brutalistBadge(
                     backgroundColor: KingdomTheme.Colors.color(fromThemeName: item.color),
-                    cornerRadius: 20,
-                    shadowOffset: 4,
+                    cornerRadius: 24,
+                    shadowOffset: 5,
                     borderWidth: 3
                 )
             
             Text(item.displayName)
-                .font(FontStyles.headingLarge)
+                .font(FontStyles.displaySmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text(item.description)
-                .font(FontStyles.bodySmall)
+                .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .multilineTextAlignment(.center)
             
-            // Stats
-            HStack(spacing: KingdomTheme.Spacing.large) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Stats row
+            HStack(spacing: KingdomTheme.Spacing.xxLarge) {
                 if item.attackBonus > 0 {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 4) {
+                    VStack(spacing: 6) {
+                        HStack(spacing: 6) {
                             Image(systemName: "bolt.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMedium)
                             Text("+\(item.attackBonus)")
-                                .font(FontStyles.bodyMediumBold)
+                                .font(FontStyles.headingMedium)
                         }
                         .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        
                         Text("Attack")
-                            .font(FontStyles.bodySmall)
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
+                
                 if item.defenseBonus > 0 {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 4) {
+                    VStack(spacing: 6) {
+                        HStack(spacing: 6) {
                             Image(systemName: "shield.fill")
-                                .font(.caption)
+                                .font(FontStyles.iconMedium)
                             Text("+\(item.defenseBonus)")
-                                .font(FontStyles.bodyMediumBold)
+                                .font(FontStyles.headingMedium)
                         }
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
+                        
                         Text("Defense")
-                            .font(FontStyles.bodySmall)
+                            .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
             }
         }
-        .padding()
+        .padding(KingdomTheme.Spacing.large)
         .frame(maxWidth: .infinity)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Blueprint Cost
+    // MARK: - Requirements Card
     
-    private var blueprintCost: some View {
-        HStack {
-            Image(systemName: "scroll.fill")
-                .font(.title3)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .frame(width: 32)
-            
-            Text("Blueprint")
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Spacer()
-            
-            HStack(spacing: 4) {
-                Text("\(blueprintCount)")
-                    .foregroundColor(blueprintCount > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                Text("/")
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                Text("1")
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-            .font(FontStyles.bodyMediumBold)
-            
-            Image(systemName: blueprintCount > 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundColor(blueprintCount > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    // MARK: - Recipe Section
-    
-    private var recipeSection: some View {
+    private var requirementsCard: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack {
-                Image(systemName: "list.bullet.rectangle.portrait")
+            // Section header
+            HStack(spacing: 8) {
+                Image(systemName: "checklist")
+                    .font(FontStyles.iconMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Text("Materials Required")
-                    .font(FontStyles.headingSmall)
+                
+                Text("Requirements")
+                    .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
             
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Blueprint requirement
+            requirementRow(
+                icon: "scroll.fill",
+                iconColor: KingdomTheme.Colors.buttonPrimary,
+                label: "Blueprint",
+                required: 1,
+                available: blueprintCount,
+                hasEnough: blueprintCount > 0
+            )
+            
+            // Material requirements
             ForEach(item.recipe) { ingredient in
-                IngredientRow(ingredient: ingredient)
+                requirementRow(
+                    icon: ingredient.icon,
+                    iconColor: KingdomTheme.Colors.color(fromThemeName: ingredient.color),
+                    label: ingredient.displayName,
+                    required: ingredient.required,
+                    available: ingredient.playerHas,
+                    hasEnough: ingredient.hasEnough
+                )
             }
         }
-        .padding()
+        .padding(KingdomTheme.Spacing.medium)
         .frame(maxWidth: .infinity, alignment: .leading)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // MARK: - Craft Button
+    private func requirementRow(icon: String, iconColor: Color, label: String, required: Int, available: Int, hasEnough: Bool) -> some View {
+        HStack(spacing: 12) {
+            // Material icon
+            Image(systemName: icon)
+                .font(FontStyles.iconMedium)
+                .foregroundColor(.white)
+                .frame(width: 36, height: 36)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(iconColor)
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.black, lineWidth: 1.5)
+                    }
+                )
+            
+            Text(label)
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            Spacer()
+            
+            // Amount: have/need
+            HStack(spacing: 4) {
+                Text("\(available)")
+                    .foregroundColor(hasEnough ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                Text("/")
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                Text("\(required)")
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .font(FontStyles.bodyMediumBold)
+            
+            // Status icon
+            Image(systemName: hasEnough ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(FontStyles.iconMedium)
+                .foregroundColor(hasEnough ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+        }
+        .padding(.vertical, 8)
+    }
     
-    private var craftButton: some View {
-        VStack(spacing: 8) {
+    // MARK: - Craft Action Section
+    
+    private var craftActionSection: some View {
+        VStack(spacing: KingdomTheme.Spacing.small) {
             Button {
                 isCrafting = true
                 Task {
                     await onCraft()
-                    isCrafting = false
+                    await MainActor.run {
+                        isCrafting = false
+                        dismiss()
+                    }
                 }
             } label: {
-                HStack {
+                HStack(spacing: 8) {
                     if isCrafting {
                         ProgressView()
                             .tint(.white)
@@ -509,60 +628,29 @@ struct CraftDetailSheet: View {
             }
             .buttonStyle(.brutalist(
                 backgroundColor: canCraft ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                foregroundColor: .white,
                 fullWidth: true
             ))
             .disabled(!canCraft || isCrafting)
             
+            // Show reason if can't craft
             if !canCraft {
-                if blueprintCount == 0 {
-                    Text("Need a blueprint")
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                } else {
-                    Text("Missing materials")
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                }
+                Text(craftBlockReason)
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
             }
         }
     }
-}
-
-// MARK: - Ingredient Row
-
-struct IngredientRow: View {
-    let ingredient: RecipeIngredient
     
-    var body: some View {
-        HStack {
-            // Material icon
-            Image(systemName: ingredient.icon)
-                .font(.title3)
-                .foregroundColor(KingdomTheme.Colors.color(fromThemeName: ingredient.color))
-                .frame(width: 32)
-            
-            Text(ingredient.displayName)
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Spacer()
-            
-            // Amount: have/need
-            HStack(spacing: 4) {
-                Text("\(ingredient.playerHas)")
-                    .foregroundColor(ingredient.hasEnough ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
-                Text("/")
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                Text("\(ingredient.required)")
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-            .font(FontStyles.bodyMediumBold)
-            
-            // Status icon
-            Image(systemName: ingredient.hasEnough ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundColor(ingredient.hasEnough ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+    private var craftBlockReason: String {
+        if !hasWorkshop {
+            return "Workshop required (Property Tier 3+)"
+        } else if blueprintCount == 0 {
+            return "Need a blueprint to craft"
+        } else if !item.canCraft {
+            return "Missing materials"
         }
-        .padding(.vertical, 8)
+        return ""
     }
 }
 
@@ -575,34 +663,57 @@ struct CraftResultOverlay: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.4)
+            Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation { isShowing = false }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isShowing = false
+                    }
                 }
             
             VStack(spacing: KingdomTheme.Spacing.large) {
-                Image(systemName: success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 56))
-                    .foregroundColor(success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger)
+                // Icon
+                Image(systemName: success ? "checkmark.seal.fill" : "xmark.seal.fill")
+                    .font(.system(size: 56, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 100, height: 100)
+                    .brutalistBadge(
+                        backgroundColor: success ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger,
+                        cornerRadius: 24,
+                        shadowOffset: 5,
+                        borderWidth: 3
+                    )
                 
                 Text(success ? "Success!" : "Failed")
-                    .font(FontStyles.headingLarge)
+                    .font(FontStyles.displaySmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text(message)
                     .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal)
                 
                 Button("OK") {
-                    withAnimation { isShowing = false }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isShowing = false
+                    }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary))
             }
             .padding(KingdomTheme.Spacing.xxLarge)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment)
-            .padding(.horizontal, 40)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.black)
+                        .offset(x: 4, y: 4)
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(KingdomTheme.Colors.parchment)
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.black, lineWidth: 3)
+                }
+            )
+            .padding(.horizontal, 32)
         }
     }
 }

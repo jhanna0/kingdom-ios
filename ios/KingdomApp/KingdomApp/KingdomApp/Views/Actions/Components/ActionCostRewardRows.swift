@@ -63,10 +63,10 @@ struct ActionCostRow: View {
         HStack(spacing: 4) {
             Image(systemName: cost.icon)
                 .font(FontStyles.iconMini)
-                .foregroundColor(cost.canAfford ? cost.color : .red)
+                .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
             Text("\(cost.amount)")
                 .font(FontStyles.labelBold)
-                .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkDark : .red)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -163,10 +163,10 @@ struct ActionCostRewardRow: View {
                 HStack(spacing: 3) {
                     Image(systemName: cost.icon)
                         .font(FontStyles.iconMini)
-                        .foregroundColor(cost.canAfford ? cost.color : .red)
+                        .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
                     Text("\(cost.amount)")
                         .font(FontStyles.labelBold)
-                        .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkDark : .red)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
             }
         }
