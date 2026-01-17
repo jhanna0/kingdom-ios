@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, research
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -182,6 +182,7 @@ async def startup_event():
         print("📖 Tutorial: /tutorial (Help content)")
         print("🤝 Trades: /trades (Player-to-player trading)")
         print("🎣 Fishing: /fishing (Chill fishing minigame)")
+        print("🧪 Research: /research (Discover blueprints)")
         print("🔌 WebSocket: /ws (Real-time updates)")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
@@ -230,6 +231,7 @@ app.include_router(trades.router)  # Player-to-player trading (Merchant skill)
 app.include_router(fishing.router)  # Chill fishing minigame
 app.include_router(workshop.router)  # Blueprint-based crafting at Workshop (Property T3+)
 app.include_router(equipment.router)  # View and equip weapons/armor
+app.include_router(research.router)  # Research lab - discover blueprints
 
 
 # ===== WebSocket Endpoint (Local Development) =====

@@ -196,6 +196,12 @@ struct KingdomTheme {
             case "disabled": return disabled
             case "error": return error
             
+            // Parchment variants
+            case "parchment": return parchment
+            case "parchmentlight": return parchmentLight
+            case "parchmentdark": return parchmentDark
+            case "parchmentrich": return parchmentRich
+            
             default:
                 return inkMedium  // Default fallback
             }
