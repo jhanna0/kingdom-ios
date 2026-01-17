@@ -15,8 +15,6 @@ struct ActivityLogEntry: Codable, Identifiable {
     let visibility: String
     let createdAt: String
     let details: ActivityDetails?
-    
-    // Optional user info (for friend feeds)
     let username: String?
     let displayName: String?
     let userLevel: Int?
@@ -37,21 +35,12 @@ struct ActivityLogEntry: Codable, Identifiable {
 // MARK: - Activity Details
 
 struct ActivityDetails: Codable {
-    // Training-specific
     let trainingType: String?
-    let tier: Int?
-    let progress: String?
-    let completed: Bool?
-    
-    // Equipment crafting
     let equipmentType: String?
-    
-    // Can add more fields as needed for other action types
     
     enum CodingKeys: String, CodingKey {
         case trainingType = "training_type"
         case equipmentType = "equipment_type"
-        case tier, progress, completed
     }
 }
 

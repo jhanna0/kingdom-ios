@@ -36,19 +36,14 @@ struct CharacterSheetView: View {
                     onPurchaseTraining: purchaseTraining
                 )
                 
-                // Inventory section
+                // Resources section (gold, iron, steel, etc.)
                 InventoryCardView(player: player)
+                
+                // Equipment section
+                EquipmentInfoCard(player: player)
                 
                 // Pets section
                 PetsCard(pets: player.pets, showEmpty: true)
-                
-                // Crafting section
-                CraftingInfoCard(
-                    player: player,
-                    craftingQueue: craftingQueue,
-                    craftingCosts: craftingCosts,
-                    onPurchaseCraft: purchaseCraft
-                )
                 
                 // Active Perks section
                 if player.activePerks != nil {

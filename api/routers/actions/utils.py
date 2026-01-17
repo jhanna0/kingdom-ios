@@ -445,18 +445,27 @@ def get_equipped_items(db: Session, user_id: int) -> Dict:
     for item in equipped:
         if item.type == "weapon":
             result["equipped_weapon"] = {
+                "id": str(item.id),
+                "type": item.type,
                 "tier": item.tier,
-                "attackBonus": item.attack_bonus
+                "attack_bonus": item.attack_bonus,
+                "defense_bonus": item.defense_bonus,
             }
         elif item.type == "armor":
             result["equipped_armor"] = {
+                "id": str(item.id),
+                "type": item.type,
                 "tier": item.tier,
-                "defenseBonus": item.defense_bonus
+                "attack_bonus": item.attack_bonus,
+                "defense_bonus": item.defense_bonus,
             }
         elif item.type == "shield":
             result["equipped_shield"] = {
+                "id": str(item.id),
+                "type": item.type,
                 "tier": item.tier,
-                "defenseBonus": item.defense_bonus
+                "attack_bonus": item.attack_bonus,
+                "defense_bonus": item.defense_bonus,
             }
     
     return result

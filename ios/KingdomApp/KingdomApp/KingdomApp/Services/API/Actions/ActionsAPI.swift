@@ -83,16 +83,6 @@ class ActionsAPI {
         return try await client.execute(request)
     }
     
-    func equipItem(equipmentId: String) async throws -> EquipResponse {
-        let request = client.request(endpoint: "/actions/equip/\(equipmentId)", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    func unequipItem(equipmentType: String) async throws -> EquipResponse {
-        let request = client.request(endpoint: "/actions/unequip/\(equipmentType)", method: "POST")
-        return try await client.execute(request)
-    }
-    
     // MARK: - Sabotage
     
     func sabotageContract(contractId: String) async throws -> SabotageActionResponse {

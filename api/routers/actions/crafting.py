@@ -400,7 +400,7 @@ def get_inventory(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get player's inventory from player_items table"""
+    """Get player's crafted items inventory"""
     items = db.query(PlayerItem).filter(
         PlayerItem.user_id == current_user.id
     ).order_by(PlayerItem.crafted_at.desc()).all()

@@ -439,6 +439,7 @@ def work_on_craft(
         # Create the item
         new_item = PlayerItem(
             user_id=current_user.id,
+            item_id=contract.type,  # "fur_armor", "hunting_bow", etc.
             type=item_config.get("type", "weapon"),
             tier=item_config.get("tier", 1),
             attack_bonus=item_config.get("attack_bonus", 0),

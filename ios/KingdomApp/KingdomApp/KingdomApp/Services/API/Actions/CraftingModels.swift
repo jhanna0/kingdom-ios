@@ -140,13 +140,6 @@ struct CraftingActionResponse: Codable {
     }
 }
 
-// MARK: - Equip Response
-
-struct EquipResponse: Codable {
-    let success: Bool
-    let message: String
-    let equipped: CraftingActionResponse.EquipmentReward?
-}
 
 
 

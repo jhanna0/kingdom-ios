@@ -26,6 +26,7 @@ class KingdomAPIService: ObservableObject {
     let weather = WeatherAPI()
     let hunts: HuntAPI
     let trades = TradesAPI()
+    let equipment: EquipmentAPI
     
     // MARK: - Shared Client
     private let client = APIClient.shared
@@ -49,6 +50,7 @@ class KingdomAPIService: ObservableObject {
         // Initialize APIs that need the shared client
         self.notifications = NotificationsAPI(client: client)
         self.hunts = HuntAPI(client: client)
+        self.equipment = EquipmentAPI(client: client)
         
         // Forward state from APIClient
         client.$isConnected

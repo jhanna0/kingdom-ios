@@ -94,22 +94,6 @@ def gather_resource(
     # Add gathered resources to player's inventory
     if result.amount > 0:
         setattr(state, player_field, result.new_total)
-        
-        # Log activity only if we gathered something
-        log_activity(
-            db=db,
-            user_id=current_user.id,
-            action_type=f"gather_{resource_type}",
-            action_category="gathering",
-            description=f"Gathered {resource_type}",
-            kingdom_id=state.current_kingdom_id,
-            amount=result.amount,
-            details={
-                "tier": result.tier,
-                "amount": result.amount,
-                "new_total": result.new_total,
-            }
-        )
     
     db.commit()
     

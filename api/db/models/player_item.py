@@ -18,6 +18,7 @@ class PlayerItem(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     
     # Item definition
+    item_id = Column(String(64), nullable=True)  # "fur_armor", "hunting_bow" - nullable for legacy items
     type = Column(String(32), nullable=False)  # 'weapon', 'armor'
     tier = Column(Integer, nullable=False, default=1)
     
