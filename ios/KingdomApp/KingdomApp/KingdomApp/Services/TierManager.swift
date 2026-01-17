@@ -42,15 +42,8 @@ class TierManager {
         skillTierNames = [1: "Novice", 2: "Apprentice", 3: "Journeyman", 4: "Adept", 5: "Expert",
                          6: "Master", 7: "Grandmaster", 8: "Legendary", 9: "Mythic", 10: "Divine"]
         
-        // Reputation defaults
-        reputation = ReputationTiersData(maxTier: 6, tiers: [
-            1: ReputationTierInfo(name: "Stranger", requirement: 0, icon: "person.fill", abilities: ["Basic game access"]),
-            2: ReputationTierInfo(name: "Resident", requirement: 50, icon: "house.fill", abilities: ["Buy property"]),
-            3: ReputationTierInfo(name: "Citizen", requirement: 150, icon: "person.2.fill", abilities: ["Vote on coups"]),
-            4: ReputationTierInfo(name: "Notable", requirement: 300, icon: "star.fill", abilities: ["Propose coups"]),
-            5: ReputationTierInfo(name: "Champion", requirement: 500, icon: "crown.fill", abilities: ["2x vote weight"]),
-            6: ReputationTierInfo(name: "Legendary", requirement: 1000, icon: "sparkles", abilities: ["3x vote weight"])
-        ])
+        // Reputation loaded from backend ONLY - no defaults!
+        reputation = nil
         
         // Building type defaults
         buildingTypes = [

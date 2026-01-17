@@ -27,6 +27,7 @@ INVASION_COST_PER_ATTACKER = 500  # High risk, high reward
 INVASION_WARNING_HOURS = 2
 ATTACKER_ADVANTAGE_REQUIRED = 1.25
 WALL_DEFENSE_PER_LEVEL = 5
+RULER_PROTECTION_DAYS = 30  # Rulers must be in power for 30 days before kingdom can be invaded
 
 
 def _get_player_state(db: Session, user: User) -> PlayerState:
@@ -121,6 +122,16 @@ def declare_invasion(
     target_kingdom = db.query(Kingdom).filter(Kingdom.id == request.target_kingdom_id).first()
     if not target_kingdom:
         raise HTTPException(status_code=404, detail="Target kingdom not found")
+    
+    # Check ruler has been in power for at least 30 days
+    if target_kingdom.ruler_started_at:
+        ruler_tenure = datetime.utcnow() - target_kingdom.ruler_started_at
+        if ruler_tenure.days < RULER_PROTECTION_DAYS:
+            days_remaining = RULER_PROTECTION_DAYS - ruler_tenure.days
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot invade: Ruler has only been in power for {ruler_tenure.days} days. Must wait at least {RULER_PROTECTION_DAYS} days ({days_remaining} days remaining)."
+            )
     
     if target_kingdom.empire_id == attacking_kingdom.empire_id:
         raise HTTPException(status_code=400, detail="Cannot invade your own empire")

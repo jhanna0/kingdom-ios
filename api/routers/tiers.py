@@ -383,7 +383,7 @@ REPUTATION_TIERS = {
     },
     2: {
         "name": "Resident",
-        "requirement": 50,
+        "requirement": 2500,
         "icon": "house.fill",
         "abilities": [
             "Buy property in cities",
@@ -393,7 +393,7 @@ REPUTATION_TIERS = {
     },
     3: {
         "name": "Citizen",
-        "requirement": 150,
+        "requirement": 7500,
         "icon": "person.2.fill",
         "abilities": [
             "Vote on city coups",
@@ -403,7 +403,7 @@ REPUTATION_TIERS = {
     },
     4: {
         "name": "Notable",
-        "requirement": 300,
+        "requirement": 15000,
         "icon": "star.fill",
         "abilities": [
             "Propose city coups (with Leadership 3+)",
@@ -413,7 +413,7 @@ REPUTATION_TIERS = {
     },
     5: {
         "name": "Champion",
-        "requirement": 500,
+        "requirement": 25000,
         "icon": "crown.fill",
         "abilities": [
             "Vote weight counts 2x",
@@ -423,7 +423,7 @@ REPUTATION_TIERS = {
     },
     6: {
         "name": "Legendary",
-        "requirement": 1000,
+        "requirement": 50000,
         "icon": "sparkles",
         "abilities": [
             "Vote weight counts 3x",

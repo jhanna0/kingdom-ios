@@ -452,12 +452,13 @@ struct ResearchView: View {
     
     private var stepHintText: String {
         if isAnimatingRoll { return "…" }
-        if viewModel.showMasterRoll { return "Next roll adds to the main tube" }
+        if viewModel.showMasterRoll { return "Master roll: chance = bar fill %\nHIT adds more to the tube" }
         if let bar = viewModel.currentMiniBar {
             let remaining = max(0, bar.rolls.count - (viewModel.currentRollIndex + 1))
-            return remaining > 0 ? "\(remaining) rolls left on this bar" : "Next: master roll"
+            let base = remaining > 0 ? "\(remaining) rolls left on this bar" : "Next: master roll"
+            return "\(base)\nNormal: 61+ = HIT"
         }
-        return "Tap ROLL"
+        return "Tap ROLL\nNormal: 61+ = HIT"
     }
     
     private var rollColor: Color {
@@ -505,20 +506,32 @@ struct ResearchView: View {
     @MainActor
     private func doFillRollWithAnimation() async {
         guard !isAnimatingRoll else { return }
-        
-        // Advance model to the next step (single user click)
-        viewModel.doNextFillRoll()
-        
-        // Animate to the shown roll value
-        if let roll = viewModel.currentRoll {
-            await animateRoll(to: roll.roll)
-        } else if viewModel.showMasterRoll {
-            // Master roll is also a "roll" the user clicked for.
-            await animateRoll(to: viewModel.masterRollValue)
-            
-            // After the master roll is revealed, auto-apply its contribution into the main tube
-            // (so the user doesn't need an extra click just to transfer the result).
+
+        // Animate FIRST, then advance model state.
+        // This prevents HIT/MISS from appearing before the roll animation completes.
+        guard viewModel.uiState == .filling, let bar = viewModel.currentMiniBar else { return }
+
+        if viewModel.showMasterRoll {
+            // Reveal master roll, then apply its contribution (same click).
+            await animateRoll(to: bar.masterRoll)
+            await Task.yield()
             viewModel.doNextFillRoll()
+            return
+        }
+
+        let nextRollIdx = viewModel.currentRollIndex + 1
+        if nextRollIdx < bar.rolls.count {
+            // Reveal the next normal roll.
+            await animateRoll(to: bar.rolls[nextRollIdx].roll)
+            await Task.yield()
+            viewModel.doNextFillRoll()
+        } else {
+            // No normal rolls left: reveal master roll, then auto-apply into the main tube.
+            await animateRoll(to: bar.masterRoll)
+            await Task.yield()
+            viewModel.doNextFillRoll() // flips into master roll state
+            try? await Task.sleep(nanoseconds: 200_000_000) // tiny beat so the UI can show MASTER HIT/MISS
+            viewModel.doNextFillRoll() // apply contribution + advance
         }
     }
     
@@ -617,9 +630,6 @@ struct ResearchView: View {
     private func mainTubeView(tubeWidth: CGFloat, tubeHeight: CGFloat) -> some View {
         let clampedFill = min(1, max(0, viewModel.mainTubeFill))
         return VStack(spacing: 8) {
-            Text("REAGENT")
-                .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkMedium)
-            
             ZStack(alignment: .bottom) {
                 // Background
                 RoundedRectangle(cornerRadius: 16)
@@ -649,13 +659,12 @@ struct ResearchView: View {
                     .offset(y: -tubeHeight * 0.5)
             }
             .frame(width: tubeWidth, height: tubeHeight)
-            
-            Text("\(Int(clampedFill * 100))%")
-                .fontStyle(FontStyles.statLarge, color: clampedFill >= 0.5 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.royalBlue)
-            
+
             Text("need 50%")
                 .fontStyle(FontStyles.captionLarge, color: KingdomTheme.Colors.inkMedium)
         }
+        .padding(12)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
     }
     
     // MARK: - Fill Result View
@@ -754,33 +763,96 @@ struct ResearchView: View {
     // MARK: - Result View
     
     private var resultView: some View {
-        VStack(spacing: 16) {
-            if let outcome = viewModel.experiment?.outcome {
-                Image(systemName: outcome.success ? (outcome.isCritical ? "star.fill" : "scroll.fill") : "xmark.circle.fill")
-                    .font(.system(size: 50))
-                    .foregroundColor(outcome.success ? (outcome.isCritical ? KingdomTheme.Colors.gold : KingdomTheme.Colors.royalBlue) : KingdomTheme.Colors.buttonDanger)
-                
-                Text(outcome.message)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if outcome.blueprints > 0 {
-                    HStack {
-                        Image(systemName: "scroll.fill").foregroundColor(KingdomTheme.Colors.royalBlue)
-                        Text("+\(outcome.blueprints) Blueprint")
+        let outcome = viewModel.experiment?.outcome
+        
+        return VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: outcomeIcon(outcome))
+                        .font(.system(size: 26, weight: .black))
+                        .foregroundColor(outcomeColor(outcome))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("RESULT")
+                            .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
+                        Text(outcomeTitle(outcome))
+                            .fontStyle(FontStyles.captionLarge, color: KingdomTheme.Colors.inkMedium)
                     }
-                    .font(.system(size: 14, weight: .bold))
+                    
+                    Spacer()
+                    
+                    Text(outcomeBadge(outcome))
+                        .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.parchmentLight,
+                            cornerRadius: 10,
+                            borderWidth: 2
+                        )
                 }
                 
-                if outcome.gp > 0 {
-                    HStack {
-                        Image(systemName: "g.circle.fill").foregroundColor(KingdomTheme.Colors.gold)
-                        Text("+\(outcome.gp) Gold")
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 3)
+                
+                Text(outcome?.message ?? "No result available.")
+                    .fontStyle(FontStyles.bodyMedium, color: KingdomTheme.Colors.inkDark)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                if let outcome, (outcome.blueprints > 0 || outcome.gp > 0) {
+                    HStack(spacing: 10) {
+                        if outcome.blueprints > 0 {
+                            rewardPill(icon: "scroll.fill", iconColor: KingdomTheme.Colors.royalBlue, text: "+\(outcome.blueprints) Blueprint")
+                        }
+                        if outcome.gp > 0 {
+                            rewardPill(icon: "g.circle.fill", iconColor: KingdomTheme.Colors.gold, text: "+\(outcome.gp) Gold")
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .font(.system(size: 14, weight: .bold))
                 }
             }
+            .padding(14)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 16)
+            .frame(maxWidth: .infinity)
         }
+        .padding(.horizontal, 20)
+    }
+    
+    private func rewardPill(icon: String, iconColor: Color, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundColor(iconColor)
+            Text(text)
+                .fontStyle(FontStyles.labelMedium, color: KingdomTheme.Colors.inkDark)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12, borderWidth: 2)
+    }
+    
+    private func outcomeIcon(_ outcome: OutcomeResult?) -> String {
+        guard let outcome else { return "questionmark.circle.fill" }
+        if outcome.success { return outcome.isCritical ? "star.fill" : "scroll.fill" }
+        return "xmark.circle.fill"
+    }
+    
+    private func outcomeColor(_ outcome: OutcomeResult?) -> Color {
+        guard let outcome else { return KingdomTheme.Colors.inkMedium }
+        if outcome.success { return outcome.isCritical ? KingdomTheme.Colors.gold : KingdomTheme.Colors.royalBlue }
+        return KingdomTheme.Colors.buttonDanger
+    }
+    
+    private func outcomeTitle(_ outcome: OutcomeResult?) -> String {
+        guard let outcome else { return "UNKNOWN" }
+        if outcome.success { return outcome.isCritical ? "Critical discovery" : "Discovery" }
+        return "Failed experiment"
+    }
+    
+    private func outcomeBadge(_ outcome: OutcomeResult?) -> String {
+        guard let outcome else { return "—" }
+        if outcome.success { return outcome.isCritical ? "CRITICAL" : "SUCCESS" }
+        return "FAIL"
     }
     
     // MARK: - Action Bar

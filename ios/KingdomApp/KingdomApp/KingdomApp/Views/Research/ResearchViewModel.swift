@@ -160,8 +160,15 @@ class ResearchViewModel: ObservableObject {
                 currentRollIndex = -1
                 showMasterRoll = false
             } else {
-                // All bars done
-                uiState = .fillResult
+                // All bars done — skip the fill result screen entirely.
+                // Go straight into phase 2 (or final result if phase 1 failed).
+                if experiment?.phase1Fill.success == true {
+                    stabilizeRollIndex = -1
+                    stabilizeHits = 0
+                    uiState = .stabilizing
+                } else {
+                    uiState = .result
+                }
             }
         }
     }
@@ -172,6 +179,8 @@ class ResearchViewModel: ObservableObject {
         guard let exp = experiment else { return }
         
         if !exp.phase1Fill.success {
+            // Let the player actually see the phase 1 result state before switching screens.
+            try? await Task.sleep(nanoseconds: phaseDelay)
             uiState = .result
             return
         }
