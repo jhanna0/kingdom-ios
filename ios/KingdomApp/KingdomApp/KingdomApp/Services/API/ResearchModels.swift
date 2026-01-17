@@ -4,54 +4,75 @@ import Foundation
 
 struct ResearchConfig: Codable {
     let goldCost: Int
-    let phases: ResearchPhases
-    let rewards: [String: RewardConfig]
-    let ui: ResearchUIConfig
+    let phase1Fill: FillConfig
+    let phase2Cooking: CookingConfig
     
     enum CodingKeys: String, CodingKey {
         case goldCost = "gold_cost"
-        case phases, rewards, ui
+        case phase1Fill = "phase1_fill"
+        case phase2Cooking = "phase2_cooking"
     }
 }
 
-struct ResearchPhases: Codable {
-    let fill: PhaseConfig
-    let stabilize: PhaseConfig
-    let build: PhaseConfig
-}
-
-struct PhaseConfig: Codable {
+struct FillConfig: Codable {
     let stat: String
     let statDisplayName: String
-    let animationMs: Int
+    let baseRolls: Int
+    let rollsPerStat: Int
+    let hitThreshold: Int
+    let hitFillAmount: Double
+    let missFillAmount: Double
+    let miniBarNames: [String]
     
     enum CodingKeys: String, CodingKey {
         case stat
         case statDisplayName = "stat_display_name"
-        case animationMs = "animation_ms"
+        case baseRolls = "base_rolls"
+        case rollsPerStat = "rolls_per_stat"
+        case hitThreshold = "hit_threshold"
+        case hitFillAmount = "hit_fill_amount"
+        case missFillAmount = "miss_fill_amount"
+        case miniBarNames = "mini_bar_names"
     }
 }
 
-struct RewardConfig: Codable {
+struct CookingConfig: Codable {
+    let stat: String
+    let statDisplayName: String
+    let baseAttempts: Int
+    let attemptsPerStat: Int
+    let rewardTiers: [RewardTier]
+    
+    enum CodingKeys: String, CodingKey {
+        case stat
+        case statDisplayName = "stat_display_name"
+        case baseAttempts = "base_attempts"
+        case attemptsPerStat = "attempts_per_stat"
+        case rewardTiers = "reward_tiers"
+    }
+}
+
+struct RewardTier: Codable, Identifiable {
+    let id: String
+    let minPercent: Int
+    let maxPercent: Int
+    let label: String
+    let description: String
     let blueprints: Int
     let gpMin: Int
     let gpMax: Int
-    let message: String
     
     enum CodingKeys: String, CodingKey {
-        case blueprints
+        case id
+        case minPercent = "min_percent"
+        case maxPercent = "max_percent"
+        case label, description, blueprints
         case gpMin = "gp_min"
         case gpMax = "gp_max"
-        case message
     }
 }
 
-struct ResearchUIConfig: Codable {
-    let title: String
-    let icon: String
-}
-
-// MARK: - Experiment Result
+// MARK: - Experiment Response
 
 struct ExperimentResponse: Codable {
     let experiment: ExperimentResult
@@ -67,31 +88,27 @@ struct ExperimentResponse: Codable {
 
 struct ExperimentResult: Codable {
     let phase1Fill: FillPhaseResult
-    let phase2Stabilize: StabilizePhaseResult
-    let phase3Build: BuildPhaseResult
+    let phase2Cooking: CookingPhaseResult
     let outcome: OutcomeResult
     
     enum CodingKeys: String, CodingKey {
         case phase1Fill = "phase1_fill"
-        case phase2Stabilize = "phase2_stabilize"
-        case phase3Build = "phase3_build"
+        case phase2Cooking = "phase2_cooking"
         case outcome
     }
 }
 
-// MARK: - Phase 1: Fill (3 mini bars)
+// MARK: - Phase 1
 
 struct FillPhaseResult: Codable {
     let miniBars: [MiniBarResult]
     let mainTubeFill: Double
-    let success: Bool
-    let minRequired: Double
+    let config: FillConfig
     
     enum CodingKeys: String, CodingKey {
         case miniBars = "mini_bars"
         case mainTubeFill = "main_tube_fill"
-        case success
-        case minRequired = "min_required"
+        case config
     }
 }
 
@@ -99,8 +116,7 @@ struct MiniBarResult: Codable, Identifiable {
     let name: String
     let rolls: [MiniRoll]
     let finalFill: Double
-    let masterRoll: Int
-    let masterHit: Bool
+    let reagentSelect: Int
     let contribution: Double
     
     var id: String { name }
@@ -108,8 +124,7 @@ struct MiniBarResult: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case name, rolls
         case finalFill = "final_fill"
-        case masterRoll = "master_roll"
-        case masterHit = "master_hit"
+        case reagentSelect = "reagent_select"
         case contribution
     }
 }
@@ -129,64 +144,37 @@ struct MiniRoll: Codable, Identifiable {
     }
 }
 
-// MARK: - Phase 2: Stabilize
+// MARK: - Phase 2
 
-struct StabilizePhaseResult: Codable {
-    let rolls: [StabilizeRoll]
-    let totalHits: Int
-    let success: Bool
-    let hitsNeeded: Int
+struct CookingPhaseResult: Codable {
+    let landings: [CookingLanding]
+    let bestLanding: Int
+    let totalAttempts: Int
+    let landedTierId: String?
+    let maxLanding: Int
+    let config: CookingConfig
     
     enum CodingKeys: String, CodingKey {
-        case rolls
-        case totalHits = "total_hits"
-        case success
-        case hitsNeeded = "hits_needed"
+        case landings
+        case bestLanding = "best_landing"
+        case totalAttempts = "total_attempts"
+        case landedTierId = "landed_tier_id"
+        case maxLanding = "max_landing"
+        case config
     }
 }
 
-struct StabilizeRoll: Codable, Identifiable {
-    let rollNumber: Int
-    let roll: Int
-    let hit: Bool
+struct CookingLanding: Codable, Identifiable {
+    let attemptNumber: Int
+    let landingPosition: Int
+    let isBest: Bool
     
-    var id: Int { rollNumber }
-    
-    enum CodingKeys: String, CodingKey {
-        case rollNumber = "roll_number"
-        case roll, hit
-    }
-}
-
-// MARK: - Phase 3: Build
-
-struct BuildPhaseResult: Codable {
-    let taps: [TapResult]
-    let finalProgress: Int
-    let success: Bool
-    let progressNeeded: Int
+    var id: Int { attemptNumber }
     
     enum CodingKeys: String, CodingKey {
-        case taps
-        case finalProgress = "final_progress"
-        case success
-        case progressNeeded = "progress_needed"
-    }
-}
-
-struct TapResult: Codable, Identifiable {
-    let tapNumber: Int
-    let hit: Bool
-    let progressAdded: Int
-    let totalProgress: Int
-    
-    var id: Int { tapNumber }
-    
-    enum CodingKeys: String, CodingKey {
-        case tapNumber = "tap_number"
-        case hit
-        case progressAdded = "progress_added"
-        case totalProgress = "total_progress"
+        case attemptNumber = "attempt_number"
+        case landingPosition = "landing_position"
+        case isBest = "is_best"
     }
 }
 

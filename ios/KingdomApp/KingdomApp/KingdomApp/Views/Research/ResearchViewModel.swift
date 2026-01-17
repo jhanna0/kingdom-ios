@@ -1,19 +1,14 @@
 import SwiftUI
 import Combine
 
-// MARK: - Research View Model
-
 @MainActor
 class ResearchViewModel: ObservableObject {
     
     enum UIState: Equatable {
         case loading
         case idle
-        case filling           // Phase 1: animating 3 mini bars
-        case fillResult        // Phase 1 done, show result
-        case stabilizing       // Phase 2
-        case stabilizeResult
-        case building          // Phase 3
+        case filling
+        case cooking
         case result
         case error(String)
     }
@@ -25,30 +20,49 @@ class ResearchViewModel: ObservableObject {
     @Published var stats: PlayerResearchStats?
     @Published var experiment: ExperimentResult?
     
-    // Phase 1: Mini bars
-    @Published var currentBarIndex: Int = 0        // Which mini bar (0, 1, 2)
-    @Published var currentRollIndex: Int = -1      // Which roll on current bar
-    @Published var miniBarFills: [CGFloat] = [0, 0, 0]  // Fill level of each mini bar
-    @Published var showMasterRoll: Bool = false
-    @Published var masterRollValue: Int = 0
+    // Phase 1
+    @Published var currentBarIndex: Int = 0
+    @Published var currentRollIndex: Int = -1
+    @Published var miniBarFills: [CGFloat] = [0, 0, 0]
+    @Published var showReagentSelect: Bool = false
     @Published var mainTubeFill: CGFloat = 0
     
-    // Phase 2: Stabilize
-    @Published var stabilizeRollIndex: Int = -1
-    @Published var stabilizeHits: Int = 0
-    
-    // Phase 3: Build
-    @Published var currentTapIndex: Int = 0
-    @Published var buildProgress: Int = 0
-    
-    // Timing
-    private let rollDelay: UInt64 = 1_000_000_000      // 1 sec per roll
-    private let masterRollDelay: UInt64 = 1_500_000_000 // 1.5 sec for master roll
-    private let phaseDelay: UInt64 = 1_000_000_000      // 1 sec between phases
+    // Phase 2
+    @Published var currentLandingIndex: Int = -1
+    @Published var bestLandingSoFar: Int = 0
     
     private var api: ResearchAPI?
     
-    // MARK: - Computed
+    // MARK: - Config from backend
+    
+    var fillConfig: FillConfig? {
+        experiment?.phase1Fill.config
+    }
+    
+    var cookingConfig: CookingConfig? {
+        experiment?.phase2Cooking.config
+    }
+    
+    var miniBarNames: [String] {
+        fillConfig?.miniBarNames ?? []
+    }
+    
+    var rewardTiers: [RewardTier] {
+        cookingConfig?.rewardTiers ?? []
+    }
+    
+    var maxLanding: Int {
+        experiment?.phase2Cooking.maxLanding ?? 0
+    }
+    
+    func tierForLanding(_ landing: Int) -> RewardTier? {
+        rewardTiers.first { landing >= $0.minPercent && landing <= $0.maxPercent }
+    }
+    
+    var landedTier: RewardTier? {
+        guard let tierId = experiment?.phase2Cooking.landedTierId else { return nil }
+        return rewardTiers.first { $0.id == tierId }
+    }
     
     var currentMiniBar: MiniBarResult? {
         guard let bars = experiment?.phase1Fill.miniBars,
@@ -63,11 +77,16 @@ class ResearchViewModel: ObservableObject {
         return bar.rolls[currentRollIndex]
     }
     
-    var currentStabilizeRoll: StabilizeRoll? {
-        guard let rolls = experiment?.phase2Stabilize.rolls,
-              stabilizeRollIndex >= 0,
-              stabilizeRollIndex < rolls.count else { return nil }
-        return rolls[stabilizeRollIndex]
+    var currentLanding: CookingLanding? {
+        guard let landings = experiment?.phase2Cooking.landings,
+              currentLandingIndex >= 0,
+              currentLandingIndex < landings.count else { return nil }
+        return landings[currentLandingIndex]
+    }
+    
+    var remainingAttempts: Int {
+        guard let cooking = experiment?.phase2Cooking else { return 0 }
+        return cooking.totalAttempts - (currentLandingIndex + 1)
     }
     
     // MARK: - Init
@@ -98,31 +117,25 @@ class ResearchViewModel: ObservableObject {
             return
         }
         
-        // Reset
         currentBarIndex = 0
         currentRollIndex = -1
         miniBarFills = [0, 0, 0]
-        showMasterRoll = false
-        masterRollValue = 0
+        showReagentSelect = false
         mainTubeFill = 0
-        stabilizeRollIndex = -1
-        stabilizeHits = 0
-        currentTapIndex = 0
-        buildProgress = 0
+        currentLandingIndex = -1
+        bestLandingSoFar = 0
         
         do {
             let response = try await api.runExperiment()
             experiment = response.experiment
             self.stats = response.playerStats
-            
-            // Ready for user to click through rolls
             uiState = .filling
         } catch {
             uiState = .error(error.localizedDescription)
         }
     }
     
-    // MARK: - Phase 1: Fill - User clicks each roll
+    // MARK: - Phase 1
     
     func doNextFillRoll() {
         guard uiState == .filling,
@@ -131,120 +144,60 @@ class ResearchViewModel: ObservableObject {
         
         let bar = miniBars[currentBarIndex]
         
-        // If we haven't shown master roll yet
-        if !showMasterRoll {
+        if !showReagentSelect {
             let nextRollIdx = currentRollIndex + 1
             
             if nextRollIdx < bar.rolls.count {
-                // Show next roll
                 currentRollIndex = nextRollIdx
                 let roll = bar.rolls[nextRollIdx]
                 withAnimation(.easeOut(duration: 0.3)) {
                     miniBarFills[currentBarIndex] = CGFloat(roll.totalFill)
                 }
             } else {
-                // All rolls done, show master roll
-                showMasterRoll = true
-                masterRollValue = bar.masterRoll
+                showReagentSelect = true
             }
         } else {
-            // Master roll shown, add contribution and move to next bar
             withAnimation(.easeOut(duration: 0.5)) {
                 mainTubeFill += CGFloat(bar.contribution)
             }
             
-            // Move to next bar or finish
             let nextBarIdx = currentBarIndex + 1
             if nextBarIdx < miniBars.count {
                 currentBarIndex = nextBarIdx
                 currentRollIndex = -1
-                showMasterRoll = false
+                showReagentSelect = false
             } else {
-                // All bars done — skip the fill result screen entirely.
-                // Go straight into phase 2 (or final result if phase 1 failed).
-                if experiment?.phase1Fill.success == true {
-                    stabilizeRollIndex = -1
-                    stabilizeHits = 0
-                    uiState = .stabilizing
-                } else {
-                    uiState = .result
-                }
+                currentLandingIndex = -1
+                bestLandingSoFar = 0
+                uiState = .cooking
             }
         }
     }
     
-    // MARK: - Phase 2: Stabilize
+    // MARK: - Phase 2
     
-    func startStabilize() async {
-        guard let exp = experiment else { return }
-        
-        if !exp.phase1Fill.success {
-            // Let the player actually see the phase 1 result state before switching screens.
-            try? await Task.sleep(nanoseconds: phaseDelay)
-            uiState = .result
-            return
-        }
-        
-        stabilizeRollIndex = -1
-        stabilizeHits = 0
-        uiState = .stabilizing
+    var isExperimentComplete: Bool {
+        guard let landings = experiment?.phase2Cooking.landings else { return false }
+        return currentLandingIndex >= landings.count - 1
     }
     
-    func doNextStabilizeRoll() {
-        guard uiState == .stabilizing,
-              let rolls = experiment?.phase2Stabilize.rolls else { return }
+    func doNextLanding() {
+        guard uiState == .cooking,
+              let landings = experiment?.phase2Cooking.landings else { return }
         
-        let nextIdx = stabilizeRollIndex + 1
+        let nextIdx = currentLandingIndex + 1
         
-        if nextIdx < rolls.count {
-            stabilizeRollIndex = nextIdx
-            let roll = rolls[nextIdx]
+        if nextIdx < landings.count {
+            currentLandingIndex = nextIdx
+            let landing = landings[nextIdx]
             
-            if roll.hit {
+            if landing.isBest {
                 withAnimation(.spring()) {
-                    stabilizeHits += 1
+                    bestLandingSoFar = landing.landingPosition
                 }
             }
-        } else {
-            // Done with stabilize
-            uiState = .stabilizeResult
         }
-    }
-    
-    // MARK: - Phase 3: Build
-    
-    func startBuild() async {
-        guard let exp = experiment else { return }
-        
-        if !exp.phase2Stabilize.success {
-            uiState = .result
-            return
-        }
-        
-        currentTapIndex = 0
-        buildProgress = 0
-        uiState = .building
-    }
-    
-    func handleTap() {
-        guard uiState == .building,
-              let taps = experiment?.phase3Build.taps,
-              currentTapIndex < taps.count else { return }
-        
-        let tap = taps[currentTapIndex]
-        
-        withAnimation(.spring()) {
-            buildProgress = tap.totalProgress
-        }
-        
-        currentTapIndex += 1
-        
-        if currentTapIndex >= taps.count || tap.totalProgress >= (experiment?.phase3Build.progressNeeded ?? 100) {
-            Task {
-                try? await Task.sleep(nanoseconds: phaseDelay)
-                uiState = .result
-            }
-        }
+        // Don't switch to result screen - show results inline in cooking phase
     }
     
     // MARK: - Reset
@@ -254,13 +207,10 @@ class ResearchViewModel: ObservableObject {
         currentBarIndex = 0
         currentRollIndex = -1
         miniBarFills = [0, 0, 0]
-        showMasterRoll = false
-        masterRollValue = 0
+        showReagentSelect = false
         mainTubeFill = 0
-        stabilizeRollIndex = -1
-        stabilizeHits = 0
-        currentTapIndex = 0
-        buildProgress = 0
+        currentLandingIndex = -1
+        bestLandingSoFar = 0
         
         if let api = api {
             stats = try? await api.getStats()

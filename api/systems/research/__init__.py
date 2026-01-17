@@ -1,7 +1,5 @@
 """
 RESEARCH SYSTEM
-===============
-Three-phase minigame for discovering blueprints.
 """
 
 from .config import (
@@ -9,9 +7,7 @@ from .config import (
     ResearchPhase,
     RESEARCH_GOLD_COST,
     FILL_CONFIG,
-    STABILIZE_CONFIG,
-    BUILD_CONFIG,
-    REWARDS,
+    COOKING_CONFIG,
 )
 from .research_manager import ResearchManager
 
@@ -21,7 +17,5 @@ __all__ = [
     "ResearchPhase",
     "RESEARCH_GOLD_COST",
     "FILL_CONFIG",
-    "STABILIZE_CONFIG",
-    "BUILD_CONFIG",
-    "REWARDS",
+    "COOKING_CONFIG",
 ]
