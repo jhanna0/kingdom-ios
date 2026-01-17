@@ -1,18 +1,30 @@
 """
-WORKSHOP SYSTEM - Blueprint-based crafting
-==========================================
+WORKSHOP SYSTEM - Blueprint-based crafting with CONTRACT SYSTEM
+================================================================
 Blueprints are generic crafting tokens. You need 1 blueprint + materials to craft ANY item.
-The Workshop shows what you CAN craft based on your materials.
-
-Think Minecraft crafting table - blueprint is just the "permission to craft".
+Crafting uses the contract system like everything else in the game:
+  1. Start craft → creates contract, deducts materials
+  2. Work on craft → cooldown-based actions
+  3. Complete → item created
 """
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from datetime import datetime, timedelta
 
-from db import get_db, User, Property, PlayerItem
+from db import get_db, User, Property, PlayerItem, UnifiedContract, ContractContribution
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.resources import RESOURCES
+from routers.actions.utils import (
+    check_and_set_slot_cooldown_atomic, 
+    format_datetime_iso, 
+    calculate_cooldown, 
+    set_cooldown,
+    check_and_deduct_food_cost
+)
+from routers.actions.constants import WORK_BASE_COOLDOWN
+from config import DEV_MODE
 
 
 router = APIRouter(prefix="/workshop", tags=["workshop"])
@@ -31,6 +43,7 @@ CRAFTABLE_ITEMS = {
         "tier": 1,
         "attack_bonus": 2,
         "defense_bonus": 0,
+        "actions_required": 10,  # Crafting takes real effort over time
         "recipe": {
             "sinew": 5,
             "wood": 100,
@@ -45,6 +58,7 @@ CRAFTABLE_ITEMS = {
         "tier": 1,
         "attack_bonus": 0,
         "defense_bonus": 2,
+        "actions_required": 10,  # Crafting takes real effort over time
         "recipe": {
             "fur": 10
         },
@@ -151,13 +165,22 @@ def consume_blueprint(db: Session, user_id: int) -> bool:
     return True
 
 
+def get_active_workshop_contract(db: Session, user_id: int):
+    """Get active workshop crafting contract if any."""
+    return db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.category == "workshop_craft",
+        UnifiedContract.completed_at.is_(None)
+    ).first()
+
+
 @router.get("/status")
 def get_workshop_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get workshop status - blueprints owned, what can be crafted.
+    Get workshop status - blueprints owned, active contract, what can be crafted.
     Frontend renders everything from this response.
     """
     state = current_user.player_state
@@ -175,28 +198,46 @@ def get_workshop_status(
     # Get blueprint count
     blueprint_count = get_blueprint_count(db, current_user.id)
     
+    # Get active crafting contract
+    active_contract = get_active_workshop_contract(db, current_user.id)
+    active_contract_data = None
+    
+    if active_contract:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == active_contract.id
+        ).scalar()
+        
+        item_config = CRAFTABLE_ITEMS.get(active_contract.type, {})
+        
+        active_contract_data = {
+            "id": active_contract.id,
+            "item_id": active_contract.type,
+            "display_name": item_config.get("display_name", active_contract.type),
+            "icon": item_config.get("icon", "hammer"),
+            "color": item_config.get("color", "gray"),
+            "actions_required": active_contract.actions_required,
+            "actions_completed": actions_completed,
+            "progress_percent": int((actions_completed / active_contract.actions_required) * 100) if active_contract.actions_required > 0 else 0,
+            "created_at": format_datetime_iso(active_contract.created_at) if active_contract.created_at else None,
+        }
+    
     # Build list of craftable items with recipe status
-    # ONLY show items if:
-    # 1. Player has workshop access
-    # 2. Player has at least ONE of the required materials (like Minecraft!)
     craftable_items = []
     if has_workshop:
         for item_id, item_config in CRAFTABLE_ITEMS.items():
             recipe = item_config["recipe"]
-            can_craft = blueprint_count > 0
+            can_craft = blueprint_count > 0 and active_contract is None  # Can't start new if one is active
             materials_status = []
-            has_any_material = False  # Track if player has ANY required material
+            has_any_material = False
             
             for mat_id, required in recipe.items():
                 player_has = get_player_material_count(db, current_user.id, mat_id)
                 has_enough = player_has >= required
                 can_craft = can_craft and has_enough
                 
-                # Check if player has ANY of this material
                 if player_has > 0:
                     has_any_material = True
                 
-                # Get material display info
                 mat_info = RESOURCES.get(mat_id, {})
                 
                 materials_status.append({
@@ -209,7 +250,6 @@ def get_workshop_status(
                     "has_enough": has_enough,
                 })
             
-            # ONLY show item if player has at least one required material
             if has_any_material:
                 craftable_items.append({
                     "id": item_id,
@@ -220,6 +260,7 @@ def get_workshop_status(
                     "type": item_config["type"],
                     "attack_bonus": item_config.get("attack_bonus", 0),
                     "defense_bonus": item_config.get("defense_bonus", 0),
+                    "actions_required": item_config.get("actions_required", 3),
                     "recipe": materials_status,
                     "can_craft": can_craft,
                 })
@@ -227,40 +268,44 @@ def get_workshop_status(
     return {
         "has_workshop": has_workshop,
         "workshop_property": {
-            "id": workshop_property.id,
+            "id": str(workshop_property.id),
             "kingdom_name": workshop_property.kingdom_name,
             "tier": workshop_property.tier,
         } if workshop_property else None,
         "blueprint_count": blueprint_count,
+        "active_contract": active_contract_data,
         "craftable_items": craftable_items,
-        "workshop_requirement": "Upgrade your property to unlock Workshop access.",
+        "workshop_requirement": "Upgrade your property to Tier 3 to unlock Workshop.",
     }
 
 
-@router.post("/craft/{item_id}")
-def craft_item(
+@router.post("/craft/{item_id}/start")
+def start_craft(
     item_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Craft an item. Consumes 1 blueprint + required materials.
+    Start crafting an item. Creates a contract, deducts blueprint + materials.
+    Must complete actions to finish crafting.
     """
     state = current_user.player_state
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check workshop requirement (tier 3+)
+    # Check workshop requirement
     workshop_property = db.query(Property).filter(
         Property.owner_id == current_user.id,
         Property.tier >= 3
     ).first()
     
     if not workshop_property:
-        raise HTTPException(
-            status_code=400,
-            detail="You need a Workshop (Property Tier 3) to craft items."
-        )
+        raise HTTPException(status_code=400, detail="You need a Workshop (Property Tier 3) to craft items.")
+    
+    # Check no active contract
+    active_contract = get_active_workshop_contract(db, current_user.id)
+    if active_contract:
+        raise HTTPException(status_code=400, detail="You already have a craft in progress. Complete it first!")
     
     # Check item exists
     if item_id not in CRAFTABLE_ITEMS:
@@ -268,12 +313,12 @@ def craft_item(
     
     item_config = CRAFTABLE_ITEMS[item_id]
     
-    # Check player has a blueprint
+    # Check blueprint
     blueprint_count = get_blueprint_count(db, current_user.id)
     if blueprint_count < 1:
         raise HTTPException(status_code=400, detail="You need a blueprint to craft items")
     
-    # Check player has all materials
+    # Check materials
     recipe = item_config["recipe"]
     for mat_id, required in recipe.items():
         player_has = get_player_material_count(db, current_user.id, mat_id)
@@ -293,33 +338,156 @@ def craft_item(
             db.rollback()
             raise HTTPException(status_code=500, detail="Failed to deduct materials")
     
-    # Create the item (equipment goes to player_items table)
-    new_item = PlayerItem(
+    # Create the contract
+    contract = UnifiedContract(
         user_id=current_user.id,
-        type=item_config["type"],
+        category="workshop_craft",
+        type=item_id,
         tier=item_config.get("tier", 1),
-        attack_bonus=item_config.get("attack_bonus", 0),
-        defense_bonus=item_config.get("defense_bonus", 0),
-        is_equipped=False,
+        actions_required=item_config.get("actions_required", 3),
+        kingdom_id=state.current_kingdom_id,
     )
-    db.add(new_item)
+    db.add(contract)
     db.commit()
-    db.refresh(new_item)
+    db.refresh(contract)
     
     return {
         "success": True,
-        "message": f"Crafted {item_config['display_name']}!",
-        "item": {
-            "id": new_item.id,
+        "message": f"Started crafting {item_config['display_name']}! Complete {contract.actions_required} work actions to finish.",
+        "contract": {
+            "id": contract.id,
+            "item_id": item_id,
             "display_name": item_config["display_name"],
             "icon": item_config["icon"],
             "color": item_config["color"],
+            "actions_required": contract.actions_required,
+            "actions_completed": 0,
+        },
+        "blueprints_remaining": get_blueprint_count(db, current_user.id),
+    }
+
+
+@router.post("/craft/work")
+def work_on_craft(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Work on active crafting contract. Uses cooldown system like all other actions.
+    """
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(status_code=404, detail="Player state not found")
+    
+    # Get active contract
+    contract = get_active_workshop_contract(db, current_user.id)
+    if not contract:
+        raise HTTPException(status_code=400, detail="No active craft. Start one first!")
+    
+    item_config = CRAFTABLE_ITEMS.get(contract.type, {})
+    
+    # Calculate skill-adjusted cooldown
+    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
+    # Check and deduct food cost
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "crafting")
+    if not food_result["success"]:
+        raise HTTPException(status_code=400, detail=food_result["error"])
+    
+    # Cooldown check
+    if not DEV_MODE:
+        cooldown_result = check_and_set_slot_cooldown_atomic(
+            db, current_user.id,
+            action_type="workshop_craft",
+            cooldown_minutes=cooldown_minutes,
+            expires_at=cooldown_expires
+        )
+        
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
+            minutes = remaining // 60
+            seconds = remaining % 60
+            raise HTTPException(
+                status_code=429,
+                detail=f"Crafting on cooldown. Wait {minutes}m {seconds}s."
+            )
+    else:
+        set_cooldown(db, current_user.id, "workshop_craft", cooldown_expires)
+    
+    # Add contribution
+    xp_earned = 15
+    contribution = ContractContribution(
+        contract_id=contract.id,
+        user_id=current_user.id,
+        xp_earned=xp_earned
+    )
+    db.add(contribution)
+    state.experience += xp_earned
+    
+    # Count actions
+    actions_completed = db.query(func.count(ContractContribution.id)).filter(
+        ContractContribution.contract_id == contract.id
+    ).scalar() + 1  # +1 for the one we just added
+    
+    is_complete = actions_completed >= contract.actions_required
+    new_item = None
+    
+    if is_complete:
+        contract.completed_at = datetime.utcnow()
+        
+        # Create the item
+        new_item = PlayerItem(
+            user_id=current_user.id,
+            type=item_config.get("type", "weapon"),
+            tier=item_config.get("tier", 1),
+            attack_bonus=item_config.get("attack_bonus", 0),
+            defense_bonus=item_config.get("defense_bonus", 0),
+            is_equipped=False,
+        )
+        db.add(new_item)
+        
+        # Bonus XP for completion
+        bonus_xp = 50
+        xp_earned += bonus_xp
+        state.experience += bonus_xp
+    
+    # Level up check
+    xp_needed = 100 * (2 ** (state.level - 1))
+    leveled_up = False
+    if state.experience >= xp_needed:
+        state.level += 1
+        state.skill_points += 1
+        leveled_up = True
+    
+    db.commit()
+    
+    if new_item:
+        db.refresh(new_item)
+    
+    return {
+        "success": True,
+        "message": "Crafting progress!" + (" Item crafted!" if is_complete else ""),
+        "contract_id": contract.id,
+        "actions_completed": actions_completed,
+        "actions_required": contract.actions_required,
+        "progress_percent": int((actions_completed / contract.actions_required) * 100),
+        "is_complete": is_complete,
+        "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"],
+        "xp_earned": xp_earned,
+        "leveled_up": leveled_up,
+        "item": {
+            "id": new_item.id,
+            "display_name": item_config.get("display_name", contract.type),
+            "icon": item_config.get("icon", "hammer"),
+            "color": item_config.get("color", "gray"),
             "type": new_item.type,
             "tier": new_item.tier,
             "attack_bonus": new_item.attack_bonus,
             "defense_bonus": new_item.defense_bonus,
-        },
-        "blueprints_remaining": get_blueprint_count(db, current_user.id),
+        } if new_item else None,
     }
 
 

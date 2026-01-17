@@ -343,6 +343,8 @@ struct ActionsView: View {
         switch slot.contentType {
         case "training_contracts":
             return !status.trainingContracts.filter { $0.status != "completed" }.isEmpty
+        case "workshop_contracts":
+            return !(status.workshopContracts?.filter { $0.status != "completed" }.isEmpty ?? true)
         case "building_contracts":
             let hasKingdomContracts = !availableContractsInKingdom.isEmpty
             let hasPropertyContracts = !(status.propertyUpgradeContracts?.filter { $0.status != "completed" }.isEmpty ?? true)
@@ -361,6 +363,9 @@ struct ActionsView: View {
         switch slot.contentType {
         case "training_contracts":
             renderTrainingContracts(slot: slot, status: status)
+            
+        case "workshop_contracts":
+            renderWorkshopContracts(slot: slot, status: status)
             
         case "building_contracts":
             renderBuildingContracts(slot: slot, status: status)
@@ -393,6 +398,28 @@ struct ActionsView: View {
                 globalCooldownSecondsRemaining: remainingSeconds,
                 onAction: { performTraining(contractId: contract.id) }
             )
+        }
+    }
+    
+    @ViewBuilder
+    private func renderWorkshopContracts(slot: SlotInfo, status: AllActionStatus) -> some View {
+        let cooldown = status.cooldown(for: slot.id)
+        let isReady = cooldown?.ready ?? true
+        let remainingSeconds = cooldown?.secondsRemaining ?? 0
+        
+        if let workshopContracts = status.workshopContracts {
+            ForEach(workshopContracts.filter { $0.status != "completed" }) { contract in
+                WorkshopContractCard(
+                    contract: contract,
+                    status: status.crafting,
+                    fetchedAt: statusFetchedAt ?? Date(),
+                    currentTime: currentTime,
+                    globalCooldownActive: !isReady,
+                    blockingAction: cooldown?.blockingAction,
+                    globalCooldownSecondsRemaining: remainingSeconds,
+                    onAction: { performWorkshopWork(contract: contract) }
+                )
+            }
         }
     }
     
@@ -918,6 +945,61 @@ extension ActionsView {
                     )
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showReward = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performWorkshopWork(contract: WorkshopContract) {
+        guard let endpoint = contract.endpoint else {
+            errorMessage = "Action not available (no endpoint)"
+            showError = true
+            return
+        }
+        
+        Task {
+            do {
+                let previousExperience = viewModel.player.experience
+                
+                let response = try await KingdomAPIService.shared.actions.performGenericAction(endpoint: endpoint)
+                
+                await loadActionStatus(force: true)
+                await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
+                
+                // Schedule notification for cooldown completion
+                await scheduleNotificationForCooldown(actionName: "Workshop", slot: actionStatus?.crafting.slot)
+                
+                await MainActor.run {
+                    if let rewards = response.rewards {
+                        currentReward = Reward(
+                            goldReward: 0,
+                            reputationReward: 0,
+                            experienceReward: rewards.experience ?? 0,
+                            message: response.message,
+                            previousGold: viewModel.player.gold,
+                            previousReputation: viewModel.player.reputation,
+                            previousExperience: previousExperience,
+                            currentGold: viewModel.player.gold,
+                            currentReputation: viewModel.player.reputation,
+                            currentExperience: viewModel.player.experience
+                        )
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showReward = true
+                        }
+                    } else {
+                        actionResultSuccess = response.success
+                        actionResultTitle = response.success ? "Progress!" : "Failed"
+                        actionResultMessage = response.message
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showActionResult = true
+                        }
                     }
                 }
             } catch {

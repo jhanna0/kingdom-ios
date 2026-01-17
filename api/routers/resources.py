@@ -119,7 +119,7 @@ RESOURCES = {
     "blueprint": {
         "display_name": "Blueprint",
         "icon": "scroll.fill",
-        "color": "inkMedium",
+        "color": "royalBlue",
         "description": "A crafting blueprint. Take to your Workshop to craft items.",
         "category": "crafting",
         "display_order": 20,

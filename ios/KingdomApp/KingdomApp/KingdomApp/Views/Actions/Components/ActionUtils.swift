@@ -10,6 +10,7 @@ func actionNameToDisplayName(_ actionName: String?) -> String {
     case "scout": return "Scouting"
     case "sabotage": return "Sabotaging"
     case "training": return "Training"
+    case "workshop_craft", "crafting": return "Crafting"
     default: return name.capitalized
     }
 }

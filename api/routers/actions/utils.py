@@ -463,19 +463,22 @@ def get_equipped_items(db: Session, user_id: int) -> Dict:
 
 
 def get_inventory(db: Session, user_id: int) -> list:
-    """Get all inventory items (non-equipped) for a user from player_items table"""
-    items = db.query(PlayerItem).filter(
-        PlayerItem.user_id == user_id,
-        PlayerItem.is_equipped == False
+    """Get all inventory resources for a user from player_inventory table.
+    
+    NOTE: This returns RESOURCES (fur, meat, blueprint, etc), NOT equipment.
+    Equipment is handled separately via get_equipped_items() and player_items table.
+    """
+    from db.models.inventory import PlayerInventory
+    
+    items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id
     ).all()
     
     inventory = []
     for item in items:
         inventory.append({
-            "type": item.type,
-            "tier": item.tier,
-            "attackBonus": item.attack_bonus,
-            "defenseBonus": item.defense_bonus
+            "item_id": item.item_id,
+            "quantity": item.quantity
         })
     
     return inventory

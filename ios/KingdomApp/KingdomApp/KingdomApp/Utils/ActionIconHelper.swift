@@ -20,8 +20,8 @@ struct ActionIconHelper {
             return "banknote.fill"
         case "training", "train":
             return "figure.strengthtraining.traditional"
-        case "craft", "crafting":
-            return "hammer.fill"
+        case "craft", "crafting", "workshop_craft":
+            return "wrench.and.screwdriver.fill"
         case "vote":
             return "checkmark.seal.fill"
         case "invasion":
@@ -60,7 +60,7 @@ struct ActionIconHelper {
             return "Vault Heist"
         case "training", "train":
             return "Training"
-        case "craft", "crafting":
+        case "craft", "crafting", "workshop_craft":
             return "Crafting"
         case "vote":
             return "Vote"
@@ -100,7 +100,7 @@ struct ActionIconHelper {
             return "Robbed vault"
         case "training", "train":
             return "Trained"
-        case "craft", "crafting":
+        case "craft", "crafting", "workshop_craft":
             return "Crafted"
         case "vote":
             return "Voted"
@@ -156,7 +156,7 @@ struct ActionIconHelper {
             return Color.purple // Purple for high-tier intelligence action
         case "training", "train":
             return KingdomTheme.Colors.buttonPrimary // Blue
-        case "craft", "crafting":
+        case "craft", "crafting", "workshop_craft":
             return KingdomTheme.Colors.buttonWarning // Orange
         case "vote":
             return KingdomTheme.Colors.buttonPrimary // Blue

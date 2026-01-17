@@ -95,6 +95,45 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
+def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
+    """Get workshop crafting contracts from unified_contracts table for status endpoint"""
+    from routers.workshop import CRAFTABLE_ITEMS
+    
+    contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == user_id,
+        UnifiedContract.category == "workshop_craft",
+        UnifiedContract.completed_at.is_(None)  # Active contracts only
+    ).all()
+    
+    result = []
+    for contract in contracts:
+        actions_completed = db.query(func.count(ContractContribution.id)).filter(
+            ContractContribution.contract_id == contract.id
+        ).scalar()
+        
+        item_config = CRAFTABLE_ITEMS.get(contract.type, {})
+        
+        result.append({
+            "id": str(contract.id),
+            "item_id": contract.type,
+            "display_name": item_config.get("display_name", contract.type),
+            "icon": item_config.get("icon", "hammer"),
+            "color": item_config.get("color", "buttonWarning"),
+            "type": item_config.get("type", "equipment"),
+            "tier": contract.tier,
+            "attack_bonus": item_config.get("attack_bonus", 0),
+            "defense_bonus": item_config.get("defense_bonus", 0),
+            "actions_required": contract.actions_required,
+            "actions_completed": actions_completed,
+            "progress_percent": int((actions_completed / contract.actions_required) * 100) if contract.actions_required > 0 else 0,
+            "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
+            "status": "completed" if contract.completed_at else "in_progress",
+            "endpoint": "/workshop/craft/work"  # For action button
+        })
+    
+    return result
+
+
 def get_property_contracts_for_status(db: Session, user_id: int, player_state) -> list:
     """Get property contracts from unified_contracts table for status endpoint"""
     from routers.tiers import PROPERTY_TIERS
@@ -819,6 +858,7 @@ def get_action_status(
         "training_costs": _get_training_costs_dict(state),
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,
+        "workshop_contracts": get_workshop_contracts_for_status(db, current_user.id),  # Workshop crafting
         "property_upgrade_contracts": property_contracts,
         "contracts": contracts,
         # Alliance requests for rulers - shows in ActionsView with accept/decline buttons

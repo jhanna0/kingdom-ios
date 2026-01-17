@@ -175,9 +175,12 @@ ACTION_SLOTS = {
     # INTELLIGENCE SLOT - Hostile operations (ONE action, outcomes scale with tier)
     "scout": "intelligence",          # Triggers incidents - outcomes: intel, disruption, sabotage, heist
     
-    # PERSONAL SLOT - Self-improvement
+    # PERSONAL SLOT - Training
     "training": "personal",
-    "crafting": "personal",
+    
+    # CRAFTING SLOT - Workshop crafting
+    "crafting": "crafting",
+    "workshop_craft": "crafting",
     
     # POLITICAL SLOT - Power struggles (initiate coups)
     "stage_coup": "political",
@@ -204,8 +207,18 @@ SLOT_DEFINITIONS = {
         "color_theme": "buttonPrimary",
         "display_order": 1,
         "description": "Train your skills - complete actions to level up",
-        "location": "any",  # Can be done anywhere
-        "content_type": "training_contracts",  # Frontend uses this to pick renderer
+        "location": "any",
+        "content_type": "training_contracts",
+    },
+    "crafting": {
+        "id": "crafting",
+        "display_name": "Crafting",
+        "icon": "hammer.fill",
+        "color_theme": "buttonWarning",
+        "display_order": 2,
+        "description": "Craft equipment from blueprints",
+        "location": "any",
+        "content_type": "workshop_contracts",
     },
     "building": {
         "id": "building",

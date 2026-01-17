@@ -46,6 +46,9 @@ BUILDING_POPULATION_ACTIONS_DIVISOR = 30
 # gold_cost: Gold paid UPFRONT to start the contract
 # per_action_costs: Resources required PER WORK ACTION (wood, iron, etc.)
 # base_actions: Base actions required (reduced by building skill)
+#
+# RESOURCE COSTS: per_action = base_actions, so total = actions^2
+# e.g. Tier 5: 80 actions × 80 wood/action = 6,400 wood total
 
 PROPERTY_TIERS = {
     1: {
@@ -54,44 +57,44 @@ PROPERTY_TIERS = {
         "description": "Cleared land with travel benefits",
         "benefits": ["Free travel to this kingdom"],
         "gold_cost": 500,
-        "per_action_costs": [],
-        "base_actions": 5
+        "per_action_costs": [{"resource": "wood", "amount": 10}],
+        "base_actions": 10
     },
     2: {
         "name": "House",
         "icon": "house.fill",
         "description": "Basic dwelling",
         "benefits": ["All Land benefits", "Ability to train skills in this kingdom"],
-        "gold_cost": 500,
-        "per_action_costs": [{"resource": "wood", "amount": 40}],
-        "base_actions": 7
+        "gold_cost": 1000,
+        "per_action_costs": [{"resource": "wood", "amount": 20}],
+        "base_actions": 20
     },
     3: {
         "name": "Workshop",
         "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
-        "gold_cost": 1000,
-        "per_action_costs": [{"resource": "wood", "amount": 50}, {"resource": "iron", "amount": 50}],
-        "base_actions": 9
+        "gold_cost": 2000,
+        "per_action_costs": [{"resource": "wood", "amount": 35}, {"resource": "iron", "amount": 35}],
+        "base_actions": 35
     },
     4: {
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
-        "description": "Luxurious property",
-        "benefits": ["All Workshop benefits", "Pay 50% less tax on all income"],
-        "gold_cost": 2000,
-        "per_action_costs": [{"resource": "wood", "amount": 75}, {"resource": "iron", "amount": 75}],
-        "base_actions": 11
+        "description": "Animals & Gardens",
+        "benefits": ["All Workshop benefits", "You can raise animals, pets, and grow your garden"],
+        "gold_cost": 4000,
+        "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 55}],
+        "base_actions": 55
     },
     5: {
         "name": "Defensive Walls",
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
-        "gold_cost": 4000,
-        "per_action_costs": [{"resource": "wood", "amount": 100}, {"resource": "iron", "amount": 100}],
-        "base_actions": 13
+        "gold_cost": 8000,
+        "per_action_costs": [{"resource": "wood", "amount": 80}, {"resource": "iron", "amount": 80}],
+        "base_actions": 80
     }
 }
 
@@ -812,18 +815,10 @@ def get_all_tiers():
 
 @router.get("/properties")
 def get_property_tiers():
-    """Get property tier info with costs"""
+    """Get property tier info with costs - ALL VALUES FROM PROPERTY_TIERS (single source of truth)"""
     tiers_dict = {}
     for tier in range(1, 6):
         info = PROPERTY_TIERS[tier]
-        
-        # Calculate costs
-        if tier == 1:
-            base_cost = 500  # Base land price
-        else:
-            base_cost = 500 * (2 ** (tier - 2))  # Upgrade cost formula
-        
-        base_actions = 5 + ((tier - 1) * 2)
         
         tiers_dict[str(tier)] = {
             "tier": tier,
@@ -831,8 +826,9 @@ def get_property_tiers():
             "icon": info.get("icon", "house.fill"),
             "description": info["description"],
             "benefits": info["benefits"],
-            "base_gold_cost": base_cost,
-            "base_actions_required": base_actions,
+            "base_gold_cost": info["gold_cost"],
+            "base_actions_required": info["base_actions"],
+            "per_action_costs": info.get("per_action_costs", []),
         }
     
     return {
@@ -840,7 +836,7 @@ def get_property_tiers():
         "tiers": tiers_dict,
         "notes": {
             "land_purchase": "Tier 1 land cost varies by kingdom population (base 500g)",
-            "upgrade_costs": "Tier 2-5 costs shown are for upgrading from previous tier",
+            "upgrade_costs": "Gold costs shown are upfront. Resources are per-action costs.",
             "actions": "Base actions required, reduced by Building skill (up to 50% reduction)",
             "reputation_required": "50+ reputation required to purchase land in a kingdom"
         }

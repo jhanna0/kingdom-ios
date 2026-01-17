@@ -91,6 +91,45 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     }
 }
 
+// MARK: - Workshop Contract (blueprint-based crafting)
+
+struct WorkshopContract: Codable, Identifiable {
+    let contractId: String
+    let itemId: String
+    let displayName: String
+    let icon: String
+    let color: String
+    let type: String
+    let tier: Int
+    let attackBonus: Int
+    let defenseBonus: Int
+    let actionsRequired: Int
+    let actionsCompleted: Int
+    let progressPercent: Int
+    let createdAt: String?
+    let status: String
+    let endpoint: String?
+    
+    var id: String { contractId }
+    
+    enum CodingKeys: String, CodingKey {
+        case status, icon, color, type, tier, endpoint
+        case contractId = "id"
+        case itemId = "item_id"
+        case displayName = "display_name"
+        case attackBonus = "attack_bonus"
+        case defenseBonus = "defense_bonus"
+        case actionsRequired = "actions_required"
+        case actionsCompleted = "actions_completed"
+        case progressPercent = "progress_percent"
+        case createdAt = "created_at"
+    }
+    
+    var progress: Double {
+        return Double(actionsCompleted) / Double(actionsRequired)
+    }
+}
+
 // MARK: - Resource Consumed (result of an action)
 
 struct ResourceConsumed: Codable {
