@@ -1,0 +1,13 @@
+# Kingdom API Endpoints Backup
+# Saved: 2026-01-16
+# These are the original AWS-generated endpoints (will continue working)
+
+REST API:
+https://eu0qm86e1m.execute-api.us-east-1.amazonaws.com
+
+WebSocket:
+wss://02oas6q503.execute-api.us-east-1.amazonaws.com/dev
+
+# After custom domain setup, new endpoints will be:
+# https://api.kingdoms.ninja
+# wss://wss.kingdoms.ninja

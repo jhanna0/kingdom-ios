@@ -118,8 +118,25 @@ functions:
 
 plugins:
   - serverless-python-requirements
+  - serverless-domain-manager
 
 custom:
+  customDomain:
+    http:
+      domainName: 'api.kingdoms.ninja'
+      stage: ${sls:stage}
+      basePath: ''
+      certificateName: '*.kingdoms.ninja'
+      createRoute53Record: true
+      endpointType: REGIONAL
+      securityPolicy: tls_1_2
+    websocket:
+      domainName: 'wss.kingdoms.ninja'
+      stage: ${sls:stage}
+      basePath: ''
+      certificateName: '*.kingdoms.ninja'
+      createRoute53Record: true
+      endpointType: REGIONAL
   pythonRequirements:
     dockerizePip: true
     slim: true
@@ -193,10 +210,6 @@ resources:
         TargetGroupName: default
         DBInstanceIdentifiers:
           - kingdom-test-1
-        ConnectionPoolConfig:
-          MaxConnectionsPercent: 100
-          MaxIdleConnectionsPercent: 50
-          ConnectionBorrowTimeout: 120
 
     RDSProxyRole:
       Type: AWS::IAM::Role
