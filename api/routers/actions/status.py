@@ -101,17 +101,19 @@ def get_catchup_contracts_for_status(db: Session, user_id: int, state: PlayerSta
     
     Only returns catchup records that have been STARTED (player tried to use the building).
     This prevents spamming the Actions view with every building that needs catchup.
+    
+    Catchup is only for HOMETOWN - you can only contribute to your hometown's buildings!
     """
     from db import BuildingCatchup
     from routers.tiers import BUILDING_TYPES
     
-    # Only get incomplete catchup records for the player's current kingdom
-    if not state.current_kingdom_id:
+    # Only get incomplete catchup records for the player's HOMETOWN kingdom
+    if not state.hometown_kingdom_id:
         return []
     
     catchups = db.query(BuildingCatchup).filter(
         BuildingCatchup.user_id == user_id,
-        BuildingCatchup.kingdom_id == state.current_kingdom_id,
+        BuildingCatchup.kingdom_id == state.hometown_kingdom_id,
         BuildingCatchup.completed_at.is_(None)  # Only incomplete
     ).all()
     
@@ -132,7 +134,7 @@ def get_catchup_contracts_for_status(db: Session, user_id: int, state: PlayerSta
             "progress_percent": catchup.progress_percent,
             "created_at": format_datetime_iso(catchup.created_at) if catchup.created_at else None,
             "status": "in_progress",
-            "endpoint": f"/actions/catchup/{catchup.building_type}/work"
+            "endpoint": None  # Work is done through normal building contracts
         })
     
     return result

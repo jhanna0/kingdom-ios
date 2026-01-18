@@ -60,13 +60,19 @@ def get_buildings_for_kingdom(
     ).all()
     building_levels_map = {b.building_type: b.level for b in kingdom_buildings_rows}
     
-    # Get player's building skill if user is logged in
+    # Get player's building skill and hometown if user is logged in
     building_skill = 0
+    user_hometown_id = None
     if current_user:
         player_state = db.query(PlayerState).filter(
             PlayerState.user_id == current_user.id
         ).first()
-        building_skill = player_state.building_skill if player_state else 0
+        if player_state:
+            building_skill = player_state.building_skill or 0
+            user_hometown_id = player_state.hometown_kingdom_id
+    
+    # Catch-up only applies to your HOMETOWN - you can only contribute to your hometown's buildings
+    is_hometown = user_hometown_id and kingdom.id == user_hometown_id
     
     buildings = []
     for building_type, building_meta in BUILDING_TYPES.items():
@@ -116,9 +122,9 @@ def get_buildings_for_kingdom(
                 "resource": click_action_meta.get("resource")
             }
         
-        # Get catch-up info (only for logged-in users, built buildings, non-exempt)
+        # Get catch-up info ONLY for hometown (you can only contribute to your hometown's buildings)
         catchup_info = None
-        if current_user and level > 0 and building_type not in EXEMPT_BUILDINGS:
+        if current_user and is_hometown and level > 0 and building_type not in EXEMPT_BUILDINGS:
             catchup_status = get_catchup_status(
                 db, current_user.id, kingdom.id, 
                 building_type, level, building_skill

@@ -32,13 +32,13 @@ def get_building_catchup_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get catch-up status for a specific building."""
+    """Get catch-up status for a specific building in player's HOMETOWN."""
     state = current_user.player_state
     if not state:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player state not found")
     
-    if not state.current_kingdom_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must be checked into a kingdom")
+    if not state.hometown_kingdom_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must have a hometown kingdom")
     
     from routers.tiers import BUILDING_TYPES
     building_type = building_type.lower()
@@ -49,15 +49,15 @@ def get_building_catchup_status(
     if building_type in EXEMPT_BUILDINGS:
         return {"building_type": building_type, "needs_catchup": False, "can_use": True, "reason": "Building is always accessible"}
     
-    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+    kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
     if not kingdom:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kingdom not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hometown kingdom not found")
     
     level_attr = f"{building_type}_level"
     building_level = getattr(kingdom, level_attr, 0) if hasattr(kingdom, level_attr) else 0
     
     status_info = get_catchup_status(
-        db, current_user.id, state.current_kingdom_id, 
+        db, current_user.id, state.hometown_kingdom_id, 
         building_type, building_level, state.building_skill or 0
     )
     
@@ -83,7 +83,7 @@ def start_catchup(
     db: Session = Depends(get_db)
 ):
     """
-    Mark a building as "started" for catchup tracking.
+    Mark a building as "started" for catchup tracking in player's HOMETOWN.
     
     This is called when player opens the "Expand Capacity" view.
     Creates a catchup record so the building appears in their Actions view.
@@ -94,8 +94,8 @@ def start_catchup(
     if not state:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player state not found")
     
-    if not state.current_kingdom_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must be checked into a kingdom")
+    if not state.hometown_kingdom_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must have a hometown kingdom")
     
     from routers.tiers import BUILDING_TYPES
     building_type = building_type.lower()
@@ -106,9 +106,9 @@ def start_catchup(
     if building_type in EXEMPT_BUILDINGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This building doesn't require catchup")
     
-    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+    kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
     if not kingdom:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kingdom not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hometown kingdom not found")
     
     level_attr = f"{building_type}_level"
     building_level = getattr(kingdom, level_attr, 0) if hasattr(kingdom, level_attr) else 0
@@ -118,7 +118,7 @@ def start_catchup(
     
     # Check if catchup is actually needed
     status_info = get_catchup_status(
-        db, current_user.id, state.current_kingdom_id,
+        db, current_user.id, state.hometown_kingdom_id,
         building_type, building_level, state.building_skill or 0
     )
     
@@ -132,7 +132,7 @@ def start_catchup(
     # Check if already started
     existing = db.query(BuildingCatchup).filter(
         BuildingCatchup.user_id == current_user.id,
-        BuildingCatchup.kingdom_id == state.current_kingdom_id,
+        BuildingCatchup.kingdom_id == state.hometown_kingdom_id,
         BuildingCatchup.building_type == building_type
     ).first()
     
@@ -149,7 +149,7 @@ def start_catchup(
     # Create catchup record - this makes it appear in Actions view
     catchup = BuildingCatchup(
         user_id=current_user.id,
-        kingdom_id=state.current_kingdom_id,
+        kingdom_id=state.hometown_kingdom_id,
         building_type=building_type,
         actions_required=calculate_catchup_actions(building_level, state.building_skill or 0),
         actions_completed=0
