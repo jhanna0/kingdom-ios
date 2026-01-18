@@ -32,6 +32,7 @@ from .config import (
     ROUND2_TARGET_TYPE,
     ROUND1_REWARD_CONFIG,
     ROUND2_REWARD_CONFIG,
+    ROUND2_RARE_DROP_CONFIG,
     ROUND1_WIN_CONFIG,
     ROUND2_WIN_CONFIG,
     get_bush_type_weights,
@@ -49,18 +50,40 @@ class RoundData:
     reward_amount: int = 0
     has_seed_trail: bool = False  # Only for round 1
     seed_trail_position: int = -1  # Where in the grid array (for display)
+    has_rare_drop: bool = False  # Round 2 only - rare egg drop!
     
-    def to_dict(self, reward_config: dict, hidden_icon: str, hidden_color: str) -> dict:
+    def to_dict(self, reward_config: dict, hidden_icon: str, hidden_color: str, rare_drop_config: dict = None) -> dict:
+        # Build rewards array - frontend just renders this, no special cases
+        rewards = []
+        if self.is_winner and self.reward_amount > 0:
+            rewards.append({
+                "item": reward_config["reward_item"],
+                "display_name": reward_config["reward_item_display_name"],
+                "icon": reward_config["reward_item_icon"],
+                "color": reward_config["reward_item_color"],
+                "amount": self.reward_amount,
+            })
+        if self.has_rare_drop and rare_drop_config:
+            rewards.append({
+                "item": rare_drop_config["reward_item"],
+                "display_name": rare_drop_config["reward_item_display_name"],
+                "icon": rare_drop_config["reward_item_icon"],
+                "color": rare_drop_config["reward_item_color"],
+                "amount": 1,
+            })
+        
         return {
             "round_num": self.round_num,
             "grid": self.grid,
             "max_reveals": MAX_REVEALS,
             "matches_to_win": MATCHES_TO_WIN,
-            "is_winner": self.is_winner,
+            "is_winner": len(rewards) > 0,  # You won if you got ANY rewards
             "winning_positions": self.winning_positions,
-            "reward_amount": self.reward_amount,
+            "rewards": rewards,  # Generic array - add anything here!
             "has_seed_trail": self.has_seed_trail,
             "seed_trail_position": self.seed_trail_position,
+            # Legacy fields
+            "reward_amount": self.reward_amount,
             "reward_config": {
                 "item": reward_config["reward_item"],
                 "display_name": reward_config["reward_item_display_name"],
@@ -144,6 +167,7 @@ class ForagingSession:
                 ROUND2_REWARD_CONFIG,
                 r2_config["hidden_icon"],
                 r2_config["hidden_color"],
+                ROUND2_RARE_DROP_CONFIG,
             )
         
         return result
@@ -251,23 +275,47 @@ class ForagingManager:
         Generate Round 2 (bonus) grid - 5 cells.
         
         ONE ROLL 1-100:
-        - 1-10: Seeds (10%) → 3 seeds + 2 filler
-        - 11-100: Nothing → 5 filler
+        - 1: Rare Egg WIN (1%)
+        - 2-11: Seeds WIN (10%)
+        - 12-31: Seed TEASE (20%) - 1-2 seeds, can't win
+        - 32-41: Egg TEASE (10%) - 1-2 eggs, no drop
+        - 42-100: Nothing
         """
         weights = get_bush_type_weights(round_num=2)
         bush_types = list(weights.keys())
         type_weights = list(weights.values())
         
-        # ONE ROLL
+        # ONE ROLL - no crossover
         roll = self.rng.randint(1, 100)
-        seeds_threshold = int(ROUND2_WIN_CONFIG["cluster_probability"] * 100)  # 10
+        rare_threshold = int(ROUND2_RARE_DROP_CONFIG["probability"] * 100)  # 1
+        seeds_threshold = rare_threshold + int(ROUND2_WIN_CONFIG["cluster_probability"] * 100)  # 11
+        seed_tease_threshold = seeds_threshold + int(ROUND2_WIN_CONFIG["seed_tease_probability"] * 100)  # 31
+        egg_tease_threshold = seed_tease_threshold + int(ROUND2_WIN_CONFIG["egg_tease_probability"] * 100)  # 41
         
         cells = []
+        has_rare_drop = False
         
-        if roll <= seeds_threshold:
+        if roll <= rare_threshold:
+            # RARE EGG WIN - place 3 eggs (mark as targets so frontend counts them!)
+            has_rare_drop = True
+            for _ in range(3):
+                cell = self._make_cell(0, "rare_egg", round_num=2)
+                cell["is_seed"] = True  # Eggs ARE the winning match for this roll!
+                cells.append(cell)
+        elif roll <= seeds_threshold:
             # SEEDS WIN - place 3 seeds
             for _ in range(ROUND2_WIN_CONFIG["guaranteed_cluster_size"]):
                 cells.append(self._make_cell(0, ROUND2_TARGET_TYPE, round_num=2))
+        elif roll <= seed_tease_threshold:
+            # SEED TEASE - 1-2 seeds, can't win
+            tease_count = self.rng.randint(1, 2)
+            for _ in range(tease_count):
+                cells.append(self._make_cell(0, ROUND2_TARGET_TYPE, round_num=2))
+        elif roll <= egg_tease_threshold:
+            # EGG TEASE - 1-2 eggs, no drop
+            tease_count = self.rng.randint(1, 2)
+            for _ in range(tease_count):
+                cells.append(self._make_cell(0, "rare_egg", round_num=2))
         
         # Fill rest with random filler
         while len(cells) < MAX_REVEALS:
@@ -281,23 +329,24 @@ class ForagingManager:
         for i, cell in enumerate(cells):
             cell["position"] = i
         
-        # Check results
-        seed_count = sum(1 for c in cells if c["is_seed"])
-        is_winner = seed_count >= ROUND2_WIN_CONFIG["guaranteed_cluster_size"]
-        reward_amount = 1 if is_winner else 0
+        # Check results - only count actual wheat seeds, not eggs marked as is_seed for UI
+        actual_seed_count = sum(1 for c in cells if c["bush_type"] == ROUND2_TARGET_TYPE)
+        is_seed_winner = actual_seed_count >= ROUND2_WIN_CONFIG["guaranteed_cluster_size"]
+        reward_amount = 1 if is_seed_winner else 0
         
         target_positions = [i for i, c in enumerate(cells) if c["is_seed"]]
         
         return RoundData(
             round_num=2,
             grid=cells,
-            is_winner=is_winner,
+            is_winner=is_seed_winner,  # Only true for actual seed wins
             winning_positions=target_positions,
             reward_amount=reward_amount,
+            has_rare_drop=has_rare_drop,
         )
     
     def _make_cell(self, position: int, bush_type: str, round_num: int) -> dict:
-        """Create a cell dict with display info."""
+        """Create a cell dict with display info from config."""
         bush_types = ROUND1_BUSH_TYPES if round_num == 1 else ROUND2_BUSH_TYPES
         target_type = ROUND1_TARGET_TYPE if round_num == 1 else ROUND2_TARGET_TYPE
         
@@ -315,6 +364,7 @@ class ForagingManager:
             "name": info.get("name", bush_type),
             "is_seed": bush_type == target_type,
             "is_seed_trail": bush_type == "seed_trail",
+            "label": info.get("label"),  # Read from config, not hardcoded
         }
     
     def collect_rewards(self, session: ForagingSession) -> dict:
@@ -342,6 +392,16 @@ class ForagingManager:
                 "item": ROUND2_REWARD_CONFIG["reward_item"],
                 "amount": session.round2.reward_amount,
                 "display_name": ROUND2_REWARD_CONFIG["reward_item_display_name"],
+            })
+        
+        # Round 2 RARE DROP (Rare Egg) - independent bonus!
+        if session.round2 and session.round2.has_rare_drop:
+            rewards.append({
+                "round": 2,
+                "item": ROUND2_RARE_DROP_CONFIG["reward_item"],
+                "amount": 1,
+                "display_name": ROUND2_RARE_DROP_CONFIG["reward_item_display_name"],
+                "is_rare": True,
             })
         
         # Total for legacy compatibility

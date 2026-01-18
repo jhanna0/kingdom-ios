@@ -162,50 +162,91 @@ struct KingdomTheme {
             }
         }
         
-        /// Map semantic color name from API to theme color
+        /// Map ANY color name from API to SwiftUI Color
+        /// Handles: theme colors, standard SwiftUI colors, and hex codes
         static func color(fromThemeName name: String) -> Color {
-            switch name.lowercased() {
+            let lowercased = name.lowercased()
+            
+            // 1. Check theme colors first
+            if let themeColor = themeColors[lowercased] {
+                return themeColor
+            }
+            
+            // 2. Check standard SwiftUI colors
+            if let standardColor = standardColors[lowercased] {
+                return standardColor
+            }
+            
+            // 3. Try parsing as hex color (e.g., "#FF5500" or "FF5500")
+            if let hexColor = Color(hex: name) {
+                return hexColor
+            }
+            
+            // 4. Fallback
+            print("⚠️ Unknown color name: '\(name)' - falling back to inkMedium")
+            return inkMedium
+        }
+        
+        /// Theme-specific colors (our custom palette)
+        private static let themeColors: [String: Color] = [
             // Buttons
-            case "buttonprimary": return buttonPrimary
-            case "buttonsecondary": return buttonSecondary
-            case "buttonsuccess": return buttonSuccess
-            case "buttondanger": return buttonDanger
-            case "buttonwarning": return buttonWarning
-            case "buttonspecial": return buttonSpecial
+            "buttonprimary": buttonPrimary,
+            "buttonsecondary": buttonSecondary,
+            "buttonsuccess": buttonSuccess,
+            "buttondanger": buttonDanger,
+            "buttonwarning": buttonWarning,
+            "buttonspecial": buttonSpecial,
             
             // Ink
-            case "inkdark": return inkDark
-            case "inkmedium": return inkMedium
-            case "inklight": return inkLight
-            case "inksubtle": return inkSubtle
+            "inkdark": inkDark,
+            "inkmedium": inkMedium,
+            "inklight": inkLight,
+            "inksubtle": inkSubtle,
             
             // Gold
-            case "gold": return gold
-            case "goldlight": return goldLight
-            case "goldwarm": return goldWarm
+            "gold": gold,
+            "goldlight": goldLight,
+            "goldwarm": goldWarm,
             
             // Royal
-            case "royalpurple": return royalPurple
-            case "regalpurple": return regalPurple
-            case "imperialgold": return imperialGold
-            case "royalcrimson": return royalCrimson
-            case "royalblue": return royalBlue
-            case "royalemerald": return royalEmerald
+            "royalpurple": royalPurple,
+            "regalpurple": regalPurple,
+            "imperialgold": imperialGold,
+            "royalcrimson": royalCrimson,
+            "royalblue": royalBlue,
+            "royalemerald": royalEmerald,
             
             // Semantic
-            case "disabled": return disabled
-            case "error": return error
+            "disabled": disabled,
+            "error": error,
             
             // Parchment variants
-            case "parchment": return parchment
-            case "parchmentlight": return parchmentLight
-            case "parchmentdark": return parchmentDark
-            case "parchmentrich": return parchmentRich
-            
-            default:
-                return inkMedium  // Default fallback
-            }
-        }
+            "parchment": parchment,
+            "parchmentlight": parchmentLight,
+            "parchmentdark": parchmentDark,
+            "parchmentrich": parchmentRich,
+        ]
+        
+        /// Standard SwiftUI colors - handles ANY standard color name
+        private static let standardColors: [String: Color] = [
+            "black": .black,
+            "blue": .blue,
+            "brown": .brown,
+            "clear": .clear,
+            "cyan": .cyan,
+            "gray": .gray,
+            "grey": .gray,  // British spelling
+            "green": .green,
+            "indigo": .indigo,
+            "mint": .mint,
+            "orange": .orange,
+            "pink": .pink,
+            "purple": .purple,
+            "red": .red,
+            "teal": .teal,
+            "white": .white,
+            "yellow": .yellow,
+        ]
     }
     
     // MARK: - Typography

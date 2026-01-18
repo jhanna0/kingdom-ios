@@ -12,9 +12,21 @@ DESIGN:
 
 KEY: Backend has ALL the strings, odds, rewards, colors.
 Frontend is a DUMB RENDERER.
+
+IMPORTANT: Item display configs (icon, color, name) come from RESOURCES - single source of truth!
 """
 
 from typing import Dict, List
+from routers.resources import RESOURCES
+
+
+# ============================================================
+# HELPER: Get item display from RESOURCES
+# ============================================================
+
+def _get_resource(item_id: str) -> dict:
+    """Get item config from RESOURCES - single source of truth."""
+    return RESOURCES.get(item_id, {})
 
 
 # ============================================================
@@ -32,19 +44,20 @@ MATCHES_TO_WIN = 3      # Need 3 matching to win
 
 ROUND1_BUSH_TYPES = {
     "berries": {
-        "name": "Berries",
-        "icon": "seal.fill",
-        "color": "buttonDanger",  # Deep red
-        "is_target": True,  # Main target for Round 1
+        "name": _get_resource("berries").get("display_name", "Berries"),
+        "icon": _get_resource("berries").get("icon", "seal.fill"),
+        "color": _get_resource("berries").get("color", "buttonDanger"),
+        "is_target": True,
         "weight": 40,
     },
     "seed_trail": {
         "name": "Seed Trail",
-        "icon": "arrow.triangle.turn.up.right.diamond.fill",  # Nice trail icon
+        "icon": "arrow.triangle.turn.up.right.diamond.fill",
         "color": "gold",
-        "is_target": False,  # Special - triggers bonus round
+        "is_target": False,
         "is_seed_trail": True,
-        "weight": 0,  # Placed specifically, not randomly
+        "label": "BONUS",
+        "weight": 0,
     },
     "rock": {
         "name": "Rock",
@@ -72,40 +85,47 @@ ROUND1_BUSH_TYPES = {
 # Round 1 target type
 ROUND1_TARGET_TYPE = "berries"
 
-# Round 1 reward config
+# Round 1 reward - reads from RESOURCES
+ROUND1_REWARD_ITEM = "berries"
 ROUND1_REWARD_CONFIG = {
     "base_reward": 1,
     "bonus_per_extra_match": 1,
-    "reward_item": "berries",
-    "reward_item_display_name": "Berries",
-    "reward_item_icon": "seal.fill",
-    "reward_item_color": "buttonDanger",
+    "reward_item": ROUND1_REWARD_ITEM,
+    "reward_item_display_name": _get_resource(ROUND1_REWARD_ITEM).get("display_name"),
+    "reward_item_icon": _get_resource(ROUND1_REWARD_ITEM).get("icon"),
+    "reward_item_color": _get_resource(ROUND1_REWARD_ITEM).get("color"),
 }
 
 # Round 1 probabilities
 ROUND1_WIN_CONFIG = {
-    # Berries
-    "cluster_probability": 0.10,          # 10% chance to win berries
-    "guaranteed_cluster_size": 3,         # How many berries to place when won
-    
-    # Seed Trail (triggers bonus round) - ALSO NEEDS MATCH 3!
-    "seed_trail_probability": 0.05,       # 5% chance to win (match 3 trails)
-    "seed_trail_cluster_size": 3,         # How many seed trails to place (match 3!)
-    "seed_trail_tease_probability": 0.20, # 20% chance to tease (1-2 trails, can't win)
+    "cluster_probability": 0.10,
+    "guaranteed_cluster_size": 3,
+    "seed_trail_probability": 0.05,
+    "seed_trail_cluster_size": 3,
+    "seed_trail_tease_probability": 0.20,
 }
 
 
 # ============================================================
-# ROUND 2: BONUS ROUND (Seeds!)
+# ROUND 2: BONUS ROUND (Seeds + Rare Egg!)
 # ============================================================
 
 ROUND2_BUSH_TYPES = {
     "wheat": {
-        "name": "Seed",
-        "icon": "leaf.fill",
-        "color": "gold",
-        "is_target": True,  # Target for bonus round
+        "name": _get_resource("wheat_seed").get("display_name", "Seed"),
+        "icon": _get_resource("wheat_seed").get("icon", "leaf.fill"),
+        "color": _get_resource("wheat_seed").get("color", "gold"),
+        "is_target": True,
         "weight": 40,
+    },
+    "rare_egg": {
+        "name": _get_resource("rare_egg").get("display_name", "Rare Egg"),
+        "icon": _get_resource("rare_egg").get("icon", "oval.fill"),
+        "color": _get_resource("rare_egg").get("color", "imperialGold"),
+        "is_target": False,
+        "is_rare_drop": True,
+        "label": "Rare Egg",
+        "weight": 0,
     },
     "dirt": {
         "name": "Dirt",
@@ -133,20 +153,33 @@ ROUND2_BUSH_TYPES = {
 # Round 2 target type
 ROUND2_TARGET_TYPE = "wheat"
 
-# Round 2 reward config (the actual seeds!)
+# Round 2 reward - reads from RESOURCES
+ROUND2_REWARD_ITEM = "wheat_seed"
 ROUND2_REWARD_CONFIG = {
     "base_reward": 1,
     "bonus_per_extra_match": 1,
-    "reward_item": "wheat_seed",
-    "reward_item_display_name": "Seed",
-    "reward_item_icon": "leaf.fill",
-    "reward_item_color": "gold",
+    "reward_item": ROUND2_REWARD_ITEM,
+    "reward_item_display_name": _get_resource(ROUND2_REWARD_ITEM).get("display_name"),
+    "reward_item_icon": _get_resource(ROUND2_REWARD_ITEM).get("icon"),
+    "reward_item_color": _get_resource(ROUND2_REWARD_ITEM).get("color"),
 }
 
 # Round 2 probabilities
 ROUND2_WIN_CONFIG = {
-    "cluster_probability": 0.10,      # 10% chance to find seeds in bonus
+    "cluster_probability": 0.10,
     "guaranteed_cluster_size": 3,
+    "seed_tease_probability": 0.20,
+    "egg_tease_probability": 0.10,
+}
+
+# Round 2 RARE DROP - reads from RESOURCES
+ROUND2_RARE_ITEM = "rare_egg"
+ROUND2_RARE_DROP_CONFIG = {
+    "probability": 0.01,
+    "reward_item": ROUND2_RARE_ITEM,
+    "reward_item_display_name": _get_resource(ROUND2_RARE_ITEM).get("display_name"),
+    "reward_item_icon": _get_resource(ROUND2_RARE_ITEM).get("icon"),
+    "reward_item_color": _get_resource(ROUND2_RARE_ITEM).get("color"),
 }
 
 

@@ -137,6 +137,16 @@ RESOURCES = {
         "storage_type": "inventory",
         "is_food": True,  # Can be consumed to pay action food costs
     },
+    "rare_egg": {
+        "display_name": "Rare Egg",
+        "icon": "oval.fill",
+        "color": "imperialGold",
+        "description": "A mysterious golden egg found while foraging. Will hatch into a chicken pet!",
+        "category": "material",
+        "display_order": 11,
+        "is_tradeable": False,
+        "storage_type": "inventory",
+    },
     # ===== BLUEPRINT - Generic crafting token =====
     "blueprint": {
         "display_name": "Blueprint",

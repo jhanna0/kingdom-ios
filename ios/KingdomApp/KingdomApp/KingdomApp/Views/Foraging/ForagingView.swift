@@ -63,9 +63,8 @@ struct ForagingView: View {
             if showResult {
                 ForagingResultOverlay(
                     hasWon: viewModel.hasWon,
-                    rewardConfig: viewModel.rewardConfig,
                     isBonusRound: viewModel.isBonusRound,
-                    allRewards: viewModel.allRewards,
+                    rewards: viewModel.allRewards,
                     onPrimary: {
                         Task {
                             await viewModel.collect()
@@ -654,14 +653,14 @@ struct BushTile: View {
             if let cell, isRevealed {
                 VStack(spacing: 2) {
                     Image(systemName: cell.icon)
-                        .font(cell.isSeedTrail ? FontStyles.iconSmall : FontStyles.iconMedium)
+                        .font(cell.label != nil ? FontStyles.iconSmall : FontStyles.iconMedium)
                         .foregroundColor(cellColor(for: cell))
                         .shadow(color: .clear, radius: 0)
                     
-                    if cell.isSeedTrail {
-                        Text("BONUS")
+                    if let label = cell.label {
+                        Text(label)
                             .font(.system(size: 9, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            .foregroundColor(KingdomTheme.Colors.color(fromThemeName: cell.color))
                     }
                 }
             } else {
@@ -831,16 +830,15 @@ private struct SeedTrailFoundOverlay: View {
 
 private struct ForagingResultOverlay: View {
     let hasWon: Bool
-    let rewardConfig: ForagingRewardConfig?
     let isBonusRound: Bool
-    let allRewards: [(round: Int, config: ForagingRewardConfig, amount: Int)]
+    let rewards: [ForagingReward]  // Just render this array!
     let onPrimary: () -> Void
     let onSecondary: () -> Void
     
     @State private var iconScale: CGFloat = 0.86
     @State private var contentOpacity: Double = 0
     
-    private var hasAnyRewards: Bool { !allRewards.isEmpty }
+    private var hasAnyRewards: Bool { !rewards.isEmpty }
     
     var body: some View {
         ZStack {
@@ -853,7 +851,7 @@ private struct ForagingResultOverlay: View {
                         ForEach(0..<6, id: \.self) { _ in
                             Image(systemName: "sparkle")
                                 .font(FontStyles.iconSmall)
-                                .foregroundColor(isBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonSuccess)
+                                .foregroundColor(KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess"))
                                 .offset(
                                     x: CGFloat.random(in: -70...70),
                                     y: CGFloat.random(in: -55...55)
@@ -862,27 +860,27 @@ private struct ForagingResultOverlay: View {
                         }
                     }
                     
-                    Image(systemName: hasAnyRewards ? (allRewards.first?.config.icon ?? "checkmark.circle.fill") : "xmark.circle.fill")
+                    Image(systemName: hasAnyRewards ? (rewards.first?.icon ?? "checkmark.circle.fill") : "xmark.circle.fill")
                         .font(.system(size: 64, weight: .black))
-                        .foregroundColor(hasAnyRewards ? KingdomTheme.Colors.color(fromThemeName: allRewards.first?.config.color ?? "buttonSuccess") : KingdomTheme.Colors.inkMedium)
+                        .foregroundColor(hasAnyRewards ? KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess") : KingdomTheme.Colors.inkMedium)
                         .shadow(color: .clear, radius: 0)
                         .scaleEffect(iconScale)
                 }
                 
                 if hasAnyRewards {
-                    Text(isBonusRound ? "Seeds Found!" : "Berries Found!")
+                    Text("Found!")
                         .font(FontStyles.resultSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    // Show all rewards
+                    // Just render whatever backend sent
                     VStack(spacing: 8) {
-                        ForEach(allRewards.indices, id: \.self) { index in
-                            let reward = allRewards[index]
+                        ForEach(rewards.indices, id: \.self) { index in
+                            let reward = rewards[index]
                             HStack(spacing: 6) {
-                                Image(systemName: reward.config.icon)
+                                Image(systemName: reward.icon)
                                     .font(FontStyles.iconSmall)
-                                    .foregroundColor(KingdomTheme.Colors.color(fromThemeName: reward.config.color))
-                                Text("+\(reward.amount) \(reward.config.display_name)")
+                                    .foregroundColor(KingdomTheme.Colors.color(fromThemeName: reward.color))
+                                Text("+\(reward.amount) \(reward.display_name)")
                                     .font(FontStyles.bodyMediumBold)
                                     .foregroundColor(KingdomTheme.Colors.inkDark)
                             }
@@ -897,7 +895,7 @@ private struct ForagingResultOverlay: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.brutalist(
-                        backgroundColor: isBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonSuccess,
+                        backgroundColor: KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess"),
                         foregroundColor: .white,
                         fullWidth: true
                     ))
@@ -906,7 +904,7 @@ private struct ForagingResultOverlay: View {
                         .font(FontStyles.resultSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text(isBonusRound ? "The seeds eluded you this time." : "Better luck next time!")
+                    Text("Better luck next time!")
                         .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     

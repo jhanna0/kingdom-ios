@@ -14,6 +14,7 @@ struct ForagingBushCell: Codable, Identifiable {
     let name: String
     let is_seed: Bool  // Is this the target for the current round?
     let is_seed_trail: Bool?  // Special cell that triggers bonus round
+    let label: String?  // Label to show on the tile (e.g. "BONUS", "Rare Egg")
     
     var id: Int { position }
     
@@ -31,6 +32,15 @@ struct ForagingRewardConfig: Codable {
 
 // MARK: - Round Data (single round)
 
+// Single reward item in rewards array
+struct ForagingReward: Codable {
+    let item: String
+    let display_name: String
+    let icon: String
+    let color: String
+    let amount: Int
+}
+
 struct ForagingRoundData: Codable {
     let round_num: Int
     let grid: [ForagingBushCell]
@@ -38,9 +48,11 @@ struct ForagingRoundData: Codable {
     let matches_to_win: Int
     let is_winner: Bool
     let winning_positions: [Int]
-    let reward_amount: Int
+    let rewards: [ForagingReward]?   // All rewards for this round - generic!
     let has_seed_trail: Bool?        // Only Round 1: did we find a trail?
     let seed_trail_position: Int?    // Where in the grid array
+    // Legacy fields
+    let reward_amount: Int
     let reward_config: ForagingRewardConfig
     let hidden_icon: String
     let hidden_color: String

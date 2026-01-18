@@ -73,20 +73,31 @@ class ForagingViewModel: ObservableObject {
         }
     }
     
-    var hasWon: Bool { revealedTargetCount >= matchesToWin }
+    /// Won if revealed 3+ targets, OR after all reveals if backend says we have rewards
+    var hasWon: Bool {
+        // Traditional win: matched 3 targets
+        if revealedTargetCount >= matchesToWin {
+            return true
+        }
+        // After all reveals: check if backend has rewards (handles rare drops etc)
+        if revealedCount >= maxReveals, let rewards = currentRoundData?.rewards, !rewards.isEmpty {
+            return true
+        }
+        return false
+    }
     var isWarming: Bool { revealedTargetCount >= 1 }
     var hasBonusRound: Bool { session?.has_bonus_round ?? false }
     var isBonusRound: Bool { currentRound == 2 }
     
-    // Combined rewards for display - backend determines what's winnable
-    var allRewards: [(round: Int, config: ForagingRewardConfig, amount: Int)] {
-        var rewards: [(Int, ForagingRewardConfig, Int)] = []
+    // Combined rewards for display - just render whatever backend sends
+    var allRewards: [ForagingReward] {
+        var rewards: [ForagingReward] = []
         
-        if let r1 = session?.round1, r1.is_winner {
-            rewards.append((1, r1.reward_config, r1.reward_amount))
+        if let r1 = session?.round1, let r1Rewards = r1.rewards {
+            rewards.append(contentsOf: r1Rewards)
         }
-        if let r2 = session?.round2, r2.is_winner {
-            rewards.append((2, r2.reward_config, r2.reward_amount))
+        if let r2 = session?.round2, let r2Rewards = r2.rewards {
+            rewards.append(contentsOf: r2Rewards)
         }
         
         return rewards
