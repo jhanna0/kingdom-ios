@@ -16,7 +16,7 @@ scale with Intelligence tier (T1: intel, T3: +disruption, T5: +sabotage/heist)
 """
 from fastapi import APIRouter
 
-from . import status, contracts, patrol, farming, training, crafting, gathering
+from . import status, contracts, patrol, farming, training, crafting, gathering, catchup
 
 # Main actions router
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -29,6 +29,7 @@ router.include_router(farming.router)
 router.include_router(training.router)
 router.include_router(crafting.router)
 router.include_router(gathering.router)
+router.include_router(catchup.router)
 
 # NOTE: sabotage and vault_heist removed - now incident outcomes at /incidents
 

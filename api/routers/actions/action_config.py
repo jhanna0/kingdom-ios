@@ -165,6 +165,7 @@ ACTION_SLOTS = {
     # BUILDING SLOT - Kingdom/property construction work
     "work": "building",
     "property_upgrade": "building",
+    "capacity": "building",  # Expand building capacity (catchup work)
     
     # ECONOMY SLOT - Resource gathering
     "farm": "economy",

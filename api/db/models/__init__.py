@@ -48,6 +48,9 @@ from .trade_offer import TradeOffer, TradeOfferStatus
 # PvP Arena Duels
 from .duel import DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, DuelOutcome
 
+# Building Catchup system
+from .building_catchup import BuildingCatchup
+
 __all__ = [
     "User",
     "PlayerState",
@@ -122,5 +125,7 @@ __all__ = [
     "DuelStats",
     "DuelStatus",
     "DuelOutcome",
+    # Building Catchup
+    "BuildingCatchup",
 ]
 

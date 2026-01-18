@@ -42,6 +42,7 @@ from .models import (
     Friend,
     TradeOffer,
     TradeOfferStatus,
+    BuildingCatchup,
 )
 
 __all__ = [
@@ -89,5 +90,6 @@ __all__ = [
     "Friend",
     "TradeOffer",
     "TradeOfferStatus",
+    "BuildingCatchup",
 ]
 

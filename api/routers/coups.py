@@ -354,12 +354,20 @@ def _apply_coup_outcome(
             new_ruler_id = initiator.id
             new_ruler_name = initiator.display_name
             
+            # Set empire to initiator's hometown kingdom
+            # Since coups are internal (only locals can coup), this restores independence
+            # e.g., if kingdom 123 was conquered by empire 456, a local (hometown=123) 
+            # couping will restore empire_id to 123
+            initiator_state = _get_player_state(db, initiator)
+            new_empire_id = initiator_state.hometown_kingdom_id or kingdom.id
+            kingdom.empire_id = new_empire_id
+            
             # Create new KingdomHistory entry for the new ruler
             new_history = KingdomHistory(
                 kingdom_id=kingdom.id,
                 ruler_id=initiator.id,
                 ruler_name=initiator.display_name,
-                empire_id=kingdom.empire_id or kingdom.id,  # Use kingdom's empire or itself
+                empire_id=new_empire_id,
                 event_type='coup',
                 started_at=now,
                 coup_id=coup.id

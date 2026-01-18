@@ -262,6 +262,17 @@ extension MapViewModel {
                         BuildingClickAction(type: $0.type, resource: $0.resource)
                     }
                     
+                    // Convert catchup info if present
+                    let catchupInfo: BuildingCatchupInfo? = building.catchup.map {
+                        BuildingCatchupInfo(
+                            needsCatchup: $0.needs_catchup,
+                            canUse: $0.can_use,
+                            actionsRequired: $0.actions_required,
+                            actionsCompleted: $0.actions_completed,
+                            actionsRemaining: $0.actions_remaining
+                        )
+                    }
+                    
                     // Store full metadata
                     kingdom.buildingMetadata[building.type] = BuildingMetadata(
                         type: building.type,
@@ -275,6 +286,7 @@ extension MapViewModel {
                         sortOrder: building.sort_order ?? 100,
                         upgradeCost: upgradeCost,
                         clickAction: clickAction,
+                        catchup: catchupInfo,
                         tierName: building.tier_name,
                         tierBenefit: building.tier_benefit,
                         allTiers: allTiers
@@ -368,6 +380,17 @@ extension MapViewModel {
                                 BuildingClickAction(type: $0.type, resource: $0.resource)
                             }
                             
+                            // Convert catchup info if present
+                            let catchupInfo: BuildingCatchupInfo? = building.catchup.map {
+                                BuildingCatchupInfo(
+                                    needsCatchup: $0.needs_catchup,
+                                    canUse: $0.can_use,
+                                    actionsRequired: $0.actions_required,
+                                    actionsCompleted: $0.actions_completed,
+                                    actionsRemaining: $0.actions_remaining
+                                )
+                            }
+                            
                             // Store full metadata
                             kingdoms[index].buildingMetadata[building.type] = BuildingMetadata(
                                 type: building.type,
@@ -381,6 +404,7 @@ extension MapViewModel {
                                 sortOrder: building.sort_order ?? 100,
                                 upgradeCost: upgradeCost,
                                 clickAction: clickAction,
+                                catchup: catchupInfo,
                                 tierName: building.tier_name,
                                 tierBenefit: building.tier_benefit,
                                 allTiers: allTiers

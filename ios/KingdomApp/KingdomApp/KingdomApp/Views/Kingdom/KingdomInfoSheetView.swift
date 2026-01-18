@@ -19,6 +19,8 @@ struct KingdomInfoSheetView: View {
     @State private var allianceResultSuccess = false
     // DYNAMIC: Single state for any building action - no hardcoded types!
     @State private var activeBuildingAction: BuildingClickAction?
+    // Catchup state - for buildings that need catch-up work
+    @State private var catchupBuilding: BuildingMetadata?
     
     // Battle state (Coups & Invasions)
     @State private var showBattleView = false
@@ -522,6 +524,22 @@ struct KingdomInfoSheetView: View {
                 onDismiss: { activeBuildingAction = nil }
             )
         }
+        // Catchup view for buildings that need catch-up work
+        .fullScreenCover(item: $catchupBuilding) { building in
+            NavigationStack {
+                BuildingCatchupView(
+                    building: building,
+                    kingdom: kingdom,
+                    onDismiss: { catchupBuilding = nil },
+                    onComplete: {
+                        // Refresh kingdom data after completing catchup
+                        Task {
+                            await viewModel.refreshKingdomData()
+                        }
+                    }
+                )
+            }
+        }
         .fullScreenCover(isPresented: $showBattleView) {
             if let battleId = initiatedBattleId {
                 BattleView(battleId: battleId, onDismiss: { showBattleView = false })
@@ -645,6 +663,8 @@ struct KingdomInfoSheetView: View {
         let color = Color(hex: building.colorHex) ?? KingdomTheme.Colors.inkMedium
         // DYNAMIC: Building is clickable if backend says so AND player is inside
         let isClickable = isPlayerInside && building.isClickable
+        // Check if player needs to complete catch-up work
+        let needsCatchup = building.needsCatchup && isPlayerInside
         
         let content = HStack(spacing: 10) {
             // Icon with level badge - brutalist style
@@ -672,32 +692,57 @@ struct KingdomInfoSheetView: View {
             
             // Name + description
             VStack(alignment: .leading, spacing: 2) {
-                Text(building.displayName)
-                    .font(FontStyles.bodySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                HStack(spacing: 6) {
+                    Text(building.displayName)
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    // Show expand badge if building needs capacity expansion
+                    if needsCatchup {
+                        Text("EXPAND")
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(KingdomTheme.Colors.buttonWarning)
+                            .cornerRadius(4)
+                    }
+                }
                 
-                Text(building.description)
-                    .font(FontStyles.labelTiny)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .lineLimit(1)
+                if needsCatchup, let catchup = building.catchup {
+                    Text("\(catchup.actionsCompleted)/\(catchup.actionsRequired) actions to unlock")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        .lineLimit(1)
+                } else {
+                    Text(building.description)
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .lineLimit(1)
+                }
             }
             
             Spacer()
             
-            // Chevron for clickable buildings
-            if isClickable {
-                Image(systemName: "chevron.right")
+            // Chevron for clickable buildings or catchup
+            if isClickable || needsCatchup {
+                Image(systemName: needsCatchup ? "hammer.fill" : "chevron.right")
                     .font(FontStyles.iconMini)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .foregroundColor(needsCatchup ? KingdomTheme.Colors.buttonWarning : KingdomTheme.Colors.inkMedium)
             }
         }
         .padding(10)
         .background(isBuilt ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(needsCatchup ? KingdomTheme.Colors.buttonWarning : Color.black, lineWidth: needsCatchup ? 2 : 1.5))
         
-        // DYNAMIC: Handle click based on backend-provided click_action
-        if isClickable, let clickAction = building.clickAction {
+        // Handle click: catchup takes priority over normal action
+        if needsCatchup {
+            Button {
+                catchupBuilding = building
+            } label: { content }
+            .buttonStyle(.plain)
+        } else if isClickable, let clickAction = building.clickAction {
             Button {
                 activeBuildingAction = clickAction
             } label: { content }

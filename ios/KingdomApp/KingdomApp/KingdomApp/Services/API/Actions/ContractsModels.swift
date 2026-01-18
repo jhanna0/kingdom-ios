@@ -172,5 +172,41 @@ struct PropertyUpgradeActionResponse: Codable {
     }
 }
 
+// MARK: - Building Catchup Contract
 
-
+/// Catchup work for buildings player didn't help construct.
+/// Only shows buildings they've tried to access (not all buildings).
+struct CatchupContract: Codable, Identifiable {
+    let contractId: String
+    let buildingType: String
+    let buildingDisplayName: String
+    let buildingIcon: String
+    let kingdomId: String
+    let actionsRequired: Int
+    let actionsCompleted: Int
+    let actionsRemaining: Int
+    let progressPercent: Int
+    let createdAt: String?
+    let status: String
+    let endpoint: String?
+    
+    var id: String { contractId }
+    
+    enum CodingKeys: String, CodingKey {
+        case status, endpoint
+        case contractId = "id"
+        case buildingType = "building_type"
+        case buildingDisplayName = "building_display_name"
+        case buildingIcon = "building_icon"
+        case kingdomId = "kingdom_id"
+        case actionsRequired = "actions_required"
+        case actionsCompleted = "actions_completed"
+        case actionsRemaining = "actions_remaining"
+        case progressPercent = "progress_percent"
+        case createdAt = "created_at"
+    }
+    
+    var progress: Double {
+        return Double(actionsCompleted) / Double(actionsRequired)
+    }
+}

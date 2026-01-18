@@ -14,8 +14,9 @@ import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db, CoupEvent
 from db.models import Battle
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BuildingClickAction, BUILDING_COLORS, AllianceInfo, ActiveCoupData
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BuildingClickAction, BuildingCatchupInfo, BUILDING_COLORS, AllianceInfo, ActiveCoupData
 from routers.alliances import are_empires_allied, get_alliance_between
+from services.catchup_service import get_catchup_status, EXEMPT_BUILDINGS
 from osm_service import (
     find_user_city_fast,
     fetch_nearby_city_candidates,
@@ -24,6 +25,131 @@ from osm_service import (
     _min_distance_between_polygons,
 )
 from routers.tiers import BUILDING_TYPES
+
+
+def get_buildings_for_kingdom(
+    db: Session, 
+    kingdom: Kingdom, 
+    current_user: Optional[User] = None,
+    include_upgrade_costs: bool = True
+) -> list:
+    """
+    Build the buildings array for a kingdom with all metadata, upgrade costs, and catchup info.
+    
+    This is THE SINGLE SOURCE OF TRUTH for building data.
+    Used by both /kingdoms/{id} and city service endpoints.
+    
+    Args:
+        db: Database session
+        kingdom: The kingdom to get buildings for
+        current_user: Optional user for catchup info (None = no catchup check)
+        include_upgrade_costs: Whether to calculate upgrade costs
+        
+    Returns:
+        List of building dicts with full metadata
+    """
+    from services.kingdom_service import calculate_actions_required, calculate_construction_cost, get_active_citizens_count
+    from db.models import PlayerState, KingdomBuilding
+    
+    # Get active citizens count for cost calculations
+    active_citizens_count = get_active_citizens_count(db, kingdom.id) if include_upgrade_costs else 0
+    
+    # Load all buildings for this kingdom from the table
+    kingdom_buildings_rows = db.query(KingdomBuilding).filter(
+        KingdomBuilding.kingdom_id == kingdom.id
+    ).all()
+    building_levels_map = {b.building_type: b.level for b in kingdom_buildings_rows}
+    
+    # Get player's building skill if user is logged in
+    building_skill = 0
+    if current_user:
+        player_state = db.query(PlayerState).filter(
+            PlayerState.user_id == current_user.id
+        ).first()
+        building_skill = player_state.building_skill if player_state else 0
+    
+    buildings = []
+    for building_type, building_meta in BUILDING_TYPES.items():
+        # Try new table first, fallback to old column
+        level = building_levels_map.get(building_type)
+        if level is None:
+            level_attr = f"{building_type}_level"
+            level = getattr(kingdom, level_attr, 0)
+        
+        max_level = building_meta["max_tier"]
+        
+        # Calculate upgrade cost for next level
+        upgrade_cost = None
+        if include_upgrade_costs and level < max_level:
+            next_level = level + 1
+            actions = calculate_actions_required(building_meta["display_name"], next_level, active_citizens_count)
+            construction_cost = calculate_construction_cost(next_level, active_citizens_count)
+            upgrade_cost = {
+                "actions_required": actions,
+                "construction_cost": construction_cost,
+                "can_afford": kingdom.treasury_gold >= construction_cost
+            }
+        
+        # Get current tier info
+        tiers_data = building_meta.get("tiers", {})
+        current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
+        tier_name = current_tier_data.get("name", f"Level {level}")
+        tier_benefit = current_tier_data.get("benefit", "")
+        
+        # Build all tiers info
+        all_tiers = []
+        for tier_num in range(1, max_level + 1):
+            tier_data = tiers_data.get(tier_num, {})
+            all_tiers.append({
+                "tier": tier_num,
+                "name": tier_data.get("name", f"Level {tier_num}"),
+                "benefit": tier_data.get("benefit", ""),
+                "description": tier_data.get("description", "")
+            })
+        
+        # Get click action if defined (only clickable if level > 0)
+        click_action = None
+        click_action_meta = building_meta.get("click_action")
+        if click_action_meta and level > 0:
+            click_action = {
+                "type": click_action_meta.get("type", ""),
+                "resource": click_action_meta.get("resource")
+            }
+        
+        # Get catch-up info (only for logged-in users, built buildings, non-exempt)
+        catchup_info = None
+        if current_user and level > 0 and building_type not in EXEMPT_BUILDINGS:
+            catchup_status = get_catchup_status(
+                db, current_user.id, kingdom.id, 
+                building_type, level, building_skill
+            )
+            catchup_info = {
+                "needs_catchup": catchup_status["needs_catchup"],
+                "can_use": catchup_status["can_use_building"],
+                "actions_required": catchup_status["actions_required"],
+                "actions_completed": catchup_status["actions_completed"],
+                "actions_remaining": catchup_status["actions_remaining"]
+            }
+        
+        buildings.append({
+            "type": building_type,
+            "display_name": building_meta["display_name"],
+            "icon": building_meta["icon"],
+            "color": BUILDING_COLORS.get(building_type, "#666666"),
+            "category": building_meta["category"],
+            "description": building_meta["description"],
+            "level": level,
+            "max_level": max_level,
+            "sort_order": building_meta.get("sort_order", 100),
+            "upgrade_cost": upgrade_cost,
+            "click_action": click_action,
+            "catchup": catchup_info,
+            "tier_name": tier_name,
+            "tier_benefit": tier_benefit,
+            "all_tiers": all_tiers
+        })
+    
+    return buildings
 
 
 def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -214,75 +340,61 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                     else:
                         can_stage_coup = True
         
-        # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata
-        # Keys are lowercase matching DB column prefixes (e.g., "wall", "education")
-        # Import cost calculation functions
-        from services.kingdom_service import calculate_actions_required, calculate_construction_cost, get_active_citizens_count
+        # SINGLE SOURCE OF TRUTH: Get buildings with all metadata, costs, and catchup info
+        buildings_data = get_buildings_for_kingdom(db, kingdom, current_user)
         
-        # CALCULATE LIVE: Get citizen count for this kingdom for accurate cost calculation
-        # Must calculate this BEFORE the building loop since we need it for upgrade costs
-        citizen_count_for_cost = active_citizens.get(kingdom.id, 0)
-        
+        # Convert dicts to Pydantic models for this endpoint
         buildings = []
-        for building_type, building_meta in BUILDING_TYPES.items():
-            # Get level from kingdom model (e.g. kingdom.wall_level, kingdom.education_level)
-            level_attr = f"{building_type}_level"
-            level = getattr(kingdom, level_attr, 0)
-            
-            # Calculate upgrade cost for next level (None if at max)
+        for b in buildings_data:
             upgrade_cost = None
-            max_level = building_meta["max_tier"]
-            if level < max_level:
-                next_level = level + 1
-                # Use LIVE citizen count for accurate cost calculation (not stale kingdom.population)
-                actions = calculate_actions_required(building_meta["display_name"], next_level, citizen_count_for_cost)
-                construction_cost = calculate_construction_cost(next_level, citizen_count_for_cost)
+            if b["upgrade_cost"]:
                 upgrade_cost = BuildingUpgradeCost(
-                    actions_required=actions,
-                    construction_cost=construction_cost,
-                    can_afford=kingdom.treasury_gold >= construction_cost
+                    actions_required=b["upgrade_cost"]["actions_required"],
+                    construction_cost=b["upgrade_cost"]["construction_cost"],
+                    can_afford=b["upgrade_cost"]["can_afford"]
                 )
             
-            # Get current tier info
-            tiers_data = building_meta.get("tiers", {})
-            current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
-            tier_name = current_tier_data.get("name", f"Level {level}")
-            tier_benefit = current_tier_data.get("benefit", "")
-            
-            # Build all tiers info for detail view
-            all_tiers = []
-            for tier_num in range(1, max_level + 1):
-                tier_data = tiers_data.get(tier_num, {})
-                all_tiers.append(BuildingTierInfo(
-                    tier=tier_num,
-                    name=tier_data.get("name", f"Level {tier_num}"),
-                    benefit=tier_data.get("benefit", ""),
-                    description=tier_data.get("description", "")
-                ))
-            
-            # Get click action if defined (only clickable if level > 0)
             click_action = None
-            click_action_meta = building_meta.get("click_action")
-            if click_action_meta and level > 0:
+            if b["click_action"]:
                 click_action = BuildingClickAction(
-                    type=click_action_meta.get("type", ""),
-                    resource=click_action_meta.get("resource")
+                    type=b["click_action"]["type"],
+                    resource=b["click_action"].get("resource")
                 )
+            
+            catchup_info = None
+            if b["catchup"]:
+                catchup_info = BuildingCatchupInfo(
+                    needs_catchup=b["catchup"]["needs_catchup"],
+                    can_use=b["catchup"]["can_use"],
+                    actions_required=b["catchup"]["actions_required"],
+                    actions_completed=b["catchup"]["actions_completed"],
+                    actions_remaining=b["catchup"]["actions_remaining"]
+                )
+            
+            all_tiers = [
+                BuildingTierInfo(
+                    tier=t["tier"],
+                    name=t["name"],
+                    benefit=t["benefit"],
+                    description=t["description"]
+                ) for t in b["all_tiers"]
+            ]
             
             buildings.append(BuildingData(
-                type=building_type,
-                display_name=building_meta["display_name"],
-                icon=building_meta["icon"],
-                color=BUILDING_COLORS.get(building_type, "#666666"),  # Fallback gray
-                category=building_meta["category"],
-                description=building_meta["description"],
-                level=level,
-                max_level=max_level,
-                sort_order=building_meta.get("sort_order", 100),
+                type=b["type"],
+                display_name=b["display_name"],
+                icon=b["icon"],
+                color=b["color"],
+                category=b["category"],
+                description=b["description"],
+                level=b["level"],
+                max_level=b["max_level"],
+                sort_order=b["sort_order"],
                 upgrade_cost=upgrade_cost,
                 click_action=click_action,
-                tier_name=tier_name,
-                tier_benefit=tier_benefit,
+                catchup=catchup_info,
+                tier_name=b["tier_name"],
+                tier_benefit=b["tier_benefit"],
                 all_tiers=all_tiers
             ))
         

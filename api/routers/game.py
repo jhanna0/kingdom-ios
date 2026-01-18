@@ -11,7 +11,7 @@ import uuid
 from db import get_db, User, PlayerState, Kingdom, UserKingdom, CityBoundary
 from db.models.kingdom_event import KingdomEvent
 from schemas import CheckInRequest, CheckInResponse, CheckInRewards
-from routers.auth import get_current_user
+from routers.auth import get_current_user, get_current_user_optional
 from routers.actions.utils import format_datetime_iso
 from config import DEV_MODE
 
@@ -107,13 +107,15 @@ def list_kingdoms(
 
 
 @router.get("/kingdoms/{kingdom_id}")
-def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
-    """Get kingdom details with building upgrade costs"""
-    from services.kingdom_service import calculate_actions_required, calculate_construction_cost, get_active_citizens_count
-    from routers.tiers import BUILDING_TYPES
-    from schemas.common import BUILDING_COLORS
-    from db.models import PlayerState, UserKingdom
-    from datetime import datetime, timedelta
+def get_kingdom(
+    kingdom_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    """Get kingdom details with building upgrade costs and catchup info"""
+    from services.kingdom_service import get_active_citizens_count
+    from services.city_service import get_buildings_for_kingdom
+    from db.models import PlayerState
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -138,81 +140,8 @@ def get_kingdom(kingdom_id: str, db: Session = Depends(get_db)):
     # CALCULATE LIVE: Count active citizens (alive citizens whose hometown is this kingdom)
     active_citizens_count = get_active_citizens_count(db, kingdom.id)
     
-    # DYNAMIC BUILDINGS - Build array from BUILDING_TYPES metadata with upgrade costs
-    # Read from kingdom_buildings table (NEW WAY) with fallback to columns (OLD WAY)
-    from db.models import KingdomBuilding
-    
-    # Load all buildings for this kingdom from the table
-    kingdom_buildings_rows = db.query(KingdomBuilding).filter(
-        KingdomBuilding.kingdom_id == kingdom.id
-    ).all()
-    building_levels_map = {b.building_type: b.level for b in kingdom_buildings_rows}
-    
-    buildings = []
-    for building_type, building_meta in BUILDING_TYPES.items():
-        # Try new table first, fallback to old column
-        level = building_levels_map.get(building_type)
-        if level is None:
-            # Fallback to old column for backward compatibility
-            level_attr = f"{building_type}_level"
-            level = getattr(kingdom, level_attr, 0)
-        
-        # Calculate upgrade cost for next level (None if at max)
-        # Use LIVE citizen count (players with this kingdom as hometown) for scaling
-        max_level = building_meta["max_tier"]
-        upgrade_cost = None
-        if level < max_level:
-            next_level = level + 1
-            actions = calculate_actions_required(building_meta["display_name"], next_level, active_citizens_count)
-            construction_cost = calculate_construction_cost(next_level, active_citizens_count)
-            upgrade_cost = {
-                "actions_required": actions,
-                "construction_cost": construction_cost,
-                "can_afford": kingdom.treasury_gold >= construction_cost
-            }
-        
-        # Get current tier info
-        tiers_data = building_meta.get("tiers", {})
-        current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
-        tier_name = current_tier_data.get("name", f"Level {level}")
-        tier_benefit = current_tier_data.get("benefit", "")
-        
-        # Build all tiers info for detail view
-        all_tiers = []
-        for tier_num in range(1, max_level + 1):
-            tier_data = tiers_data.get(tier_num, {})
-            all_tiers.append({
-                "tier": tier_num,
-                "name": tier_data.get("name", f"Level {tier_num}"),
-                "benefit": tier_data.get("benefit", ""),
-                "description": tier_data.get("description", "")
-            })
-        
-        # Get click action if defined (only clickable if level > 0)
-        click_action = None
-        click_action_meta = building_meta.get("click_action")
-        if click_action_meta and level > 0:
-            click_action = {
-                "type": click_action_meta.get("type", ""),
-                "resource": click_action_meta.get("resource")
-            }
-        
-        buildings.append({
-            "type": building_type,
-            "display_name": building_meta["display_name"],
-            "icon": building_meta["icon"],
-            "color": BUILDING_COLORS.get(building_type, "#666666"),
-            "category": building_meta["category"],
-            "description": building_meta["description"],
-            "level": level,
-            "max_level": max_level,
-            "sort_order": building_meta.get("sort_order", 100),
-            "upgrade_cost": upgrade_cost,
-            "click_action": click_action,
-            "tier_name": tier_name,
-            "tier_benefit": tier_benefit,
-            "all_tiers": all_tiers
-        })
+    # SINGLE SOURCE OF TRUTH: Get buildings with all metadata, costs, and catchup info
+    buildings = get_buildings_for_kingdom(db, kingdom, current_user)
     
     # Return kingdom data - buildings array is the SINGLE SOURCE OF TRUTH
     # Frontend should iterate buildings array - no hardcoded building references!

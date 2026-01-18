@@ -138,7 +138,7 @@ def get_upgrade_resource_costs(current_tier: int, population: int = 0) -> list:
 
 def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 0) -> int:
     """Calculate how many actions required to complete property upgrade"""
-    from routers.tiers import PROPERTY_TIERS, get_property_max_tier
+    from routers.tiers import PROPERTY_TIERS, get_property_max_tier, get_building_action_reduction
     
     next_tier = current_tier + 1
     if current_tier >= get_property_max_tier():
@@ -147,7 +147,8 @@ def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 
     tier_data = PROPERTY_TIERS.get(next_tier, {})
     base_actions = tier_data.get("base_actions", 5 + (current_tier * 2))
     
-    building_reduction = 1.0 - min(building_skill * 0.05, 0.5)
+    # Use centralized building skill reduction
+    building_reduction = get_building_action_reduction(building_skill)
     reduced_actions = int(base_actions * building_reduction)
     return max(1, reduced_actions)
 

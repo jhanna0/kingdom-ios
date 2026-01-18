@@ -206,6 +206,7 @@ struct AllActionStatus: Codable {
     let craftingCosts: CraftingCosts
     let workshopContracts: [WorkshopContract]?  // Workshop crafting contracts
     let propertyUpgradeContracts: [PropertyUpgradeContract]?
+    let catchupContracts: [CatchupContract]?  // Building catchup work (only started ones)
     let contracts: [APIContract]
     let pendingAllianceRequests: [PendingAllianceRequest]?
     
@@ -236,6 +237,7 @@ struct AllActionStatus: Codable {
         case craftingCosts = "crafting_costs"
         case workshopContracts = "workshop_contracts"
         case propertyUpgradeContracts = "property_upgrade_contracts"
+        case catchupContracts = "catchup_contracts"
         case pendingAllianceRequests = "pending_alliance_requests"
     }
     

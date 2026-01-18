@@ -35,6 +35,7 @@ from .common import (
     BuildingClickAction,
     BuildingUpgradeCost,
     BuildingTierInfo,
+    BuildingCatchupInfo,
     BUILDING_COLORS,
     AllianceInfo,
     ActiveCoupData,
@@ -108,6 +109,7 @@ __all__ = [
     "BuildingClickAction",
     "BuildingUpgradeCost",
     "BuildingTierInfo",
+    "BuildingCatchupInfo",
     "BUILDING_COLORS",
     # Coup
     "CoupInitiateRequest",

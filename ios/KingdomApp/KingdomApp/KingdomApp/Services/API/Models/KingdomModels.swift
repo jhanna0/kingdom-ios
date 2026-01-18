@@ -23,6 +23,15 @@ struct APIBuildingClickAction: Codable {
     let resource: String?  // For gathering: "wood", "iron"
 }
 
+/// Catch-up info for players who joined after building was constructed
+struct APIBuildingCatchupInfo: Codable {
+    let needs_catchup: Bool  // True if player must complete catch-up to use this building
+    let can_use: Bool  // True if player can use this building
+    let actions_required: Int  // Total catch-up actions required
+    let actions_completed: Int  // Completed catch-up actions
+    let actions_remaining: Int  // Remaining catch-up actions
+}
+
 /// DYNAMIC Building data from backend - includes metadata, upgrade costs, and tier info
 /// Frontend iterates this array - NO HARDCODING required!
 struct APIBuildingData: Codable {
@@ -39,6 +48,10 @@ struct APIBuildingData: Codable {
     
     // Click action - what happens when building is tapped (nil = not clickable)
     let click_action: APIBuildingClickAction?
+    
+    // Catch-up info - for players who joined after building was constructed
+    // If needs_catchup is true, player must complete catch-up work before using
+    let catchup: APIBuildingCatchupInfo?
     
     // Current tier info
     let tier_name: String  // Name of current tier (e.g. "Stone Wall")

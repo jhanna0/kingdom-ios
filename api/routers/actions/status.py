@@ -95,6 +95,49 @@ def get_crafting_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
+def get_catchup_contracts_for_status(db: Session, user_id: int, state: PlayerState) -> list:
+    """
+    Get active building catchup work for status endpoint.
+    
+    Only returns catchup records that have been STARTED (player tried to use the building).
+    This prevents spamming the Actions view with every building that needs catchup.
+    """
+    from db import BuildingCatchup
+    from routers.tiers import BUILDING_TYPES
+    
+    # Only get incomplete catchup records for the player's current kingdom
+    if not state.current_kingdom_id:
+        return []
+    
+    catchups = db.query(BuildingCatchup).filter(
+        BuildingCatchup.user_id == user_id,
+        BuildingCatchup.kingdom_id == state.current_kingdom_id,
+        BuildingCatchup.completed_at.is_(None)  # Only incomplete
+    ).all()
+    
+    result = []
+    for catchup in catchups:
+        # Get building metadata
+        building_meta = BUILDING_TYPES.get(catchup.building_type, {})
+        
+        result.append({
+            "id": str(catchup.id),
+            "building_type": catchup.building_type,
+            "building_display_name": building_meta.get("display_name", catchup.building_type.capitalize()),
+            "building_icon": building_meta.get("icon", "building.2.fill"),
+            "kingdom_id": catchup.kingdom_id,
+            "actions_required": catchup.actions_required,
+            "actions_completed": catchup.actions_completed,
+            "actions_remaining": catchup.actions_remaining,
+            "progress_percent": catchup.progress_percent,
+            "created_at": format_datetime_iso(catchup.created_at) if catchup.created_at else None,
+            "status": "in_progress",
+            "endpoint": f"/actions/catchup/{catchup.building_type}/work"
+        })
+    
+    return result
+
+
 def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
     """Get workshop crafting contracts from unified_contracts table for status endpoint"""
     from routers.workshop import CRAFTABLE_ITEMS
@@ -247,6 +290,35 @@ def get_action_status(
             UnifiedContract.completed_at.is_(None)  # Active contracts only
         ).all()
         contracts = [contract_to_response(c, db) for c in contracts_query]
+        
+        # Add catchup contracts as building contracts (unique name: "Expand {building}")
+        catchup_list = get_catchup_contracts_for_status(db, current_user.id, state)
+        for c in catchup_list:
+            contracts.append({
+                "id": f"catchup_{c['id']}",
+                "kingdom_id": c["kingdom_id"],
+                "kingdom_name": "",
+                "building_type": c["building_type"],
+                "building_level": 0,
+                "building_benefit": "Expand capacity",
+                "building_icon": c["building_icon"],
+                "building_display_name": f"Expand {c['building_display_name']}",
+                "base_population": 0,
+                "base_hours_required": 0,
+                "work_started_at": c.get("created_at") or datetime.utcnow().isoformat(),
+                "total_actions_required": c["actions_required"],
+                "actions_completed": c["actions_completed"],
+                "action_contributions": {},
+                "construction_cost": 0,
+                "reward_pool": 0,
+                "action_reward": 0,
+                "created_by": current_user.id,
+                "created_at": c.get("created_at") or datetime.utcnow().isoformat(),
+                "completed_at": None,
+                "status": "open",
+                "per_action_costs": [],
+                "endpoint": c["endpoint"],
+            })
     
     # Check slot-based cooldowns (PARALLEL ACTIONS!)
     # Each slot can have one action running - different slots can run in parallel
@@ -814,10 +886,10 @@ def get_action_status(
     slots = []
     for slot_def in get_all_slot_definitions():
         slot_id = slot_def["id"]
-        # Get actions that belong to this slot
+        # Get actions that belong to this slot (only those with endpoints - others are handled by contracts)
         slot_actions = [
             action_key for action_key, action_data in actions.items()
-            if action_data.get("slot") == slot_id
+            if action_data.get("slot") == slot_id and action_data.get("endpoint")
         ]
         slots.append({
             "id": slot_id,

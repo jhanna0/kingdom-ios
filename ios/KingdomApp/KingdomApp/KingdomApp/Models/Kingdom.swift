@@ -25,9 +25,24 @@ struct BuildingClickAction: Hashable, Identifiable {
     var id: String { "\(type)_\(resource ?? "")" }
 }
 
+// Catch-up info for players who joined after building was constructed
+struct BuildingCatchupInfo: Hashable {
+    let needsCatchup: Bool  // True if player must complete catch-up to use this building
+    let canUse: Bool  // True if player can use this building
+    let actionsRequired: Int  // Total catch-up actions required
+    let actionsCompleted: Int  // Completed catch-up actions
+    let actionsRemaining: Int  // Remaining catch-up actions
+    
+    var progressPercent: Int {
+        guard actionsRequired > 0 else { return 100 }
+        return min(100, Int((Double(actionsCompleted) / Double(actionsRequired)) * 100))
+    }
+}
+
 // DYNAMIC Building metadata from backend - includes upgrade costs and tier info
 // Constructed manually from API response - not decoded directly
-struct BuildingMetadata: Hashable {
+struct BuildingMetadata: Hashable, Identifiable {
+    var id: String { type }  // Use building type as unique identifier
     let type: String  // e.g. "wall", "vault", "mine"
     let displayName: String  // e.g. "Walls", "Vault"
     let icon: String  // SF Symbol name
@@ -41,6 +56,10 @@ struct BuildingMetadata: Hashable {
 
     // Click action - what happens when building is tapped (nil = not clickable)
     let clickAction: BuildingClickAction?
+    
+    // Catch-up info - for players who joined after building was constructed
+    // If needsCatchup is true, player must complete catch-up work before using
+    let catchup: BuildingCatchupInfo?
 
     // Current tier info
     let tierName: String  // Name of current tier (e.g. "Stone Wall")
@@ -52,6 +71,16 @@ struct BuildingMetadata: Hashable {
     // Computed: is this building clickable?
     var isClickable: Bool {
         clickAction != nil && level > 0
+    }
+    
+    // Computed: does this building need catch-up work before it can be used?
+    var needsCatchup: Bool {
+        catchup?.needsCatchup ?? false
+    }
+    
+    // Computed: can the player use this building?
+    var canUseBuilding: Bool {
+        catchup?.canUse ?? true
     }
 }
 

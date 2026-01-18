@@ -666,6 +666,22 @@ def get_building_refund_chance(tier: int) -> float:
     return get_skill_mechanic("building", "refund_chance", tier)
 
 
+def get_building_action_reduction(building_skill: int) -> float:
+    """Get building skill action reduction multiplier.
+    
+    Reduces actions required for property upgrades, catch-up work, etc.
+    Formula: 5% reduction per skill level, max 50% at level 10.
+    
+    Args:
+        building_skill: Player's building skill level (1-10)
+    
+    Returns: multiplier to apply (e.g., 0.95 for 5% reduction, 0.50 for 50% reduction)
+    """
+    # 5% per level, capped at 50%
+    reduction = min(building_skill * 0.05, 0.5)
+    return 1.0 - reduction
+
+
 def get_science_training_reduction(tier: int) -> float:
     """Get science skill training actions reduction multiplier for a tier.
     

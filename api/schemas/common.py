@@ -59,6 +59,15 @@ class BuildingClickAction(BaseModel):
     resource: Optional[str] = None  # For gathering: "wood", "iron"
 
 
+class BuildingCatchupInfo(BaseModel):
+    """Catch-up info for players who joined after building was constructed"""
+    needs_catchup: bool  # True if player must complete catch-up to use this building
+    can_use: bool  # True if player can use this building
+    actions_required: int  # Total catch-up actions required
+    actions_completed: int  # Completed catch-up actions
+    actions_remaining: int  # Remaining catch-up actions
+
+
 class BuildingData(BaseModel):
     """Building data with metadata - FULLY DYNAMIC from backend"""
     type: str  # e.g. "wall", "vault", "mine"
@@ -74,6 +83,10 @@ class BuildingData(BaseModel):
     
     # Click action - what happens when building is tapped (None = not clickable)
     click_action: Optional['BuildingClickAction'] = None
+    
+    # Catch-up info - for players who joined after building was constructed
+    # If needs_catchup is True, player must complete catch-up work before using
+    catchup: Optional['BuildingCatchupInfo'] = None
     
     # Current tier info
     tier_name: str = ""  # Name of current tier (e.g. "Stone Wall")
