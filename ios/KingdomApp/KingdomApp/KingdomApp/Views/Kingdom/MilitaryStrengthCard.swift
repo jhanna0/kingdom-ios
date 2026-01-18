@@ -4,9 +4,7 @@ struct MilitaryStrengthCard: View {
     let strength: MilitaryStrength?
     let kingdom: Kingdom
     let player: Player
-    let onGatherIntel: () -> Void
     
-    @State private var isGathering = false
     @State private var isExpanded = false
     
     var body: some View {
@@ -125,7 +123,7 @@ struct MilitaryStrengthCard: View {
         }
     }
     
-    // MARK: - Enemy Kingdom with Intel
+    // MARK: - Enemy Kingdom with Intel (passive display - no button)
     
     private func enemyIntelView(_ strength: MilitaryStrength) -> some View {
         VStack(spacing: 6) {
@@ -138,13 +136,21 @@ struct MilitaryStrengthCard: View {
             
             compactStatRow(icon: "building.2.fill", label: "Walls", value: "Lv.\(strength.wallLevel)")
             
-            if let level = strength.intelLevel, level >= 3 {
-                if let citizens = strength.activeCitizens {
-                    compactStatRow(icon: "person.3.fill", label: "Citizens", value: "\(citizens)")
-                }
+            // T2+ intel: show citizens
+            if let citizens = strength.activeCitizens {
+                compactStatRow(icon: "person.3.fill", label: "Citizens", value: "\(citizens)")
             }
             
-            if let level = strength.intelLevel, level >= 5 {
+            // T2+ intel: show military stats
+            if let attack = strength.totalAttack {
+                compactStatRow(icon: "bolt.fill", label: "Attack", value: "\(attack)")
+            }
+            if let defense = strength.totalDefense {
+                compactStatRow(icon: "shield.fill", label: "Defense", value: "\(defense)")
+            }
+            
+            // Show vulnerability assessment if we have military intel
+            if strength.totalAttack != nil {
                 HStack(spacing: 4) {
                     Image(systemName: strength.canDefeatInAttack ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .font(FontStyles.iconMini)
@@ -155,33 +161,17 @@ struct MilitaryStrengthCard: View {
                 }
             }
             
-            // Update intel button
-            if !isGathering && canGatherIntel {
-                Button(action: {
-                    Task {
-                        isGathering = true
-                        onGatherIntel()
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        isGathering = false
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("Update (500g)")
-                            .font(FontStyles.labelSmall)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                }
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-                .padding(.top, 4)
+            // Show intel age
+            if let intelAge = strength.intelAgeDays {
+                Text(intelAge == 0 ? "Intel gathered today" : "Intel is \(intelAge) day\(intelAge == 1 ? "" : "s") old")
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                    .padding(.top, 2)
             }
         }
     }
     
-    // MARK: - No Intel View
+    // MARK: - No Intel View (passive - tells user to scout via Actions)
     
     private func noIntelView(_ strength: MilitaryStrength) -> some View {
         VStack(spacing: 6) {
@@ -191,33 +181,16 @@ struct MilitaryStrengthCard: View {
                 Image(systemName: "eye.slash")
                     .font(FontStyles.iconMini)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
-                Text("Scout to reveal more intel")
+                Text("No intel available")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
             }
             
-            if canGatherIntel {
-                Button(action: {
-                    Task {
-                        isGathering = true
-                        onGatherIntel()
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        isGathering = false
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "eye.fill")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("Gather Intel (500g)")
-                            .font(FontStyles.labelSmall)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                }
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonWarning, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-                .padding(.top, 4)
-            }
+            // Hint to use Scout action
+            Text("Use Scout action to gather intel")
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .italic()
         }
     }
     
@@ -237,14 +210,5 @@ struct MilitaryStrengthCard: View {
                 .font(FontStyles.labelBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
         }
-    }
-    
-    // MARK: - Actions
-    
-    private var canGatherIntel: Bool {
-        player.intelligence >= 3 &&
-        player.gold >= 500 &&
-        player.currentKingdom == kingdom.id &&
-        !isGathering
     }
 }

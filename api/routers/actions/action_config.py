@@ -51,25 +51,23 @@ ACTION_TYPES = {
         }
     },
     "scout": {
-        "display_name": "Infiltrate",
+        "display_name": "Scout",
         "icon": "eye.fill",
-        "description": "Hostile operation in enemy territory. Higher tiers unlock better outcomes!",
+        "description": "Gather intelligence on enemy kingdom. Higher tiers unlock better outcomes!",
         "category": "hostile",
         "cooldown_minutes": 30,
         "theme_color": "royalEmerald",
         "display_order": 5,
-        "endpoint": "/incidents/trigger",
+        "endpoint": "/actions/scout",
         "always_unlocked": False,
         "requirements": {
             "skill": "intelligence",
             "skill_level": 1,
             "location": "enemy_kingdom",
             "cost": 100,
-            "requirement_text": "Intelligence T1+ (100g). T3: disruption, T5: sabotage/heist"
+            "requirement_text": "Intelligence T1+ (100g). T3: military intel, T5: disruption, T7: heist"
         }
     },
-    # NOTE: sabotage and vault_heist are now OUTCOMES of the incident probability bar
-    # T1: intel only, T3: +disruption, T5: +contract_sabotage, +vault_heist
     "training": {
         "display_name": "Training",
         "icon": "figure.run",

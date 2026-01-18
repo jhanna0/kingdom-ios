@@ -42,6 +42,12 @@ struct ActionsView: View {
     @State private var showBattleConfirmation = false
     @State private var pendingBattleAction: ActionStatus?
     
+    // Scout result popup state (slot machine style)
+    @State private var showScoutResult = false
+    @State private var scoutResultSuccess = false
+    @State private var scoutResultTitle = ""
+    @State private var scoutResultMessage = ""
+    
     var currentKingdom: Kingdom? {
         guard let currentKingdomId = viewModel.player.currentKingdom else {
             return nil
@@ -119,6 +125,15 @@ struct ActionsView: View {
                     title: actionResultTitle,
                     message: actionResultMessage,
                     isShowing: $showActionResult
+                )
+                .transition(.opacity)
+            }
+            if showScoutResult {
+                ScoutResultPopup(
+                    success: scoutResultSuccess,
+                    title: scoutResultTitle,
+                    message: scoutResultMessage,
+                    isShowing: $showScoutResult
                 )
                 .transition(.opacity)
             }
@@ -705,7 +720,18 @@ struct ActionsView: View {
                 await scheduleNotificationForCooldown(actionName: action.title ?? "Action", slot: action.slot)
                 
                 await MainActor.run {
-                    if let rewards = response.rewards {
+                    // Check if this is a scout action - use special slot machine popup
+                    let isScoutAction = endpoint.contains("scout") || action.actionType == "scout"
+                    
+                    if isScoutAction {
+                        // Scout action - show slot machine popup
+                        scoutResultSuccess = response.success
+                        scoutResultTitle = response.success ? "Success!" : "Detected!"
+                        scoutResultMessage = response.message
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            showScoutResult = true
+                        }
+                    } else if let rewards = response.rewards {
                         // Show reward popup for actions with rewards
                         currentReward = Reward(
                             goldReward: rewards.gold ?? 0,

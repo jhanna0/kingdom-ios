@@ -11,6 +11,7 @@ from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractCon
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
+from routers.alliances import are_empires_allied
 from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
 from .training import calculate_training_cost, TRAINING_TYPES
 from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost
@@ -32,6 +33,7 @@ from .constants import (
     PATROL_REPUTATION_REWARD,
     SCOUT_COOLDOWN,
 )
+from .scout import SCOUT_COST_GOLD, OUTCOMES_BY_TIER, OUTCOME_DESCRIPTIONS
 
 
 router = APIRouter()
@@ -262,7 +264,6 @@ def get_action_status(
     work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     patrol_cooldown = PATROL_COOLDOWN
     farm_cooldown = FARM_COOLDOWN
-    sabotage_cooldown = SABOTAGE_COOLDOWN
     training_cooldown = TRAINING_COOLDOWN
     
     # Count active patrollers in current kingdom
@@ -333,7 +334,7 @@ def get_action_status(
         "patrol": patrol_cooldown,
         "training": training_cooldown,
         "crafting": work_cooldown,  # Uses building skill
-        "scout": sabotage_cooldown,
+        "scout": SCOUT_COOLDOWN,  # 30 minutes from scout.py
     }
     
     slot_cooldowns = {}
@@ -515,31 +516,51 @@ def get_action_status(
     # Patrol count determines if the incident triggers
     intel_tier = state.intelligence
     
-    # Build outcome list with tier requirements shown
-    current_outcomes = []
+    # Check if we're in allied territory (can't scout allies)
+    is_in_allied_territory = False
+    if state.current_kingdom_id and state.hometown_kingdom_id and state.current_kingdom_id != state.hometown_kingdom_id:
+        home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+        current_kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if home_kingdom and current_kingdom:
+            is_in_allied_territory = are_empires_allied(
+                db,
+                home_kingdom.empire_id or home_kingdom.id,
+                current_kingdom.empire_id or current_kingdom.id
+            )
+    
+    # Build outcome list dynamically from OUTCOMES_BY_TIER
+    available_outcomes = OUTCOMES_BY_TIER.get(intel_tier, []) if intel_tier >= 1 else []
+    current_outcomes = [OUTCOME_DESCRIPTIONS.get(o, o) for o in available_outcomes]
+    
+    # Show what's locked at higher tiers
     locked_outcomes = []
-    
-    if intel_tier >= 1:
-        current_outcomes.append("Intel")
-    else:
-        locked_outcomes.append("Intel (T1)")
-    
-    if intel_tier >= 3:
-        current_outcomes.append("Disruption")
-    else:
-        locked_outcomes.append("Disruption (T3)")
-    
-    if intel_tier >= 5:
-        current_outcomes.append("Sabotage")
-        current_outcomes.append("Vault Heist")
-    else:
-        locked_outcomes.append("Sabotage (T5)")
-        locked_outcomes.append("Vault Heist (T5)")
+    for tier in range(intel_tier + 1, 6):
+        tier_outcomes = OUTCOMES_BY_TIER.get(tier, [])
+        for o in tier_outcomes:
+            if o not in available_outcomes:
+                locked_outcomes.append(f"{OUTCOME_DESCRIPTIONS.get(o, o)} (T{tier})")
     
     scout_food_cost = calculate_food_cost(SCOUT_COOLDOWN)
-    if state.intelligence >= 1:
+    if is_in_allied_territory:
+        # In allied territory - can't scout
+        actions["scout"] = {
+            "ready": False,
+            "seconds_remaining": 0,
+            "unlocked": False,
+            "action_type": "scout",
+            "requirements_met": False,
+            "requirement_description": "Cannot scout allied kingdoms",
+            "title": "Intelligence Operation",
+            "icon": "eye.fill",
+            "description": "Cannot scout allies",
+            "category": "hostile",
+            "theme_color": "royalEmerald",
+            "display_order": 5,
+            "endpoint": None,
+        }
+    elif state.intelligence >= 1:
         # ONLY show what they CAN do - no locked outcomes
-        description = f"Outcomes: {', '.join(current_outcomes)}"
+        description = f"{', '.join(current_outcomes)}" if current_outcomes else "Gather intel"
         
         actions["scout"] = {
             **check_cooldown_from_table(db, current_user.id, "scout", SCOUT_COOLDOWN),
@@ -549,14 +570,14 @@ def get_action_status(
             "unlocked": True,
             "action_type": "scout",
             "requirements_met": True,
-            "title": "Infiltrate",
+            "title": "Intelligence Operation",
             "icon": "eye.fill",
             "description": description,
             "category": "hostile",
             "theme_color": "royalEmerald",
             "display_order": 5,
-            "endpoint": "/incidents/trigger",
-            "cost": 100,
+            "endpoint": "/actions/scout",
+            "cost": SCOUT_COST_GOLD,
             "intelligence_tier": intel_tier,
             "current_outcomes": current_outcomes,
             "locked_outcomes": locked_outcomes,
@@ -569,9 +590,9 @@ def get_action_status(
             "action_type": "scout",
             "requirements_met": False,
             "requirement_description": f"Requires Intelligence T1+ (you: T{state.intelligence})",
-            "title": "Infiltrate",
+            "title": "Intelligence Operation",
             "icon": "eye.fill",
-            "description": "Hostile operations in enemy territory",
+            "description": "Gather intel in enemy territory",
             "category": "hostile",
             "theme_color": "royalEmerald",
             "display_order": 5,

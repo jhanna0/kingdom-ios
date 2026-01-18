@@ -96,12 +96,7 @@ struct KingdomDetailView: View {
                 MilitaryStrengthCard(
                     strength: viewModel.militaryStrengthCache[kingdomId],
                     kingdom: kingdom,
-                    player: player,
-                    onGatherIntel: {
-                        Task {
-                            await handleGatherIntelligence()
-                        }
-                    }
+                    player: player
                 )
                 .padding(.horizontal)
                 .task {
@@ -350,26 +345,6 @@ struct KingdomDetailView: View {
             weather = response.weather
         } catch {
             print("⚠️ Weather error: \(error)")
-        }
-    }
-    
-    // MARK: - Intelligence Actions
-    
-    @MainActor
-    private func handleGatherIntelligence() async {
-        do {
-            let response = try await viewModel.gatherIntelligence(kingdomId: kingdomId)
-            
-            // Show result
-            if response.success {
-                // Success - show what we learned
-                print("✅ Successfully gathered intelligence!")
-            } else {
-                // Caught - show failure
-                print("❌ Caught gathering intelligence!")
-            }
-        } catch {
-            print("❌ Failed to gather intelligence: \(error)")
         }
     }
 }

@@ -7,25 +7,17 @@ Intelligence & Military Strength System
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
-from typing import Optional
-import random
+from datetime import datetime
 
 from db.base import get_db
-from db.models import User, Kingdom, PlayerState, KingdomIntelligence, UserKingdom
+from db.models import User, Kingdom, PlayerState, KingdomIntelligence
 from db import ActionCooldown
 from routers.auth import get_current_user
-from routers.alliances import are_empires_allied
-from routers.actions.utils import get_cooldown, set_cooldown, check_cooldown_from_table, format_datetime_iso
-from config import DEV_MODE
+from routers.actions.utils import format_datetime_iso
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 
-# Constants
-INTELLIGENCE_COST = 500
-INTELLIGENCE_COOLDOWN_HOURS = 24
-INTELLIGENCE_EXPIRY_DAYS = 7
-MIN_INTELLIGENCE_LEVEL = 3
+# NOTE: Old constants removed - scout action now in /actions/scout with its own config
 
 
 # ===== Helper Functions =====
@@ -79,29 +71,6 @@ def _get_population(db: Session, kingdom_id: str) -> int:
     return count
 
 
-def _get_top_players(db: Session, kingdom_id: str, intelligence_level: int) -> Optional[list]:
-    """Get top 5 strongest players if intelligence is high enough"""
-    if intelligence_level < 6:
-        return None
-    
-    # Get top 5 by combined combat power
-    players = db.query(PlayerState).join(User).filter(
-        PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.is_alive == True
-    ).order_by(
-        (PlayerState.attack_power + PlayerState.defense_power).desc()
-    ).limit(5).all()
-    
-    return [
-        {
-            "name": db.query(User).filter(User.id == p.user_id).first().display_name,
-            "attack": p.attack_power,
-            "defense": p.defense_power
-        }
-        for p in players
-    ]
-
-
 def _count_active_patrols(db: Session, kingdom_id: str) -> int:
     """Count how many players are currently on patrol"""
     now = datetime.utcnow()
@@ -121,23 +90,6 @@ def _count_active_patrols(db: Session, kingdom_id: str) -> int:
     ).count()
     
     return count
-
-
-def _calculate_intel_success_chance(
-    intelligence: int,
-    vault_level: int,
-    active_patrols: int
-) -> float:
-    """Calculate success chance for gathering intelligence"""
-    base_success = 0.40  # 40% base
-    intelligence_bonus = intelligence * 0.08  # +8% per level
-    patrol_penalty = active_patrols * 0.05  # -5% per patrol
-    vault_penalty = vault_level * 0.03  # +3% security per vault level
-    
-    success_chance = base_success + intelligence_bonus - patrol_penalty - vault_penalty
-    
-    # Clamp between 10% and 90%
-    return max(0.10, min(0.90, success_chance))
 
 
 # ===== API Endpoints =====
@@ -197,17 +149,20 @@ def get_military_strength(
             "intel_level": None
         }
     else:
-        # Check if we have intel on this kingdom
-        intel = db.query(KingdomIntelligence).filter(
+        # Get ALL non-expired intel records for this kingdom pair
+        intel_records = db.query(KingdomIntelligence).filter(
             KingdomIntelligence.kingdom_id == kingdom_id,
             KingdomIntelligence.gatherer_kingdom_id == state.hometown_kingdom_id,
             KingdomIntelligence.expires_at > datetime.utcnow()
-        ).first()
+        ).all()
         
-        if intel:
-            # Return intel based on level gathered
-            intel_level = intel.intelligence_level
-            days_old = (datetime.utcnow() - intel.gathered_at).days
+        if intel_records:
+            # Find the highest intel level we have
+            intel_level = max(r.intelligence_level for r in intel_records)
+            # Use the most recent record for metadata
+            latest_intel = max(intel_records, key=lambda r: r.gathered_at)
+            # Find earliest expiry (when we start losing intel)
+            earliest_expiry = min(r.expires_at for r in intel_records)
             
             response = {
                 "kingdom_id": kingdom_id,
@@ -216,35 +171,34 @@ def get_military_strength(
                 "is_own_kingdom": False,
                 "has_intel": True,
                 "intel_level": intel_level,
-                "intel_age_days": days_old,
-                "gathered_by": intel.gatherer_name,
-                "gathered_at": format_datetime_iso(intel.gathered_at)
+                "gathered_at": format_datetime_iso(latest_intel.gathered_at),
+                "expires_at": format_datetime_iso(earliest_expiry),
+                "intel_records": len(intel_records),
             }
             
-            # Level 3+: Basic info
+            # Level 1 = basic_intel: population, citizens
+            if intel_level >= 1:
+                response["population"] = _get_population(db, kingdom_id)
+                response["active_citizens"] = _count_active_citizens(db, kingdom_id)
+            
+            # Level 2 = military_intel: attack, defense, walls
+            if intel_level >= 2:
+                total_attack = _calculate_total_attack(db, kingdom_id)
+                total_defense = _calculate_total_defense(db, kingdom_id)
+                response["total_attack"] = total_attack
+                response["total_defense"] = total_defense
+                response["total_defense_with_walls"] = total_defense + (kingdom.wall_level * 5)
+            
+            # Level 3 = building_intel: all building levels
             if intel_level >= 3:
-                response["population"] = intel.population_estimate
-                response["active_citizens"] = intel.active_citizen_count
-            
-            # Level 4+: Patrol info
-            if intel_level >= 4:
-                # Get current patrol count
-                active_patrols = _count_active_patrols(db, kingdom_id)
-                response["patrol_strength"] = active_patrols
-            
-            # Level 5+: Full military stats
-            if intel_level >= 5:
-                response["total_attack"] = intel.total_attack_power
-                response["total_defense"] = intel.total_defense_power
-                response["total_defense_with_walls"] = intel.total_defense_power + (intel.wall_level * 5)
-            
-            # Level 6+: Top players
-            if intel_level >= 6 and intel.top_players:
-                response["top_players"] = intel.top_players
-            
-            # Level 7+: Building levels
-            if intel_level >= 7 and intel.building_levels:
-                response["building_levels"] = intel.building_levels
+                response["building_levels"] = {
+                    "walls": kingdom.wall_level,
+                    "vault": kingdom.vault_level,
+                    "mine": kingdom.mine_level,
+                    "market": kingdom.market_level,
+                    "farm": kingdom.farm_level,
+                    "education": kingdom.education_level,
+                }
             
             return response
         else:
@@ -259,251 +213,4 @@ def get_military_strength(
             }
 
 
-@router.post("/gather/{kingdom_id}")
-def gather_intelligence(
-    kingdom_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Gather intelligence on an enemy kingdom
-    
-    Requirements:
-    - Intelligence 3+
-    - 500g cost (always paid upfront)
-    - Must be checked into target kingdom
-    - 24h cooldown
-    - Cannot target your own kingdom
-    
-    Success: Reveal military stats for 7 days (shared with your kingdom)
-    Failure: Caught, lose gold + reputation, temporarily banned
-    """
-    state = current_user.player_state
-    
-    if not state:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Player state not found"
-        )
-    
-    # Check if player has a home kingdom
-    if not state.hometown_kingdom_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You must have a home kingdom to gather intelligence"
-        )
-    
-    # Check intelligence level requirement
-    if state.intelligence < MIN_INTELLIGENCE_LEVEL:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Requires intelligence level {MIN_INTELLIGENCE_LEVEL}+. Current: {state.intelligence}"
-        )
-    
-    # Check gold
-    if state.gold < INTELLIGENCE_COST:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient gold. Need {INTELLIGENCE_COST}g, have {int(state.gold)}g"
-        )
-    
-    # Check cooldown (using action_cooldowns table)
-    if not DEV_MODE:
-        cooldown_check = check_cooldown_from_table(db, current_user.id, "intelligence", INTELLIGENCE_COOLDOWN_HOURS * 60)
-        if not cooldown_check["ready"]:
-            remaining_seconds = cooldown_check["seconds_remaining"]
-            hours = int(remaining_seconds / 3600)
-            minutes = int((remaining_seconds % 3600) / 60)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Intelligence action on cooldown. Wait {hours}h {minutes}m."
-            )
-    
-    # Check if checked into target kingdom
-    if state.current_kingdom_id != kingdom_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must be checked into target kingdom to gather intelligence"
-        )
-    
-    # Cannot target own kingdom
-    if state.hometown_kingdom_id == kingdom_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot gather intelligence on your own kingdom"
-        )
-    
-    # Get target kingdom
-    kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
-    if not kingdom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kingdom not found"
-        )
-    
-    # Cannot spy on allies
-    home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
-    if home_kingdom and are_empires_allied(
-        db, 
-        home_kingdom.empire_id or home_kingdom.id,
-        kingdom.empire_id or kingdom.id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot spy on allies! This would violate your alliance."
-        )
-    
-    # Deduct gold (always paid upfront)
-    state.gold -= INTELLIGENCE_COST
-    set_cooldown(db, current_user.id, "intelligence")
-    
-    # Calculate success chance
-    active_patrols = _count_active_patrols(db, kingdom_id)
-    success_chance = _calculate_intel_success_chance(
-        intelligence=state.intelligence,
-        vault_level=kingdom.vault_level,
-        active_patrols=active_patrols
-    )
-    
-    # Roll the dice
-    roll = random.random()
-    caught = roll >= success_chance
-    
-    if not caught:
-        # SUCCESS - Gather intelligence
-        
-        # Calculate intel data
-        total_attack = _calculate_total_attack(db, kingdom_id)
-        total_defense = _calculate_total_defense(db, kingdom_id)
-        active_citizens = _count_active_citizens(db, kingdom_id)
-        population = _get_population(db, kingdom_id)
-        top_players = _get_top_players(db, kingdom_id, state.intelligence)
-        
-        building_levels = None
-        if state.intelligence >= 7:
-            building_levels = {
-                "walls": kingdom.wall_level,
-                "vault": kingdom.vault_level,
-                "mine": kingdom.mine_level,
-                "market": kingdom.market_level,
-                "farm": kingdom.farm_level,
-                "education": kingdom.education_level
-            }
-        
-        # Store or update intel
-        existing_intel = db.query(KingdomIntelligence).filter(
-            KingdomIntelligence.kingdom_id == kingdom_id,
-            KingdomIntelligence.gatherer_kingdom_id == state.hometown_kingdom_id
-        ).first()
-        
-        if existing_intel:
-            # Update existing intel
-            existing_intel.gatherer_id = current_user.id
-            existing_intel.gatherer_name = current_user.display_name
-            existing_intel.wall_level = kingdom.wall_level
-            existing_intel.total_attack_power = total_attack
-            existing_intel.total_defense_power = total_defense
-            existing_intel.active_citizen_count = active_citizens
-            existing_intel.population_estimate = population
-            existing_intel.top_players = top_players
-            existing_intel.building_levels = building_levels
-            existing_intel.intelligence_level = state.intelligence
-            existing_intel.gathered_at = datetime.utcnow()
-            existing_intel.expires_at = datetime.utcnow() + timedelta(days=INTELLIGENCE_EXPIRY_DAYS)
-        else:
-            # Create new intel
-            new_intel = KingdomIntelligence(
-                kingdom_id=kingdom_id,
-                gatherer_id=current_user.id,
-                gatherer_kingdom_id=state.hometown_kingdom_id,
-                gatherer_name=current_user.display_name,
-                wall_level=kingdom.wall_level,
-                total_attack_power=total_attack,
-                total_defense_power=total_defense,
-                active_citizen_count=active_citizens,
-                population_estimate=population,
-                top_players=top_players,
-                building_levels=building_levels,
-                intelligence_level=state.intelligence,
-                gathered_at=datetime.utcnow(),
-                expires_at=datetime.utcnow() + timedelta(days=INTELLIGENCE_EXPIRY_DAYS)
-            )
-            db.add(new_intel)
-        
-        # Reward reputation in home kingdom
-        if state.hometown_kingdom_id:
-            user_kingdom = db.query(UserKingdom).filter(
-                UserKingdom.user_id == state.user_id,
-                UserKingdom.kingdom_id == state.hometown_kingdom_id
-            ).first()
-            
-            if user_kingdom:
-                user_kingdom.local_reputation += 50
-            else:
-                # Create new user_kingdom record
-                user_kingdom = UserKingdom(
-                    user_id=state.user_id,
-                    kingdom_id=state.hometown_kingdom_id,
-                    local_reputation=50,
-                    checkins_count=0,
-                    gold_earned=0,
-                    gold_spent=0
-                )
-                db.add(user_kingdom)
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "caught": False,
-            "message": f"Successfully gathered intelligence on {kingdom.name}!",
-            "cost_paid": INTELLIGENCE_COST,
-            "reputation_gained": 50,
-            "detection_chance": round(success_chance * 100, 1),
-            "intel_expires_in_days": INTELLIGENCE_EXPIRY_DAYS,
-            "intel_level": state.intelligence,
-            "intel_data": {
-                "wall_level": kingdom.wall_level,
-                "total_attack": total_attack if state.intelligence >= 5 else None,
-                "total_defense": total_defense if state.intelligence >= 5 else None,
-                "active_citizens": active_citizens if state.intelligence >= 3 else None,
-                "population": population if state.intelligence >= 3 else None
-            }
-        }
-    else:
-        # CAUGHT - Penalties
-        
-        # Lose reputation in target kingdom
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == state.user_id,
-            UserKingdom.kingdom_id == kingdom_id
-        ).first()
-        
-        if user_kingdom:
-            user_kingdom.local_reputation -= 200
-        else:
-            # Create new user_kingdom record with negative reputation
-            user_kingdom = UserKingdom(
-                user_id=state.user_id,
-                kingdom_id=kingdom_id,
-                local_reputation=-200,
-                checkins_count=0,
-                gold_earned=0,
-                gold_spent=0
-            )
-            db.add(user_kingdom)
-        
-        # TODO: Add temporary ban system
-        
-        db.commit()
-        
-        return {
-            "success": False,
-            "caught": True,
-            "message": f"Caught gathering intelligence on {kingdom.name}! Lost {INTELLIGENCE_COST}g and 200 reputation.",
-            "cost_paid": INTELLIGENCE_COST,
-            "reputation_lost": 200,
-            "detection_chance": round(success_chance * 100, 1),
-            "roll": round(roll * 100, 1)
-        }
-
+# NOTE: Old /gather endpoint removed - replaced by /actions/scout

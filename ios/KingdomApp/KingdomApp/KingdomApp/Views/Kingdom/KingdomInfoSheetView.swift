@@ -216,16 +216,7 @@ struct KingdomInfoSheetView: View {
                 MilitaryStrengthCard(
                     strength: viewModel.militaryStrengthCache[kingdom.id],
                     kingdom: kingdom,
-                    player: player,
-                    onGatherIntel: {
-                        Task {
-                            do {
-                                _ = try await viewModel.gatherIntelligence(kingdomId: kingdom.id)
-                            } catch {
-                                print("❌ Failed to gather intelligence: \(error)")
-                            }
-                        }
-                    }
+                    player: player
                 )
                 .padding(.horizontal)
                 .task {

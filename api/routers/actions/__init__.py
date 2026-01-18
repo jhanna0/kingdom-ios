@@ -9,14 +9,11 @@ This module organizes action endpoints into logical groupings:
 - training: Purchase and complete stat training
 - crafting: Purchase and craft weapons/armor
 - gathering: Click-to-gather resources (wood/iron) with roll system
-
-HOSTILE INTEL OPERATIONS (sabotage, vault_heist) are now OUTCOMES of the
-incident system at /incidents. One button "Covert Operation" - outcomes
-scale with Intelligence tier (T1: intel, T3: +disruption, T5: +sabotage/heist)
+- scout: Intelligence operations in enemy territory (tiered outcomes)
 """
 from fastapi import APIRouter
 
-from . import status, contracts, patrol, farming, training, crafting, gathering, catchup
+from . import status, contracts, patrol, farming, training, crafting, gathering, catchup, scout
 
 # Main actions router
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -30,6 +27,5 @@ router.include_router(training.router)
 router.include_router(crafting.router)
 router.include_router(gathering.router)
 router.include_router(catchup.router)
-
-# NOTE: sabotage and vault_heist removed - now incident outcomes at /incidents
+router.include_router(scout.router)
 
