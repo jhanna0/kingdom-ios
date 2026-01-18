@@ -77,6 +77,19 @@ struct TownHallView: View {
                         )
                     }
                     
+                    // Foraging
+                    NavigationLink {
+                        ForagingView(apiClient: APIClient.shared)
+                    } label: {
+                        TownHallActivityCard(
+                            icon: "leaf.fill",
+                            title: "Foraging",
+                            description: "Search bushes for seeds and herbs",
+                            color: KingdomTheme.Colors.buttonSuccess,
+                            badge: nil
+                        )
+                    }
+                    
                     // Town Pub
                     NavigationLink {
                         TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)

@@ -115,6 +115,17 @@ RESOURCES = {
         "storage_type": "inventory",
         "is_pet": True,  # Flag to identify pets
     },
+    # ===== FORAGING RESOURCES =====
+    "wheat_seed": {
+        "display_name": "Wheat Seed",
+        "icon": "leaf.fill",
+        "color": "gold",
+        "description": "Seeds gathered from wild bushes. Used for farming.",
+        "category": "material",
+        "display_order": 9,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
     # ===== BLUEPRINT - Generic crafting token =====
     "blueprint": {
         "display_name": "Blueprint",
