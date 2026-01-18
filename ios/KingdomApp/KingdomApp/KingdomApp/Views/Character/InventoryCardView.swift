@@ -12,21 +12,10 @@ struct ResourceItem: Identifiable {
 }
 
 // MARK: - Color Mapping Helper
+// Use the theme's centralized color mapping - NO DUPLICATE MAPPINGS!
 
 private func mapColorName(_ colorName: String) -> Color {
-    switch colorName.lowercased() {
-    case "goldlight": return KingdomTheme.Colors.goldLight
-    case "gray": return .gray
-    case "blue": return .blue
-    case "brown": return .brown
-    case "green": return .green
-    case "red": return .red
-    case "purple": return .purple
-    case "orange": return .orange
-    case "cyan": return .cyan
-    case "yellow": return .yellow
-    default: return KingdomTheme.Colors.inkMedium
-    }
+    return KingdomTheme.Colors.color(fromThemeName: colorName)
 }
 
 // MARK: - Number Formatting Helper

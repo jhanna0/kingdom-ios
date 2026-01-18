@@ -1,12 +1,14 @@
 """
 FORAGING API ROUTER
 ===================
-Simple scratch-ticket minigame.
+Two-round foraging with bonus round!
 
 Flow:
-1. POST /foraging/start - Get pre-calculated grid + result
-2. Frontend reveals locally (no API calls needed!)
-3. POST /foraging/collect - Claim reward if won
+1. POST /foraging/start - Get BOTH rounds pre-calculated upfront
+   - Round 1: Berries (food) + potential seed trail
+   - Round 2: Seeds (only if seed trail found in R1)
+2. Frontend reveals locally + animates transition if bonus round
+3. POST /foraging/collect - Claim ALL rewards (berries + seeds)
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -43,6 +45,8 @@ def get_config():
         "bush_types": BUSH_DISPLAY,
         "hidden_icon": GRID_CONFIG["bush_hidden_icon"],
         "hidden_color": GRID_CONFIG["bush_hidden_color"],
+        "bonus_hidden_icon": GRID_CONFIG["bonus_hidden_icon"],
+        "bonus_hidden_color": GRID_CONFIG["bonus_hidden_color"],
     }
 
 
@@ -53,9 +57,14 @@ def start_foraging(
     user: User = Depends(get_current_user),
 ):
     """
-    Start foraging - returns EVERYTHING pre-calculated.
+    Start foraging - returns EVERYTHING pre-calculated for BOTH rounds.
     
-    Frontend reveals locally, no more API calls until collect.
+    Response includes:
+    - round1: Berries grid + result + seed_trail info
+    - round2: Seeds grid + result (only if seed_trail found!)
+    - has_bonus_round: Quick flag to check
+    
+    Frontend reveals locally, animates transition if bonus round.
     """
     player_id = user.id
     
@@ -63,7 +72,7 @@ def start_foraging(
     if player_id in _sessions:
         del _sessions[player_id]
     
-    # Create new session
+    # Create new session (generates both rounds if seed trail found)
     session = _manager.create_session(player_id)
     _sessions[player_id] = session
     
@@ -79,7 +88,13 @@ def collect_rewards(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Collect rewards from a winning session."""
+    """
+    Collect ALL rewards from the session.
+    
+    Can include:
+    - Berries from Round 1 (if won)
+    - Seeds from Round 2 bonus (if seed trail found AND won)
+    """
     player_id = user.id
     
     if player_id not in _sessions:
@@ -92,24 +107,28 @@ def collect_rewards(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Add to inventory if won
-    if result["is_winner"] and result["reward_amount"] > 0:
-        inv = db.query(PlayerInventory).filter(
-            PlayerInventory.user_id == player_id,
-            PlayerInventory.item_id == result["reward_item"]
-        ).first()
+    # Add ALL rewards to inventory
+    for reward in result.get("rewards", []):
+        item_id = reward["item"]
+        amount = reward["amount"]
         
-        if inv:
-            inv.quantity += result["reward_amount"]
-        else:
-            inv = PlayerInventory(
-                user_id=player_id,
-                item_id=result["reward_item"],
-                quantity=result["reward_amount"]
-            )
-            db.add(inv)
-        
-        db.commit()
+        if amount > 0:
+            inv = db.query(PlayerInventory).filter(
+                PlayerInventory.user_id == player_id,
+                PlayerInventory.item_id == item_id
+            ).first()
+            
+            if inv:
+                inv.quantity += amount
+            else:
+                inv = PlayerInventory(
+                    user_id=player_id,
+                    item_id=item_id,
+                    quantity=amount
+                )
+                db.add(inv)
+    
+    db.commit()
     
     # Clear session
     del _sessions[player_id]

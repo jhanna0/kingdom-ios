@@ -117,7 +117,7 @@ RESOURCES = {
     },
     # ===== FORAGING RESOURCES =====
     "wheat_seed": {
-        "display_name": "Wheat Seed",
+        "display_name": "Seed",
         "icon": "leaf.fill",
         "color": "gold",
         "description": "Seeds gathered from wild bushes. Used for farming.",
@@ -125,6 +125,17 @@ RESOURCES = {
         "display_order": 9,
         "is_tradeable": True,
         "storage_type": "inventory",
+    },
+    "berries": {
+        "display_name": "Berries",
+        "icon": "seal.fill",
+        "color": "buttonDanger",
+        "description": "Fresh wild berries gathered from bushes. A tasty source of food.",
+        "category": "consumable",
+        "display_order": 10,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+        "is_food": True,  # Can be consumed to pay action food costs
     },
     # ===== BLUEPRINT - Generic crafting token =====
     "blueprint": {
