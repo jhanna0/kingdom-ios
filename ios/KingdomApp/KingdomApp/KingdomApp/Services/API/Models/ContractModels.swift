@@ -39,6 +39,9 @@ struct APIContract: Codable {
     
     // Per-action resource costs (NEW - required during each work action)
     let per_action_costs: [APIPerActionCost]?
+    
+    // Custom endpoint (for catchup contracts)
+    let endpoint: String?
 }
 
 struct ContractCreateRequest: Codable {

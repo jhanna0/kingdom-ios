@@ -41,6 +41,9 @@ struct Contract: Identifiable, Codable, Hashable {
     // Per-action resource costs (NEW - resources required each work action)
     let perActionCosts: [ContractPerActionCost]?
     
+    // Custom endpoint (for contracts with dedicated endpoints like catchup)
+    let endpoint: String?
+    
     // Status
     let createdBy: Int // Ruler's player ID (PostgreSQL auto-generated)
     let createdAt: Date
@@ -181,7 +184,8 @@ struct Contract: Identifiable, Codable, Hashable {
             constructionCost: upfrontCost,
             rewardPool: upfrontCost,
             actionReward: actionReward,
-            perActionCosts: nil,  // Will be populated from API
+            perActionCosts: nil,
+            endpoint: nil,
             createdBy: createdBy,
             createdAt: Date(),
             completedAt: nil,

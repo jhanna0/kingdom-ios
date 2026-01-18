@@ -98,6 +98,7 @@ extension MapViewModel {
                         rewardPool: apiContract.reward_pool,
                         actionReward: apiContract.action_reward,
                         perActionCosts: perActionCosts,
+                        endpoint: apiContract.endpoint,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },

@@ -40,14 +40,13 @@ struct ActionResultPopup: View {
                 
                 // Title
                 Text(title)
-                    .font(KingdomTheme.Typography.title3())
-                    .fontWeight(.bold)
+                    .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .multilineTextAlignment(.center)
                 
                 // Message
                 Text(message)
-                    .font(KingdomTheme.Typography.body())
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)

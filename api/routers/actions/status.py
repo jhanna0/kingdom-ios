@@ -298,7 +298,7 @@ def get_action_status(
         catchup_list = get_catchup_contracts_for_status(db, current_user.id, state)
         for c in catchup_list:
             contracts.append({
-                "id": f"catchup_{c['id']}",
+                "id": c['id'],  # Numeric ID for the dedicated endpoint
                 "kingdom_id": c["kingdom_id"],
                 "kingdom_name": "",
                 "building_type": c["building_type"],
@@ -320,7 +320,7 @@ def get_action_status(
                 "completed_at": None,
                 "status": "open",
                 "per_action_costs": [],
-                "endpoint": c["endpoint"],
+                "endpoint": f"/actions/work/catchup/{c['id']}",
             })
     
     # Check slot-based cooldowns (PARALLEL ACTIONS!)

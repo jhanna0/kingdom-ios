@@ -169,3 +169,116 @@ def start_catchup(
         "actions_remaining": catchup.actions_required,
         "message": f"Work on {building_meta.get('display_name', building_type)} contracts to expand capacity"
     }
+
+
+@router.post("/work/catchup/{catchup_id}")
+def work_on_catchup(
+    catchup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Work on a building catchup contract.
+    
+    Player must be in their hometown kingdom to work on catchup.
+    Uses the same cooldown slot as regular building work.
+    """
+    from datetime import datetime, timedelta
+    from .utils import (
+        calculate_cooldown,
+        check_and_set_slot_cooldown_atomic,
+        format_datetime_iso,
+        set_cooldown,
+        check_and_deduct_food_cost
+    )
+    from .constants import WORK_BASE_COOLDOWN
+    from config import DEV_MODE
+    
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player state not found")
+    
+    if not state.hometown_kingdom_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must have a hometown kingdom")
+    
+    # Must be in hometown to work on catchup
+    if state.current_kingdom_id != state.hometown_kingdom_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must be in your hometown kingdom")
+    
+    # Get the catchup record
+    catchup = db.query(BuildingCatchup).filter(
+        BuildingCatchup.id == catchup_id,
+        BuildingCatchup.user_id == current_user.id
+    ).first()
+    
+    if not catchup:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catchup contract not found")
+    
+    if catchup.completed_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Catchup already completed")
+    
+    # Calculate skill-adjusted cooldown
+    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+    
+    # Check and deduct food cost
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "catchup work")
+    if not food_result["success"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=food_result["error"])
+    
+    # ATOMIC COOLDOWN CHECK + SET
+    if not DEV_MODE:
+        cooldown_result = check_and_set_slot_cooldown_atomic(
+            db, current_user.id,
+            action_type="work",
+            cooldown_minutes=cooldown_minutes,
+            expires_at=cooldown_expires
+        )
+        
+        if not cooldown_result["ready"]:
+            remaining = cooldown_result["seconds_remaining"]
+            minutes = remaining // 60
+            seconds = remaining % 60
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Building action is on cooldown. Wait {minutes}m {seconds}s."
+            )
+    else:
+        set_cooldown(db, current_user.id, "work", cooldown_expires)
+    
+    # Increment actions completed
+    catchup.actions_completed += 1
+    
+    # Check if complete
+    is_complete = catchup.actions_completed >= catchup.actions_required
+    if is_complete:
+        catchup.completed_at = datetime.utcnow()
+    
+    db.commit()
+    
+    from routers.tiers import BUILDING_TYPES
+    building_meta = BUILDING_TYPES.get(catchup.building_type, {})
+    building_name = building_meta.get("display_name", catchup.building_type.capitalize())
+    
+    if is_complete:
+        message = f"Capacity expanded! You can now use the {building_name}."
+    else:
+        message = f"You worked on expanding {building_name} capacity."
+    
+    progress_percent = int((catchup.actions_completed / catchup.actions_required) * 100)
+    
+    return {
+        "success": True,
+        "message": message,
+        "catchup_id": catchup_id,
+        "building_type": catchup.building_type,
+        "building_display_name": building_name,
+        "actions_completed": catchup.actions_completed,
+        "actions_required": catchup.actions_required,
+        "actions_remaining": max(0, catchup.actions_required - catchup.actions_completed),
+        "progress_percent": progress_percent,
+        "is_complete": is_complete,
+        "next_work_available_at": format_datetime_iso(cooldown_expires),
+        "food_cost": food_result["food_cost"],
+        "food_remaining": food_result["food_remaining"]
+    }

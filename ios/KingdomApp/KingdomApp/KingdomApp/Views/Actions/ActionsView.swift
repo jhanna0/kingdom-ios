@@ -454,7 +454,13 @@ struct ActionsView: View {
                 globalCooldownActive: !isReady,
                 blockingAction: cooldown?.blockingAction,
                 globalCooldownSecondsRemaining: remainingSeconds,
-                onAction: { performWork(contractId: contract.id) }
+                onAction: {
+                    if let endpoint = contract.endpoint {
+                        performGenericWorkAction(endpoint: endpoint)
+                    } else {
+                        performWork(contractId: contract.id)
+                    }
+                }
             )
         }
         
@@ -829,6 +835,7 @@ extension ActionsView {
                         rewardPool: apiContract.reward_pool,
                         actionReward: apiContract.action_reward,
                         perActionCosts: perActionCosts,
+                        endpoint: apiContract.endpoint,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
                         completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },
@@ -862,7 +869,6 @@ extension ActionsView {
                 let response = try await KingdomAPIService.shared.actions.workOnContract(contractId: contractId)
                 
                 await loadActionStatus(force: true)
-                await viewModel.loadContracts()
                 await viewModel.refreshPlayerFromBackend()
                 viewModel.refreshCooldown()
                 
@@ -886,6 +892,34 @@ extension ActionsView {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             showReward = true
                         }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func performGenericWorkAction(endpoint: String) {
+        Task {
+            do {
+                let response = try await KingdomAPIService.shared.actions.performGenericAction(endpoint: endpoint)
+                
+                await loadActionStatus(force: true)
+                await viewModel.refreshPlayerFromBackend()
+                viewModel.refreshCooldown()
+                
+                await scheduleNotificationForCooldown(actionName: "Work", slot: actionStatus?.work.slot)
+                
+                await MainActor.run {
+                    actionResultSuccess = response.success
+                    actionResultTitle = response.success ? "Progress!" : "Failed"
+                    actionResultMessage = response.message
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showActionResult = true
                     }
                 }
             } catch {

@@ -20,7 +20,8 @@ struct TrainingContractCard: View {
     }
     
     var isReady: Bool {
-        return !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
+        let canAffordFood = status.canAffordFood ?? true
+        return !globalCooldownActive && canAffordFood && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var skillConfig: SkillConfig {
@@ -38,6 +39,23 @@ struct TrainingContractCard: View {
     var iconColor: Color {
         skillConfig.color
     }
+    
+    // Build cost items (food only for training)
+    private func buildCostItems() -> [CostItem] {
+        var items: [CostItem] = []
+        
+        if let food = status.foodCost, food > 0 {
+            items.append(CostItem(
+                icon: "fork.knife",
+                amount: food,
+                color: KingdomTheme.Colors.buttonWarning,
+                canAfford: status.canAffordFood ?? true
+            ))
+        }
+        
+        return items
+    }
+    
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -84,6 +102,9 @@ struct TrainingContractCard: View {
                 }
             }
             
+            // Cost and Reward Row
+            ActionCostRewardRow(costs: buildCostItems(), rewards: status.buildRewardItems())
+            
             // Progress bar - brutalist style
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -126,11 +147,19 @@ struct TrainingContractCard: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            } else if !(status.canAffordFood ?? true) {
+                Text("Need food")
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if isReady && isEnabled {
                 Button(action: onAction) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Start")
+                        Text("Train")
                     }
                 }
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))

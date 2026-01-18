@@ -19,7 +19,8 @@ struct WorkshopContractCard: View {
     }
     
     var isReady: Bool {
-        !globalCooldownActive && (status.ready || calculatedSecondsRemaining <= 0)
+        let canAffordFood = status.canAffordFood ?? true
+        return !globalCooldownActive && canAffordFood && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var body: some View {
@@ -85,8 +86,8 @@ struct WorkshopContractCard: View {
             }
             .frame(height: 12)
             
-            // Cost row
-            ActionCostRow(costs: buildCosts())
+            // Cost and Reward Row
+            ActionCostRewardRow(costs: buildCosts(), rewards: status.buildRewardItems())
             
             // Button state
             if globalCooldownActive {
@@ -96,6 +97,14 @@ struct WorkshopContractCard: View {
                 let seconds = remaining % 60
                 
                 Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            } else if !(status.canAffordFood ?? true) {
+                Text("Need food")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity)

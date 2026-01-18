@@ -32,16 +32,12 @@ private func mapColorName(_ colorName: String) -> Color {
 // MARK: - Number Formatting Helper
 
 extension Int {
-    /// Format large numbers with k/m suffix (e.g., 4540 → "4.5k")
+    /// Format large numbers with k/m suffix (e.g., 4540 → "4k")
     func abbreviated() -> String {
-        let number = Double(self)
-        
-        if abs(number) >= 1_000_000 {
-            let formatted = number / 1_000_000
-            return String(format: "%.1fm", formatted).replacingOccurrences(of: ".0", with: "")
-        } else if abs(number) >= 1_000 {
-            let formatted = number / 1_000
-            return String(format: "%.1fk", formatted).replacingOccurrences(of: ".0", with: "")
+        if abs(self) >= 1_000_000 {
+            return "\(self / 1_000_000)m"
+        } else if abs(self) >= 1_000 {
+            return "\(self / 1_000)k"
         } else {
             return "\(self)"
         }

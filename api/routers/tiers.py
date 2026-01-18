@@ -383,7 +383,7 @@ REPUTATION_TIERS = {
     },
     2: {
         "name": "Resident",
-        "requirement": 2500,
+        "requirement": 300,
         "icon": "house.fill",
         "abilities": [
             "Buy property in cities",
@@ -393,7 +393,7 @@ REPUTATION_TIERS = {
     },
     3: {
         "name": "Citizen",
-        "requirement": 7500,
+        "requirement": 1000,
         "icon": "person.2.fill",
         "abilities": [
             "Vote on city coups",
