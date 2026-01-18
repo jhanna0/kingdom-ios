@@ -21,7 +21,9 @@ class ForagingViewModel: ObservableObject {
     @Published var session: ForagingSession?
     
     // Local reveal state - NO API calls!
-    @Published var revealedPositions: Set<Int> = []
+    // Key = grid position user tapped, Value = index in backend array
+    @Published var revealedBushes: [Int: Int] = [:]  // position -> arrayIndex
+    @Published var nextArrayIndex: Int = 0
     
     // API
     private var api: ForagingAPI?
@@ -38,17 +40,18 @@ class ForagingViewModel: ObservableObject {
     var hiddenColor: String { session?.hidden_color ?? "buttonSuccess" }
     var rewardConfig: ForagingRewardConfig? { session?.reward_config }
     
-    var revealedCount: Int { revealedPositions.count }
+    var revealedCount: Int { revealedBushes.count }
     var canReveal: Bool { uiState == .playing && revealedCount < maxReveals }
     
-    /// How many targets have been revealed (is_seed = is target from backend)
+    /// How many targets revealed - just count seeds in the revealed portion of array
     var revealedTargetCount: Int {
-        revealedPositions.filter { pos in
-            pos < grid.count && grid[pos].is_seed
+        (0..<nextArrayIndex).filter { i in
+            i < grid.count && grid[i].is_seed
         }.count
     }
     
     var hasWon: Bool { revealedTargetCount >= matchesToWin }
+    var isWarming: Bool { revealedTargetCount >= 1 && revealedTargetCount < matchesToWin }
     
     // MARK: - Init
     
@@ -62,7 +65,8 @@ class ForagingViewModel: ObservableObject {
         guard let api = api else { return }
         
         uiState = .loading
-        revealedPositions = []
+        revealedBushes = [:]
+        nextArrayIndex = 0
         
         do {
             let response = try await api.startForaging()
@@ -75,10 +79,11 @@ class ForagingViewModel: ObservableObject {
     
     func reveal(position: Int) {
         guard canReveal else { return }
-        guard !revealedPositions.contains(position) else { return }
+        guard revealedBushes[position] == nil else { return }  // Already revealed
         
-        // Local reveal - no API call!
-        revealedPositions.insert(position)
+        // Assign next array item to this position
+        revealedBushes[position] = nextArrayIndex
+        nextArrayIndex += 1
         
         // Check for win
         if hasWon {
@@ -88,7 +93,7 @@ class ForagingViewModel: ObservableObject {
         
         // Check if out of reveals
         if revealedCount >= maxReveals {
-            uiState = isWinner && hasWon ? .won : .lost
+            uiState = .lost
         }
     }
     
@@ -99,7 +104,8 @@ class ForagingViewModel: ObservableObject {
             _ = try await api.collectRewards()
             // Reset for next game
             session = nil
-            revealedPositions = []
+            revealedBushes = [:]
+            nextArrayIndex = 0
             uiState = .loading
         } catch {
             uiState = .error(error.localizedDescription)
@@ -125,10 +131,12 @@ class ForagingViewModel: ObservableObject {
     // MARK: - Display Helpers
     
     func isRevealed(_ position: Int) -> Bool {
-        revealedPositions.contains(position)
+        revealedBushes[position] != nil
     }
     
-    func cell(at position: Int) -> ForagingBushCell? {
-        grid.first { $0.position == position }
+    /// Get the array item revealed at this bush position
+    func revealedCell(at position: Int) -> ForagingBushCell? {
+        guard let arrayIndex = revealedBushes[position], arrayIndex < grid.count else { return nil }
+        return grid[arrayIndex]
     }
 }

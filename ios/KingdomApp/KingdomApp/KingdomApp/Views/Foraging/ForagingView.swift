@@ -138,14 +138,14 @@ struct ForagingView: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
         
         return LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(viewModel.grid) { cell in
-                let isRevealed = viewModel.isRevealed(cell.position)
-                let isTarget = isRevealed && cell.is_seed  // is_seed = is target from backend
-                let targetCount = viewModel.revealedTargetCount
-                let shouldPulse = isTarget && targetCount >= 1 && targetCount < viewModel.matchesToWin
+            ForEach(0..<16, id: \.self) { position in
+                let isRevealed = viewModel.isRevealed(position)
+                let revealedCell = viewModel.revealedCell(at: position)
+                let isTarget = revealedCell?.is_seed ?? false
+                let shouldPulse = isTarget && viewModel.isWarming
                 
                 BushTile(
-                    cell: cell,
+                    cell: revealedCell,
                     isRevealed: isRevealed,
                     isHighlighted: isTarget,
                     shouldPulse: shouldPulse,
@@ -153,9 +153,10 @@ struct ForagingView: View {
                     hiddenColor: viewModel.hiddenColor
                 ) {
                     if viewModel.canReveal && !isRevealed {
-                        viewModel.reveal(position: cell.position)
+                        viewModel.reveal(position: position)
                     }
                 }
+                .id("\(viewModel.session?.session_id ?? "none")_\(position)")  // Force recreate on new session
             }
         }
         .padding(KingdomTheme.Spacing.small)
@@ -176,7 +177,7 @@ struct ForagingView: View {
                 }
             }
             
-            Text("\(viewModel.revealedCount)/\(viewModel.maxReveals) revealed • \(viewModel.revealedSeedCount) seeds found")
+            Text("\(viewModel.revealedCount)/\(viewModel.maxReveals) revealed • \(viewModel.revealedTargetCount) found")
                 .font(.system(size: 12, weight: .medium, design: .serif))
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
@@ -221,7 +222,7 @@ struct ForagingView: View {
                         HStack(spacing: 4) {
                             Image(systemName: config.icon)
                                 .foregroundColor(KingdomTheme.Colors.gold)
-                            Text("+\(viewModel.rewardAmount) \(config.display_name)")
+                            Text("+1 \(config.display_name)")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
@@ -283,13 +284,13 @@ struct ForagingView: View {
 }
 
 // MARK: - Bush Tile
-// Completely dumb - just renders what backend says
+// Dumb renderer - show hidden or revealed content from array
 
 struct BushTile: View {
-    let cell: ForagingBushCell      // Has is_seed, icon, color from backend
+    let cell: ForagingBushCell?     // nil = not revealed yet
     let isRevealed: Bool
-    let isHighlighted: Bool         // Backend decides if this should glow
-    let shouldPulse: Bool           // Backend decides if this should pulse
+    let isHighlighted: Bool
+    let shouldPulse: Bool
     let hiddenIcon: String
     let hiddenColor: String
     let onTap: () -> Void
@@ -312,27 +313,32 @@ struct BushTile: View {
                             .stroke(borderColor, lineWidth: isHighlighted ? 3 : 2.5)
                     )
                 
-                // Icon from backend
-                Image(systemName: isRevealed ? cell.icon : hiddenIcon)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(isRevealed 
-                        ? KingdomTheme.Colors.color(fromThemeName: cell.color)
-                        : KingdomTheme.Colors.color(fromThemeName: hiddenColor))
+                // Icon - from array if revealed, hidden otherwise
+                if let cell = cell, isRevealed {
+                    Image(systemName: cell.icon)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.color(fromThemeName: cell.color))
+                } else {
+                    Image(systemName: hiddenIcon)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.color(fromThemeName: hiddenColor))
+                }
             }
             .frame(height: 65)
             .scaleEffect(pulse ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            if shouldPulse { startPulse() }
+        }
         .onChange(of: shouldPulse) { _, doPulse in
-            if doPulse {
-                withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            } else {
-                withAnimation(.default) {
-                    pulse = false
-                }
-            }
+            if doPulse { startPulse() } else { pulse = false }
+        }
+    }
+    
+    private func startPulse() {
+        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+            pulse = true
         }
     }
     

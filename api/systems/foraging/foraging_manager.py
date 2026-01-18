@@ -89,9 +89,8 @@ class ForagingManager:
         # Determine if winnable (has at least 3 seeds)
         is_winner = len(seed_positions) >= MATCHES_TO_WIN
         
-        # Calculate reward - cap at max reveals since that's max player can find
-        seeds_player_can_find = min(len(seed_positions), MAX_REVEALS)
-        reward_amount = calculate_reward(seeds_player_can_find) if is_winner else 0
+        # Reward is always 1 if they win
+        reward_amount = 1 if is_winner else 0
         
         return ForagingSession(
             session_id=session_id,
