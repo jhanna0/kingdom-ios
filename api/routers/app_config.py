@@ -47,23 +47,12 @@ async def get_app_config(
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Query with platform fallback: prefer specific platform, then 'all'
         query = """
-            SELECT 
-                platform, 
-                min_version, 
-                maintenance, 
-                COALESCE(maintenance_message, 'Kingdom: Territory is currently undergoing maintenance. Please check back later.') as maintenance_message,
-                COALESCE(link_url, 'https://testflight.apple.com/join/4jxSyUmW') as link_url
+            SELECT platform, min_version, maintenance, maintenance_message, link_url
             FROM app_config 
-            WHERE platform IN (%s, 'all')
-            ORDER BY 
-                CASE WHEN platform = %s THEN 0 ELSE 1 END,
-                updated_at DESC
-            LIMIT 1
+            WHERE LOWER(platform) = %s
         """
-        
-        cur.execute(query, (platform, platform))
+        cur.execute(query, (platform,))
         row = cur.fetchone()
         
         cur.close()

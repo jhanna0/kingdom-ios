@@ -26,7 +26,7 @@ class LocationManager: NSObject, ObservableObject {
     
     // MARK: - Debug/Testing Features
     /// Set to true to use fake location instead of real GPS
-    static var useFakeLocation = false
+    static var useFakeLocation = true
     
     /// Test city locations for development
     /// NOTE: Not all locations may have kingdom data in the database yet.
@@ -66,7 +66,7 @@ class LocationManager: NSObject, ObservableObject {
     ]
     
     /// Fake location for testing (defaults to SF)
-    static var fakeLocation = testCities["sf"]!
+    static var fakeLocation = testCities["springfield"]!
     
     override init() {
         super.init()

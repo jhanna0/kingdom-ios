@@ -206,6 +206,9 @@ def list_friends(
             else:
                 pending_received.append(friend_response)
     
+    # Sort friends by last activity (most recent first)
+    friends.sort(key=lambda f: f.last_seen or '', reverse=True)
+    
     return FriendListResponse(
         success=True,
         friends=friends,

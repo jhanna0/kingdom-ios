@@ -187,8 +187,28 @@ struct FriendsView: View {
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                 .padding(.horizontal)
                                 
-                                ForEach(viewModel.friends) { friend in
+                ForEach(viewModel.friends.prefix(5)) { friend in
                                     FriendCard(friend: friend)
+                }
+                
+                // View All button if more than 5 friends
+                if viewModel.friends.count > 5 {
+                    NavigationLink(destination: AllFriendsView(friends: viewModel.friends)) {
+                        HStack(spacing: 6) {
+                            Text("All Friends")
+                                .font(FontStyles.headingSmall)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.iconSmall)
+                        }
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: .infinity)
+                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
                 }
             } else if !viewModel.isLoading && viewModel.pendingReceived.isEmpty {
                 emptyFriendsState
@@ -704,6 +724,33 @@ struct PendingSentCard: View {
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - All Friends View
+
+struct AllFriendsView: View {
+    let friends: [Friend]
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    ForEach(friends) { friend in
+                        FriendCard(friend: friend)
+                    }
+                }
+                .padding(.vertical)
+            }
+        }
+        .navigationTitle("All Friends")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
