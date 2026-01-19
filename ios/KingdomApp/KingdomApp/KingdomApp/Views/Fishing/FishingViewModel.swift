@@ -184,19 +184,19 @@ class FishingViewModel: ObservableObject {
     
     var statusMessage: String {
         switch uiState {
-        case .loading: return "Preparing..."
-        case .idle: return "Cast your line"
-        case .casting: return currentRoll?.message ?? "Waiting..."
+        case .loading: return "Wading in..."
+        case .idle: return "Cast your line."
+        case .casting: return currentRoll?.message ?? "Line’s out..."
         case .fishFound:
             if let fish = currentFishData {
                 return "\(fish.icon ?? "🐟") \(fish.name ?? "Fish") on the line!"
             }
-            return "Fish on the line!"
-        case .reeling: return currentRoll?.message ?? "Reeling..."
+            return "A bite!"
+        case .reeling: return currentRoll?.message ?? "Hold steady..."
         case .caught:
-            return "Caught! Roll for loot..."
+            return "Landed! Time to claim your spoils."
         case .looting:
-            return "Rolling..."
+            return "Checking the creel..."
         case .lootResult:
             if let loot = currentLootResult {
                 if loot.rare_loot_dropped, let rareName = loot.rare_loot_name {
@@ -205,7 +205,7 @@ class FishingViewModel: ObservableObject {
                 return "+\(loot.meat_earned) meat!"
             }
             return "Collect your loot!"
-        case .escaped: return "It got away..."
+        case .escaped: return "It slipped the hook..."
         case .masterRollAnimation: return "..."
         case .error(let msg): return msg
         }

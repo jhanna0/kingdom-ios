@@ -330,11 +330,18 @@ class FishingManager:
             if pet_dropped:
                 # Landed in rare zone (top of bar)
                 rare_slots = loot_drop_table.get("rare_loot", 0)
-                loot_roll = total_slots - (rare_slots // 2)  # Middle of rare zone
+                loot_roll = total_slots - max(1, (rare_slots // 2))  # Middle of rare zone
             else:
                 # Landed in meat zone
                 meat_slots = loot_drop_table.get("meat", total_slots)
                 loot_roll = meat_slots // 2  # Middle of meat zone
+            
+            # UI expects 1...100 for all phases, including loot (visual-only roll).
+            if total_slots <= 0:
+                loot_roll_percent = 50
+            else:
+                loot_roll_percent = int((loot_roll / total_slots) * 100)
+                loot_roll_percent = max(1, min(100, loot_roll_percent))
             
             outcome_display["loot"] = {
                 "drop_table": loot_drop_table,
@@ -343,7 +350,7 @@ class FishingManager:
                 "rare_loot_name": loot_config["rare_loot_name"],
                 "meat_earned": meat,
                 "rare_loot_dropped": pet_dropped,
-                "master_roll": loot_roll,
+                "master_roll": loot_roll_percent,
             }
         else:
             # Escaped
@@ -412,7 +419,9 @@ class FishingManager:
             slot_count = slots.get(outcome, 0)
             cumulative += slot_count
             if roll_value <= cumulative:
+                # UI expects a 1...100 display roll. Clamp so it never returns 0.
                 roll_percent = int((roll_value / total) * 100)
+                roll_percent = max(1, min(100, roll_percent))
                 return (outcome, roll_percent)
         
         return (order[0], 50)  # Fallback

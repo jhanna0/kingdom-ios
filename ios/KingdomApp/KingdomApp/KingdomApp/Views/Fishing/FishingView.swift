@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Fishing View
 // Single-screen, chill fishing minigame
@@ -21,14 +24,26 @@ struct FishingView: View {
     // Shift glow effect
     @State private var showBarShiftGlow: Bool = false
     
+    // Flavor + juice
+    @State private var bobberJiggle: Bool = false
+    @State private var statusPulse: Bool = false
+    @State private var lastState: FishingViewModel.UIState? = nil
+    @State private var lastRolledIndex: Int = -999
+    
     var body: some View {
         ZStack {
-            KingdomTheme.Colors.parchment
+            fishingBackdrop
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
                 topSection
+                    .padding(.bottom, KingdomTheme.Spacing.medium)
                 Spacer()
+                
+                statusCard
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+                    .padding(.bottom, KingdomTheme.Spacing.medium)
+                
                 fishingArea
                 Spacer()
                 bottomSection
@@ -42,12 +57,52 @@ struct FishingView: View {
         .task {
             viewModel.configure(with: apiClient)
             await viewModel.startSession()
+            lastState = viewModel.uiState
         }
         .onChange(of: viewModel.petFishDropped) { _, newValue in
             if newValue && !lastPetFishState {
                 triggerPetFishCelebration()
             }
             lastPetFishState = newValue
+        }
+        .onChange(of: viewModel.uiState) { _, newState in
+            handleStateChange(newState)
+        }
+        .onChange(of: viewModel.currentRollIndex) { _, newIndex in
+            guard newIndex != lastRolledIndex else { return }
+            lastRolledIndex = newIndex
+            handleRollBeat(index: newIndex)
+        }
+    }
+    
+    // MARK: - Backdrop
+    
+    private var fishingBackdrop: some View {
+        ZStack {
+            KingdomTheme.Colors.parchmentDark
+            
+            // Subtle “water” wash so the whole screen feels alive.
+            LinearGradient(
+                colors: [
+                    KingdomTheme.Colors.territoryNeutral7.opacity(0.22),
+                    KingdomTheme.Colors.parchmentDark.opacity(0.0)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
+            
+            // Gentle rings (very low opacity) — keeps it from feeling flat.
+            ZStack {
+                Circle()
+                    .stroke(KingdomTheme.Colors.territoryNeutral7.opacity(0.10), lineWidth: 2)
+                    .frame(width: 260, height: 260)
+                    .offset(x: 120, y: -220)
+                
+                Circle()
+                    .stroke(KingdomTheme.Colors.royalBlue.opacity(0.08), lineWidth: 2)
+                    .frame(width: 340, height: 340)
+                    .offset(x: -140, y: 260)
+            }
         }
     }
     
@@ -58,11 +113,11 @@ struct FishingView: View {
             HStack {
                 HStack(spacing: 10) {
                     Image(systemName: "figure.fishing")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(FontStyles.iconMedium)
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
                     
                     Text("FISHING")
-                        .font(.system(size: 18, weight: .black, design: .serif))
+                        .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
                 
@@ -75,7 +130,7 @@ struct FishingView: View {
                     }
                 } label: {
                     Text("Done")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 }
             }
@@ -89,11 +144,177 @@ struct FishingView: View {
             )
             
             Rectangle()
-                .fill(Color.black)
+                .fill(headerAccentColor)
                 .frame(height: 3)
         }
         .background(KingdomTheme.Colors.parchmentLight)
     }
+    
+    private var headerAccentColor: Color {
+        switch viewModel.uiState {
+        case .fishFound, .caught, .looting, .lootResult:
+            return KingdomTheme.Colors.gold
+        case .escaped:
+            return KingdomTheme.Colors.inkMedium
+        case .error:
+            return KingdomTheme.Colors.buttonDanger
+        default:
+            return Color.black
+        }
+    }
+    
+    // MARK: - Status Card
+    
+    private var statusCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                
+                Image(systemName: statusIcon)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(statusTint)
+                    .scaleEffect(statusPulse ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.55), value: statusPulse)
+            }
+            .frame(width: 46, height: 46)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text(statusTitle)
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text(statusLine)
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(statusRightStat)
+                    .font(FontStyles.statMedium)
+                    .foregroundColor(statusTint)
+                
+                Text(statusRightLabel)
+                    .font(FontStyles.captionLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .frame(width: 96, alignment: .trailing)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 92)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 16)
+    }
+    
+    private var statusIcon: String {
+        switch viewModel.uiState {
+        case .loading: return "hourglass"
+        case .idle: return "water.waves"
+        case .casting: return "water.waves"
+        case .fishFound: return "fish.fill"
+        case .reeling: return "arrow.up.circle.fill"
+        case .caught: return "checkmark.circle.fill"
+        case .looting, .lootResult: return "sparkles"
+        case .escaped: return "arrow.uturn.backward.circle.fill"
+        case .masterRollAnimation: return "scope"
+        case .error: return "exclamationmark.triangle.fill"
+        }
+    }
+    
+    private var statusTint: Color {
+        switch viewModel.uiState {
+        case .fishFound, .caught, .looting, .lootResult:
+            return KingdomTheme.Colors.gold
+        case .escaped, .error:
+            return KingdomTheme.Colors.buttonDanger
+        default:
+            return KingdomTheme.Colors.royalBlue
+        }
+    }
+    
+    private var statusTitle: String {
+        switch viewModel.uiState {
+        case .loading: return "SHORE UP"
+        case .idle: return "CAST"
+        case .casting: return "CASTING"
+        case .fishFound: return "A BITE!"
+        case .reeling: return "REEL"
+        case .caught: return "LANDED"
+        case .looting: return "SPOILS"
+        case .lootResult: return "CLAIMED"
+        case .escaped: return "SLIPPED"
+        case .masterRollAnimation: return "DRUMROLL"
+        case .error: return "TROUBLE"
+        }
+    }
+    
+    private var statusLine: String {
+        switch viewModel.uiState {
+        case .loading:
+            return "Wading in..."
+        case .idle:
+            return "Cast. Then wait."
+        case .casting:
+            return "Watching the line..."
+        case .fishFound:
+            if let fish = viewModel.currentFishData {
+                return "\(fish.icon ?? "🐟") \(fish.name ?? "Something") — set the hook!"
+            }
+            return "A bite — set the hook!"
+        case .reeling:
+            return "Keep tension. Reel!"
+        case .caught:
+            if let fish = viewModel.currentFishData {
+                return "\(fish.icon ?? "🐟") \(fish.name ?? "Catch") landed."
+            }
+            return "Landed."
+        case .looting:
+            return "Taking your cut..."
+        case .lootResult:
+            if viewModel.currentLootResult?.rare_loot_dropped == true {
+                return "Rare find!"
+            }
+            return "Collected."
+        case .escaped:
+            return "It slipped."
+        case .masterRollAnimation:
+            return "..."
+        case .error(let msg):
+            return msg
+        }
+    }
+    
+    private var statusRightLabel: String {
+        if viewModel.currentBarType == .loot { return "loot" }
+        switch viewModel.currentBarType {
+        case .cast: return "bite"
+        case .reel: return "land"
+        case .loot: return "loot"
+        }
+    }
+    
+    private var statusRightStat: String {
+        if viewModel.currentBarType == .loot {
+            if let loot = viewModel.currentLootResult {
+                return loot.rare_loot_dropped ? "✨" : "+\(loot.meat_earned)"
+            }
+            return "—"
+        }
+        return "\(viewModel.mainOutcomePercentage)%"
+    }
+    
+    // Intentionally no long “flavor text” paragraphs here — keep it punchy like the rest of the app.
     
     // MARK: - Fishing Area
     
@@ -117,7 +338,7 @@ struct FishingView: View {
     
     private func bobberDisplay(size: CGFloat) -> some View {
         VStack(spacing: 12) {
-            ZStack {
+            let face = ZStack {
                 Circle()
                     .fill(viewModel.phaseColor.opacity(0.12))
                 
@@ -128,10 +349,20 @@ struct FishingView: View {
             }
             .frame(width: size, height: size)
             
+            if bobberJiggle {
+                // NOTE: Avoid `repeatForever` here — it can “stick” and jitter forever.
+                TimelineView(.animation) { context in
+                    face
+                        .rotationEffect(.degrees(biteJiggleAngle(at: context.date)))
+                }
+            } else {
+                face
+            }
+            
             // Keep space but hide content for loot phases - not skill based
             VStack(spacing: 4) {
                 Text(viewModel.currentStatName)
-                    .font(.system(size: 11, weight: .bold, design: .serif))
+                    .font(FontStyles.captionMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 rollCountIndicator
@@ -159,7 +390,7 @@ struct FishingView: View {
                         .font(.system(size: mainFont, weight: .black, design: .monospaced))
                         .foregroundColor(rollColor)
                     
-                    Text(roll.is_critical ? "CRIT!" : (roll.is_success ? "BITE!" : "NOTHING"))
+                    Text(roll.is_critical ? "HOOK SET!" : (roll.is_success ? "A BITE!" : "DRIFT..."))
                         .font(.system(size: subFont, weight: .black))
                         .foregroundColor(rollColor)
                 }
@@ -168,7 +399,7 @@ struct FishingView: View {
                     .scaleEffect(1.5)
                     .tint(viewModel.phaseColor)
             }
-        } else if viewModel.uiState == .masterRollAnimation || masterRollAnimationStarted {
+        } else if viewModel.shouldAnimateMasterRoll || viewModel.uiState == .masterRollAnimation {
             Text("\(masterRollDisplayValue)")
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
                 .foregroundColor(viewModel.phaseColor)
@@ -194,7 +425,7 @@ struct FishingView: View {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(KingdomTheme.Colors.gold)
-                Text("...")
+                Text("Rummaging...")
                     .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
@@ -223,7 +454,7 @@ struct FishingView: View {
                 Image(systemName: "arrow.uturn.backward.circle.fill")
                     .font(.system(size: mainFont, weight: .bold))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Text("ESCAPED")
+                Text("SLIPPED")
                     .font(.system(size: subFont * 1.2, weight: .black, design: .serif))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
@@ -238,6 +469,15 @@ struct FishingView: View {
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
+    }
+    
+    private func biteJiggleAngle(at date: Date) -> Double {
+        // Snappy wobble for “A BITE!” — subtle enough to not smear text.
+        let t = date.timeIntervalSinceReferenceDate
+        let period = 0.22
+        let phase = (t / period) * (2.0 * Double.pi)
+        let normalized = sin(phase) // -1...1
+        return 2.2 * normalized
     }
     
     // MARK: - Roll Count Indicator
@@ -276,7 +516,7 @@ struct FishingView: View {
         
         return VStack(spacing: 8) {
             Text(showBarShiftGlow ? "NICE!" : barTitle)
-                .font(.system(size: 11, weight: .bold, design: .serif))
+                .font(FontStyles.captionMedium)
                 .foregroundColor(showBarShiftGlow ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium)
                 .frame(height: 16)
             
@@ -348,12 +588,14 @@ struct FishingView: View {
         let finalValue = viewModel.masterRollValue
         guard finalValue > 0 else { return }
         
+        let clampedFinal = min(max(finalValue, 1), 100)
+        
         var positions = Array(stride(from: 1, through: 100, by: 3))
-        if finalValue < 100 {
-            positions.append(contentsOf: stride(from: 97, through: max(1, finalValue), by: -3))
+        if clampedFinal < 100 {
+            positions.append(contentsOf: stride(from: 97, through: max(1, clampedFinal), by: -3))
         }
         if positions.last != finalValue {
-            positions.append(finalValue)
+            positions.append(clampedFinal)
         }
         
         showMasterRollMarker = true
@@ -363,7 +605,7 @@ struct FishingView: View {
             try? await Task.sleep(nanoseconds: 30_000_000)
         }
         
-        masterRollDisplayValue = finalValue
+        masterRollDisplayValue = clampedFinal
         viewModel.onMasterRollAnimationComplete()
     }
     
@@ -388,8 +630,8 @@ struct FishingView: View {
     private var rollHistoryCard: some View {
         ZStack {
             if viewModel.currentRolls.isEmpty {
-                Text("Cast your line")
-                    .font(.system(size: 13, weight: .medium, design: .serif))
+                Text("Cast, then wait for the bite.")
+                    .font(FontStyles.labelMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .frame(maxWidth: .infinity)
             } else {
@@ -423,11 +665,12 @@ struct FishingView: View {
                     
                 case .idle:
                     Button {
+                        hapticImpact(.medium)
                         Task { await viewModel.cast() }
                     } label: {
                         HStack {
                             Image(systemName: "water.waves")
-                            Text("Cast")
+                            Text("Cast the Line")
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -439,11 +682,12 @@ struct FishingView: View {
                     
                 case .fishFound:
                     Button {
+                        hapticImpact(.heavy)
                         Task { await viewModel.reel() }
                     } label: {
                         HStack {
-                            Image(systemName: "arrow.up.circle.fill")
-                            Text("Reel In!")
+                            Image(systemName: "bolt.fill")
+                            Text("Set the Hook!")
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -458,8 +702,8 @@ struct FishingView: View {
                         ProgressView()
                             .scaleEffect(1.1)
                             .tint(viewModel.phaseColor)
-                        Text(viewModel.uiState == .casting ? "Casting..." : "Reeling in...")
-                            .font(.system(size: 16, weight: .bold))
+                        Text(actionProgressLine)
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
@@ -469,7 +713,7 @@ struct FishingView: View {
                     } label: {
                         HStack {
                             Image(systemName: "sparkles")
-                            Text("Loot!")
+                            Text("Dress the Catch")
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -484,8 +728,8 @@ struct FishingView: View {
                         ProgressView()
                             .scaleEffect(1.1)
                             .tint(KingdomTheme.Colors.gold)
-                        Text("Cleaning...")
-                            .font(.system(size: 16, weight: .bold))
+                        Text("Carving up the spoils...")
+                            .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
@@ -495,7 +739,7 @@ struct FishingView: View {
                     } label: {
                         HStack {
                             Image(systemName: "archivebox.fill")
-                            Text("Collect")
+                            Text("Stow the Spoils")
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -506,13 +750,13 @@ struct FishingView: View {
                     ))
                     
                 case .escaped:
-                    Text("It got away...")
-                        .font(.system(size: 16, weight: .bold, design: .serif))
+                    Text("It slipped the hook...")
+                        .font(FontStyles.bodyMediumBold)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                 case .error(let message):
                     Text(message)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.buttonDanger)
                 }
             }
@@ -598,6 +842,144 @@ struct FishingView: View {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             showPetFishCelebration = true
         }
+    }
+    
+    private var actionProgressLine: String {
+        switch viewModel.uiState {
+        case .casting:
+            return "Casting... eyes on the water."
+        case .reeling:
+            return "Reeling... don’t let it run."
+        case .masterRollAnimation:
+            return "Holding..."
+        default:
+            return "..."
+        }
+    }
+    
+    // MARK: - Haptics + Beats
+    
+    private func handleStateChange(_ newState: FishingViewModel.UIState) {
+        // Bite jiggle loop
+        switch newState {
+        case .fishFound:
+            bobberJiggle = true
+        default:
+            bobberJiggle = false
+        }
+        
+        // One-shot beats
+        if lastState != newState {
+            switch newState {
+            case .fishFound:
+                // Big fish (tier 3+) = shake the phone off the table
+                // Small fish = just a tap
+                let tier = viewModel.currentFishData?.tier ?? 0
+                if tier >= 3 {
+                    biteHapticBurst()
+                } else if tier >= 2 {
+                    haptic(.success)
+                    hapticImpact(.heavy)
+                } else {
+                    hapticImpact(.medium)
+                }
+                pulseStatusIcon()
+                
+            case .caught:
+                haptic(.success)
+                hapticImpact(.medium)
+                pulseStatusIcon()
+                
+            case .escaped:
+                haptic(.warning)
+                hapticImpact(.light)
+                pulseStatusIcon()
+                
+            case .lootResult:
+                if viewModel.currentLootResult?.rare_loot_dropped == true {
+                    // RARE DROP - go crazy
+                    biteHapticBurst()
+                } else {
+                    hapticImpact(.light)
+                }
+                pulseStatusIcon()
+                
+            case .idle:
+                // Coming back to idle after a miss/escape: keep it subtle.
+                hapticImpact(.light)
+                
+            default:
+                break
+            }
+        }
+        
+        lastState = newState
+    }
+    
+    private func handleRollBeat(index: Int) {
+        guard index >= 0, index < viewModel.currentRolls.count else { return }
+        let roll = viewModel.currentRolls[index]
+        
+        // Light “clicks” per roll, heavier on criticals.
+        if roll.is_critical && roll.is_success {
+            hapticImpact(.heavy)
+            pulseStatusIcon()
+        } else if roll.is_success {
+            hapticImpact(.light)
+        } else if roll.is_critical {
+            hapticImpact(.medium)
+        }
+    }
+    
+    private func pulseStatusIcon() {
+        statusPulse.toggle()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            statusPulse.toggle()
+        }
+    }
+    
+    private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        #if canImport(UIKit)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(type)
+        #endif
+    }
+    
+    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        #endif
+    }
+    
+    /// Rapid-fire burst of heavy haptics for the BITE moment
+    private func biteHapticBurst() {
+        #if canImport(UIKit)
+        let heavy = UIImpactFeedbackGenerator(style: .heavy)
+        let rigid = UIImpactFeedbackGenerator(style: .rigid)
+        heavy.prepare()
+        rigid.prepare()
+        
+        // Initial slam
+        haptic(.success)
+        heavy.impactOccurred(intensity: 1.0)
+        
+        // Rapid follow-up hits
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            rigid.impactOccurred(intensity: 1.0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            heavy.impactOccurred(intensity: 1.0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            rigid.impactOccurred(intensity: 0.8)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            heavy.impactOccurred(intensity: 0.9)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+            rigid.impactOccurred(intensity: 0.7)
+        }
+        #endif
     }
 }
 

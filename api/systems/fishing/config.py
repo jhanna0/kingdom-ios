@@ -188,9 +188,10 @@ LOOT_DROP_TABLE_DISPLAY = [
 PET_FISH_ELIGIBLE = ["catfish", "legendary_carp"]
 
 # Chance of pet_fish drop when catching an eligible fish
+# These should be RARE - a flex, not a guarantee
 PET_FISH_DROP_CHANCE = {
-    "catfish": 0.02,          # 2% chance from catfish
-    "legendary_carp": 0.05,   # 5% chance from legendary
+    "catfish": 0.002,         # 0.2% chance from catfish (1 in 500)
+    "legendary_carp": 0.005,  # 0.5% chance from legendary (1 in 200)
 }
 
 

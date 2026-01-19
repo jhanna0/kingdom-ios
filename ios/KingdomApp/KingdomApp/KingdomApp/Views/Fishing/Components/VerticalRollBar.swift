@@ -7,7 +7,9 @@ import SwiftUI
 struct VerticalRollBar: View {
     let items: [FishingDropTableItem]
     let slots: [String: Int]
-    let markerValue: Int  // 1-100, where the marker sits
+    /// Roll position for the marker (1...100).
+    /// Backend should always send a percent roll for every phase.
+    let markerValue: Int
     let showMarker: Bool
     let markerIcon: String
     
@@ -15,6 +17,11 @@ struct VerticalRollBar: View {
     
     private var total: Int {
         slots.values.reduce(0, +)
+    }
+    
+    private var clampedMarkerValue: Int {
+        guard showMarker else { return 0 }
+        return min(max(animatedMarkerValue, 0), 100)
     }
     
     var body: some View {
@@ -52,7 +59,7 @@ struct VerticalRollBar: View {
                 
                 // Marker
                 if showMarker {
-                    let markerY = geo.size.height * (1 - CGFloat(animatedMarkerValue) / 100.0)
+                    let markerY = geo.size.height * (1 - CGFloat(clampedMarkerValue) / 100.0)
                     
                     HStack(spacing: 0) {
                         Capsule()
