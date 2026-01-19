@@ -101,19 +101,6 @@ struct ActionsView: View {
         } message: {
             Text(errorMessage)
         }
-        .alert(pendingBattleAction?.title ?? "Confirm Action", isPresented: $showBattleConfirmation) {
-            Button("Cancel", role: .cancel) {
-                pendingBattleAction = nil
-            }
-            Button(pendingBattleAction?.title ?? "Confirm", role: .destructive) {
-                if let action = pendingBattleAction {
-                    executeBattleInitiation(action: action)
-                }
-                pendingBattleAction = nil
-            }
-        } message: {
-            Text(getBattleConfirmationMessage())
-        }
         .overlay {
             if showReward, let reward = currentReward {
                 RewardDisplayView(reward: reward, isShowing: $showReward)
@@ -134,6 +121,18 @@ struct ActionsView: View {
                     title: scoutResultTitle,
                     message: scoutResultMessage,
                     isShowing: $showScoutResult
+                )
+                .transition(.opacity)
+            }
+            if showBattleConfirmation, let action = pendingBattleAction {
+                BattleConfirmationPopup(
+                    title: action.title ?? "Confirm Action",
+                    isInvasion: action.endpoint?.contains("invasion") == true,
+                    isShowing: $showBattleConfirmation,
+                    onConfirm: {
+                        executeBattleInitiation(action: action)
+                        pendingBattleAction = nil
+                    }
                 )
                 .transition(.opacity)
             }
@@ -641,24 +640,6 @@ struct ActionsView: View {
     private func initiateBattle(action: ActionStatus) {
         pendingBattleAction = action
         showBattleConfirmation = true
-    }
-    
-    /// Get confirmation message for pending battle action
-    private func getBattleConfirmationMessage() -> String {
-        guard let action = pendingBattleAction else {
-            return "Are you sure you want to proceed?"
-        }
-        
-        let kingdomName = currentKingdom?.name ?? "this kingdom"
-        
-        // Customize message based on action type
-        if action.endpoint?.contains("invasion") == true {
-            return "You are about to declare war on \(kingdomName). This will start a battle that other players can join. Are you sure?"
-        } else if action.endpoint?.contains("coup") == true {
-            return "You are about to stage a coup in \(kingdomName). This will challenge the current ruler for control. Are you sure?"
-        } else {
-            return action.description ?? "Are you sure you want to proceed with this action?"
-        }
     }
     
     /// Actually execute the battle initiation after confirmation
