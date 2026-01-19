@@ -77,6 +77,19 @@ struct TownHallView: View {
                         )
                     }
                     
+                    // Science Lab
+                    NavigationLink {
+                        ScienceView(apiClient: APIClient.shared)
+                    } label: {
+                        TownHallActivityCard(
+                            icon: "flask.fill",
+                            title: "The Laboratory",
+                            description: "Test your intuition, win blueprints!",
+                            color: KingdomTheme.Colors.royalBlue,
+                            badge: nil
+                        )
+                    }
+                    
                     // Town Pub
                     NavigationLink {
                         TownPubView(kingdomId: kingdom.id, kingdomName: kingdom.name)

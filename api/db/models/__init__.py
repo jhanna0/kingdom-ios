@@ -45,6 +45,8 @@ from .hunt_session import HuntSession
 from .hunt_stats import HuntStats
 from .foraging_session import ForagingSession
 from .fishing_session import FishingSession
+from .science_session import ScienceSession
+from .science_stats import ScienceStats
 from .trade_offer import TradeOffer, TradeOfferStatus
 
 # PvP Arena Duels
@@ -119,6 +121,8 @@ __all__ = [
     "HuntStats",
     "ForagingSession",
     "FishingSession",
+    "ScienceSession",
+    "ScienceStats",
     # Player Trading
     "TradeOffer",
     "TradeOfferStatus",
