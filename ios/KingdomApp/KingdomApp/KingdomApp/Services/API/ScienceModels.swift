@@ -115,6 +115,7 @@ struct ScienceStartResponse: Codable {
     let success: Bool
     let session: ScienceSession
     let skill_info: ScienceSkillInfo?
+    let cost: Int?
 }
 
 struct ScienceGuessResponse: Codable {

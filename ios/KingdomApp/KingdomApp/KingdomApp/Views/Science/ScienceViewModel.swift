@@ -27,6 +27,7 @@ class ScienceViewModel: ObservableObject {
     @Published var skillInfo: ScienceSkillInfo?
     @Published var stats: SciencePlayerStats?
     @Published var collectResponse: ScienceCollectResponse?
+    @Published var entryCost: Int = 10  // Default, updated from backend
     
     // Last guess result (for animation)
     @Published var lastGuessResult: ScienceGuessResponse?
@@ -72,6 +73,7 @@ class ScienceViewModel: ObservableObject {
             let response = try await api.startExperiment()
             session = response.session
             skillInfo = response.skill_info
+            entryCost = response.cost ?? 10
             uiState = .ready
             
             // Non-blocking: stats are nice-to-have in the bottom bar.

@@ -31,6 +31,7 @@ def _get_resource(item_id: str) -> dict:
 MIN_NUMBER = 1          # Lowest possible number
 MAX_NUMBER = 100        # Highest possible number
 MAX_GUESSES = 4         # Max rounds - change here to adjust
+ENTRY_COST = 10         # Gold cost to start a trial
 
 
 # ============================================================
@@ -58,7 +59,7 @@ def _build_reward_config() -> Dict[int, dict]:
             }
         else:
             # Earlier rounds = gold (scales up)
-            base_gold = 5 * streak  # 5, 10, 15, 20...
+            base_gold = 4 * streak  # 5, 10, 15, 20...
             config[streak] = {
                 "gold": base_gold,
                 "gold_per_science_tier": streak,  # +1, +2, +3... per science level

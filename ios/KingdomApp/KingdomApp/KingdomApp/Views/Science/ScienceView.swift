@@ -671,7 +671,7 @@ struct ScienceView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.counterclockwise")
-                Text("New Trial")
+                Text("New Trial (\(viewModel.entryCost)g)")
             }
             .frame(maxWidth: .infinity)
         }
@@ -697,7 +697,7 @@ struct ScienceView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.counterclockwise")
-                Text("New Trial")
+                Text("New Trial (\(viewModel.entryCost)g)")
             }
             .frame(maxWidth: .infinity)
         }

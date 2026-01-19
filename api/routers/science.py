@@ -25,7 +25,7 @@ from db.models.science_stats import ScienceStats
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from systems.science.science_manager import ScienceManager, ScienceSession
-from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG
+from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG, ENTRY_COST
 
 
 router = APIRouter(prefix="/science", tags=["science"])
@@ -83,13 +83,24 @@ def start_science(
     """
     Start science minigame - ALL numbers pre-calculated!
     
+    Costs ENTRY_COST gold to start.
     Returns the first number. Backend has already determined all future numbers.
     """
     player_id = user.id
     
-    # Get player's science skill
+    # Get player state
     state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
-    science_level = state.science if state else 0
+    if not state:
+        raise HTTPException(status_code=400, detail="No player state")
+    
+    # Check gold
+    if state.gold < ENTRY_COST:
+        raise HTTPException(status_code=400, detail=f"Not enough gold. Need {ENTRY_COST}g")
+    
+    # Deduct entry cost
+    state.gold -= ENTRY_COST
+    
+    science_level = state.science or 0
     
     # End any existing active session
     existing = db.query(ScienceSessionDB).filter(
@@ -125,6 +136,7 @@ def start_science(
             "skill": "science",
             "level": science_level,
         },
+        "cost": ENTRY_COST,
     }
 
 
