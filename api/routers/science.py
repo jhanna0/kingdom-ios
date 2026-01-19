@@ -24,8 +24,9 @@ from db.models.science_session import ScienceSession as ScienceSessionDB
 from db.models.science_stats import ScienceStats
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
+from routers.actions.tax_utils import apply_kingdom_tax
 from systems.science.science_manager import ScienceManager, ScienceSession
-from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG, ENTRY_COST
+from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG, ENTRY_COST, MIN_SCIENCE_LEVEL
 
 
 router = APIRouter(prefix="/science", tags=["science"])
@@ -92,6 +93,11 @@ def start_science(
     state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
     if not state:
         raise HTTPException(status_code=400, detail="No player state")
+    
+    # Check science level requirement
+    science_level = state.science or 0
+    if science_level < MIN_SCIENCE_LEVEL:
+        raise HTTPException(status_code=400, detail=f"Requires Science T{MIN_SCIENCE_LEVEL}")
     
     # Check gold
     if state.gold < ENTRY_COST:
@@ -233,13 +239,26 @@ def collect_rewards(
         raise HTTPException(status_code=400, detail=result.get("error", "Cannot collect"))
     
     # Add rewards to player
-    gold = result.get("gold", 0)
+    gross_gold = result.get("gold", 0)
     blueprint = result.get("blueprint", 0)
     
-    if gold > 0:
-        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
-        if state:
-            state.gold += gold
+    # Get player state for tax calculation
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    
+    # Apply kingdom tax to gold
+    net_gold = gross_gold
+    tax_amount = 0
+    tax_rate = 0
+    
+    if gross_gold > 0 and state:
+        kingdom_id = state.current_kingdom_id
+        if kingdom_id:
+            net_gold, tax_amount, tax_rate = apply_kingdom_tax(
+                db, kingdom_id, state, float(gross_gold)
+            )
+            net_gold = int(net_gold)
+            tax_amount = int(tax_amount)
+        state.gold += net_gold
     
     if blueprint > 0:
         inv = db.query(PlayerInventory).filter(
@@ -261,7 +280,7 @@ def collect_rewards(
     db_session.status = 'collected'
     db_session.collected_at = datetime.utcnow()
     db_session.final_streak = session.streak
-    db_session.gold_earned = gold
+    db_session.gold_earned = net_gold
     db_session.blueprint_earned = blueprint
     db_session.session_data = session.to_db_dict()
     
@@ -287,7 +306,7 @@ def collect_rewards(
     stats.experiments_completed = (stats.experiments_completed or 0) + 1
     stats.total_guesses = (stats.total_guesses or 0) + total_guesses
     stats.correct_guesses = (stats.correct_guesses or 0) + correct_guesses
-    stats.total_gold_earned = (stats.total_gold_earned or 0) + gold
+    stats.total_gold_earned = (stats.total_gold_earned or 0) + net_gold
     stats.total_blueprints_earned = (stats.total_blueprints_earned or 0) + blueprint
     
     if session.streak > (stats.best_streak or 0):
@@ -298,11 +317,34 @@ def collect_rewards(
     
     db.commit()
     
+    # Update rewards list to show net gold (after tax)
+    rewards = []
+    if net_gold > 0:
+        from systems.science.config import GOLD_CONFIG
+        rewards.append({
+            "item": "gold",
+            "amount": net_gold,
+            "display_name": GOLD_CONFIG["display_name"],
+            "icon": GOLD_CONFIG["icon"],
+            "color": GOLD_CONFIG["color"],
+        })
+    if blueprint > 0:
+        from systems.science.config import BLUEPRINT_CONFIG
+        rewards.append({
+            "item": BLUEPRINT_CONFIG["item"],
+            "amount": blueprint,
+            "display_name": BLUEPRINT_CONFIG["display_name"],
+            "icon": BLUEPRINT_CONFIG["icon"],
+            "color": BLUEPRINT_CONFIG["color"],
+        })
+    
     return {
         "success": True,
         "streak": session.streak,
-        "rewards": result.get("rewards", []),
-        "gold": gold,
+        "rewards": rewards,
+        "gold": net_gold,
+        "gold_tax": tax_amount,
+        "tax_rate": tax_rate,
         "blueprint": blueprint,
         "message": result.get("message", ""),
         "stats": stats.to_dict(),

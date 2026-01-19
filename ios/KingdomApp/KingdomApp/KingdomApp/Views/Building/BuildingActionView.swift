@@ -6,6 +6,7 @@ struct BuildingActionView: View {
     let action: BuildingClickAction
     let kingdom: Kingdom
     let playerId: Int
+    var scienceLevel: Int = 0
     let onDismiss: () -> Void
     
     var body: some View {
@@ -29,7 +30,7 @@ struct BuildingActionView: View {
         case "market":
             MarketView()
         case "townhall":
-            TownHallView(kingdom: kingdom, playerId: playerId)
+            TownHallView(kingdom: kingdom, playerId: playerId, scienceLevel: scienceLevel)
         default:
             // Unknown action type - show error
             VStack(spacing: 20) {

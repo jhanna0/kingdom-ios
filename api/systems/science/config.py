@@ -32,6 +32,7 @@ MIN_NUMBER = 1          # Lowest possible number
 MAX_NUMBER = 100        # Highest possible number
 MAX_GUESSES = 4         # Max rounds - change here to adjust
 ENTRY_COST = 10         # Gold cost to start a trial
+MIN_SCIENCE_LEVEL = 2   # Minimum science skill required (T2)
 
 
 # ============================================================

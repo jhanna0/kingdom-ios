@@ -512,6 +512,7 @@ struct KingdomInfoSheetView: View {
                 action: action,
                 kingdom: kingdom,
                 playerId: player.playerId,
+                scienceLevel: player.science,
                 onDismiss: { activeBuildingAction = nil }
             )
         }

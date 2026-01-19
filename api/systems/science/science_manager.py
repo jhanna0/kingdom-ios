@@ -241,8 +241,8 @@ class ScienceManager:
         session_id = f"science_{player_id}_{int(time.time() * 1000)}"
         
         # PRE-CALCULATE ALL 4 NUMBERS!
-        # Start in middle range so both HIGH and LOW are reasonable
-        numbers = [self.rng.randint(25, 75)]  # Starting number (middle of 1-100)
+        # Start in tight middle range - harder to guess near 50
+        numbers = [self.rng.randint(45, 65)]  # Starting number (tight middle)
         
         # Generate 3 more numbers for the 3 rounds
         for _ in range(MAX_GUESSES):

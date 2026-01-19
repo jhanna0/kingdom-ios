@@ -4,6 +4,7 @@ import CoreLocation
 struct TownHallView: View {
     let kingdom: Kingdom
     let playerId: Int
+    var scienceLevel: Int = 0  // Player's science skill level
     
     var body: some View {
         ScrollView {
@@ -77,16 +78,24 @@ struct TownHallView: View {
                         )
                     }
                     
-                    // Science Lab
-                    NavigationLink {
-                        ScienceView(apiClient: APIClient.shared)
-                    } label: {
-                        TownHallActivityCard(
+                    // Science Lab - Requires T2 Science
+                    if scienceLevel >= 2 {
+                        NavigationLink {
+                            ScienceView(apiClient: APIClient.shared)
+                        } label: {
+                            TownHallActivityCard(
+                                icon: "flask.fill",
+                                title: "The Laboratory",
+                                description: "Test your intuition, win blueprints!",
+                                color: KingdomTheme.Colors.royalBlue,
+                                badge: nil
+                            )
+                        }
+                    } else {
+                        TownHallLockedCard(
                             icon: "flask.fill",
                             title: "The Laboratory",
-                            description: "Test your intuition, win blueprints!",
-                            color: KingdomTheme.Colors.royalBlue,
-                            badge: nil
+                            requirement: "Requires Science T2"
                         )
                     }
                     
@@ -218,6 +227,50 @@ struct TownHallActivityCard: View {
         .background(KingdomTheme.Colors.parchmentLight)
         .cornerRadius(8)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Town Hall Locked Card (skill requirement not met)
+
+struct TownHallLockedCard: View {
+    let icon: String
+    let title: String
+    let requirement: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon (dimmed with lock)
+            ZStack {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white.opacity(0.5))
+                    .frame(width: 32, height: 32)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
+                
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .offset(x: 10, y: 10)
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text(requirement)
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+            }
+            
+            Spacer()
+        }
+        .padding(10)
+        .background(KingdomTheme.Colors.parchmentLight.opacity(0.5))
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(KingdomTheme.Colors.inkLight, lineWidth: 1.5))
         .padding(.horizontal)
     }
 }
