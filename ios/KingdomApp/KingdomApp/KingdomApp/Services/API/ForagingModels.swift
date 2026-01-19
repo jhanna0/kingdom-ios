@@ -114,11 +114,24 @@ struct ForagingCollectedReward: Codable {
     let display_name: String
 }
 
+// MARK: - Skill Info
+
+struct ForagingSkillInfo: Codable {
+    let skill: String
+    let level: Int
+}
+
+struct ForagingSkillsUsed: Codable {
+    let round1: ForagingSkillInfo
+    let round2: ForagingSkillInfo
+}
+
 // MARK: - API Responses
 
 struct ForagingStartResponse: Codable {
     let success: Bool
     let session: ForagingSession
+    let skills_used: ForagingSkillsUsed?
 }
 
 struct ForagingCollectResponse: Codable {

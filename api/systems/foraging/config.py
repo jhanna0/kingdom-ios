@@ -96,13 +96,27 @@ ROUND1_REWARD_CONFIG = {
     "reward_item_color": _get_resource(ROUND1_REWARD_ITEM).get("color"),
 }
 
-# Round 1 probabilities
+# Round 1 probabilities (skill-adjusted)
+# Leadership affects these rates
+# DESIGN: Berries appear almost EVERY time (win or tease). Seed trails are rare bonus.
 ROUND1_WIN_CONFIG = {
-    "cluster_probability": 0.10,
     "guaranteed_cluster_size": 3,
-    "seed_trail_probability": 0.05,
     "seed_trail_cluster_size": 3,
-    "seed_trail_tease_probability": 0.20,
+    "tease_count_min": 1,
+    "tease_count_max": 2,
+    # Skill: leadership
+    "skill": "leadership",
+    # Base rates (T0) - berry teases dominate!
+    "berry_win_base": 0.15,
+    "seed_trail_win_base": 0.05,
+    "berry_tease_base": 0.65,       # 65% - almost won berries!
+    "seed_trail_tease_base": 0.10,  # 10% - rare bonus round tease
+    # Nothing: only 5% at T0
+    # Per tier bonus
+    "berry_win_per_tier": 0.07,
+    "seed_trail_win_per_tier": 0.03,
+    "berry_tease_per_tier": -0.08,      # Teasers decrease as wins increase
+    "seed_trail_tease_per_tier": -0.01,
 }
 
 
@@ -164,12 +178,24 @@ ROUND2_REWARD_CONFIG = {
     "reward_item_color": _get_resource(ROUND2_REWARD_ITEM).get("color"),
 }
 
-# Round 2 probabilities
+# Round 2 probabilities (skill-adjusted)
+# Merchant affects these rates
+# DESIGN: Teasers dominate - you almost got those seeds!
 ROUND2_WIN_CONFIG = {
-    "cluster_probability": 0.10,
     "guaranteed_cluster_size": 3,
-    "seed_tease_probability": 0.20,
-    "egg_tease_probability": 0.10,
+    "tease_count_min": 1,
+    "tease_count_max": 2,
+    # Skill: merchant
+    "skill": "merchant",
+    # Base rates (T0) - teasers dominate!
+    "seed_win_base": 0.15,
+    "rare_egg_base": 0.01,
+    "seed_tease_base": 0.70,  # 70% - so close to seeds!
+    # Nothing: only 14% at T0
+    # Per tier bonus
+    "seed_win_per_tier": 0.07,
+    "rare_egg_per_tier": 0.01,
+    "seed_tease_per_tier": -0.06,  # Teasers decrease as wins increase
 }
 
 # Round 2 RARE DROP - reads from RESOURCES
@@ -325,6 +351,76 @@ def is_target_type(bush_type: str, round_num: int = 1) -> bool:
     """Check if this bush type is the target for the given round."""
     target = ROUND1_TARGET_TYPE if round_num == 1 else ROUND2_TARGET_TYPE
     return bush_type == target
+
+
+def get_round1_probabilities(leadership: int = 0) -> dict:
+    """
+    Get Round 1 outcome probabilities adjusted for leadership skill.
+    
+    Returns thresholds for roll 1-100:
+    - berry_win: Find 3 berries
+    - seed_trail_win: Find 3 seed trails (triggers bonus round)
+    - berry_tease: Find 1-2 berries (near miss)
+    - seed_trail_tease: Find 1-2 seed trails (near miss)
+    - nothing: Just junk
+    """
+    cfg = ROUND1_WIN_CONFIG
+    
+    # Calculate rates based on leadership tier
+    berry_win = cfg["berry_win_base"] + (leadership * cfg["berry_win_per_tier"])
+    seed_trail_win = cfg["seed_trail_win_base"] + (leadership * cfg["seed_trail_win_per_tier"])
+    berry_tease = max(0.05, cfg["berry_tease_base"] + (leadership * cfg["berry_tease_per_tier"]))
+    seed_trail_tease = max(0.05, cfg["seed_trail_tease_base"] + (leadership * cfg["seed_trail_tease_per_tier"]))
+    
+    # Convert to cumulative thresholds (1-100 roll)
+    # Order: seed_trail_win, berry_win, seed_trail_tease, berry_tease, nothing
+    t1 = int(seed_trail_win * 100)
+    t2 = t1 + int(berry_win * 100)
+    t3 = t2 + int(seed_trail_tease * 100)
+    t4 = t3 + int(berry_tease * 100)
+    
+    return {
+        "seed_trail_win_threshold": t1,
+        "berry_win_threshold": t2,
+        "seed_trail_tease_threshold": t3,
+        "berry_tease_threshold": t4,
+        # Rates for display
+        "berry_win_rate": berry_win,
+        "seed_trail_win_rate": seed_trail_win,
+    }
+
+
+def get_round2_probabilities(merchant: int = 0) -> dict:
+    """
+    Get Round 2 outcome probabilities adjusted for merchant skill.
+    
+    Returns thresholds for roll 1-100:
+    - rare_egg: Find rare egg (jackpot!)
+    - seed_win: Find 3 seeds
+    - seed_tease: Find 1-2 seeds (near miss)
+    - nothing: Just junk
+    """
+    cfg = ROUND2_WIN_CONFIG
+    
+    # Calculate rates based on merchant tier
+    rare_egg = cfg["rare_egg_base"] + (merchant * cfg["rare_egg_per_tier"])
+    seed_win = cfg["seed_win_base"] + (merchant * cfg["seed_win_per_tier"])
+    seed_tease = max(0.05, cfg["seed_tease_base"] + (merchant * cfg["seed_tease_per_tier"]))
+    
+    # Convert to cumulative thresholds (1-100 roll)
+    # Order: rare_egg, seed_win, seed_tease, nothing
+    t1 = int(rare_egg * 100)
+    t2 = t1 + int(seed_win * 100)
+    t3 = t2 + int(seed_tease * 100)
+    
+    return {
+        "rare_egg_threshold": t1,
+        "seed_win_threshold": t2,
+        "seed_tease_threshold": t3,
+        # Rates for display
+        "seed_win_rate": seed_win,
+        "rare_egg_rate": rare_egg,
+    }
 
 
 def calculate_reward(match_count: int, round_num: int = 1) -> int:

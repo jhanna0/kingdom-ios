@@ -14,20 +14,21 @@ Flow:
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Dict
+from datetime import datetime
 
 from db import get_db
 from db.models import User
 from db.models.inventory import PlayerInventory
+from db.models.player_state import PlayerState
+from db.models.foraging_session import ForagingSession as ForagingSessionDB
+from db.models.foraging_stats import ForagingStats
 from routers.auth import get_current_user
-from systems.foraging.foraging_manager import ForagingManager, ForagingSession
-from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG
+from systems.foraging.foraging_manager import ForagingManager
+from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG, ROUND1_WIN_CONFIG, ROUND2_WIN_CONFIG
 
 
 router = APIRouter(prefix="/foraging", tags=["foraging"])
 
-# In-memory sessions
-_sessions: Dict[int, ForagingSession] = {}
 _manager = ForagingManager()
 
 
@@ -47,6 +48,9 @@ def get_config():
         "hidden_color": GRID_CONFIG["bush_hidden_color"],
         "bonus_hidden_icon": GRID_CONFIG["bonus_hidden_icon"],
         "bonus_hidden_color": GRID_CONFIG["bonus_hidden_color"],
+        # Skill info
+        "round1_skill": ROUND1_WIN_CONFIG["skill"],
+        "round2_skill": ROUND2_WIN_CONFIG["skill"],
     }
 
 
@@ -58,27 +62,54 @@ def start_foraging(
 ):
     """
     Start foraging - returns EVERYTHING pre-calculated for BOTH rounds.
-    
-    Response includes:
-    - round1: Berries grid + result + seed_trail info
-    - round2: Seeds grid + result (only if seed_trail found!)
-    - has_bonus_round: Quick flag to check
-    
-    Frontend reveals locally, animates transition if bonus round.
     """
     player_id = user.id
     
-    # End any existing session
-    if player_id in _sessions:
-        del _sessions[player_id]
+    # Get player skills
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    leadership = state.leadership if state else 0
+    merchant = state.merchant if state else 0
+    kingdom_id = state.current_kingdom_id if state else None
     
-    # Create new session (generates both rounds if seed trail found)
-    session = _manager.create_session(player_id)
-    _sessions[player_id] = session
+    # End any existing active session
+    existing = db.query(ForagingSessionDB).filter(
+        ForagingSessionDB.user_id == player_id,
+        ForagingSessionDB.status == 'active'
+    ).first()
+    if existing:
+        existing.status = 'cancelled'
+        db.commit()
+    
+    # Create new session with skill-adjusted probabilities
+    session = _manager.create_session(
+        player_id=player_id,
+        leadership=leadership,
+        merchant=merchant,
+    )
+    
+    # Store in database
+    db_session = ForagingSessionDB(
+        session_id=session.session_id,
+        user_id=player_id,
+        kingdom_id=kingdom_id,
+        status='active',
+        session_data=session.to_dict(),
+        has_bonus_round=session.has_bonus_round,
+        round1_won=session.round1.is_winner,
+        round2_won=session.round2.is_winner if session.round2 else False,
+        has_rare_drop=session.round2.has_rare_drop if session.round2 else False,
+        expires_at=ForagingSessionDB.default_expiry(),
+    )
+    db.add(db_session)
+    db.commit()
     
     return {
         "success": True,
         "session": session.to_dict(),
+        "skills_used": {
+            "round1": {"skill": "leadership", "level": leadership},
+            "round2": {"skill": "merchant", "level": merchant},
+        },
     }
 
 
@@ -90,29 +121,69 @@ def collect_rewards(
 ):
     """
     Collect ALL rewards from the session.
-    
-    Can include:
-    - Berries from Round 1 (if won)
-    - Seeds from Round 2 bonus (if seed trail found AND won)
     """
     player_id = user.id
     
-    if player_id not in _sessions:
+    # Get active session from database
+    db_session = db.query(ForagingSessionDB).filter(
+        ForagingSessionDB.user_id == player_id,
+        ForagingSessionDB.status == 'active'
+    ).first()
+    
+    if not db_session:
         raise HTTPException(status_code=400, detail="No active session")
     
-    session = _sessions[player_id]
+    if db_session.is_expired:
+        db_session.status = 'expired'
+        db.commit()
+        raise HTTPException(status_code=400, detail="Session expired")
     
-    try:
-        result = _manager.collect_rewards(session)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    # Get session data
+    session_data = db_session.session_data
+    
+    # Build rewards list
+    rewards = []
+    
+    # Round 1 rewards
+    round1 = session_data.get("round1", {})
+    if round1.get("is_winner") and round1.get("reward_amount", 0) > 0:
+        reward_config = round1.get("reward_config", {})
+        rewards.append({
+            "round": 1,
+            "item": reward_config.get("item"),
+            "amount": round1.get("reward_amount"),
+            "display_name": reward_config.get("display_name"),
+        })
+    
+    # Round 2 rewards
+    round2 = session_data.get("round2")
+    if round2:
+        if round2.get("is_winner") and round2.get("reward_amount", 0) > 0:
+            reward_config = round2.get("reward_config", {})
+            rewards.append({
+                "round": 2,
+                "item": reward_config.get("item"),
+                "amount": round2.get("reward_amount"),
+                "display_name": reward_config.get("display_name"),
+            })
+        
+        # Check for rare drops in round 2 rewards array
+        for r in round2.get("rewards", []):
+            if r.get("item") == "rare_egg":
+                rewards.append({
+                    "round": 2,
+                    "item": "rare_egg",
+                    "amount": 1,
+                    "display_name": r.get("display_name", "Rare Egg"),
+                    "is_rare": True,
+                })
     
     # Add ALL rewards to inventory
-    for reward in result.get("rewards", []):
-        item_id = reward["item"]
-        amount = reward["amount"]
+    for reward in rewards:
+        item_id = reward.get("item")
+        amount = reward.get("amount", 0)
         
-        if amount > 0:
+        if item_id and amount > 0:
             inv = db.query(PlayerInventory).filter(
                 PlayerInventory.user_id == player_id,
                 PlayerInventory.item_id == item_id
@@ -128,12 +199,58 @@ def collect_rewards(
                 )
                 db.add(inv)
     
+    # Mark session as collected
+    db_session.status = 'collected'
+    db_session.collected_at = datetime.utcnow()
+    
+    # Update stats (proper columns, not JSONB)
+    if db_session.kingdom_id:
+        stats = db.query(ForagingStats).filter(
+            ForagingStats.user_id == player_id,
+            ForagingStats.kingdom_id == db_session.kingdom_id
+        ).first()
+        
+        if not stats:
+            stats = ForagingStats(
+                user_id=player_id,
+                kingdom_id=db_session.kingdom_id,
+                forages_completed=0,
+                berries_found=0,
+                round1_wins=0,
+                bonus_rounds_triggered=0,
+                seeds_found=0,
+                round2_wins=0,
+                rare_eggs_found=0,
+            )
+            db.add(stats)
+        
+        stats.forages_completed = (stats.forages_completed or 0) + 1
+        
+        if db_session.round1_won:
+            stats.round1_wins = (stats.round1_wins or 0) + 1
+            stats.berries_found = (stats.berries_found or 0) + session_data.get("round1", {}).get("reward_amount", 0)
+        
+        if db_session.has_bonus_round:
+            stats.bonus_rounds_triggered = (stats.bonus_rounds_triggered or 0) + 1
+        
+        if db_session.round2_won:
+            stats.round2_wins = (stats.round2_wins or 0) + 1
+            stats.seeds_found = (stats.seeds_found or 0) + session_data.get("round2", {}).get("reward_amount", 0)
+        
+        if db_session.has_rare_drop:
+            stats.rare_eggs_found = (stats.rare_eggs_found or 0) + 1
+    
     db.commit()
     
-    # Clear session
-    del _sessions[player_id]
-    
-    return result
+    # Return result
+    primary_reward = rewards[0] if rewards else None
+    return {
+        "success": True,
+        "is_winner": len(rewards) > 0,
+        "rewards": rewards,
+        "reward_item": primary_reward["item"] if primary_reward else None,
+        "reward_amount": primary_reward["amount"] if primary_reward else 0,
+    }
 
 
 @router.post("/end")
@@ -145,7 +262,13 @@ def end_foraging(
     """End session without collecting."""
     player_id = user.id
     
-    if player_id in _sessions:
-        del _sessions[player_id]
+    db_session = db.query(ForagingSessionDB).filter(
+        ForagingSessionDB.user_id == player_id,
+        ForagingSessionDB.status == 'active'
+    ).first()
+    
+    if db_session:
+        db_session.status = 'cancelled'
+        db.commit()
     
     return {"success": True}

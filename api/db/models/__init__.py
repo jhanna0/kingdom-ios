@@ -43,6 +43,10 @@ from .inventory import PlayerInventory
 from .item import Item
 from .hunt_session import HuntSession
 from .hunt_stats import HuntStats
+from .foraging_session import ForagingSession
+from .foraging_stats import ForagingStats
+from .research_session import ResearchSession
+from .research_stats import ResearchStats
 from .trade_offer import TradeOffer, TradeOfferStatus
 
 # PvP Arena Duels
@@ -115,6 +119,10 @@ __all__ = [
     "Item",
     "HuntSession",
     "HuntStats",
+    "ForagingSession",
+    "ForagingStats",
+    "ResearchSession",
+    "ResearchStats",
     # Player Trading
     "TradeOffer",
     "TradeOfferStatus",

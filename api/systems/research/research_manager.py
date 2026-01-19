@@ -2,7 +2,8 @@
 RESEARCH MANAGER
 ================
 Phase 1: 3 mini bars - each fills then selects reagent amount
-Phase 2: COOKING - Marker bounces within filled range, best landing = reward tier
+Phase 2: CRYSTALLIZATION - Rolls raise floor threshold, higher rolls = more gain
+         Final floor = your result tier.
 
 ALL CONFIG IS SENT TO FRONTEND - NO HARDCODING ON CLIENT.
 """
@@ -54,17 +55,19 @@ class MiniBarResult:
 
 
 @dataclass
-class CookingLanding:
-    """One landing attempt in the cooking phase."""
-    attempt_number: int
-    landing_position: int  # 0 to main_tube_fill
-    is_best: bool
+class CrystallizationRoll:
+    """One roll in the crystallization phase."""
+    roll: int           # 1-100
+    hit: bool           # Did it meet threshold?
+    floor_gain: int     # How much floor raised (0 if miss)
+    floor_after: int    # Floor level after this roll
     
     def to_dict(self):
         return {
-            "attempt_number": self.attempt_number,
-            "landing_position": self.landing_position,
-            "is_best": self.is_best,
+            "roll": self.roll,
+            "hit": self.hit,
+            "floor_gain": self.floor_gain,
+            "floor_after": self.floor_after,
         }
 
 
@@ -75,10 +78,11 @@ class ResearchResult:
     mini_bars: List[MiniBarResult]
     main_tube_fill: float
     
-    # Phase 2: Cooking
-    landings: List[CookingLanding]
-    best_landing: int
-    total_attempts: int
+    # Phase 2: Crystallization
+    crystal_rolls: List[CrystallizationRoll]
+    final_floor: int        # Best floor reached (floor only goes up)
+    ceiling: int            # Max possible (from Phase 1 fill)
+    total_rolls: int
     landed_tier_id: Optional[str]
     
     # Outcome
@@ -96,11 +100,11 @@ class ResearchResult:
                 "config": FILL_CONFIG,
             },
             "phase2_cooking": {
-                "landings": [l.to_dict() for l in self.landings],
-                "best_landing": self.best_landing,
-                "total_attempts": self.total_attempts,
+                "crystallization_rolls": [r.to_dict() for r in self.crystal_rolls],
+                "final_floor": self.final_floor,
+                "ceiling": self.ceiling,
+                "total_rolls": self.total_rolls,
                 "landed_tier_id": self.landed_tier_id,
-                "max_landing": int(self.main_tube_fill * 100),
                 "config": COOKING_CONFIG,
             },
             "outcome": {
@@ -119,18 +123,20 @@ class ResearchManager:
         # Phase 1: Fill
         mini_bars, main_fill = self._run_fill_phase(science)
         
-        # Phase 2: Cooking - always runs, range is 0 to main_fill
-        landings, best_landing, tier_id = self._run_cooking_phase(philosophy, main_fill)
+        # Phase 2: Crystallization - rolls raise floor, final floor = result
+        ceiling = int(main_fill * 100)
+        crystal_rolls, final_floor, tier_id = self._run_crystallization_phase(philosophy, ceiling)
         
-        # Outcome based on best landing
-        success, critical, blueprints, gp, msg = self._determine_outcome(best_landing, tier_id)
+        # Outcome based on final floor
+        success, critical, blueprints, gp, msg = self._determine_outcome(final_floor, tier_id)
         
         return ResearchResult(
             mini_bars=mini_bars,
             main_tube_fill=main_fill,
-            landings=landings,
-            best_landing=best_landing,
-            total_attempts=len(landings),
+            crystal_rolls=crystal_rolls,
+            final_floor=final_floor,
+            ceiling=ceiling,
+            total_rolls=len(crystal_rolls),
             landed_tier_id=tier_id,
             success=success,
             is_critical=critical,
@@ -186,35 +192,50 @@ class ResearchManager:
         main_fill = min(1.0, total_contribution)
         return mini_bars, main_fill
     
-    def _run_cooking_phase(self, philosophy: int, main_fill: float) -> tuple:
-        """Phase 2: Land marker within filled range."""
-        num_attempts = COOKING_CONFIG["base_attempts"] + (COOKING_CONFIG["attempts_per_stat"] * philosophy)
-        max_landing = int(main_fill * 100)
+    def _run_crystallization_phase(self, philosophy: int, ceiling: int) -> tuple:
+        """Phase 2: Crystallization rolls raise floor threshold."""
+        base_rolls = COOKING_CONFIG["base_rolls"]
+        rolls_per_stat = COOKING_CONFIG["rolls_per_stat"]
+        num_rolls = base_rolls + (rolls_per_stat * philosophy)
+        threshold = COOKING_CONFIG["hit_threshold"]
+        gain_ranges = COOKING_CONFIG["floor_gain_ranges"]
         
-        landings = []
-        best_so_far = 0
+        crystal_rolls = []
+        floor = 0
         
-        for i in range(num_attempts):
-            landing = random.randint(0, max_landing) if max_landing > 0 else 0
+        for i in range(num_rolls):
+            roll = random.randint(1, 100)
+            hit = roll >= threshold
             
-            is_best = landing > best_so_far
-            if is_best:
-                best_so_far = landing
+            # Calculate floor gain based on roll value
+            floor_gain = 0
+            if hit:
+                for gain_range in gain_ranges:
+                    if gain_range["min_roll"] <= roll <= gain_range["max_roll"]:
+                        floor_gain = random.randint(gain_range["gain_min"], gain_range["gain_max"])
+                        break
             
-            landings.append(CookingLanding(
-                attempt_number=i + 1,
-                landing_position=landing,
-                is_best=is_best,
+            # Floor can't exceed ceiling
+            floor = min(ceiling, floor + floor_gain)
+            
+            crystal_rolls.append(CrystallizationRoll(
+                roll=roll,
+                hit=hit,
+                floor_gain=floor_gain,
+                floor_after=floor,
             ))
         
-        # Find tier
+        # Final floor is the result (floor only goes up, so final = best)
+        final_floor = floor
+        
+        # Find tier based on final floor
         tier_id = None
         for tier in COOKING_CONFIG["reward_tiers"]:
-            if tier["min_percent"] <= best_so_far <= tier["max_percent"]:
+            if tier["min_percent"] <= final_floor <= tier["max_percent"]:
                 tier_id = tier["id"]
                 break
         
-        return landings, best_so_far, tier_id
+        return crystal_rolls, final_floor, tier_id
     
     def _determine_outcome(self, best_landing, tier_id):
         """Determine rewards from landing."""

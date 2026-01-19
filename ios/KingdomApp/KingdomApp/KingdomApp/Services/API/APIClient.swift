@@ -172,6 +172,16 @@ class APIClient: ObservableObject {
     
     // MARK: - Request Execution
     
+    /// Check if error is a stale connection error that should be silently retried
+    private func isStaleConnectionError(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            // -1005: The network connection was lost (often stale keep-alive)
+            // -1001: Timeout can also happen on stale connections
+            return urlError.code == .networkConnectionLost
+        }
+        return false
+    }
+    
     func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         // If there's already a critical error showing, wait for it to clear first
         if await MainActor.run(body: { isShowingBlockingError }) {
@@ -182,6 +192,9 @@ class APIClient: ObservableObject {
             }
         }
         
+        var silentRetryCount = 0
+        let maxSilentRetries = 2
+        
         // Retry loop - on critical errors, suspend and wait for user to tap retry
         while true {
             let data: Data
@@ -189,11 +202,21 @@ class APIClient: ObservableObject {
             
             do {
                 (data, response) = try await session.data(for: request)
+                silentRetryCount = 0 // Reset on success
             } catch {
+                // Stale connection errors (-1005) get silent retry first
+                if isStaleConnectionError(error) && silentRetryCount < maxSilentRetries {
+                    silentRetryCount += 1
+                    print("🔄 Silent retry \(silentRetryCount)/\(maxSilentRetries) for stale connection on \(request.url?.path ?? "unknown")")
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
+                    continue
+                }
+                
                 // Network-level error (no response received)
                 if isCriticalError(error) {
                     let message = userFriendlyMessage(for: error)
                     await waitForRetry(message: message)
+                    silentRetryCount = 0 // Reset after user retry
                     continue // Retry the request
                 }
                 throw APIError.networkError(error)
@@ -284,6 +307,9 @@ class APIClient: ObservableObject {
             }
         }
         
+        var silentRetryCount = 0
+        let maxSilentRetries = 2
+        
         // Retry loop - on critical errors, suspend and wait for user to tap retry
         while true {
             let data: Data
@@ -291,11 +317,21 @@ class APIClient: ObservableObject {
             
             do {
                 (data, response) = try await session.data(for: request)
+                silentRetryCount = 0 // Reset on success
             } catch {
+                // Stale connection errors (-1005) get silent retry first
+                if isStaleConnectionError(error) && silentRetryCount < maxSilentRetries {
+                    silentRetryCount += 1
+                    print("🔄 Silent retry \(silentRetryCount)/\(maxSilentRetries) for stale connection on \(request.url?.path ?? "unknown")")
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
+                    continue
+                }
+                
                 // Network-level error (no response received)
                 if isCriticalError(error) {
                     let message = userFriendlyMessage(for: error)
                     await waitForRetry(message: message)
+                    silentRetryCount = 0 // Reset after user retry
                     continue // Retry the request
                 }
                 throw APIError.networkError(error)

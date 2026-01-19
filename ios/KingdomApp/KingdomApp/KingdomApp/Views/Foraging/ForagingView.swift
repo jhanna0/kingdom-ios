@@ -10,16 +10,17 @@ struct ForagingView: View {
     
     let apiClient: APIClient
     
-    @State private var showResult: Bool = false
-    @State private var showSeedTrailOverlay: Bool = false
     @State private var isRevealing: Bool = false
+    @State private var isResetting: Bool = false
+    @State private var displayedIsBonusRound: Bool = false
+    @State private var displayedRewardConfig: ForagingRewardConfig? = nil
+    @State private var pulsingPositions: Set<Int> = []
     
     // Juice state
     @State private var lastRevealedCount: Int = 0
     @State private var lastFoundCount: Int = 0
-    @State private var boardIsResetting: Bool = true
     
-    // Transition animation state
+    // Transition animation state (only for seed trail -> bonus round)
     @State private var isTransitioning: Bool = false
     @State private var gridSlideOffset: CGFloat = 0
     
@@ -48,41 +49,13 @@ struct ForagingView: View {
                 
                 bottomBar
             }
-            
-            // Seed Trail Found Overlay
-            if showSeedTrailOverlay {
-                SeedTrailFoundOverlay(
-                    onFollowTrail: {
-                        showSeedTrailOverlay = false
-                        startBonusTransition()
-                    }
-                )
-            }
-            
-            // Result Overlay (win/lose for current round)
-            if showResult {
-                ForagingResultOverlay(
-                    hasWon: viewModel.hasWon,
-                    isBonusRound: viewModel.isBonusRound,
-                    rewards: viewModel.allRewards,
-                    onPrimary: {
-                        Task {
-                            await viewModel.collect()
-                            showResult = false
-                            await viewModel.startSession()
-                        }
-                    },
-                    onSecondary: {
-                        showResult = false
-                        Task { await viewModel.playAgain() }
-                    }
-                )
-            }
         }
         .navigationBarHidden(true)
         .task {
             viewModel.configure(with: apiClient)
             await viewModel.startSession()
+            displayedIsBonusRound = viewModel.isBonusRound
+            displayedRewardConfig = viewModel.rewardConfig
         }
         .onChange(of: viewModel.uiState) { _, newState in
             handleStateChange(newState)
@@ -107,29 +80,31 @@ struct ForagingView: View {
                 }
             }
         }
+        .onChange(of: viewModel.revealedBushes) { _, _ in
+            recomputePulsingPositions()
+        }
+        .onChange(of: isResetting) { _, _ in
+            recomputePulsingPositions()
+        }
     }
     
     // MARK: - State Change Handler
     
     private func handleStateChange(_ newState: ForagingViewModel.UIState) {
         switch newState {
-        case .loading:
-            withAnimation(.easeOut(duration: 0.18)) {
-                boardIsResetting = true
+        case .loading, .playing, .bonusRound:
+            // No drop animation - tiles just reset in place
+            if newState == .playing || newState == .bonusRound {
+                isResetting = false
+                displayedIsBonusRound = viewModel.isBonusRound
+                displayedRewardConfig = viewModel.rewardConfig
+                recomputePulsingPositions()
             }
-            
-        case .playing, .bonusRound:
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.75)) {
-                boardIsResetting = false
-            }
+            break
             
         case .seedTrailFound:
-            // Show the seed trail overlay after a moment
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    showSeedTrailOverlay = true
-                }
-            }
+            // Bottom bar will show the transition button
+            haptic(.success)
             
         case .transitioning:
             // Animation handled by startBonusTransition()
@@ -139,15 +114,39 @@ struct ForagingView: View {
             let isWin = newState == .won || newState == .bonusWon
             haptic(isWin ? .success : .warning)
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    showResult = true
-                }
-            }
-            
         case .error:
             break
         }
+    }
+
+    // MARK: - Reset Helpers
+    
+    @MainActor
+    private func flipResetThen(_ action: @escaping () async -> Void) async {
+        guard !isResetting else { return }
+        isResetting = true
+        pulsingPositions = []
+        
+        // Let BushTile animate flip-back before we mutate the session.
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        await action()
+    }
+    
+    @MainActor
+    private func recomputePulsingPositions() {
+        guard !isResetting else {
+            pulsingPositions = []
+            return
+        }
+        guard viewModel.isWarming else {
+            pulsingPositions = []
+            return
+        }
+        
+        let pulsing = viewModel.revealedBushes.keys.filter { pos in
+            viewModel.revealedCell(at: pos)?.is_seed == true
+        }
+        pulsingPositions = Set(pulsing)
     }
     
     // MARK: - Bonus Round Transition
@@ -183,14 +182,14 @@ struct ForagingView: View {
         VStack(spacing: 0) {
             HStack {
                 HStack(spacing: 10) {
-                    Image(systemName: viewModel.isBonusRound ? "sparkles" : "leaf.fill")
+                    Image(systemName: displayedIsBonusRound ? "sparkles" : "leaf.fill")
                         .font(FontStyles.iconMedium)
                         .frame(width: 24, height: 24)
-                        .foregroundColor(viewModel.isBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonSuccess)
+                        .foregroundColor(displayedIsBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonSuccess)
                     
-                    Text(viewModel.isBonusRound ? "SEED TRAIL" : "FORAGING")
+                    Text(displayedIsBonusRound ? "SEED TRAIL" : "FORAGING")
                         .font(FontStyles.headingMedium)
-                        .foregroundColor(viewModel.isBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.inkDark)
+                        .foregroundColor(displayedIsBonusRound ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.inkDark)
                 }
                 
                 Spacer()
@@ -210,10 +209,10 @@ struct ForagingView: View {
             .padding(.vertical, KingdomTheme.Spacing.medium)
             
             Rectangle()
-                .fill(viewModel.isBonusRound ? KingdomTheme.Colors.imperialGold : Color.black)
+                .fill(displayedIsBonusRound ? KingdomTheme.Colors.imperialGold : Color.black)
                 .frame(height: 3)
         }
-        .background(viewModel.isBonusRound ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
+        .background(displayedIsBonusRound ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Status
@@ -248,7 +247,7 @@ struct ForagingView: View {
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     HStack(spacing: 10) {
-                        if let config = viewModel.rewardConfig {
+                        if let config = displayedRewardConfig {
                             HStack(spacing: 6) {
                                 Image(systemName: config.icon)
                                     .font(FontStyles.iconTiny)
@@ -307,7 +306,7 @@ struct ForagingView: View {
                 )
                 
                 // Show seed trail indicator in Round 1
-                if !viewModel.isBonusRound && viewModel.foundSeedTrail {
+                if !displayedIsBonusRound && viewModel.foundSeedTrail {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                             .font(FontStyles.iconTiny)
@@ -343,33 +342,27 @@ struct ForagingView: View {
     
     private var bushGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
-        let entryToken = "\(viewModel.session?.session_id ?? "loading")_r\(viewModel.currentRound)"
         
         return LazyVGrid(columns: columns, spacing: 10) {
             ForEach(0..<16, id: \.self) { position in
                 let isRevealed = viewModel.isRevealed(position)
+                let effectiveRevealed = isRevealed && !isResetting
                 let revealedCell = viewModel.revealedCell(at: position)
-                let isTarget = revealedCell?.is_seed ?? false
+                let isTarget = effectiveRevealed && (revealedCell?.is_seed ?? false)
                 let isSeedTrail = revealedCell?.isSeedTrail ?? false
-                let shouldPulse = isTarget && viewModel.isWarming
-                let row = position / 4
-                let col = position % 4
-                let entryDelay = Double(row) * 0.06 + Double(col) * 0.02
+                let shouldPulse = pulsingPositions.contains(position)
                 
                 BushTile(
                     cell: revealedCell,
-                    isRevealed: isRevealed,
+                    isRevealed: effectiveRevealed,
                     isHighlighted: isTarget && !viewModel.hasWon,
                     isWinningMatch: isTarget && viewModel.hasWon,
                     isSeedTrail: isSeedTrail,
                     shouldPulse: shouldPulse,
                     hiddenIcon: viewModel.hiddenIcon,
-                    hiddenColor: viewModel.hiddenColor,
-                    boardIsResetting: boardIsResetting || isTransitioning,
-                    entryToken: entryToken,
-                    entryDelay: entryDelay
+                    hiddenColor: viewModel.hiddenColor
                 ) {
-                    guard viewModel.canReveal, !isRevealed, !isRevealing, !isTransitioning else { return }
+                    guard viewModel.canReveal, !isRevealed, !isRevealing, !isTransitioning, !isResetting else { return }
                     isRevealing = true
                     
                     Task { @MainActor in
@@ -381,7 +374,7 @@ struct ForagingView: View {
                         isRevealing = false
                     }
                 }
-                .id("\(viewModel.session?.session_id ?? "none")_r\(viewModel.currentRound)_\(position)")
+                .id(position)
             }
         }
         .padding(KingdomTheme.Spacing.small)
@@ -413,44 +406,178 @@ struct ForagingView: View {
     // MARK: - Bottom
     
     private var bottomBar: some View {
-        let message: String
-        let color: Color
-        
-        if viewModel.isBonusRound {
-            if viewModel.isWarming {
-                message = "You're getting close!"
-                color = KingdomTheme.Colors.imperialGold
-            } else {
-                message = "Dig for seeds..."
-                color = KingdomTheme.Colors.inkMedium
-            }
-        } else if viewModel.foundSeedTrail {
-            message = "Seed trail found!"
-            color = KingdomTheme.Colors.imperialGold
-        } else if viewModel.isWarming {
-            message = "Keep going."
-            color = KingdomTheme.Colors.buttonSuccess
-        } else {
-            message = "Tap a bush to reveal."
-            color = KingdomTheme.Colors.inkMedium
-        }
-        
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             Rectangle()
-                .fill(viewModel.isBonusRound ? KingdomTheme.Colors.imperialGold : Color.black)
+                .fill(displayedIsBonusRound ? KingdomTheme.Colors.imperialGold : Color.black)
                 .frame(height: 3)
             
-            Text(message)
-                .font(FontStyles.bodySmallBold)
-                .foregroundColor(color)
-                .frame(height: 50)
+            bottomBarContent
                 .frame(maxWidth: .infinity)
+                .frame(height: 56)
                 .padding(.horizontal, KingdomTheme.Spacing.large)
         }
-        .background((viewModel.isBonusRound ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight).ignoresSafeArea(edges: .bottom))
+        .background((displayedIsBonusRound ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight).ignoresSafeArea(edges: .bottom))
     }
     
-    // MARK: - Result Overlay
+    @ViewBuilder
+    private var bottomBarContent: some View {
+        switch viewModel.uiState {
+        case .loading, .transitioning:
+            HStack {
+                skillBadge
+                Spacer()
+                ProgressView()
+                    .tint(KingdomTheme.Colors.loadingTint)
+            }
+            
+        case .playing, .bonusRound:
+            HStack {
+                skillBadge
+                Spacer()
+                Text(playingMessage)
+                    .font(FontStyles.bodySmallBold)
+                    .foregroundColor(playingMessageColor)
+            }
+            
+        case .seedTrailFound:
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.imperialGold)
+                    Text("Seed Trail!")
+                        .font(FontStyles.bodySmallBold)
+                        .foregroundColor(KingdomTheme.Colors.imperialGold)
+                }
+                
+                Spacer()
+                
+                Button {
+                    startBonusTransition()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Follow")
+                        Image(systemName: "arrow.right")
+                    }
+                }
+                .buttonStyle(.brutalist(
+                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                    foregroundColor: .white
+                ))
+            }
+            
+        case .won, .bonusWon:
+            HStack(spacing: 12) {
+                if let reward = viewModel.allRewards.first {
+                    HStack(spacing: 6) {
+                        Image(systemName: reward.icon)
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.color(fromThemeName: reward.color))
+                        Text("+\(reward.amount) \(reward.display_name)")
+                            .font(FontStyles.bodySmallBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    Task {
+                        await flipResetThen {
+                            await viewModel.collect()
+                            await viewModel.startSession()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                        Text("Collect")
+                    }
+                }
+                .buttonStyle(.brutalist(
+                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                    foregroundColor: .white
+                ))
+            }
+            
+        case .lost, .bonusLost:
+            HStack(spacing: 12) {
+                Text("No match — try again!")
+                    .font(FontStyles.bodySmallBold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Spacer()
+                
+                Button {
+                    Task {
+                        await flipResetThen {
+                            await viewModel.playAgain()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Retry")
+                    }
+                }
+                .buttonStyle(.brutalist(
+                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                    foregroundColor: .white
+                ))
+            }
+            
+        case .error(let message):
+            Text(message)
+                .font(FontStyles.captionMedium)
+                .foregroundColor(KingdomTheme.Colors.buttonDanger)
+        }
+    }
+    
+    @ViewBuilder
+    private var skillBadge: some View {
+        if let skillInfo = viewModel.currentSkillInfo {
+            let config = SkillConfig.get(skillInfo.skill)
+            
+            HStack(spacing: 4) {
+                Image(systemName: config.icon)
+                    .font(FontStyles.iconTiny)
+                Text("\(config.displayName) T\(skillInfo.level)")
+                    .font(FontStyles.captionMedium)
+            }
+            .foregroundColor(config.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .brutalistBadge(
+                backgroundColor: KingdomTheme.Colors.parchmentDark,
+                cornerRadius: 6,
+                borderWidth: 1.5
+            )
+        }
+    }
+    
+    private var playingMessage: String {
+        if displayedIsBonusRound {
+            return viewModel.isWarming ? "Getting close!" : "Dig for seeds..."
+        } else if viewModel.foundSeedTrail {
+            return "Seed trail found!"
+        } else if viewModel.isWarming {
+            return "Keep going..."
+        } else {
+            return "Tap to reveal"
+        }
+    }
+    
+    private var playingMessageColor: Color {
+        if displayedIsBonusRound && viewModel.isWarming {
+            return KingdomTheme.Colors.imperialGold
+        } else if viewModel.foundSeedTrail {
+            return KingdomTheme.Colors.imperialGold
+        } else if viewModel.isWarming {
+            return KingdomTheme.Colors.buttonSuccess
+        } else {
+            return KingdomTheme.Colors.inkMedium
+        }
+    }
     
     // MARK: - Haptics
     
@@ -476,24 +603,15 @@ struct BushTile: View {
     let shouldPulse: Bool
     let hiddenIcon: String
     let hiddenColor: String
-    let boardIsResetting: Bool
-    let entryToken: String
-    let entryDelay: Double
     let onTap: () -> Void
     
-    @State private var pulse = false
     @State private var isFlipped = false
-    @State private var seedTrailGlow = false
     
     // Minimal feedback (no particle clouds)
     @State private var tapRingScale: CGFloat = 0.75
     @State private var tapRingOpacity: Double = 0
     @State private var flashOpacity: Double = 0
     @State private var flashColor: Color = .clear
-    
-    // Board in/out animation
-    @State private var boardOffsetY: CGFloat = -60
-    @State private var boardOpacity: Double = 0
     
     private var isCellSeedTrail: Bool {
         cell?.isSeedTrail ?? false
@@ -504,75 +622,96 @@ struct BushTile: View {
             triggerTapRing()
             onTap()
         } label: {
-            ZStack {
-                // Shadow
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 3, y: 3)
-                
-                // Background
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(backgroundColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(borderColor, lineWidth: (isHighlighted || isWinningMatch || isSeedTrail) ? 3 : 2.5)
-                    )
-                    .overlay(winningGlow)
-                    .overlay(seedTrailGlowOverlay)
-                    .overlay(revealFlashOverlay)
-                
-                // Front / Back (flip)
-                ZStack {
-                    hiddenFace
-                        .opacity(isFlipped ? 0 : 1)
-                    revealedFace
-                        .opacity(isFlipped ? 1 : 0)
-                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                }
-                .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-                .animation(.spring(response: 0.38, dampingFraction: 0.78), value: isFlipped)
-                
-                tapRingOverlay
-            }
-            .frame(height: 65)
-            .scaleEffect(pulse ? 1.08 : 1.0)
-            .scaleEffect(seedTrailGlow ? 1.03 : 1.0)
+            pulsingTileBody
         }
         .buttonStyle(ForagingTilePressButtonStyle())
         .onAppear {
             isFlipped = isRevealed
-            if shouldPulse { startPulse() }
-            animateBoardState(isResetting: boardIsResetting, token: entryToken)
-        }
-        .onChange(of: shouldPulse) { _, doPulse in
-            if doPulse { startPulse() } else { pulse = false }
         }
         .onChange(of: isRevealed) { _, nowRevealed in
-            guard nowRevealed else { return }
-            isFlipped = true
-            triggerRevealFlash()
-            
-            // Start seed trail glow if this is the trail
-            if isCellSeedTrail {
-                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                    seedTrailGlow = true
-                }
+            if nowRevealed {
+                isFlipped = true
+                triggerRevealFlash()
+            } else {
+                // Flip back to hidden
+                isFlipped = false
             }
         }
-        .onChange(of: boardIsResetting) { _, isResetting in
-            animateBoardState(isResetting: isResetting, token: entryToken)
-        }
-        .onChange(of: entryToken) { _, newToken in
-            animateBoardState(isResetting: boardIsResetting, token: newToken)
-        }
-        .offset(y: boardOffsetY)
-        .opacity(boardOpacity)
     }
     
-    private func startPulse() {
-        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-            pulse = true
+    @ViewBuilder
+    private var pulsingTileBody: some View {
+        if shouldPulse || (isCellSeedTrail && isRevealed) {
+            TimelineView(.animation) { context in
+                tileBody
+                    .scaleEffect(combinedScale(at: context.date))
+            }
+        } else {
+            tileBody
         }
+    }
+    
+    private var tileBody: some View {
+        ZStack {
+            // Shadow
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black)
+                .offset(x: 3, y: 3)
+            
+            // Background
+            RoundedRectangle(cornerRadius: 10)
+                .fill(backgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(borderColor, lineWidth: (isHighlighted || isWinningMatch || isSeedTrail) ? 3 : 2.5)
+                )
+                .overlay(winningGlow)
+                .overlay(seedTrailGlowOverlay)
+                .overlay(revealFlashOverlay)
+            
+            // Front / Back (flip)
+            ZStack {
+                hiddenFace
+                    .opacity(isFlipped ? 0 : 1)
+                revealedFace
+                    .opacity(isFlipped ? 1 : 0)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            }
+            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            .animation(.spring(response: 0.38, dampingFraction: 0.78), value: isFlipped)
+            
+            tapRingOverlay
+        }
+        .frame(height: 65)
+    }
+    
+    private func combinedScale(at date: Date) -> CGFloat {
+        var scale: CGFloat = 1.0
+        if shouldPulse {
+            scale *= pulseScale(at: date)
+        }
+        if isCellSeedTrail && isRevealed {
+            scale *= seedTrailScale(at: date)
+        }
+        return scale
+    }
+    
+    private func pulseScale(at date: Date) -> CGFloat {
+        // Smooth sine pulse: ~0.8s period, subtle amplitude.
+        let t = date.timeIntervalSinceReferenceDate
+        let period = 0.8
+        let phase = (t / period) * (2.0 * Double.pi)
+        let normalized = (sin(phase) + 1.0) / 2.0 // 0...1
+        return 1.0 + CGFloat(0.08 * normalized)
+    }
+    
+    private func seedTrailScale(at date: Date) -> CGFloat {
+        // Separate glow pulse for seed trail tiles (~1.0s period, subtle).
+        let t = date.timeIntervalSinceReferenceDate
+        let period = 1.0
+        let phase = (t / period) * (2.0 * Double.pi)
+        let normalized = (sin(phase) + 1.0) / 2.0 // 0...1
+        return 1.0 + CGFloat(0.03 * normalized)
     }
     
     private func triggerTapRing() {
@@ -602,25 +741,6 @@ struct BushTile: View {
         
         withAnimation(.easeOut(duration: 0.2)) {
             flashOpacity = 0
-        }
-    }
-    
-    private func animateBoardState(isResetting: Bool, token: String) {
-        if isResetting {
-            withAnimation(.easeIn(duration: 0.18)) {
-                boardOffsetY = 40
-                boardOpacity = 0
-            }
-        } else {
-            boardOffsetY = -70
-            boardOpacity = 0
-            let delay = max(0, entryDelay)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(.spring(response: 0.65, dampingFraction: 0.75)) {
-                    boardOffsetY = 0
-                    boardOpacity = 1
-                }
-            }
         }
     }
     
@@ -750,196 +870,6 @@ private struct ForagingMiniStatPill: View {
     }
 }
 
-// MARK: - Seed Trail Found Overlay
-
-private struct SeedTrailFoundOverlay: View {
-    let onFollowTrail: () -> Void
-    
-    @State private var iconScale: CGFloat = 0.7
-    @State private var contentOpacity: Double = 0
-    @State private var trailPulse: Bool = false
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                ZStack {
-                    // Sparkles around the icon
-                    ForEach(0..<8, id: \.self) { i in
-                        Image(systemName: "sparkle")
-                            .font(FontStyles.iconSmall)
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                            .offset(
-                                x: CGFloat.random(in: -60...60),
-                                y: CGFloat.random(in: -50...50)
-                            )
-                            .opacity(0.7)
-                    }
-                    
-                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                        .font(.system(size: 72, weight: .bold))
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                        .scaleEffect(iconScale)
-                        .scaleEffect(trailPulse ? 1.05 : 1.0)
-                }
-                
-                Text("Seed Trail Found!")
-                    .font(FontStyles.resultSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("You discovered a trail of seeds leading deeper into the forest...")
-                    .font(FontStyles.bodySmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .multilineTextAlignment(.center)
-                
-                Button(action: onFollowTrail) {
-                    HStack {
-                        Image(systemName: "arrow.right.circle.fill")
-                        Text("Follow the Trail")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.brutalist(
-                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
-                    foregroundColor: .white,
-                    fullWidth: true
-                ))
-            }
-            .padding(24)
-            .frame(maxWidth: 300)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 18)
-            .opacity(contentOpacity)
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
-                iconScale = 1.0
-            }
-            withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
-                contentOpacity = 1.0
-            }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                trailPulse = true
-            }
-        }
-    }
-}
-
-// MARK: - Result Overlay
-
-private struct ForagingResultOverlay: View {
-    let hasWon: Bool
-    let isBonusRound: Bool
-    let rewards: [ForagingReward]  // Just render this array!
-    let onPrimary: () -> Void
-    let onSecondary: () -> Void
-    
-    @State private var iconScale: CGFloat = 0.86
-    @State private var contentOpacity: Double = 0
-    
-    private var hasAnyRewards: Bool { !rewards.isEmpty }
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                ZStack {
-                    if hasAnyRewards {
-                        ForEach(0..<6, id: \.self) { _ in
-                            Image(systemName: "sparkle")
-                                .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess"))
-                                .offset(
-                                    x: CGFloat.random(in: -70...70),
-                                    y: CGFloat.random(in: -55...55)
-                                )
-                                .opacity(0.8)
-                        }
-                    }
-                    
-                    Image(systemName: hasAnyRewards ? (rewards.first?.icon ?? "checkmark.circle.fill") : "xmark.circle.fill")
-                        .font(.system(size: 64, weight: .black))
-                        .foregroundColor(hasAnyRewards ? KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess") : KingdomTheme.Colors.inkMedium)
-                        .shadow(color: .clear, radius: 0)
-                        .scaleEffect(iconScale)
-                }
-                
-                if hasAnyRewards {
-                    Text("Found!")
-                        .font(FontStyles.resultSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    // Just render whatever backend sent
-                    VStack(spacing: 8) {
-                        ForEach(rewards.indices, id: \.self) { index in
-                            let reward = rewards[index]
-                            HStack(spacing: 6) {
-                                Image(systemName: reward.icon)
-                                    .font(FontStyles.iconSmall)
-                                    .foregroundColor(KingdomTheme.Colors.color(fromThemeName: reward.color))
-                                Text("+\(reward.amount) \(reward.display_name)")
-                                    .font(FontStyles.bodyMediumBold)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                            }
-                        }
-                    }
-                    
-                    Button(action: onPrimary) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Collect & Keep Foraging")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(
-                        backgroundColor: KingdomTheme.Colors.color(fromThemeName: rewards.first?.color ?? "buttonSuccess"),
-                        foregroundColor: .white,
-                        fullWidth: true
-                    ))
-                } else {
-                    Text("No Match")
-                        .font(FontStyles.resultSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Better luck next time!")
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    Button(action: onSecondary) {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("Try Again")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.brutalist(
-                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
-                        foregroundColor: .white,
-                        fullWidth: true
-                    ))
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: 300)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 18)
-            .opacity(contentOpacity)
-            .transition(.scale(scale: 0.9).combined(with: .opacity))
-        }
-        .onAppear(perform: animateEntrance)
-    }
-    
-    private func animateEntrance() {
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.65)) {
-            iconScale = 1.0
-        }
-        withAnimation(.easeOut(duration: 0.3).delay(0.05)) {
-            contentOpacity = 1.0
-        }
-    }
-}
 
 #Preview {
     Text("Foraging Preview")

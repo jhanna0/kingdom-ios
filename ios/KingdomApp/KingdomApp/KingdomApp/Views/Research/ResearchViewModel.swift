@@ -27,9 +27,9 @@ class ResearchViewModel: ObservableObject {
     @Published var showReagentSelect: Bool = false
     @Published var mainTubeFill: CGFloat = 0
     
-    // Phase 2
-    @Published var currentLandingIndex: Int = -1
-    @Published var bestLandingSoFar: Int = 0
+    // Phase 2 (Crystallization)
+    @Published var currentCrystalRollIndex: Int = -1
+    @Published var crystalFloor: CGFloat = 0  // Current floor level (0-1)
     
     private var api: ResearchAPI?
     
@@ -51,17 +51,36 @@ class ResearchViewModel: ObservableObject {
         cookingConfig?.rewardTiers ?? []
     }
     
-    var maxLanding: Int {
-        experiment?.phase2Cooking.maxLanding ?? 0
+    var ceiling: Int {
+        experiment?.phase2Cooking.ceiling ?? 0
     }
     
-    func tierForLanding(_ landing: Int) -> RewardTier? {
-        rewardTiers.first { landing >= $0.minPercent && landing <= $0.maxPercent }
+    var finalFloor: Int {
+        experiment?.phase2Cooking.finalFloor ?? 0
+    }
+    
+    func tierForFloor(_ floor: Int) -> RewardTier? {
+        rewardTiers.first { floor >= $0.minPercent && floor <= $0.maxPercent }
     }
     
     var landedTier: RewardTier? {
         guard let tierId = experiment?.phase2Cooking.landedTierId else { return nil }
         return rewardTiers.first { $0.id == tierId }
+    }
+    
+    var crystalRolls: [CrystallizationRoll] {
+        experiment?.phase2Cooking.crystallizationRolls ?? []
+    }
+    
+    var currentCrystalRoll: CrystallizationRoll? {
+        guard currentCrystalRollIndex >= 0,
+              currentCrystalRollIndex < crystalRolls.count else { return nil }
+        return crystalRolls[currentCrystalRollIndex]
+    }
+    
+    var remainingCrystalRolls: Int {
+        guard let cooking = experiment?.phase2Cooking else { return 0 }
+        return cooking.totalRolls - (currentCrystalRollIndex + 1)
     }
     
     var currentMiniBar: MiniBarResult? {
@@ -77,17 +96,6 @@ class ResearchViewModel: ObservableObject {
         return bar.rolls[currentRollIndex]
     }
     
-    var currentLanding: CookingLanding? {
-        guard let landings = experiment?.phase2Cooking.landings,
-              currentLandingIndex >= 0,
-              currentLandingIndex < landings.count else { return nil }
-        return landings[currentLandingIndex]
-    }
-    
-    var remainingAttempts: Int {
-        guard let cooking = experiment?.phase2Cooking else { return 0 }
-        return cooking.totalAttempts - (currentLandingIndex + 1)
-    }
     
     // MARK: - Init
     
@@ -122,8 +130,8 @@ class ResearchViewModel: ObservableObject {
         miniBarFills = [0, 0, 0]
         showReagentSelect = false
         mainTubeFill = 0
-        currentLandingIndex = -1
-        bestLandingSoFar = 0
+        currentCrystalRollIndex = -1
+        crystalFloor = 0
         
         do {
             let response = try await api.runExperiment()
@@ -166,38 +174,45 @@ class ResearchViewModel: ObservableObject {
                 currentBarIndex = nextBarIdx
                 currentRollIndex = -1
                 showReagentSelect = false
-            } else {
-                currentLandingIndex = -1
-                bestLandingSoFar = 0
-                uiState = .cooking
             }
+            // Last bar: don't change anything else, currentRollIndex stays >= 0
         }
     }
     
-    // MARK: - Phase 2
+    // Called by View when user taps CRYSTALLIZE
+    func transitionToCrystallization() {
+        currentCrystalRollIndex = -1
+        crystalFloor = 0
+        uiState = .cooking
+    }
+    
+    var isPhase1Complete: Bool {
+        guard let expected = experiment?.phase1Fill.mainTubeFill else { return false }
+        return mainTubeFill >= CGFloat(expected) - 0.001
+    }
+    
+    // MARK: - Phase 2 (Crystallization)
     
     var isExperimentComplete: Bool {
-        guard let landings = experiment?.phase2Cooking.landings else { return false }
-        return currentLandingIndex >= landings.count - 1
+        // Done if all rolls completed OR floor reached ceiling
+        currentCrystalRollIndex >= crystalRolls.count - 1 || crystalFloor >= mainTubeFill - 0.001
     }
     
-    func doNextLanding() {
-        guard uiState == .cooking,
-              let landings = experiment?.phase2Cooking.landings else { return }
+    func doNextCrystalRoll() {
+        guard uiState == .cooking else { return }
         
-        let nextIdx = currentLandingIndex + 1
+        let nextIdx = currentCrystalRollIndex + 1
         
-        if nextIdx < landings.count {
-            currentLandingIndex = nextIdx
-            let landing = landings[nextIdx]
+        if nextIdx < crystalRolls.count {
+            currentCrystalRollIndex = nextIdx
+            let roll = crystalRolls[nextIdx]
             
-            if landing.isBest {
-                withAnimation(.spring()) {
-                    bestLandingSoFar = landing.landingPosition
-                }
+            // Update crystal floor based on this roll's result
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                crystalFloor = CGFloat(roll.floorAfter) / 100.0
             }
         }
-        // Don't switch to result screen - show results inline in cooking phase
+        // Results shown inline in cooking phase
     }
     
     // MARK: - Reset
@@ -209,8 +224,8 @@ class ResearchViewModel: ObservableObject {
         miniBarFills = [0, 0, 0]
         showReagentSelect = false
         mainTubeFill = 0
-        currentLandingIndex = -1
-        bestLandingSoFar = 0
+        currentCrystalRollIndex = -1
+        crystalFloor = 0
         
         if let api = api {
             stats = try? await api.getStats()

@@ -39,16 +39,34 @@ struct FillConfig: Codable {
 struct CookingConfig: Codable {
     let stat: String
     let statDisplayName: String
-    let baseAttempts: Int
-    let attemptsPerStat: Int
+    let baseRolls: Int
+    let rollsPerStat: Int
+    let hitThreshold: Int
+    let floorGainRanges: [FloorGainRange]
     let rewardTiers: [RewardTier]
     
     enum CodingKeys: String, CodingKey {
         case stat
         case statDisplayName = "stat_display_name"
-        case baseAttempts = "base_attempts"
-        case attemptsPerStat = "attempts_per_stat"
+        case baseRolls = "base_rolls"
+        case rollsPerStat = "rolls_per_stat"
+        case hitThreshold = "hit_threshold"
+        case floorGainRanges = "floor_gain_ranges"
         case rewardTiers = "reward_tiers"
+    }
+}
+
+struct FloorGainRange: Codable {
+    let minRoll: Int
+    let maxRoll: Int
+    let gainMin: Int
+    let gainMax: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case minRoll = "min_roll"
+        case maxRoll = "max_roll"
+        case gainMin = "gain_min"
+        case gainMax = "gain_max"
     }
 }
 
@@ -144,37 +162,38 @@ struct MiniRoll: Codable, Identifiable {
     }
 }
 
-// MARK: - Phase 2
+// MARK: - Phase 2 (Crystallization)
 
 struct CookingPhaseResult: Codable {
-    let landings: [CookingLanding]
-    let bestLanding: Int
-    let totalAttempts: Int
+    let crystallizationRolls: [CrystallizationRoll]
+    let finalFloor: Int
+    let ceiling: Int
+    let totalRolls: Int
     let landedTierId: String?
-    let maxLanding: Int
     let config: CookingConfig
     
     enum CodingKeys: String, CodingKey {
-        case landings
-        case bestLanding = "best_landing"
-        case totalAttempts = "total_attempts"
+        case crystallizationRolls = "crystallization_rolls"
+        case finalFloor = "final_floor"
+        case ceiling
+        case totalRolls = "total_rolls"
         case landedTierId = "landed_tier_id"
-        case maxLanding = "max_landing"
         case config
     }
 }
 
-struct CookingLanding: Codable, Identifiable {
-    let attemptNumber: Int
-    let landingPosition: Int
-    let isBest: Bool
+struct CrystallizationRoll: Codable, Identifiable {
+    let roll: Int
+    let hit: Bool
+    let floorGain: Int
+    let floorAfter: Int
     
-    var id: Int { attemptNumber }
+    var id: UUID { UUID() }
     
     enum CodingKeys: String, CodingKey {
-        case attemptNumber = "attempt_number"
-        case landingPosition = "landing_position"
-        case isBest = "is_best"
+        case roll, hit
+        case floorGain = "floor_gain"
+        case floorAfter = "floor_after"
     }
 }
 

@@ -25,6 +25,7 @@ class ForagingViewModel: ObservableObject {
     
     @Published var uiState: UIState = .loading
     @Published var session: ForagingSession?
+    @Published var skillsUsed: ForagingSkillsUsed?
     
     // Current round tracking
     @Published var currentRound: Int = 1
@@ -89,6 +90,11 @@ class ForagingViewModel: ObservableObject {
     var hasBonusRound: Bool { session?.has_bonus_round ?? false }
     var isBonusRound: Bool { currentRound == 2 }
     
+    var currentSkillInfo: ForagingSkillInfo? {
+        guard let skills = skillsUsed else { return nil }
+        return currentRound == 1 ? skills.round1 : skills.round2
+    }
+    
     // Combined rewards for display - just render whatever backend sends
     var allRewards: [ForagingReward] {
         var rewards: [ForagingReward] = []
@@ -119,11 +125,12 @@ class ForagingViewModel: ObservableObject {
         revealedBushes = [:]
         nextArrayIndex = 0
         foundSeedTrail = false
-        session = nil
+        skillsUsed = nil
         
         do {
             let response = try await api.startForaging()
             session = response.session
+            skillsUsed = response.skills_used
             uiState = .playing
         } catch {
             uiState = .error(error.localizedDescription)
@@ -191,13 +198,6 @@ class ForagingViewModel: ObservableObject {
         
         do {
             _ = try await api.collectRewards()
-            // Reset for next game
-            session = nil
-            currentRound = 1
-            revealedBushes = [:]
-            nextArrayIndex = 0
-            foundSeedTrail = false
-            uiState = .loading
         } catch {
             uiState = .error(error.localizedDescription)
         }

@@ -37,6 +37,8 @@ from .config import (
     ROUND2_WIN_CONFIG,
     get_bush_type_weights,
     get_round_config,
+    get_round1_probabilities,
+    get_round2_probabilities,
 )
 
 
@@ -181,17 +183,26 @@ class ForagingManager:
     def __init__(self, seed: Optional[int] = None):
         self.rng = random.Random(seed)
     
-    def create_session(self, player_id: int) -> ForagingSession:
-        """Create a fully pre-calculated session with potential bonus round."""
+    def create_session(self, player_id: int, leadership: int = 0, merchant: int = 0) -> ForagingSession:
+        """
+        Create a fully pre-calculated session with potential bonus round.
+        
+        Args:
+            player_id: The player's ID
+            leadership: Player's leadership skill (affects Round 1 odds)
+            merchant: Player's merchant skill (affects Round 2 odds)
+        """
         session_id = f"forage_{player_id}_{int(time.time() * 1000)}"
         
         # Generate Round 1 (berries + potential seed trail)
-        round1 = self._generate_round1()
+        # Leadership skill affects win probabilities
+        round1 = self._generate_round1(leadership=leadership)
         
         # Generate Round 2 only if seed trail found
+        # Merchant skill affects win probabilities
         round2 = None
         if round1.has_seed_trail:
-            round2 = self._generate_round2()
+            round2 = self._generate_round2(merchant=merchant)
         
         return ForagingSession(
             session_id=session_id,
@@ -200,46 +211,58 @@ class ForagingManager:
             round2=round2,
         )
     
-    def _generate_round1(self) -> RoundData:
+    def _generate_round1(self, leadership: int = 0) -> RoundData:
         """
-        Generate Round 1 grid - 5 cells, that's it.
+        Generate Round 1 grid - 5 cells.
         
-        ONE ROLL 1-100:
-        - 1-5: Seed trail WIN (5%) → 3 trails + 2 filler
-        - 6-15: Berries WIN (10%) → 3 berries + 2 filler  
-        - 16-35: Seed trail TEASE (20%) → 1-2 trails + filler (can't win)
-        - 36-100: Nothing → 5 filler
+        Leadership skill affects probabilities:
+        - T0: 15% berry win, 5% seed trail win
+        - T5: 50% berry win, 20% seed trail win
+        
+        ONE ROLL 1-100 with skill-adjusted thresholds.
         """
+        # Get filler weights (exclude berries - they're placed deliberately)
         weights = get_bush_type_weights(round_num=1)
-        bush_types = list(weights.keys())
-        type_weights = list(weights.values())
+        filler_types = [k for k in weights.keys() if k != ROUND1_TARGET_TYPE]
+        filler_weights = [weights[k] for k in filler_types]
+        
+        # Get skill-adjusted probabilities
+        probs = get_round1_probabilities(leadership)
         
         # ONE ROLL - mutually exclusive outcomes
         roll = self.rng.randint(1, 100)
         
-        seed_trail_threshold = int(ROUND1_WIN_CONFIG["seed_trail_probability"] * 100)  # 5
-        berries_threshold = seed_trail_threshold + int(ROUND1_WIN_CONFIG["cluster_probability"] * 100)  # 15
-        tease_threshold = berries_threshold + int(ROUND1_WIN_CONFIG.get("seed_trail_tease_probability", 0) * 100)  # 35
-        
         cells = []
         
-        if roll <= seed_trail_threshold:
+        if roll <= probs["seed_trail_win_threshold"]:
             # SEED TRAIL WIN - place 3 trails
-            for _ in range(ROUND1_WIN_CONFIG["seed_trail_cluster_size"]):
+            for _ in range(ROUND1_WIN_CONFIG["guaranteed_cluster_size"]):
                 cells.append(self._make_cell(0, "seed_trail", round_num=1))
-        elif roll <= berries_threshold:
+        elif roll <= probs["berry_win_threshold"]:
             # BERRIES WIN - place 3 berries
             for _ in range(ROUND1_WIN_CONFIG["guaranteed_cluster_size"]):
                 cells.append(self._make_cell(0, ROUND1_TARGET_TYPE, round_num=1))
-        elif roll <= tease_threshold:
+        elif roll <= probs["seed_trail_tease_threshold"]:
             # SEED TRAIL TEASE - place 1-2 trails (not enough to win)
-            tease_count = self.rng.randint(1, 2)
+            tease_count = self.rng.randint(
+                ROUND1_WIN_CONFIG["tease_count_min"],
+                ROUND1_WIN_CONFIG["tease_count_max"]
+            )
             for _ in range(tease_count):
                 cells.append(self._make_cell(0, "seed_trail", round_num=1))
+        elif roll <= probs["berry_tease_threshold"]:
+            # BERRY TEASE - place 1-2 berries (not enough to win)
+            tease_count = self.rng.randint(
+                ROUND1_WIN_CONFIG["tease_count_min"],
+                ROUND1_WIN_CONFIG["tease_count_max"]
+            )
+            for _ in range(tease_count):
+                cells.append(self._make_cell(0, ROUND1_TARGET_TYPE, round_num=1))
+        # else: NOTHING - just filler
         
-        # Fill rest with random filler
+        # Fill rest with random JUNK (no berries - outcome already determined!)
         while len(cells) < MAX_REVEALS:
-            bush_type = self.rng.choices(bush_types, weights=type_weights, k=1)[0]
+            bush_type = self.rng.choices(filler_types, weights=filler_weights, k=1)[0]
             cells.append(self._make_cell(0, bush_type, round_num=1))
         
         # Shuffle so wins aren't always first
@@ -254,7 +277,7 @@ class ForagingManager:
         trail_count = sum(1 for c in cells if c.get("is_seed_trail", False))
         
         is_winner = berry_count >= ROUND1_WIN_CONFIG["guaranteed_cluster_size"]
-        has_seed_trail = trail_count >= ROUND1_WIN_CONFIG["seed_trail_cluster_size"]
+        has_seed_trail = trail_count >= ROUND1_WIN_CONFIG["guaranteed_cluster_size"]
         reward_amount = 1 if is_winner else 0
         
         target_positions = [i for i, c in enumerate(cells) if c["is_seed"]]
@@ -270,56 +293,54 @@ class ForagingManager:
             seed_trail_position=seed_trail_position,
         )
     
-    def _generate_round2(self) -> RoundData:
+    def _generate_round2(self, merchant: int = 0) -> RoundData:
         """
         Generate Round 2 (bonus) grid - 5 cells.
         
-        ONE ROLL 1-100:
-        - 1: Rare Egg WIN (1%)
-        - 2-11: Seeds WIN (10%)
-        - 12-31: Seed TEASE (20%) - 1-2 seeds, can't win
-        - 32-41: Egg TEASE (10%) - 1-2 eggs, no drop
-        - 42-100: Nothing
-        """
-        weights = get_bush_type_weights(round_num=2)
-        bush_types = list(weights.keys())
-        type_weights = list(weights.values())
+        Merchant skill affects probabilities:
+        - T0: 15% seed win, 1% rare egg
+        - T5: 50% seed win, 6% rare egg
         
-        # ONE ROLL - no crossover
+        ONE ROLL 1-100 with skill-adjusted thresholds.
+        """
+        # Get filler weights (exclude seeds - they're placed deliberately)
+        weights = get_bush_type_weights(round_num=2)
+        filler_types = [k for k in weights.keys() if k != ROUND2_TARGET_TYPE]
+        filler_weights = [weights[k] for k in filler_types]
+        
+        # Get skill-adjusted probabilities
+        probs = get_round2_probabilities(merchant)
+        
+        # ONE ROLL - mutually exclusive outcomes
         roll = self.rng.randint(1, 100)
-        rare_threshold = int(ROUND2_RARE_DROP_CONFIG["probability"] * 100)  # 1
-        seeds_threshold = rare_threshold + int(ROUND2_WIN_CONFIG["cluster_probability"] * 100)  # 11
-        seed_tease_threshold = seeds_threshold + int(ROUND2_WIN_CONFIG["seed_tease_probability"] * 100)  # 31
-        egg_tease_threshold = seed_tease_threshold + int(ROUND2_WIN_CONFIG["egg_tease_probability"] * 100)  # 41
         
         cells = []
         has_rare_drop = False
         
-        if roll <= rare_threshold:
+        if roll <= probs["rare_egg_threshold"]:
             # RARE EGG WIN - place 3 eggs (mark as targets so frontend counts them!)
             has_rare_drop = True
             for _ in range(3):
                 cell = self._make_cell(0, "rare_egg", round_num=2)
                 cell["is_seed"] = True  # Eggs ARE the winning match for this roll!
                 cells.append(cell)
-        elif roll <= seeds_threshold:
+        elif roll <= probs["seed_win_threshold"]:
             # SEEDS WIN - place 3 seeds
             for _ in range(ROUND2_WIN_CONFIG["guaranteed_cluster_size"]):
                 cells.append(self._make_cell(0, ROUND2_TARGET_TYPE, round_num=2))
-        elif roll <= seed_tease_threshold:
+        elif roll <= probs["seed_tease_threshold"]:
             # SEED TEASE - 1-2 seeds, can't win
-            tease_count = self.rng.randint(1, 2)
+            tease_count = self.rng.randint(
+                ROUND2_WIN_CONFIG["tease_count_min"],
+                ROUND2_WIN_CONFIG["tease_count_max"]
+            )
             for _ in range(tease_count):
                 cells.append(self._make_cell(0, ROUND2_TARGET_TYPE, round_num=2))
-        elif roll <= egg_tease_threshold:
-            # EGG TEASE - 1-2 eggs, no drop
-            tease_count = self.rng.randint(1, 2)
-            for _ in range(tease_count):
-                cells.append(self._make_cell(0, "rare_egg", round_num=2))
+        # else: NOTHING - just filler
         
-        # Fill rest with random filler
+        # Fill rest with random JUNK (no seeds - outcome already determined!)
         while len(cells) < MAX_REVEALS:
-            bush_type = self.rng.choices(bush_types, weights=type_weights, k=1)[0]
+            bush_type = self.rng.choices(filler_types, weights=filler_weights, k=1)[0]
             cells.append(self._make_cell(0, bush_type, round_num=2))
         
         # Shuffle

@@ -2,7 +2,8 @@
 RESEARCH SYSTEM CONFIGURATION
 =============================
 Phase 1: Fill tube via mini bars (science stat affects rolls)
-Phase 2: Land marker within filled range (philosophy stat affects attempts)
+Phase 2: Crystallization - rolls raise floor threshold (philosophy stat affects rolls)
+         Higher rolls = more floor gain. Final floor = your result tier.
 
 ALL CONFIG SENT TO FRONTEND - NO HARDCODING ON CLIENT.
 """
@@ -28,8 +29,16 @@ FILL_CONFIG = {
 COOKING_CONFIG = {
     "stat": "philosophy", 
     "stat_display_name": "Philosophy",
-    "base_attempts": 1,
-    "attempts_per_stat": 1,
+    "base_rolls": 5,           # Base crystallization attempts
+    "rolls_per_stat": 1,       # +1 roll per philosophy point
+    "hit_threshold": 51,       # Lower threshold = more hits
+    # Variable floor gain based on roll value - higher rolls = more crystal growth
+    "floor_gain_ranges": [
+        {"min_roll": 61, "max_roll": 70, "gain_min": 5, "gain_max": 8},
+        {"min_roll": 71, "max_roll": 80, "gain_min": 8, "gain_max": 12},
+        {"min_roll": 81, "max_roll": 90, "gain_min": 12, "gain_max": 16},
+        {"min_roll": 91, "max_roll": 100, "gain_min": 16, "gain_max": 20},
+    ],
     "reward_tiers": [
         {
             "id": "critical",
