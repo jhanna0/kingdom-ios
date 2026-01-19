@@ -8,17 +8,19 @@ Flow:
 2. POST /fishing/cast - Cast line, get pre-calculated rolls
 3. POST /fishing/reel - Reel in fish, get pre-calculated rolls
 4. POST /fishing/end - End session, collect rewards
+
+Sessions are stored in PostgreSQL, not in Lambda memory.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, Dict
-import time
+from datetime import datetime
 
 from db import get_db
 from db.models import PlayerState, User
 from db.models.inventory import PlayerInventory
+from db.models.fishing_session import FishingSession as FishingSessionDB
 from routers.actions.utils import log_activity
 from routers.auth import get_current_user
 from systems.fishing import FishingManager, FishingSession
@@ -40,11 +42,7 @@ from systems.fishing.config import (
 
 router = APIRouter(prefix="/fishing", tags=["fishing"])
 
-# In-memory session storage (simple for now)
-# In production, could use Redis or DB if sessions need to persist across Lambda invocations
-_active_sessions: Dict[int, FishingSession] = {}
-
-# Manager instance
+# Manager instance (stateless - just does calculations)
 _manager = FishingManager()
 
 
@@ -85,7 +83,31 @@ def get_player_stats(db: Session, player_id: int) -> dict:
     return {
         "building": player.building_skill or 0,
         "defense": player.defense_power or 0,
+        "kingdom_id": player.current_kingdom_id,
     }
+
+
+def session_from_db(db_session: FishingSessionDB) -> FishingSession:
+    """Reconstruct FishingSession from database record."""
+    data = db_session.session_data
+    session = FishingSession(
+        session_id=db_session.fishing_id,
+        player_id=db_session.created_by,
+        total_meat=data.get("total_meat", 0),
+        fish_caught=data.get("fish_caught", 0),
+        pet_fish_dropped=data.get("pet_fish_dropped", False),
+        current_fish=data.get("current_fish"),
+        casts_attempted=data.get("stats", {}).get("casts_attempted", 0),
+        successful_catches=data.get("stats", {}).get("successful_catches", 0),
+        fish_escaped=data.get("stats", {}).get("fish_escaped", 0),
+    )
+    return session
+
+
+def update_db_session(db_session: FishingSessionDB, session: FishingSession) -> None:
+    """Update database record from FishingSession."""
+    db_session.session_data = session.to_dict()
+    db_session.updated_at = datetime.utcnow()
 
 
 def add_rewards_to_inventory(db: Session, player_id: int, session: FishingSession) -> None:
@@ -113,8 +135,6 @@ def add_rewards_to_inventory(db: Session, player_id: int, session: FishingSessio
             db.add(meat_entry)
     
     # Pet fish already added in reel endpoint when caught - don't double add!
-    
-    db.commit()
 
 
 def broadcast_rare_loot(db: Session, player_id: int) -> None:
@@ -186,29 +206,53 @@ def start_fishing(
     Returns initial session state and player's relevant stats.
     """
     player_id = user.id
+    stats = get_player_stats(db, player_id)
     
-    # Check if player already has an active session
-    if player_id in _active_sessions:
-        # Return existing session
-        session = _active_sessions[player_id]
-        stats = get_player_stats(db, player_id)
-        return {
-            "success": True,
-            "message": "Resumed existing fishing session",
-            "session": session.to_dict(),
-            "player_stats": stats,
-            "config": {
-                "cast_rolls": 1 + stats["building"],
-                "reel_rolls": 1 + stats["defense"],
-                "hit_chance": int(ROLL_HIT_CHANCE * 100),
-            },
-        }
+    # Check if player already has an active session in DB
+    existing = db.query(FishingSessionDB).filter(
+        FishingSessionDB.created_by == player_id,
+        FishingSessionDB.status == 'active'
+    ).first()
+    
+    if existing:
+        # Check if expired
+        if existing.is_expired:
+            existing.status = 'expired'
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+        else:
+            # Return existing session
+            session = session_from_db(existing)
+            return {
+                "success": True,
+                "message": "Resumed existing fishing session",
+                "session": session.to_dict(),
+                "player_stats": stats,
+                "config": {
+                    "cast_rolls": 1 + stats["building"],
+                    "reel_rolls": 1 + stats["defense"],
+                    "hit_chance": int(ROLL_HIT_CHANCE * 100),
+                },
+            }
     
     # Create new session
     session = _manager.create_session(player_id)
-    _active_sessions[player_id] = session
     
-    stats = get_player_stats(db, player_id)
+    # Store in database
+    now = datetime.utcnow()
+    db_session = FishingSessionDB(
+        fishing_id=session.session_id,
+        created_by=player_id,
+        kingdom_id=stats.get("kingdom_id"),
+        status='active',
+        session_data=session.to_dict(),
+        created_at=now,
+        started_at=now,
+        updated_at=now,
+        expires_at=FishingSessionDB.default_expiry(),
+    )
+    db.add(db_session)
+    db.commit()
     
     return {
         "success": True,
@@ -237,10 +281,23 @@ def cast_line(
     """
     player_id = user.id
     
-    if player_id not in _active_sessions:
+    # Get active session from database
+    db_session = db.query(FishingSessionDB).filter(
+        FishingSessionDB.created_by == player_id,
+        FishingSessionDB.status == 'active'
+    ).first()
+    
+    if not db_session:
         raise HTTPException(status_code=400, detail="No active fishing session. Call /fishing/start first.")
     
-    session = _active_sessions[player_id]
+    if db_session.is_expired:
+        db_session.status = 'expired'
+        db_session.updated_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=400, detail="Session expired. Start a new one.")
+    
+    # Reconstruct session from DB
+    session = session_from_db(db_session)
     stats = get_player_stats(db, player_id)
     
     # Can't cast if fish is on the line (need to reel first)
@@ -252,6 +309,10 @@ def cast_line(
     
     # Execute cast with all rolls pre-calculated
     result = _manager.execute_cast(session, stats["building"])
+    
+    # Update database
+    update_db_session(db_session, session)
+    db.commit()
     
     return {
         "success": True,
@@ -276,10 +337,23 @@ def reel_in(
     """
     player_id = user.id
     
-    if player_id not in _active_sessions:
+    # Get active session from database
+    db_session = db.query(FishingSessionDB).filter(
+        FishingSessionDB.created_by == player_id,
+        FishingSessionDB.status == 'active'
+    ).first()
+    
+    if not db_session:
         raise HTTPException(status_code=400, detail="No active fishing session. Call /fishing/start first.")
     
-    session = _active_sessions[player_id]
+    if db_session.is_expired:
+        db_session.status = 'expired'
+        db_session.updated_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=400, detail="Session expired. Start a new one.")
+    
+    # Reconstruct session from DB
+    session = session_from_db(db_session)
     stats = get_player_stats(db, player_id)
     
     # Must have fish on the line
@@ -307,10 +381,12 @@ def reel_in(
             )
             db.add(pet_entry)
         
-        db.commit()
-        
         # Broadcast to friends
         broadcast_rare_loot(db, player_id)
+    
+    # Update database
+    update_db_session(db_session, session)
+    db.commit()
     
     return {
         "success": True,
@@ -328,14 +404,21 @@ def end_fishing(
     """
     End the fishing session and collect all rewards.
     
-    Adds accumulated meat and pet fish to player's inventory.
+    Adds accumulated meat to player's inventory.
     """
     player_id = user.id
     
-    if player_id not in _active_sessions:
+    # Get active session from database
+    db_session = db.query(FishingSessionDB).filter(
+        FishingSessionDB.created_by == player_id,
+        FishingSessionDB.status == 'active'
+    ).first()
+    
+    if not db_session:
         raise HTTPException(status_code=400, detail="No active fishing session.")
     
-    session = _active_sessions[player_id]
+    # Reconstruct session from DB
+    session = session_from_db(db_session)
     
     # Get final rewards summary
     rewards = _manager.end_session(session)
@@ -343,8 +426,12 @@ def end_fishing(
     # Add to inventory
     add_rewards_to_inventory(db, player_id, session)
     
-    # Clean up session
-    del _active_sessions[player_id]
+    # Mark session as collected
+    now = datetime.utcnow()
+    db_session.status = 'collected'
+    db_session.completed_at = now
+    db_session.updated_at = now
+    db.commit()
     
     return {
         "success": True,
@@ -365,13 +452,29 @@ def get_fishing_status(
     """
     player_id = user.id
     
-    if player_id not in _active_sessions:
+    # Get active session from database
+    db_session = db.query(FishingSessionDB).filter(
+        FishingSessionDB.created_by == player_id,
+        FishingSessionDB.status == 'active'
+    ).first()
+    
+    if not db_session:
         return {
             "has_session": False,
             "session": None,
         }
     
-    session = _active_sessions[player_id]
+    # Check if expired
+    if db_session.is_expired:
+        db_session.status = 'expired'
+        db_session.updated_at = datetime.utcnow()
+        db.commit()
+        return {
+            "has_session": False,
+            "session": None,
+        }
+    
+    session = session_from_db(db_session)
     stats = get_player_stats(db, player_id)
     
     return {

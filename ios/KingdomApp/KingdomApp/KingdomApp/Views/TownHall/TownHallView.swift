@@ -64,19 +64,6 @@ struct TownHallView: View {
                         )
                     }
                     
-                    // Research Lab
-                    NavigationLink {
-                        ResearchView(apiClient: APIClient.shared)
-                    } label: {
-                        TownHallActivityCard(
-                            icon: "flask.fill",
-                            title: "Research Lab",
-                            description: "Experiment to discover blueprints",
-                            color: KingdomTheme.Colors.regalPurple,
-                            badge: nil
-                        )
-                    }
-                    
                     // Foraging
                     NavigationLink {
                         ForagingView(apiClient: APIClient.shared)

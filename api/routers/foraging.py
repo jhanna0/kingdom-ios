@@ -21,7 +21,6 @@ from db.models import User
 from db.models.inventory import PlayerInventory
 from db.models.player_state import PlayerState
 from db.models.foraging_session import ForagingSession as ForagingSessionDB
-from db.models.foraging_stats import ForagingStats
 from routers.auth import get_current_user
 from systems.foraging.foraging_manager import ForagingManager
 from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG, ROUND1_WIN_CONFIG, ROUND2_WIN_CONFIG
@@ -202,44 +201,6 @@ def collect_rewards(
     # Mark session as collected
     db_session.status = 'collected'
     db_session.collected_at = datetime.utcnow()
-    
-    # Update stats (proper columns, not JSONB)
-    if db_session.kingdom_id:
-        stats = db.query(ForagingStats).filter(
-            ForagingStats.user_id == player_id,
-            ForagingStats.kingdom_id == db_session.kingdom_id
-        ).first()
-        
-        if not stats:
-            stats = ForagingStats(
-                user_id=player_id,
-                kingdom_id=db_session.kingdom_id,
-                forages_completed=0,
-                berries_found=0,
-                round1_wins=0,
-                bonus_rounds_triggered=0,
-                seeds_found=0,
-                round2_wins=0,
-                rare_eggs_found=0,
-            )
-            db.add(stats)
-        
-        stats.forages_completed = (stats.forages_completed or 0) + 1
-        
-        if db_session.round1_won:
-            stats.round1_wins = (stats.round1_wins or 0) + 1
-            stats.berries_found = (stats.berries_found or 0) + session_data.get("round1", {}).get("reward_amount", 0)
-        
-        if db_session.has_bonus_round:
-            stats.bonus_rounds_triggered = (stats.bonus_rounds_triggered or 0) + 1
-        
-        if db_session.round2_won:
-            stats.round2_wins = (stats.round2_wins or 0) + 1
-            stats.seeds_found = (stats.seeds_found or 0) + session_data.get("round2", {}).get("reward_amount", 0)
-        
-        if db_session.has_rare_drop:
-            stats.rare_eggs_found = (stats.rare_eggs_found or 0) + 1
-    
     db.commit()
     
     # Return result

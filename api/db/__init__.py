@@ -44,9 +44,7 @@ from .models import (
     TradeOfferStatus,
     BuildingCatchup,
     ForagingSession,
-    ForagingStats,
-    ResearchSession,
-    ResearchStats,
+    FishingSession,
 )
 
 __all__ = [
@@ -96,8 +94,6 @@ __all__ = [
     "TradeOfferStatus",
     "BuildingCatchup",
     "ForagingSession",
-    "ForagingStats",
-    "ResearchSession",
-    "ResearchStats",
+    "FishingSession",
 ]
 
