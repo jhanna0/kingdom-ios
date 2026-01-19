@@ -1,9 +1,11 @@
 """
 RESEARCH MANAGER
 ================
-Phase 1: 3 mini bars - each fills then selects reagent amount
-Phase 2: CRYSTALLIZATION - Rolls raise floor threshold, higher rolls = more gain
-         Final floor = your result tier.
+Phase 1: PREPARATION - 3 reagent tubes, each fills then selects amount
+Phase 2: SYNTHESIS - Infusions raise purity level, higher = better quality
+         Final purity determines result tier.
+         
+FINAL INFUSION: Last dramatic moment with boosted gains before reveal.
 
 ALL CONFIG IS SENT TO FRONTEND - NO HARDCODING ON CLIENT.
 """
@@ -13,106 +15,116 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .config import (
-    FILL_CONFIG,
-    COOKING_CONFIG,
+    PREPARATION_CONFIG,
+    SYNTHESIS_CONFIG,
 )
 
 
 @dataclass
-class MiniRoll:
-    """One roll on a mini bar."""
-    roll: int           # 1-100
-    hit: bool
-    fill_added: float   # How much this roll added
-    total_fill: float   # Total fill after this roll
+class Infusion:
+    """One infusion attempt on a reagent tube."""
+    value: int              # 1-100 (NOT called "roll")
+    stable: bool            # Was reaction stable?
+    fill_added: float       # How much this added
+    total_fill: float       # Total fill after this
 
 
-@dataclass
-class MiniBarResult:
-    """Result for one mini bar."""
+@dataclass 
+class ReagentResult:
+    """Result for one reagent tube."""
     name: str
-    rolls: List[MiniRoll]
-    final_fill: float       # Fill level after rolls (0-1)
-    reagent_select: int     # Selected reagent amount (1 to final_fill%)
-    contribution: float     # How much this contributes to main tube (0-1)
+    infusions: List[Infusion]
+    final_fill: float           # Fill level after infusions (0-1)
+    amount_selected: int        # Selected amount (1 to final_fill%)
+    contribution: float         # How much this contributes to potential (0-1)
     
     def to_dict(self):
         return {
             "name": self.name,
-            "rolls": [
+            "infusions": [
                 {
-                    "roll": r.roll,
-                    "hit": r.hit,
-                    "fill_added": round(r.fill_added, 3),
-                    "total_fill": round(r.total_fill, 3),
+                    "value": inf.value,
+                    "stable": inf.stable,
+                    "fill_added": round(inf.fill_added, 3),
+                    "total_fill": round(inf.total_fill, 3),
                 }
-                for r in self.rolls
+                for inf in self.infusions
             ],
             "final_fill": round(self.final_fill, 3),
-            "reagent_select": self.reagent_select,
+            "amount_selected": self.amount_selected,
             "contribution": round(self.contribution, 3),
         }
 
 
 @dataclass
-class CrystallizationRoll:
-    """One roll in the crystallization phase."""
-    roll: int           # 1-100
-    hit: bool           # Did it meet threshold?
-    floor_gain: int     # How much floor raised (0 if miss)
-    floor_after: int    # Floor level after this roll
+class SynthesisInfusion:
+    """One infusion in the synthesis phase."""
+    value: int              # 1-100
+    stable: bool            # Was reaction stable?
+    quality: Optional[str]  # "weak", "fair", "good", "strong", "perfect" or None
+    purity_gained: int      # How much purity raised
+    purity_after: int       # Purity level after this infusion
+    is_final: bool          # Is this the final dramatic infusion?
     
     def to_dict(self):
         return {
-            "roll": self.roll,
-            "hit": self.hit,
-            "floor_gain": self.floor_gain,
-            "floor_after": self.floor_after,
+            "value": self.value,
+            "stable": self.stable,
+            "quality": self.quality,
+            "purity_gained": self.purity_gained,
+            "purity_after": self.purity_after,
+            "is_final": self.is_final,
         }
 
 
 @dataclass
 class ResearchResult:
     """Complete research result."""
-    # Phase 1: Fill
-    mini_bars: List[MiniBarResult]
-    main_tube_fill: float
+    # Phase 1: Preparation
+    reagents: List[ReagentResult]
+    potential: int              # Max possible purity (from Phase 1)
     
-    # Phase 2: Crystallization
-    crystal_rolls: List[CrystallizationRoll]
-    final_floor: int        # Best floor reached (floor only goes up)
-    ceiling: int            # Max possible (from Phase 1 fill)
-    total_rolls: int
-    landed_tier_id: Optional[str]
+    # Phase 2: Synthesis
+    synthesis_infusions: List[SynthesisInfusion]
+    final_purity: int           # Achieved purity level
+    total_infusions: int
+    result_tier_id: Optional[str]
+    
+    # Final Infusion (dramatic ending)
+    final_infusion: Optional[SynthesisInfusion]
     
     # Outcome
     success: bool
-    is_critical: bool
+    is_eureka: bool
     blueprints: int
     gp: int
+    title: str
     message: str
     
     def to_dict(self):
         return {
-            "phase1_fill": {
-                "mini_bars": [mb.to_dict() for mb in self.mini_bars],
-                "main_tube_fill": round(self.main_tube_fill, 3),
-                "config": FILL_CONFIG,
+            "phase1_preparation": {
+                "reagents": [r.to_dict() for r in self.reagents],
+                "potential": self.potential,
+                "config": PREPARATION_CONFIG,
             },
-            "phase2_cooking": {
-                "crystallization_rolls": [r.to_dict() for r in self.crystal_rolls],
-                "final_floor": self.final_floor,
-                "ceiling": self.ceiling,
-                "total_rolls": self.total_rolls,
-                "landed_tier_id": self.landed_tier_id,
-                "config": COOKING_CONFIG,
+            "phase2_synthesis": {
+                "infusions": [inf.to_dict() for inf in self.synthesis_infusions],
+                "final_infusion": self.final_infusion.to_dict() if self.final_infusion else None,
+                "final_purity": self.final_purity,
+                "potential": self.potential,
+                "total_infusions": self.total_infusions,
+                "result_tier_id": self.result_tier_id,
+                "config": SYNTHESIS_CONFIG,
             },
             "outcome": {
                 "success": self.success,
-                "is_critical": self.is_critical,
+                "is_eureka": self.is_eureka,
                 "blueprints": self.blueprints,
                 "gp": self.gp,
+                "title": self.title,
                 "message": self.message,
+                "tier_id": self.result_tier_id,
             },
         }
 
@@ -120,138 +132,198 @@ class ResearchResult:
 class ResearchManager:
     
     def run_experiment(self, science: int, philosophy: int, building: int) -> ResearchResult:
-        # Phase 1: Fill
-        mini_bars, main_fill = self._run_fill_phase(science)
+        # Phase 1: Preparation - measure reagents
+        reagents, potential = self._run_preparation_phase(science)
         
-        # Phase 2: Crystallization - rolls raise floor, final floor = result
-        ceiling = int(main_fill * 100)
-        crystal_rolls, final_floor, tier_id = self._run_crystallization_phase(philosophy, ceiling)
+        # Phase 2: Synthesis - purify through infusions
+        infusions, purity_before_final = self._run_synthesis_phase(philosophy, potential)
         
-        # Outcome based on final floor
-        success, critical, blueprints, gp, msg = self._determine_outcome(final_floor, tier_id)
+        # Final Infusion - dramatic ending with boosted stakes
+        final_inf, final_purity = self._run_final_infusion(purity_before_final, potential)
+        
+        # Determine result tier based on final purity
+        tier_id = self._find_tier(final_purity)
+        
+        # Outcome
+        success, is_eureka, blueprints, gp, title, msg = self._determine_outcome(tier_id)
         
         return ResearchResult(
-            mini_bars=mini_bars,
-            main_tube_fill=main_fill,
-            crystal_rolls=crystal_rolls,
-            final_floor=final_floor,
-            ceiling=ceiling,
-            total_rolls=len(crystal_rolls),
-            landed_tier_id=tier_id,
+            reagents=reagents,
+            potential=potential,
+            synthesis_infusions=infusions,
+            final_purity=final_purity,
+            total_infusions=len(infusions) + (1 if final_inf else 0),
+            result_tier_id=tier_id,
+            final_infusion=final_inf,
             success=success,
-            is_critical=critical,
+            is_eureka=is_eureka,
             blueprints=blueprints,
             gp=gp,
+            title=title,
             message=msg,
         )
     
-    def _run_fill_phase(self, science: int) -> tuple:
-        """Phase 1: Fill the tube via mini bars."""
-        base = FILL_CONFIG["base_rolls"]
-        per_stat = FILL_CONFIG["rolls_per_stat"]
-        rolls_per_bar = base + (per_stat * science)
-        threshold = FILL_CONFIG["hit_threshold"]
-        hit_amount = FILL_CONFIG["hit_fill_amount"]
-        miss_amount = FILL_CONFIG["miss_fill_amount"]
-        bar_names = FILL_CONFIG["mini_bar_names"]
+    def _run_preparation_phase(self, science: int) -> tuple:
+        """Phase 1: Prepare reagents by filling tubes."""
+        cfg = PREPARATION_CONFIG
+        infusions_per_tube = cfg["base_infusions"] + (cfg["infusions_per_stat"] * science)
+        threshold = cfg["stable_threshold"]
+        stable_amount = cfg["stable_fill_amount"]
+        volatile_amount = cfg["volatile_fill_amount"]
+        reagent_names = cfg["reagent_names"]
         
-        mini_bars = []
+        reagents = []
         total_contribution = 0.0
         
-        for name in bar_names:
-            rolls = []
-            bar_fill = 0.0
+        for name in reagent_names:
+            infusions = []
+            tube_fill = 0.0
             
-            for i in range(rolls_per_bar):
-                roll = random.randint(1, 100)
-                hit = roll >= threshold
-                fill_added = hit_amount if hit else miss_amount
-                bar_fill = min(1.0, bar_fill + fill_added)
+            for _ in range(infusions_per_tube):
+                value = random.randint(1, 100)
+                stable = value >= threshold
+                fill_added = stable_amount if stable else volatile_amount
+                tube_fill = min(1.0, tube_fill + fill_added)
                 
-                rolls.append(MiniRoll(
-                    roll=roll,
-                    hit=hit,
+                infusions.append(Infusion(
+                    value=value,
+                    stable=stable,
                     fill_added=fill_added,
-                    total_fill=bar_fill,
+                    total_fill=tube_fill,
                 ))
             
-            # Select reagent: random within filled range
-            bar_fill_pct = max(1, int(bar_fill * 100))
-            reagent_select = random.randint(1, bar_fill_pct)
-            contribution = reagent_select / 100.0
+            # Select amount from filled range
+            fill_pct = max(1, int(tube_fill * 100))
+            amount_selected = random.randint(1, fill_pct)
+            contribution = amount_selected / 100.0
             total_contribution += contribution
             
-            mini_bars.append(MiniBarResult(
+            reagents.append(ReagentResult(
                 name=name,
-                rolls=rolls,
-                final_fill=bar_fill,
-                reagent_select=reagent_select,
+                infusions=infusions,
+                final_fill=tube_fill,
+                amount_selected=amount_selected,
                 contribution=contribution,
             ))
         
-        main_fill = min(1.0, total_contribution)
-        return mini_bars, main_fill
+        # Potential is capped at 100
+        potential = min(100, int(total_contribution * 100))
+        return reagents, potential
     
-    def _run_crystallization_phase(self, philosophy: int, ceiling: int) -> tuple:
-        """Phase 2: Crystallization rolls raise floor threshold."""
-        base_rolls = COOKING_CONFIG["base_rolls"]
-        rolls_per_stat = COOKING_CONFIG["rolls_per_stat"]
-        num_rolls = base_rolls + (rolls_per_stat * philosophy)
-        threshold = COOKING_CONFIG["hit_threshold"]
-        gain_ranges = COOKING_CONFIG["floor_gain_ranges"]
+    def _run_synthesis_phase(self, philosophy: int, potential: int) -> tuple:
+        """Phase 2: Synthesis infusions raise purity."""
+        cfg = SYNTHESIS_CONFIG
+        num_infusions = cfg["base_infusions"] + (cfg["infusions_per_stat"] * philosophy)
+        threshold = cfg["stable_threshold"]
+        purity_gains = cfg["purity_gains"]
+        volatile_gain = cfg["volatile_purity_gain"]
         
-        crystal_rolls = []
-        floor = 0
+        infusions = []
+        purity = 0
         
-        for i in range(num_rolls):
-            roll = random.randint(1, 100)
-            hit = roll >= threshold
+        for _ in range(num_infusions):
+            value = random.randint(1, 100)
+            stable = value >= threshold
             
-            # Calculate floor gain based on roll value
-            floor_gain = 0
-            if hit:
-                for gain_range in gain_ranges:
-                    if gain_range["min_roll"] <= roll <= gain_range["max_roll"]:
-                        floor_gain = random.randint(gain_range["gain_min"], gain_range["gain_max"])
+            # Calculate purity gain
+            purity_gained = 0
+            quality = None
+            
+            if stable:
+                # Find matching gain range - NO GAPS!
+                for gain_range in purity_gains:
+                    if gain_range["min_value"] <= value <= gain_range["max_value"]:
+                        purity_gained = random.randint(gain_range["gain_min"], gain_range["gain_max"])
+                        quality = gain_range["quality"]
                         break
+            else:
+                # Volatile still gives small progress - never feel stuck!
+                purity_gained = volatile_gain
             
-            # Floor can't exceed ceiling
-            floor = min(ceiling, floor + floor_gain)
+            # Purity can't exceed potential
+            purity = min(potential, purity + purity_gained)
             
-            crystal_rolls.append(CrystallizationRoll(
-                roll=roll,
-                hit=hit,
-                floor_gain=floor_gain,
-                floor_after=floor,
+            infusions.append(SynthesisInfusion(
+                value=value,
+                stable=stable,
+                quality=quality,
+                purity_gained=purity_gained,
+                purity_after=purity,
+                is_final=False,
             ))
         
-        # Final floor is the result (floor only goes up, so final = best)
-        final_floor = floor
-        
-        # Find tier based on final floor
-        tier_id = None
-        for tier in COOKING_CONFIG["reward_tiers"]:
-            if tier["min_percent"] <= final_floor <= tier["max_percent"]:
-                tier_id = tier["id"]
-                break
-        
-        return crystal_rolls, final_floor, tier_id
+        return infusions, purity
     
-    def _determine_outcome(self, best_landing, tier_id):
-        """Determine rewards from landing."""
+    def _run_final_infusion(self, purity_before: int, potential: int) -> tuple:
+        """Final dramatic infusion with boosted stakes."""
+        cfg = SYNTHESIS_CONFIG
+        final_cfg = cfg["final_infusion"]
+        
+        if not final_cfg["enabled"]:
+            return None, purity_before
+        
+        threshold = cfg["stable_threshold"]
+        purity_gains = cfg["purity_gains"]
+        volatile_gain = cfg["volatile_purity_gain"]
+        multiplier = final_cfg["gain_multiplier"]
+        
+        value = random.randint(1, 100)
+        stable = value >= threshold
+        
+        # Calculate base gain
+        base_gain = 0
+        quality = None
+        
+        if stable:
+            for gain_range in purity_gains:
+                if gain_range["min_value"] <= value <= gain_range["max_value"]:
+                    base_gain = random.randint(gain_range["gain_min"], gain_range["gain_max"])
+                    quality = gain_range["quality"]
+                    break
+        else:
+            base_gain = volatile_gain
+        
+        # Apply multiplier for final infusion
+        purity_gained = int(base_gain * multiplier)
+        
+        # Final purity, capped at potential
+        final_purity = min(potential, purity_before + purity_gained)
+        
+        final_inf = SynthesisInfusion(
+            value=value,
+            stable=stable,
+            quality=quality,
+            purity_gained=purity_gained,
+            purity_after=final_purity,
+            is_final=True,
+        )
+        
+        return final_inf, final_purity
+    
+    def _find_tier(self, purity: int) -> Optional[str]:
+        """Find result tier based on purity."""
+        for tier in SYNTHESIS_CONFIG["result_tiers"]:
+            if tier["min_purity"] <= purity <= tier["max_purity"]:
+                return tier["id"]
+        return None
+    
+    def _determine_outcome(self, tier_id: str) -> tuple:
+        """Determine rewards from tier."""
         tier = None
-        for t in COOKING_CONFIG["reward_tiers"]:
+        for t in SYNTHESIS_CONFIG["result_tiers"]:
             if t["id"] == tier_id:
                 tier = t
                 break
         
         if not tier:
-            tier = COOKING_CONFIG["reward_tiers"][-1]
+            # Fallback to unstable
+            tier = SYNTHESIS_CONFIG["result_tiers"][-1]
         
-        is_critical = tier["id"] == "critical"
+        is_eureka = tier["id"] == "eureka"
         blueprints = tier["blueprints"]
         gp = random.randint(tier["gp_min"], tier["gp_max"])
+        title = tier["title"]
         message = tier["description"]
         success = blueprints > 0
         
-        return success, is_critical, blueprints, gp, message
+        return success, is_eureka, blueprints, gp, title, message

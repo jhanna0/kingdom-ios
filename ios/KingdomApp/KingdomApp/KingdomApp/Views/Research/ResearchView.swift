@@ -6,19 +6,19 @@ struct ResearchView: View {
     
     let apiClient: APIClient
     
-    // Roll animation state
-    @State private var displayRollValue: Int = 0
-    @State private var isAnimatingRoll: Bool = false
+    // Infusion animation state
+    @State private var displayValue: Int = 0
+    @State private var isAnimating: Bool = false
     
     // Reagent selection bar marker animation
     @State private var barMarkerValue: Int = 0
     @State private var showBarMarker: Bool = false
     
-    // Cooking phase marker animation - only for FINAL roll
-    @State private var cookingMarkerPosition: CGFloat = 0
-    @State private var showFinalRollMarker: Bool = false
+    // Synthesis phase marker animation - for FINAL infusion
+    @State private var synthesisMarkerPosition: CGFloat = 0
+    @State private var showFinalMarker: Bool = false
     
-    // Crystallization reveal state - shows "REVEAL" button after last roll
+    // Result reveal state
     @State private var showingFinalReveal: Bool = false
     
     init(apiClient: APIClient) {
@@ -42,21 +42,31 @@ struct ResearchView: View {
             await viewModel.loadInitialData()
         }
         .onChange(of: viewModel.uiState) { _, newState in
-            if newState == .filling {
-                displayRollValue = 0
-                isAnimatingRoll = false
+            if newState == .idle {
+                // Reset everything for new experiment
+                displayValue = 0
+                isAnimating = false
                 showBarMarker = false
                 barMarkerValue = 0
-            } else if newState == .cooking {
-                // Reset for crystallization phase
-                displayRollValue = 0
-                cookingMarkerPosition = 0
-                isAnimatingRoll = false
+                synthesisMarkerPosition = 0
+                showFinalMarker = false
                 showingFinalReveal = false
-                showFinalRollMarker = false
+            } else if newState == .preparation {
+                displayValue = 0
+                isAnimating = false
+                showBarMarker = false
+                barMarkerValue = 0
+            } else if newState == .synthesis {
+                displayValue = 0
+                synthesisMarkerPosition = 0
+                isAnimating = false
+                showingFinalReveal = false
+                showFinalMarker = false
+            } else if newState == .finalInfusion {
+                // Don't auto-show marker - wait for button tap
             }
         }
-        .onChange(of: viewModel.currentBarIndex) { _, _ in
+        .onChange(of: viewModel.currentReagentIndex) { _, _ in
             showBarMarker = false
             barMarkerValue = 0
         }
@@ -113,12 +123,12 @@ struct ResearchView: View {
                     idleView
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                case .filling:
-                    fillPhaseView
+                case .preparation:
+                    preparationPhaseView
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                case .cooking:
-                    cookingPhaseView
+                case .synthesis, .finalInfusion:
+                    synthesisPhaseView
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
                 case .result:
@@ -153,17 +163,20 @@ struct ResearchView: View {
                 statPill("BLD", viewModel.stats?.building ?? 0)
             }
             
-            // Show reward tiers from config
-            if let tiers = viewModel.config?.phase2Cooking.rewardTiers, !tiers.isEmpty {
+            // Show result tiers from config
+            if let tiers = viewModel.config?.phase2Synthesis.resultTiers, !tiers.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("REWARD TIERS")
+                    Text("RESULT TIERS")
                         .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
                     
                     ForEach(Array(tiers.enumerated()), id: \.offset) { _, tier in
                         HStack {
-                            Text("\(tier.minPercent)-\(tier.maxPercent)%")
+                            Text("\(tier.minPurity)-\(tier.maxPurity)%")
                                 .fontStyle(FontStyles.statSmall, color: KingdomTheme.Colors.inkMedium)
                                 .frame(width: 60, alignment: .leading)
+                            Image(systemName: tier.icon)
+                                .font(.system(size: 12))
+                                .foregroundColor(colorForTierId(tier.id))
                             Text(tier.label)
                                 .fontStyle(FontStyles.labelSmall, color: colorForTierId(tier.id))
                             Spacer()
@@ -193,22 +206,22 @@ struct ResearchView: View {
         .cornerRadius(8)
     }
     
-    // MARK: - Fill Phase View
+    // MARK: - Preparation Phase View (Phase 1)
     
-    private var fillPhaseView: some View {
+    private var preparationPhaseView: some View {
         GeometryReader { geo in
             ViewThatFits(in: .vertical) {
-                fillPhaseLayout(size: geo.size, isCompact: false)
-                fillPhaseLayout(size: geo.size, isCompact: true)
+                preparationLayout(size: geo.size, isCompact: false)
+                preparationLayout(size: geo.size, isCompact: true)
                 ScrollView(.vertical, showsIndicators: false) {
-                    fillPhaseLayout(size: geo.size, isCompact: true)
+                    preparationLayout(size: geo.size, isCompact: true)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
     }
     
-    private func fillPhaseLayout(size: CGSize, isCompact: Bool) -> some View {
+    private func preparationLayout(size: CGSize, isCompact: Bool) -> some View {
         let w = size.width
         let h = size.height
         let sidePadding: CGFloat = 20
@@ -218,18 +231,18 @@ struct ResearchView: View {
         let tubeHeight = max(isCompact ? 170 : 210, min(h * (isCompact ? 0.38 : 0.42), 420))
         
         return VStack(spacing: sectionSpacing) {
-            fillTopMiniBars(isCompact: isCompact)
+            reagentBarsCard(isCompact: isCompact)
                 .layoutPriority(1)
             
             HStack(spacing: KingdomTheme.Spacing.medium) {
-                mainTubeView(tubeWidth: tubeWidth, tubeHeight: tubeHeight, showCookingMarker: false)
+                mainTubeView(tubeWidth: tubeWidth, tubeHeight: tubeHeight)
                 
-                fillSideConsole(isCompact: isCompact)
+                preparationConsole(isCompact: isCompact)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .fixedSize(horizontal: false, vertical: true)
             
-            fillRollPanel
+            infusionHistoryPanel
                 .frame(minHeight: isCompact ? 110 : 130)
                 .layoutPriority(2)
         }
@@ -238,20 +251,20 @@ struct ResearchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     
-    // MARK: - Fill UI Sections
+    // MARK: - Preparation UI Sections
     
-    private func fillTopMiniBars(isCompact: Bool) -> some View {
+    private func reagentBarsCard(isCompact: Bool) -> some View {
         return VStack(alignment: .leading, spacing: isCompact ? 6 : 8) {
             HStack {
-                Text("PHASE 1: FILL")
+                Text("PHASE 1: PREPARATION")
                     .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
                 Spacer()
             }
             .frame(height: isCompact ? 16 : 18)
             
             VStack(spacing: isCompact ? 5 : 6) {
-                ForEach(0..<viewModel.miniBarNames.count, id: \.self) { idx in
-                    miniBarRow(index: idx, isCompact: isCompact)
+                ForEach(0..<viewModel.reagentNames.count, id: \.self) { idx in
+                    reagentBarRow(index: idx, isCompact: isCompact)
                 }
             }
         }
@@ -260,11 +273,11 @@ struct ResearchView: View {
         .frame(maxWidth: .infinity)
     }
     
-    private func miniBarRow(index: Int, isCompact: Bool) -> some View {
-        let isActive = viewModel.currentBarIndex == index
-        let barNames = viewModel.miniBarNames
-        let barName = index < barNames.count ? barNames[index] : "BAR \(index + 1)"
-        let fill = index < viewModel.miniBarFills.count ? min(1, max(0, viewModel.miniBarFills[index])) : 0
+    private func reagentBarRow(index: Int, isCompact: Bool) -> some View {
+        let isActive = viewModel.currentReagentIndex == index
+        let barNames = viewModel.reagentNames
+        let barName = index < barNames.count ? barNames[index] : "REAGENT \(index + 1)"
+        let fill = index < viewModel.reagentFills.count ? min(1, max(0, viewModel.reagentFills[index])) : 0
         
         let showMarkerOnThisBar = isActive && showBarMarker
         let barColor = isActive ? KingdomTheme.Colors.royalBlue : KingdomTheme.Colors.buttonSuccess
@@ -280,8 +293,8 @@ struct ResearchView: View {
                 Text(barName)
                     .fontStyle(FontStyles.statSmall, color: isActive ? KingdomTheme.Colors.royalBlue : KingdomTheme.Colors.inkMedium)
                 if !isCompact {
-                    Text(isActive && viewModel.showReagentSelect ? "SELECTING" : (isActive ? "ACTIVE" : "READY"))
-                        .fontStyle(FontStyles.captionLarge, color: isActive && viewModel.showReagentSelect ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium.opacity(isActive ? 1 : 0.7))
+                    Text(isActive && viewModel.showAmountSelect ? "MEASURING" : (isActive ? "MIXING" : "READY"))
+                        .fontStyle(FontStyles.captionLarge, color: isActive && viewModel.showAmountSelect ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkMedium.opacity(isActive ? 1 : 0.7))
                 }
             }
             .frame(width: labelWidth, alignment: .leading)
@@ -329,36 +342,36 @@ struct ResearchView: View {
         .frame(height: rowHeight)
     }
     
-    private func fillSideConsole(isCompact: Bool) -> some View {
+    private func preparationConsole(isCompact: Bool) -> some View {
         let statusText: String = {
-            if isAnimatingRoll { return "..." }
-            if viewModel.showReagentSelect { return "+\(viewModel.currentMiniBar?.reagentSelect ?? 0)%" }
-            if let roll = viewModel.currentRoll { return roll.hit ? "+\(Int(roll.fillAdded * 100))%" : "+\(Int(roll.fillAdded * 100))%" }
-            return "TAP ROLL"
+            if isAnimating { return "..." }
+            if viewModel.showAmountSelect { return "+\(viewModel.currentReagent?.amountSelected ?? 0)%" }
+            if let inf = viewModel.currentInfusion { return inf.stable ? "Stable" : "Volatile" }
+            return "TAP INFUSE"
         }()
         
         let statusColor: Color = {
-            if isAnimatingRoll { return KingdomTheme.Colors.inkMedium }
-            if viewModel.showReagentSelect { return KingdomTheme.Colors.gold }
-            if let roll = viewModel.currentRoll { return roll.hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger }
+            if isAnimating { return KingdomTheme.Colors.inkMedium }
+            if viewModel.showAmountSelect { return KingdomTheme.Colors.gold }
+            if let inf = viewModel.currentInfusion { return inf.stable ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger }
             return KingdomTheme.Colors.inkMedium
         }()
         
         return VStack(spacing: 8) {
             HStack {
-                Image(systemName: viewModel.showReagentSelect ? "scope" : "dial.medium.fill")
+                Image(systemName: viewModel.showAmountSelect ? "scope" : "dial.medium.fill")
                     .font(FontStyles.iconSmall)
-                    .foregroundColor(viewModel.showReagentSelect ? KingdomTheme.Colors.gold : KingdomTheme.Colors.royalBlue)
-                Text(viewModel.showReagentSelect ? "REAGENT SELECT" : "INSTRUMENTS")
+                    .foregroundColor(viewModel.showAmountSelect ? KingdomTheme.Colors.gold : KingdomTheme.Colors.royalBlue)
+                Text(viewModel.showAmountSelect ? "MEASURE" : "INSTRUMENTS")
                     .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
                 Spacer()
             }
             
             Spacer(minLength: 0)
             
-            Text("\(displayRollValue)")
+            Text("\(displayValue)")
                 .font(.system(size: isCompact ? 48 : 64, weight: .black, design: .monospaced))
-                .foregroundColor(rollColor)
+                .foregroundColor(infusionColor)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
             
@@ -370,15 +383,15 @@ struct ResearchView: View {
             
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Mixture")
+                    Text("Potential")
                         .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkMedium)
                     Spacer()
-                    Text("\(Int(viewModel.mainTubeFill * 100))%")
+                    Text("\(Int(viewModel.potential * 100))%")
                         .fontStyle(FontStyles.statMedium, color: KingdomTheme.Colors.royalBlue)
                 }
                 
                 GeometryReader { geo in
-                    let clamped = min(1, max(0, viewModel.mainTubeFill))
+                    let clamped = min(1, max(0, viewModel.potential))
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(KingdomTheme.Colors.parchmentDark)
@@ -400,33 +413,33 @@ struct ResearchView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
     }
     
-    private var fillRollPanel: some View {
-        let rolls = viewModel.currentMiniBar?.rolls ?? []
-        let shownCount = max(0, viewModel.currentRollIndex + 1)
+    private var infusionHistoryPanel: some View {
+        let infusions = viewModel.currentReagent?.infusions ?? []
+        let shownCount = max(0, viewModel.currentInfusionIndex + 1)
         
         return VStack(spacing: 8) {
             HStack {
-                Text("ROLL HISTORY")
+                Text("INFUSION HISTORY")
                     .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
                 
                 Spacer()
             }
             
-            if rolls.isEmpty || shownCount <= 0 {
+            if infusions.isEmpty || shownCount <= 0 {
                 HStack {
-                    Text("Tap ROLL to begin")
+                    Text("Tap INFUSE to begin")
                         .fontStyle(FontStyles.labelMedium, color: KingdomTheme.Colors.inkMedium)
                 }
                 .frame(maxWidth: .infinity, minHeight: 60)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Array(rolls.prefix(shownCount).enumerated()), id: \.offset) { idx, roll in
-                            ResearchRollCard(roll: roll, index: idx + 1)
+                        ForEach(Array(infusions.prefix(shownCount).enumerated()), id: \.offset) { idx, inf in
+                            InfusionCard(infusion: inf, index: idx + 1)
                         }
                         
-                        if viewModel.showReagentSelect, let bar = viewModel.currentMiniBar {
-                            ReagentSelectCard(value: bar.reagentSelect)
+                        if viewModel.showAmountSelect, let reagent = viewModel.currentReagent {
+                            AmountSelectCard(value: reagent.amountSelected)
                         }
                     }
                     .padding(.horizontal, 10)
@@ -440,22 +453,22 @@ struct ResearchView: View {
         .frame(maxWidth: .infinity)
     }
     
-    private var rollColor: Color {
-        if isAnimatingRoll {
+    private var infusionColor: Color {
+        if isAnimating {
             return KingdomTheme.Colors.royalBlue
         }
-        if viewModel.showReagentSelect {
+        if viewModel.showAmountSelect {
             return KingdomTheme.Colors.gold
         }
-        if let roll = viewModel.currentRoll {
-            return roll.hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+        if let inf = viewModel.currentInfusion {
+            return inf.stable ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
         }
         return KingdomTheme.Colors.inkLight
     }
     
-    // MARK: - Cooking Phase View (Crystallization)
+    // MARK: - Synthesis Phase View (Phase 2)
     
-    private var cookingPhaseView: some View {
+    private var synthesisPhaseView: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
@@ -466,21 +479,18 @@ struct ResearchView: View {
             let tubeHeight = max(isCompact ? 170 : 210, min(h * (isCompact ? 0.38 : 0.42), 420))
             
             VStack(spacing: sectionSpacing) {
-                // Top card (like mini bars in Phase 1)
-                crystalResultCard
+                synthesisStatusCard
                     .layoutPriority(1)
                 
-                // Middle: tube + side console
                 HStack(spacing: KingdomTheme.Spacing.medium) {
-                    crystallizationTubeView(tubeWidth: tubeWidth, tubeHeight: tubeHeight)
+                    synthesisTubeView(tubeWidth: tubeWidth, tubeHeight: tubeHeight)
                     
-                    crystalSideConsole
+                    synthesisConsole
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 
-                // Bottom: roll history panel
-                crystalRollPanel
+                synthesisHistoryPanel
                     .frame(minHeight: isCompact ? 110 : 130)
                     .layoutPriority(2)
             }
@@ -490,86 +500,99 @@ struct ResearchView: View {
         }
     }
     
-    private func crystallizationTubeView(tubeWidth: CGFloat, tubeHeight: CGFloat) -> some View {
-        let ceiling = min(1, max(0, viewModel.mainTubeFill))
-        let floor = min(ceiling, max(0, viewModel.crystalFloor))
-        let hitCount = viewModel.crystalRolls.prefix(max(0, viewModel.currentCrystalRollIndex + 1)).filter { $0.hit }.count
+    private func synthesisTubeView(tubeWidth: CGFloat, tubeHeight: CGFloat) -> some View {
+        // ALWAYS clamp to 0-1 range
+        let potentialFrac = min(1.0, max(0, viewModel.potential))
+        let purityFrac = min(1.0, max(0, min(potentialFrac, viewModel.purity)))
+        let hitCount = viewModel.synthesisInfusions.prefix(max(0, viewModel.currentSynthesisIndex + 1)).filter { $0.stable }.count
         
         return VStack(spacing: 6) {
-            ZStack(alignment: .bottom) {
-                // Background
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KingdomTheme.Colors.parchmentDark)
-                
-                // Ceiling liquid (reagent from Phase 1)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KingdomTheme.Colors.royalBlue.opacity(0.4))
-                    .frame(height: max(4, tubeHeight * ceiling))
-                    .overlay(BubblingOverlay())
-                
-                // Crystal growth from bottom - gets more structured with each hit
-                CrystalGrowthOverlay(
-                    floor: floor,
-                    hitCount: hitCount,
-                    tubeWidth: tubeWidth,
-                    tubeHeight: tubeHeight
-                )
-                .frame(width: tubeWidth, height: tubeHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                // Tier lines
-                ForEach(Array(viewModel.rewardTiers.enumerated()), id: \.offset) { _, tier in
-                    if tier.minPercent > 0 {
-                        let yPos = tubeHeight * CGFloat(tier.minPercent) / 100.0
-                        Rectangle()
-                            .fill(colorForTierId(tier.id))
-                            .frame(height: 2)
-                            .offset(y: -yPos)
-                    }
-                }
-                
-                // Rolling marker - ONLY shows during FINAL roll
-                if showFinalRollMarker {
-                    HStack(spacing: 0) {
-                        // Left arrow
-                        Image(systemName: "arrowtriangle.right.fill")
-                            .font(.system(size: 14, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                            .shadow(color: .black, radius: 1, x: 1, y: 1)
-                        
+            // The tube container - use GeometryReader for precise marker positioning
+            GeometryReader { tubeGeo in
+                ZStack {
+                    // Background
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(KingdomTheme.Colors.parchmentDark)
+                    
+                    // Potential liquid (from Phase 1) - fills from bottom
+                    VStack {
                         Spacer()
-                        
-                        // Right arrow
-                        Image(systemName: "arrowtriangle.left.fill")
-                            .font(.system(size: 14, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.gold)
-                            .shadow(color: .black, radius: 1, x: 1, y: 1)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(KingdomTheme.Colors.royalBlue.opacity(0.4))
+                            .frame(height: max(4, tubeGeo.size.height * potentialFrac))
+                            .overlay(BubblingOverlay())
                     }
-                    .frame(width: tubeWidth + 24)
-                    .offset(y: -tubeHeight * cookingMarkerPosition + tubeHeight / 2)
+                    
+                    // Crystal growth from bottom - purity level
+                    VStack {
+                        Spacer()
+                        CrystalGrowthOverlay(
+                            purity: purityFrac,
+                            hitCount: hitCount,
+                            tubeWidth: tubeGeo.size.width,
+                            tubeHeight: tubeGeo.size.height
+                        )
+                        .frame(width: tubeGeo.size.width, height: tubeGeo.size.height * purityFrac)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    // Tier threshold lines - positioned from bottom
+                    ForEach(Array(viewModel.resultTiers.enumerated()), id: \.offset) { _, tier in
+                        if tier.minPurity > 0 {
+                            let yFromBottom = tubeGeo.size.height * CGFloat(tier.minPurity) / 100.0
+                            Rectangle()
+                                .fill(colorForTierId(tier.id))
+                                .frame(height: 2)
+                                .position(x: tubeGeo.size.width / 2, y: tubeGeo.size.height - yFromBottom)
+                        }
+                    }
+                    
+                    // Final infusion marker - bounces between purity and potential
+                    if showFinalMarker {
+                        let clampedPos = min(1.0, max(0, synthesisMarkerPosition))
+                        let markerY = tubeGeo.size.height * (1 - clampedPos)
+                        
+                        HStack(spacing: 0) {
+                            Image(systemName: "arrowtriangle.right.fill")
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 1, y: 1)
+                            
+                            Rectangle()
+                                .fill(KingdomTheme.Colors.gold)
+                                .frame(height: 3)
+                            
+                            Image(systemName: "arrowtriangle.left.fill")
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(KingdomTheme.Colors.gold)
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 1, y: 1)
+                        }
+                        .frame(width: tubeGeo.size.width + 30)
+                        .position(x: tubeGeo.size.width / 2, y: markerY)
+                    }
+                    
+                    // Border
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.black, lineWidth: 2)
                 }
-                
-                // Border
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.black, lineWidth: 2)
             }
             .frame(width: tubeWidth, height: tubeHeight)
             
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("CEIL")
+                    Text("POTENTIAL")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
-                    Text("\(viewModel.ceiling)%")
+                    Text("\(viewModel.potentialPercent)%")
                         .font(.system(size: 10, weight: .black, design: .monospaced))
                         .foregroundColor(KingdomTheme.Colors.royalBlue)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text("FLOOR")
+                    Text("PURITY")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.regalPurple)
-                    Text("\(Int(viewModel.crystalFloor * 100))%")
+                    Text("\(Int(viewModel.purity * 100))%")
                         .font(.system(size: 10, weight: .black, design: .monospaced))
                         .foregroundColor(KingdomTheme.Colors.regalPurple)
                 }
@@ -580,32 +603,35 @@ struct ResearchView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
     
-    private var crystalSideConsole: some View {
+    private var synthesisConsole: some View {
+        let isFinalPhase = viewModel.uiState == .finalInfusion
+        
         let statusText: String = {
-            if isAnimatingRoll { return "..." }
-            if let roll = viewModel.currentCrystalRoll {
-                return roll.hit ? "+\(roll.floorGain)% FLOOR" : "MISS"
+            if isAnimating { return "..." }
+            if isFinalPhase { return "Final Synthesis!" }
+            if let inf = viewModel.currentSynthesisInfusion {
+                return inf.stable ? "+\(inf.purityGained) Purity" : "Volatile"
             }
-            return "TAP ROLL"
+            return "TAP INFUSE"
         }()
         
         let statusColor: Color = {
-            if isAnimatingRoll { return KingdomTheme.Colors.inkMedium }
-            if let roll = viewModel.currentCrystalRoll {
-                return roll.hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+            if isAnimating { return KingdomTheme.Colors.inkMedium }
+            if isFinalPhase { return KingdomTheme.Colors.gold }
+            if let inf = viewModel.currentSynthesisInfusion {
+                return inf.stable ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
             }
             return KingdomTheme.Colors.inkMedium
         }()
         
         return VStack(spacing: 6) {
             HStack {
-                Image(systemName: "sparkles")
+                Image(systemName: isFinalPhase ? "sparkles" : "sparkles")
                     .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.regalPurple)
-                Text("CRYSTALLIZE")
-                    .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
+                    .foregroundColor(isFinalPhase ? KingdomTheme.Colors.gold : KingdomTheme.Colors.regalPurple)
+                Text(isFinalPhase ? "FINAL SYNTHESIS" : "SYNTHESIS")
+                    .fontStyle(FontStyles.labelBlackSerif, color: isFinalPhase ? KingdomTheme.Colors.gold : KingdomTheme.Colors.inkDark)
                 Spacer()
-                // Show Philosophy skill
                 HStack(spacing: 3) {
                     Text("PHI")
                         .font(.system(size: 9, weight: .bold))
@@ -621,15 +647,23 @@ struct ResearchView: View {
             
             Spacer(minLength: 0)
             
-            Text("\(displayRollValue)")
+            Text("\(displayValue)")
                 .font(.system(size: 48, weight: .black, design: .monospaced))
-                .foregroundColor(crystalRollColor)
+                .foregroundColor(synthesisValueColor)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
             
             Text(statusText)
                 .font(.system(size: 12, weight: .black, design: .serif))
                 .foregroundColor(statusColor)
+            
+            // Progress message
+            if !viewModel.progressMessage.isEmpty && !isFinalPhase {
+                Text(viewModel.progressMessage)
+                    .font(.system(size: 11, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .italic()
+            }
             
             Spacer(minLength: 0)
             
@@ -638,14 +672,14 @@ struct ResearchView: View {
                     Text("Current Tier")
                         .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkMedium)
                     Spacer()
-                    if let tier = viewModel.tierForFloor(Int(viewModel.crystalFloor * 100)) {
+                    if let tier = viewModel.tierForPurity(Int(viewModel.purity * 100)) {
                         Text(tier.label)
                             .font(.system(size: 11, weight: .black, design: .serif))
                             .foregroundColor(colorForTierId(tier.id))
                     } else {
-                        Text("FAIL")
+                        Text("UNSTABLE")
                             .font(.system(size: 11, weight: .black, design: .serif))
-                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
                 
@@ -656,8 +690,8 @@ struct ResearchView: View {
                         
                         RoundedRectangle(cornerRadius: 6)
                             .fill(KingdomTheme.Colors.regalPurple)
-                            .frame(width: max(4, geo.size.width * viewModel.crystalFloor))
-                            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.crystalFloor)
+                            .frame(width: max(4, geo.size.width * viewModel.purity))
+                            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.purity)
                     }
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
@@ -671,20 +705,20 @@ struct ResearchView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
     }
     
-    private var crystalRollPanel: some View {
-        let rolls = viewModel.crystalRolls
-        let shownCount = max(0, viewModel.currentCrystalRollIndex + 1)
+    private var synthesisHistoryPanel: some View {
+        let infusions = viewModel.synthesisInfusions
+        let shownCount = max(0, viewModel.currentSynthesisIndex + 1)
         
         return VStack(spacing: 6) {
             HStack {
-                Text("ROLL HISTORY")
+                Text("INFUSION HISTORY")
                     .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
                 Spacer()
             }
             
-            if rolls.isEmpty || shownCount <= 0 {
+            if infusions.isEmpty || shownCount <= 0 {
                 HStack {
-                    Text("Tap ROLL to crystallize")
+                    Text("Tap INFUSE to begin synthesis")
                         .fontStyle(FontStyles.labelMedium, color: KingdomTheme.Colors.inkMedium)
                 }
                 .frame(height: 60)
@@ -692,8 +726,13 @@ struct ResearchView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Array(rolls.prefix(shownCount).enumerated()), id: \.offset) { idx, roll in
-                            CrystalRollCard(roll: roll, index: idx + 1)
+                        ForEach(Array(infusions.prefix(shownCount).enumerated()), id: \.offset) { idx, inf in
+                            SynthesisInfusionCard(infusion: inf, index: idx + 1)
+                        }
+                        
+                        // Show final infusion card if we're in that phase and revealed
+                        if viewModel.uiState == .result, let final = viewModel.finalInfusionResult {
+                            FinalInfusionCard(infusion: final)
                         }
                     }
                     .padding(.horizontal, 10)
@@ -706,32 +745,54 @@ struct ResearchView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
     }
     
-    private var crystalResultCard: some View {
-        let isComplete = viewModel.isExperimentComplete
+    private var synthesisStatusCard: some View {
+        let isFinalPhase = viewModel.uiState == .finalInfusion
         let isRevealed = showingFinalReveal
-        let floor = Int(viewModel.crystalFloor * 100)
-        let tier = (isComplete && isRevealed) ? viewModel.landedTier : viewModel.tierForFloor(floor)
+        let purityPct = Int(viewModel.purity * 100)
+        let tier = isRevealed ? viewModel.landedTier : viewModel.tierForPurity(purityPct)
         let outcome = viewModel.experiment?.outcome
         
         return VStack(alignment: .leading, spacing: 8) {
-            // Header row (like Phase 1)
             HStack {
-                Text(isComplete ? "COMPLETE" : "PHASE 2: CRYSTALLIZATION")
-                    .fontStyle(FontStyles.labelBlackSerif, color: isComplete ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.regalPurple)
+                if isRevealed {
+                    // Show result header
+                    if let tier = tier {
+                        HStack(spacing: 6) {
+                            Image(systemName: tier.icon)
+                                .font(.system(size: 14))
+                            Text(tier.label)
+                        }
+                        .fontStyle(FontStyles.labelBlackSerif, color: colorForTierId(tier.id))
+                    } else {
+                        Text("UNSTABLE")
+                            .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkMedium)
+                    }
+                } else if isFinalPhase {
+                    Text("FINAL SYNTHESIS")
+                        .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.gold)
+                } else {
+                    Text("PHASE 2: SYNTHESIS")
+                        .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.regalPurple)
+                }
                 Spacer()
-                if !isComplete {
-                    Text("\(viewModel.remainingCrystalRolls) left")
+                if isRevealed {
+                    // Show final purity badge
+                    Text("\(purityPct)% PURITY")
+                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                        .foregroundColor(colorForPurity(purityPct))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, borderWidth: 2)
+                } else if isFinalPhase && !isAnimating {
+                    Text("One last infusion...")
+                        .fontStyle(FontStyles.captionLarge, color: KingdomTheme.Colors.gold)
+                        .italic()
+                } else if !isFinalPhase {
+                    Text("\(viewModel.remainingSynthesisInfusions) left")
                         .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkMedium)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 6, borderWidth: 2)
-                } else if isRevealed, let tier {
-                    Text(tier.label)
-                        .font(.system(size: 10, weight: .black, design: .serif))
-                        .foregroundColor(colorForTierId(tier.id))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, borderWidth: 2)
                 }
             }
             
@@ -739,58 +800,48 @@ struct ResearchView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if isComplete && !isRevealed {
-                    // Hide final result until revealed
-                    Text("??%")
+            if isRevealed {
+                // Show result details
+                if let outcome = outcome {
+                    Text(outcome.title)
+                        .font(.system(size: 18, weight: .black, design: .serif))
+                        .foregroundColor(colorForPurity(purityPct))
+                    
+                    Text(outcome.message)
+                        .fontStyle(FontStyles.bodySmall, color: KingdomTheme.Colors.inkMedium)
+                    
+                    if outcome.blueprints > 0 || outcome.gp > 0 {
+                        HStack(spacing: 6) {
+                            if outcome.blueprints > 0 {
+                                rewardPill(icon: "scroll.fill", iconColor: KingdomTheme.Colors.royalBlue, text: "+\(outcome.blueprints) BP")
+                            }
+                            if outcome.gp > 0 {
+                                rewardPill(icon: "g.circle.fill", iconColor: KingdomTheme.Colors.gold, text: "+\(outcome.gp)g")
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+            } else {
+                // Show current purity
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(purityPct)%")
                         .font(.system(size: 32, weight: .black, design: .monospaced))
-                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .foregroundColor(colorForPurity(purityPct))
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                     
-                    Text("Tap REVEAL")
-                        .font(.system(size: 12, weight: .black, design: .serif))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                } else {
-                    Text("\(floor)%")
-                        .font(.system(size: (isComplete && isRevealed) ? 40 : 32, weight: .black, design: .monospaced))
-                        .foregroundColor(colorForFloor(floor))
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                    
-                    Text((isComplete && isRevealed) ? "FINAL FLOOR" : "Current Floor")
+                    Text("Current Purity")
                         .font(.system(size: 12, weight: .black, design: .serif))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-                
-                Spacer(minLength: 0)
-            }
-            
-            if isComplete && isRevealed, let outcome, (outcome.blueprints > 0 || outcome.gp > 0) {
-                HStack(spacing: 6) {
-                    if outcome.blueprints > 0 {
-                        rewardPill(icon: "scroll.fill", iconColor: KingdomTheme.Colors.royalBlue, text: "+\(outcome.blueprints) BP")
-                    }
-                    if outcome.gp > 0 {
-                        rewardPill(icon: "g.circle.fill", iconColor: KingdomTheme.Colors.gold, text: "+\(outcome.gp)g")
-                    }
+                    
                     Spacer(minLength: 0)
                 }
-            } else if isComplete && isRevealed {
-                Text("No rewards this time.")
-                    .fontStyle(FontStyles.bodyMedium, color: KingdomTheme.Colors.inkMedium)
             }
         }
         .padding(10)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
         .frame(maxWidth: .infinity, minHeight: 120)
-    }
-    
-    private func goldRangeText(min: Int, max: Int) -> String {
-        if max <= 0 { return "" }
-        if min == max { return "\(max)g" }
-        if min <= 0 { return "up to \(max)g" }
-        return "\(min)-\(max)g"
     }
     
     // MARK: - Result View
@@ -808,14 +859,18 @@ struct ResearchView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("RESULT")
                             .fontStyle(FontStyles.labelBlackSerif, color: KingdomTheme.Colors.inkDark)
-                        Text(outcomeTitle(outcome))
+                        Text(outcome?.title ?? "Unknown")
                             .fontStyle(FontStyles.captionLarge, color: KingdomTheme.Colors.inkMedium)
                     }
                     
                     Spacer()
                     
-                    Text(outcomeBadge(outcome))
-                        .fontStyle(FontStyles.labelSmall, color: KingdomTheme.Colors.inkDark)
+                    if let tier = viewModel.landedTier {
+                        HStack(spacing: 4) {
+                            Image(systemName: tier.icon)
+                            Text(tier.label)
+                        }
+                        .fontStyle(FontStyles.labelSmall, color: colorForTierId(tier.id))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .brutalistBadge(
@@ -823,6 +878,7 @@ struct ResearchView: View {
                             cornerRadius: 10,
                             borderWidth: 2
                         )
+                    }
                 }
                 
                 Rectangle()
@@ -866,92 +922,45 @@ struct ResearchView: View {
     
     private func outcomeIcon(_ outcome: OutcomeResult?) -> String {
         guard let outcome else { return "questionmark.circle.fill" }
-        if outcome.success { return outcome.isCritical ? "star.fill" : "scroll.fill" }
-        return "xmark.circle.fill"
+        if outcome.success { return outcome.isEureka ? "sparkles" : "checkmark.seal.fill" }
+        return "wind"
     }
     
     private func outcomeColor(_ outcome: OutcomeResult?) -> Color {
         guard let outcome else { return KingdomTheme.Colors.inkMedium }
-        if outcome.success { return outcome.isCritical ? KingdomTheme.Colors.gold : KingdomTheme.Colors.royalBlue }
-        return KingdomTheme.Colors.buttonDanger
+        if outcome.success { return outcome.isEureka ? KingdomTheme.Colors.gold : KingdomTheme.Colors.buttonSuccess }
+        return KingdomTheme.Colors.inkMedium
     }
     
-    private func outcomeTitle(_ outcome: OutcomeResult?) -> String {
-        guard let outcome else { return "UNKNOWN" }
-        if outcome.success { return outcome.isCritical ? "Critical discovery" : "Discovery" }
-        return "Failed experiment"
-    }
+    // MARK: - Main Tube View (Phase 1)
     
-    private func outcomeBadge(_ outcome: OutcomeResult?) -> String {
-        guard let outcome else { return "—" }
-        if outcome.success { return outcome.isCritical ? "CRITICAL" : "SUCCESS" }
-        return "FAIL"
-    }
-    
-    // MARK: - Main Tube View
-    
-    private func mainTubeView(tubeWidth: CGFloat, tubeHeight: CGFloat, showCookingMarker: Bool) -> some View {
-        let clampedFill = min(1, max(0, viewModel.mainTubeFill))
+    private func mainTubeView(tubeWidth: CGFloat, tubeHeight: CGFloat) -> some View {
+        let clampedFill = min(1, max(0, viewModel.potential))
         
         return VStack(spacing: 8) {
             ZStack(alignment: .bottom) {
-                // Background
                 RoundedRectangle(cornerRadius: 16)
                     .fill(KingdomTheme.Colors.parchmentDark)
                 
-                // Fill
                 RoundedRectangle(cornerRadius: 16)
                     .fill(KingdomTheme.Colors.royalBlue)
                     .frame(height: max(4, tubeHeight * clampedFill))
                     .overlay(
-                        // Bubbling effect for cooking phase
-                        Group {
-                            if showCookingMarker {
-                                BubblingOverlay()
-                            } else {
-                                LinearGradient(
-                                    colors: [KingdomTheme.Colors.parchmentHighlight.opacity(0.25), Color.clear],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                            }
-                        }
+                        LinearGradient(
+                            colors: [KingdomTheme.Colors.parchmentHighlight.opacity(0.25), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     )
                     .animation(.easeOut(duration: 0.6), value: clampedFill)
                 
-                // Reward tier lines (from config)
-                if showCookingMarker {
-                    ForEach(Array(viewModel.rewardTiers.enumerated()), id: \.offset) { _, tier in
-                        if tier.minPercent > 0 {
-                            let yOffset = tubeHeight * (1 - CGFloat(tier.minPercent) / 100.0)
-                            Rectangle()
-                                .fill(colorForTierId(tier.id))
-                                .frame(width: tubeWidth + 10, height: 2)
-                                .offset(y: -tubeHeight + yOffset)
-                        }
-                    }
-                }
-                
-                // Border
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.black, lineWidth: 3)
-                
-                // Cooking marker - animates from BOTTOM (0) to TOP (fill level)
-                if showCookingMarker {
-                    let maxFill = min(1, max(0, viewModel.mainTubeFill))
-                    let markerY = tubeHeight * min(maxFill, max(0, cookingMarkerPosition))
-                    
-                    Image(systemName: "arrowtriangle.right.fill")
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundColor(KingdomTheme.Colors.gold)
-                        .shadow(color: .black, radius: 2, x: 1, y: 1)
-                        .offset(x: -tubeWidth / 2 - 15, y: -markerY)
-                }
             }
             .frame(width: tubeWidth, height: tubeHeight)
 
-            Text(showCookingMarker ? "reagent level" : "main tube")
+            Text("potential")
                 .fontStyle(FontStyles.captionLarge, color: KingdomTheme.Colors.inkMedium)
         }
         .padding(12)
@@ -982,15 +991,14 @@ struct ResearchView: View {
                         .cornerRadius(8)
                     }
                     
-                case .filling:
+                case .preparation:
                     if viewModel.isPhase1Complete {
-                        // Phase 1 done - show CRYSTALLIZE button
                         Button {
-                            viewModel.transitionToCrystallization()
+                            viewModel.transitionToSynthesis()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
-                                Text("CRYSTALLIZE")
+                                Text("BEGIN SYNTHESIS")
                             }
                             .font(.system(size: 16, weight: .black))
                             .foregroundColor(.white)
@@ -1002,23 +1010,57 @@ struct ResearchView: View {
                     } else {
                         Button {
                             Task {
-                                await doFillRollWithAnimation()
+                                await doPreparationInfusionWithAnimation()
                             }
                         } label: {
-                            Text(isAnimatingRoll ? "..." : "ROLL")
+                            Text(isAnimating ? "..." : "INFUSE")
                                 .font(.system(size: 16, weight: .black))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(isAnimatingRoll ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.royalBlue)
+                                .background(isAnimating ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.royalBlue)
                                 .cornerRadius(8)
                         }
-                        .disabled(isAnimatingRoll)
+                        .disabled(isAnimating)
                     }
                     
-                case .cooking:
-                    if viewModel.isExperimentComplete && showingFinalReveal {
-                        // All rolls done, revealed - show TRY AGAIN
+                case .synthesis:
+                    if viewModel.isSynthesisComplete {
+                        // Ready for final infusion
+                        Button {
+                            viewModel.transitionToFinalInfusion()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                Text("FINAL SYNTHESIS")
+                            }
+                            .font(.system(size: 16, weight: .black))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(KingdomTheme.Colors.gold)
+                            .cornerRadius(8)
+                        }
+                    } else {
+                        Button {
+                            Task {
+                                await doSynthesisInfusionWithAnimation()
+                            }
+                        } label: {
+                            Text(isAnimating ? "..." : "INFUSE (\(viewModel.remainingSynthesisInfusions + 1) left)")
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(isAnimating ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.regalPurple)
+                                .cornerRadius(8)
+                        }
+                        .disabled(isAnimating)
+                    }
+                    
+                case .finalInfusion:
+                    if showingFinalReveal {
+                        // Done - show try again
                         Button {
                             Task { await viewModel.reset() }
                         } label: {
@@ -1030,40 +1072,24 @@ struct ResearchView: View {
                                 .background(KingdomTheme.Colors.royalBlue)
                                 .cornerRadius(8)
                         }
-                    } else if viewModel.isExperimentComplete && !showingFinalReveal {
-                        // All rolls done, waiting to reveal
+                    } else {
                         Button {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                showingFinalReveal = true
+                            Task {
+                                await doFinalInfusionWithAnimation()
                             }
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
-                                Text("REVEAL RESULTS")
+                                Text(isAnimating ? "..." : "COMPLETE SYNTHESIS")
                             }
                             .font(.system(size: 16, weight: .black))
                             .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(KingdomTheme.Colors.gold)
+                            .background(isAnimating ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.gold)
                             .cornerRadius(8)
                         }
-                    } else {
-                        // Still rolling
-                        Button {
-                            Task {
-                                await doCrystallizationRollWithAnimation()
-                            }
-                        } label: {
-                            Text(isAnimatingRoll ? "..." : "ROLL (\(viewModel.remainingCrystalRolls + 1) left)")
-                                .font(.system(size: 16, weight: .black))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(isAnimatingRoll ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.regalPurple)
-                                .cornerRadius(8)
-                        }
-                        .disabled(isAnimatingRoll)
+                        .disabled(isAnimating)
                     }
                     
                 case .result:
@@ -1091,14 +1117,13 @@ struct ResearchView: View {
     
     // MARK: - Animations
     
-    private func animateRoll(to finalValue: Int) async {
-        isAnimatingRoll = true
+    private func animateValue(to finalValue: Int) async {
+        isAnimating = true
         
         let clampedFinal = min(100, max(1, finalValue))
         
-        // Build roll sequence: 1 -> 100 -> final value
         var positions: [Int] = []
-        positions.append(contentsOf: stride(from: 1, through: 100, by: 3))  // Slower: step by 3 instead of 4
+        positions.append(contentsOf: stride(from: 1, through: 100, by: 3))
         
         if clampedFinal < 100 {
             positions.append(contentsOf: stride(from: 100, through: max(1, clampedFinal), by: -3))
@@ -1108,44 +1133,42 @@ struct ResearchView: View {
         }
         
         for (i, pos) in positions.enumerated() {
-            displayRollValue = pos
+            displayValue = pos
             let sleepNs: UInt64 = (i > positions.count - 8) ? 30_000_000 : 18_000_000
             try? await Task.sleep(nanoseconds: sleepNs)
         }
         
-        displayRollValue = clampedFinal
-        isAnimatingRoll = false
+        displayValue = clampedFinal
+        isAnimating = false
     }
     
     @MainActor
-    private func doFillRollWithAnimation() async {
-        guard !isAnimatingRoll else { return }
-        guard viewModel.uiState == .filling, let bar = viewModel.currentMiniBar else { return }
+    private func doPreparationInfusionWithAnimation() async {
+        guard !isAnimating else { return }
+        guard viewModel.uiState == .preparation, let reagent = viewModel.currentReagent else { return }
 
-        if viewModel.showReagentSelect {
-            // Pour reagent into main tube
-            viewModel.doNextFillRoll()
-            // Wait for pour animation to complete
+        if viewModel.showAmountSelect {
+            viewModel.doNextPreparationInfusion()
             try? await Task.sleep(nanoseconds: 600_000_000)
             return
         }
 
-        let nextRollIdx = viewModel.currentRollIndex + 1
-        if nextRollIdx < bar.rolls.count {
-            await animateRoll(to: bar.rolls[nextRollIdx].roll)
+        let nextIdx = viewModel.currentInfusionIndex + 1
+        if nextIdx < reagent.infusions.count {
+            await animateValue(to: reagent.infusions[nextIdx].value)
             await Task.yield()
-            viewModel.doNextFillRoll()
+            viewModel.doNextPreparationInfusion()
         } else {
-            let fillPct = max(1, Int(bar.finalFill * 100))
-            await animateReagentSelection(maxValue: fillPct, finalValue: bar.reagentSelect)
+            let fillPct = max(1, Int(reagent.finalFill * 100))
+            await animateAmountSelection(maxValue: fillPct, finalValue: reagent.amountSelected)
             await Task.yield()
-            viewModel.doNextFillRoll()
+            viewModel.doNextPreparationInfusion()
         }
     }
     
     @MainActor
-    private func animateReagentSelection(maxValue: Int, finalValue: Int) async {
-        isAnimatingRoll = true
+    private func animateAmountSelection(maxValue: Int, finalValue: Int) async {
+        isAnimating = true
         showBarMarker = true
         
         let clampedFinal = min(maxValue, max(1, finalValue))
@@ -1161,96 +1184,122 @@ struct ResearchView: View {
         
         for (i, pos) in positions.enumerated() {
             barMarkerValue = pos
-            displayRollValue = pos
+            displayValue = pos
             let sleepNs: UInt64 = (i > positions.count - 8) ? 50_000_000 : 25_000_000
             try? await Task.sleep(nanoseconds: sleepNs)
         }
         
         barMarkerValue = clampedFinal
-        displayRollValue = clampedFinal
-        isAnimatingRoll = false
+        displayValue = clampedFinal
+        isAnimating = false
     }
     
-    // MARK: - Crystallization Roll Animation
+    // MARK: - Synthesis Infusion Animation
     
     @MainActor
-    private func doCrystallizationRollWithAnimation() async {
-        guard !isAnimatingRoll else { return }
-        guard viewModel.uiState == .cooking else { return }
+    private func doSynthesisInfusionWithAnimation() async {
+        guard !isAnimating else { return }
+        guard viewModel.uiState == .synthesis else { return }
         
-        let nextIdx = viewModel.currentCrystalRollIndex + 1
-        guard nextIdx < viewModel.crystalRolls.count else { return }
+        let nextIdx = viewModel.currentSynthesisIndex + 1
+        guard nextIdx < viewModel.synthesisInfusions.count else { return }
         
-        let roll = viewModel.crystalRolls[nextIdx]
-        let isFinalRoll = nextIdx == viewModel.crystalRolls.count - 1
+        let infusion = viewModel.synthesisInfusions[nextIdx]
         
-        if isFinalRoll {
-            // FINAL ROLL - big marker animation on the tube
-            let currentFloor = viewModel.crystalFloor
-            let ceiling = viewModel.mainTubeFill
-            
-            isAnimatingRoll = true
-            showFinalRollMarker = true
-            
-            // Animate marker bouncing between FLOOR and CEILING
-            let totalBounces = 15
-            for _ in 0..<totalBounces {
-                let randomPos = CGFloat.random(in: currentFloor...ceiling)
-                cookingMarkerPosition = randomPos
-                displayRollValue = Int.random(in: Int(currentFloor * 100)...Int(ceiling * 100))
-                try? await Task.sleep(nanoseconds: 60_000_000)
+        // Regular infusion - just animate number
+        await animateValue(to: infusion.value)
+        
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        
+        viewModel.doNextSynthesisInfusion()
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    // MARK: - Final Infusion Animation
+    
+    @MainActor
+    private func doFinalInfusionWithAnimation() async {
+        guard !isAnimating else { return }
+        guard viewModel.uiState == .finalInfusion else { return }
+        guard let final = viewModel.finalInfusionResult else { return }
+        
+        // Clamp all values to 0-1 range
+        let currentPurity = min(1.0, max(0, viewModel.purity))
+        let potential = min(1.0, max(0, viewModel.potential))
+        
+        // Ensure we have a valid range (purity should be <= potential)
+        let minPos = min(currentPurity, potential)
+        let maxPos = max(currentPurity, potential)
+        
+        isAnimating = true
+        showFinalMarker = true
+        
+        // Slow dramatic bounce between PURITY and POTENTIAL
+        let totalBounces = 12
+        for i in 0..<totalBounces {
+            let randomPos = CGFloat.random(in: minPos...maxPos)
+            withAnimation(.easeInOut(duration: 0.15)) {
+                synthesisMarkerPosition = min(1.0, max(0, randomPos))
             }
-            
-            // Land on final floor value
-            let finalFloor = currentFloor + (roll.hit ? CGFloat(roll.floorGain) / 100.0 : 0)
-            cookingMarkerPosition = min(finalFloor, ceiling)
-            displayRollValue = Int(finalFloor * 100)
-            
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            
-            isAnimatingRoll = false
-            showFinalRollMarker = false
-            
-            // Update viewModel state
-            viewModel.doNextCrystalRoll()
-            
-            try? await Task.sleep(nanoseconds: 400_000_000)
-        } else {
-            // Regular roll - just animate number
-            await animateRoll(to: roll.roll)
-            
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            
-            viewModel.doNextCrystalRoll()
-            
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            displayValue = Int.random(in: Int(minPos * 100)...Int(maxPos * 100))
+            // Slow down as we approach the end
+            let delay: UInt64 = i < totalBounces - 3 ? 150_000_000 : 250_000_000
+            try? await Task.sleep(nanoseconds: delay)
         }
+        
+        // Land on final purity value with dramatic pause (clamped to 0-1)
+        let finalPurityFrac = min(1.0, max(0, CGFloat(final.purityAfter) / 100.0))
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+            synthesisMarkerPosition = finalPurityFrac
+        }
+        displayValue = min(100, max(0, final.purityAfter))
+        
+        // Hold so user can see where it landed
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        
+        isAnimating = false
+        showFinalMarker = false
+        
+        // Apply the final infusion result - stay on this screen, don't switch!
+        viewModel.applyFinalInfusion()
+        
+        // Show the reveal after a moment
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            showingFinalReveal = true
+        }
+        
+        // DON'T transition to result - stay here so user can see what happened
     }
     
     // MARK: - Helpers
     
-    private func colorForFloor(_ floor: Int) -> Color {
-        if let tier = viewModel.tierForFloor(floor) {
+    private func colorForPurity(_ purity: Int) -> Color {
+        if let tier = viewModel.tierForPurity(purity) {
             return colorForTierId(tier.id)
         }
-        return KingdomTheme.Colors.buttonDanger
+        return KingdomTheme.Colors.inkMedium
     }
     
-    private var crystalRollColor: Color {
-        if isAnimatingRoll {
+    private var synthesisValueColor: Color {
+        if isAnimating {
             return KingdomTheme.Colors.regalPurple
         }
-        if let roll = viewModel.currentCrystalRoll {
-            return roll.hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+        if viewModel.uiState == .finalInfusion {
+            return KingdomTheme.Colors.gold
+        }
+        if let inf = viewModel.currentSynthesisInfusion {
+            return inf.stable ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
         }
         return KingdomTheme.Colors.inkLight
     }
     
     private func colorForTierId(_ tierId: String) -> Color {
         switch tierId {
-        case "critical": return KingdomTheme.Colors.gold
-        case "success": return KingdomTheme.Colors.buttonSuccess
-        case "fail": return KingdomTheme.Colors.buttonDanger
+        case "eureka": return KingdomTheme.Colors.gold
+        case "stable": return KingdomTheme.Colors.buttonSuccess
+        case "unstable": return KingdomTheme.Colors.inkMedium
         default: return KingdomTheme.Colors.inkMedium
         }
     }
@@ -1303,10 +1352,10 @@ private struct BubbleAnimation: ViewModifier {
     }
 }
 
-// MARK: - Crystal Grid Overlay
+// MARK: - Crystal Growth Overlay
 
 private struct CrystalGrowthOverlay: View {
-    let floor: CGFloat
+    let purity: CGFloat
     let hitCount: Int
     let tubeWidth: CGFloat
     let tubeHeight: CGFloat
@@ -1314,15 +1363,14 @@ private struct CrystalGrowthOverlay: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                // Diamond grid overlay - gets more visible with each hit
                 if hitCount > 0 {
                     DiamondGridOverlay(hitCount: hitCount)
-                        .frame(width: tubeWidth, height: tubeHeight * floor)
+                        .frame(width: tubeWidth, height: tubeHeight * purity)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: floor)
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: purity)
         .animation(.easeInOut(duration: 0.3), value: hitCount)
     }
 }
@@ -1330,12 +1378,10 @@ private struct CrystalGrowthOverlay: View {
 private struct DiamondGridOverlay: View {
     let hitCount: Int
     
-    // Opacity increases with hits - gets DARKER: 0.25 -> 0.45 -> 0.65 -> 0.85...
     private var gridOpacity: Double {
         min(0.95, 0.25 + Double(hitCount) * 0.18)
     }
     
-    // Line width increases with hits - thicker = more solid
     private var lineWidth: CGFloat {
         min(3.0, 1.0 + CGFloat(hitCount) * 0.25)
     }
@@ -1344,10 +1390,8 @@ private struct DiamondGridOverlay: View {
         Canvas { context, size in
             let spacing: CGFloat = 12
             
-            // Draw diamond grid (diagonal lines both ways)
             var path = Path()
             
-            // Lines going ↗ (bottom-left to top-right)
             var x: CGFloat = -size.height
             while x < size.width + size.height {
                 path.move(to: CGPoint(x: x, y: size.height))
@@ -1355,7 +1399,6 @@ private struct DiamondGridOverlay: View {
                 x += spacing
             }
             
-            // Lines going ↖ (bottom-right to top-left)
             x = 0
             while x < size.width + size.height {
                 path.move(to: CGPoint(x: x, y: size.height))
@@ -1363,7 +1406,6 @@ private struct DiamondGridOverlay: View {
                 x += spacing
             }
             
-            // Rich purple crystal color - gets darker/more solid with hits
             context.stroke(
                 path,
                 with: .color(Color(red: 0.5, green: 0.2, blue: 0.8).opacity(gridOpacity)),
@@ -1373,10 +1415,10 @@ private struct DiamondGridOverlay: View {
     }
 }
 
-// MARK: - Small Components
+// MARK: - Card Components
 
-private struct ResearchRollCard: View {
-    let roll: MiniRoll
+private struct InfusionCard: View {
+    let infusion: Infusion
     let index: Int
     
     var body: some View {
@@ -1386,36 +1428,21 @@ private struct ResearchRollCard: View {
                 .offset(x: 2, y: 2)
             
             RoundedRectangle(cornerRadius: 8)
-                .fill(cardBackground)
+                .fill(infusion.stable ? KingdomTheme.Colors.parchmentHighlight : KingdomTheme.Colors.parchment)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(cardBorder, lineWidth: 2)
+                        .stroke(infusion.stable ? KingdomTheme.Colors.buttonSuccess : Color.black, lineWidth: 2)
                 )
             
-            Text("\(roll.roll)")
+            Text("\(infusion.value)")
                 .font(.system(size: 20, weight: .black, design: .monospaced))
-                .foregroundColor(textColor)
+                .foregroundColor(infusion.stable ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
         }
         .frame(width: 44, height: 44)
     }
-    
-    private var cardBackground: Color {
-        if roll.hit {
-            return KingdomTheme.Colors.parchmentHighlight
-        }
-        return KingdomTheme.Colors.parchment
-    }
-    
-    private var cardBorder: Color {
-        roll.hit ? KingdomTheme.Colors.buttonSuccess : Color.black
-    }
-    
-    private var textColor: Color {
-        roll.hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium
-    }
 }
 
-private struct ReagentSelectCard: View {
+private struct AmountSelectCard: View {
     let value: Int
     
     var body: some View {
@@ -1439,8 +1466,8 @@ private struct ReagentSelectCard: View {
     }
 }
 
-private struct CrystalRollCard: View {
-    let roll: CrystallizationRoll
+private struct SynthesisInfusionCard: View {
+    let infusion: SynthesisInfusion
     let index: Int
     
     var body: some View {
@@ -1450,18 +1477,18 @@ private struct CrystalRollCard: View {
                 .offset(x: 2, y: 2)
             
             RoundedRectangle(cornerRadius: 8)
-                .fill(cardBackground)
+                .fill(infusion.stable ? KingdomTheme.Colors.parchmentHighlight : KingdomTheme.Colors.parchment)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(cardBorder, lineWidth: 2)
+                        .stroke(infusion.stable ? KingdomTheme.Colors.regalPurple : Color.black, lineWidth: 2)
                 )
             
             VStack(spacing: 1) {
-                Text("\(roll.roll)")
+                Text("\(infusion.value)")
                     .font(.system(size: 16, weight: .black, design: .monospaced))
-                    .foregroundColor(textColor)
-                if roll.hit {
-                    Text("+\(roll.floorGain)")
+                    .foregroundColor(infusion.stable ? KingdomTheme.Colors.regalPurple : KingdomTheme.Colors.inkMedium)
+                if infusion.stable {
+                    Text("+\(infusion.purityGained)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                 }
@@ -1469,17 +1496,34 @@ private struct CrystalRollCard: View {
         }
         .frame(width: 44, height: 44)
     }
+}
+
+private struct FinalInfusionCard: View {
+    let infusion: SynthesisInfusion
     
-    private var cardBackground: Color {
-        roll.hit ? KingdomTheme.Colors.parchmentHighlight : KingdomTheme.Colors.parchment
-    }
-    
-    private var cardBorder: Color {
-        roll.hit ? KingdomTheme.Colors.regalPurple : Color.black
-    }
-    
-    private var textColor: Color {
-        roll.hit ? KingdomTheme.Colors.regalPurple : KingdomTheme.Colors.inkMedium
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black)
+                .offset(x: 2, y: 2)
+            
+            RoundedRectangle(cornerRadius: 8)
+                .fill(KingdomTheme.Colors.parchmentHighlight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(KingdomTheme.Colors.gold, lineWidth: 3)
+                )
+            
+            VStack(spacing: 1) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.gold)
+                Text("+\(infusion.purityGained)")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundColor(KingdomTheme.Colors.gold)
+            }
+        }
+        .frame(width: 44, height: 44)
     }
 }
 

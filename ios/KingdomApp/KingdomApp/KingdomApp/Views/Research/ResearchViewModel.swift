@@ -7,8 +7,9 @@ class ResearchViewModel: ObservableObject {
     enum UIState: Equatable {
         case loading
         case idle
-        case filling
-        case cooking
+        case preparation      // Phase 1: mixing reagents
+        case synthesis        // Phase 2: purifying
+        case finalInfusion    // Final dramatic moment
         case result
         case error(String)
     }
@@ -20,82 +21,102 @@ class ResearchViewModel: ObservableObject {
     @Published var stats: PlayerResearchStats?
     @Published var experiment: ExperimentResult?
     
-    // Phase 1
-    @Published var currentBarIndex: Int = 0
-    @Published var currentRollIndex: Int = -1
-    @Published var miniBarFills: [CGFloat] = [0, 0, 0]
-    @Published var showReagentSelect: Bool = false
-    @Published var mainTubeFill: CGFloat = 0
+    // Phase 1: Preparation
+    @Published var currentReagentIndex: Int = 0
+    @Published var currentInfusionIndex: Int = -1
+    @Published var reagentFills: [CGFloat] = [0, 0, 0]
+    @Published var showAmountSelect: Bool = false
+    @Published var potential: CGFloat = 0  // Main tube fill (0-1)
     
-    // Phase 2 (Crystallization)
-    @Published var currentCrystalRollIndex: Int = -1
-    @Published var crystalFloor: CGFloat = 0  // Current floor level (0-1)
+    // Phase 2: Synthesis
+    @Published var currentSynthesisIndex: Int = -1
+    @Published var purity: CGFloat = 0  // Current purity level (0-1)
     
     private var api: ResearchAPI?
     
-    // MARK: - Config from backend
+    // MARK: - Config Accessors
     
-    var fillConfig: FillConfig? {
-        experiment?.phase1Fill.config
+    var preparationConfig: PreparationConfig? {
+        experiment?.phase1Preparation.config
     }
     
-    var cookingConfig: CookingConfig? {
-        experiment?.phase2Cooking.config
+    var synthesisConfig: SynthesisConfig? {
+        experiment?.phase2Synthesis.config
     }
     
-    var miniBarNames: [String] {
-        fillConfig?.miniBarNames ?? []
+    var reagentNames: [String] {
+        preparationConfig?.reagentNames ?? []
     }
     
-    var rewardTiers: [RewardTier] {
-        cookingConfig?.rewardTiers ?? []
+    var resultTiers: [ResultTier] {
+        synthesisConfig?.resultTiers ?? []
     }
     
-    var ceiling: Int {
-        experiment?.phase2Cooking.ceiling ?? 0
+    var potentialPercent: Int {
+        experiment?.phase2Synthesis.potential ?? 0
     }
     
-    var finalFloor: Int {
-        experiment?.phase2Cooking.finalFloor ?? 0
+    var finalPurity: Int {
+        experiment?.phase2Synthesis.finalPurity ?? 0
     }
     
-    func tierForFloor(_ floor: Int) -> RewardTier? {
-        rewardTiers.first { floor >= $0.minPercent && floor <= $0.maxPercent }
+    func tierForPurity(_ purity: Int) -> ResultTier? {
+        resultTiers.first { purity >= $0.minPurity && purity <= $0.maxPurity }
     }
     
-    var landedTier: RewardTier? {
-        guard let tierId = experiment?.phase2Cooking.landedTierId else { return nil }
-        return rewardTiers.first { $0.id == tierId }
+    var landedTier: ResultTier? {
+        guard let tierId = experiment?.phase2Synthesis.resultTierId else { return nil }
+        return resultTiers.first { $0.id == tierId }
     }
     
-    var crystalRolls: [CrystallizationRoll] {
-        experiment?.phase2Cooking.crystallizationRolls ?? []
+    // Phase 2 infusions (regular ones, not final)
+    var synthesisInfusions: [SynthesisInfusion] {
+        experiment?.phase2Synthesis.infusions ?? []
     }
     
-    var currentCrystalRoll: CrystallizationRoll? {
-        guard currentCrystalRollIndex >= 0,
-              currentCrystalRollIndex < crystalRolls.count else { return nil }
-        return crystalRolls[currentCrystalRollIndex]
+    // The special final infusion
+    var finalInfusionResult: SynthesisInfusion? {
+        experiment?.phase2Synthesis.finalInfusion
     }
     
-    var remainingCrystalRolls: Int {
-        guard let cooking = experiment?.phase2Cooking else { return 0 }
-        return cooking.totalRolls - (currentCrystalRollIndex + 1)
+    var currentSynthesisInfusion: SynthesisInfusion? {
+        guard currentSynthesisIndex >= 0,
+              currentSynthesisIndex < synthesisInfusions.count else { return nil }
+        return synthesisInfusions[currentSynthesisIndex]
     }
     
-    var currentMiniBar: MiniBarResult? {
-        guard let bars = experiment?.phase1Fill.miniBars,
-              currentBarIndex < bars.count else { return nil }
-        return bars[currentBarIndex]
+    var remainingSynthesisInfusions: Int {
+        synthesisInfusions.count - (currentSynthesisIndex + 1)
     }
     
-    var currentRoll: MiniRoll? {
-        guard let bar = currentMiniBar,
-              currentRollIndex >= 0,
-              currentRollIndex < bar.rolls.count else { return nil }
-        return bar.rolls[currentRollIndex]
+    // Current reagent being processed
+    var currentReagent: ReagentResult? {
+        guard let reagents = experiment?.phase1Preparation.reagents,
+              currentReagentIndex < reagents.count else { return nil }
+        return reagents[currentReagentIndex]
     }
     
+    // Current infusion in phase 1
+    var currentInfusion: Infusion? {
+        guard let reagent = currentReagent,
+              currentInfusionIndex >= 0,
+              currentInfusionIndex < reagent.infusions.count else { return nil }
+        return reagent.infusions[currentInfusionIndex]
+    }
+    
+    // Progress message based on current purity
+    var progressMessage: String {
+        guard let messages = synthesisConfig?.progressMessages else { return "" }
+        let purityPct = Int(purity * 100)
+        let potentialPct = potentialPercent
+        
+        if purityPct == 0 { return messages.starting }
+        if purityPct < 25 { return messages.low }
+        if purityPct < 50 { return messages.warming }
+        if purityPct >= potentialPct - 10 { return messages.excellent }
+        if purityPct >= 50 { return messages.close }
+        return messages.warming
+    }
     
     // MARK: - Init
     
@@ -125,107 +146,129 @@ class ResearchViewModel: ObservableObject {
             return
         }
         
-        currentBarIndex = 0
-        currentRollIndex = -1
-        miniBarFills = [0, 0, 0]
-        showReagentSelect = false
-        mainTubeFill = 0
-        currentCrystalRollIndex = -1
-        crystalFloor = 0
+        // Reset all state
+        currentReagentIndex = 0
+        currentInfusionIndex = -1
+        reagentFills = [0, 0, 0]
+        showAmountSelect = false
+        potential = 0
+        currentSynthesisIndex = -1
+        purity = 0
         
         do {
             let response = try await api.runExperiment()
             experiment = response.experiment
             self.stats = response.playerStats
-            uiState = .filling
+            uiState = .preparation
         } catch {
             uiState = .error(error.localizedDescription)
         }
     }
     
-    // MARK: - Phase 1
+    // MARK: - Phase 1: Preparation
     
-    func doNextFillRoll() {
-        guard uiState == .filling,
-              let miniBars = experiment?.phase1Fill.miniBars,
-              currentBarIndex < miniBars.count else { return }
+    func doNextPreparationInfusion() {
+        guard uiState == .preparation,
+              let reagents = experiment?.phase1Preparation.reagents,
+              currentReagentIndex < reagents.count else { return }
         
-        let bar = miniBars[currentBarIndex]
+        let reagent = reagents[currentReagentIndex]
         
-        if !showReagentSelect {
-            let nextRollIdx = currentRollIndex + 1
+        if !showAmountSelect {
+            let nextIdx = currentInfusionIndex + 1
             
-            if nextRollIdx < bar.rolls.count {
-                currentRollIndex = nextRollIdx
-                let roll = bar.rolls[nextRollIdx]
+            if nextIdx < reagent.infusions.count {
+                currentInfusionIndex = nextIdx
+                let infusion = reagent.infusions[nextIdx]
                 withAnimation(.easeOut(duration: 0.3)) {
-                    miniBarFills[currentBarIndex] = CGFloat(roll.totalFill)
+                    reagentFills[currentReagentIndex] = CGFloat(infusion.totalFill)
                 }
             } else {
-                showReagentSelect = true
+                // Done with infusions, show amount selection
+                showAmountSelect = true
             }
         } else {
+            // Pour reagent into main tube (cap at 1.0)
             withAnimation(.easeOut(duration: 0.5)) {
-                mainTubeFill += CGFloat(bar.contribution)
+                potential = min(1.0, potential + CGFloat(reagent.contribution))
             }
             
-            let nextBarIdx = currentBarIndex + 1
-            if nextBarIdx < miniBars.count {
-                currentBarIndex = nextBarIdx
-                currentRollIndex = -1
-                showReagentSelect = false
+            let nextReagentIdx = currentReagentIndex + 1
+            if nextReagentIdx < reagents.count {
+                currentReagentIndex = nextReagentIdx
+                currentInfusionIndex = -1
+                showAmountSelect = false
             }
-            // Last bar: don't change anything else, currentRollIndex stays >= 0
+            // If last reagent: stays in showAmountSelect state, isPhase1Complete becomes true
         }
     }
     
-    // Called by View when user taps CRYSTALLIZE
-    func transitionToCrystallization() {
-        currentCrystalRollIndex = -1
-        crystalFloor = 0
-        uiState = .cooking
+    func transitionToSynthesis() {
+        currentSynthesisIndex = -1
+        purity = 0
+        uiState = .synthesis
     }
     
     var isPhase1Complete: Bool {
-        guard let expected = experiment?.phase1Fill.mainTubeFill else { return false }
-        return mainTubeFill >= CGFloat(expected) - 0.001
+        guard let expectedPotential = experiment?.phase1Preparation.potential else { return false }
+        return Int(potential * 100) >= expectedPotential - 1
     }
     
-    // MARK: - Phase 2 (Crystallization)
+    // MARK: - Phase 2: Synthesis
+    
+    var isSynthesisComplete: Bool {
+        // All regular infusions done
+        currentSynthesisIndex >= synthesisInfusions.count - 1
+    }
     
     var isExperimentComplete: Bool {
-        // Done if all rolls completed OR floor reached ceiling
-        currentCrystalRollIndex >= crystalRolls.count - 1 || crystalFloor >= mainTubeFill - 0.001
+        // All infusions done including final
+        uiState == .result || (isSynthesisComplete && uiState != .finalInfusion)
     }
     
-    func doNextCrystalRoll() {
-        guard uiState == .cooking else { return }
+    func doNextSynthesisInfusion() {
+        guard uiState == .synthesis else { return }
         
-        let nextIdx = currentCrystalRollIndex + 1
+        let nextIdx = currentSynthesisIndex + 1
         
-        if nextIdx < crystalRolls.count {
-            currentCrystalRollIndex = nextIdx
-            let roll = crystalRolls[nextIdx]
+        if nextIdx < synthesisInfusions.count {
+            currentSynthesisIndex = nextIdx
+            let infusion = synthesisInfusions[nextIdx]
             
-            // Update crystal floor based on this roll's result
+            // Update purity based on this infusion's result
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                crystalFloor = CGFloat(roll.floorAfter) / 100.0
+                purity = CGFloat(infusion.purityAfter) / 100.0
             }
         }
-        // Results shown inline in cooking phase
+    }
+    
+    func transitionToFinalInfusion() {
+        uiState = .finalInfusion
+    }
+    
+    func applyFinalInfusion() {
+        guard let final = finalInfusionResult else { return }
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
+            purity = CGFloat(final.purityAfter) / 100.0
+        }
+    }
+    
+    func transitionToResult() {
+        uiState = .result
     }
     
     // MARK: - Reset
     
     func reset() async {
         experiment = nil
-        currentBarIndex = 0
-        currentRollIndex = -1
-        miniBarFills = [0, 0, 0]
-        showReagentSelect = false
-        mainTubeFill = 0
-        currentCrystalRollIndex = -1
-        crystalFloor = 0
+        currentReagentIndex = 0
+        currentInfusionIndex = -1
+        reagentFills = [0, 0, 0]
+        showAmountSelect = false
+        potential = 0
+        currentSynthesisIndex = -1
+        purity = 0
         
         if let api = api {
             stats = try? await api.getStats()

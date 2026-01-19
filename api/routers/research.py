@@ -3,6 +3,9 @@ RESEARCH API ENDPOINTS
 ======================
 Simple API - start experiment, get ALL results, frontend animates.
 All data persisted to PostgreSQL for Lambda compatibility.
+
+Phase 1: PREPARATION - Measure and mix reagents
+Phase 2: SYNTHESIS - Purify through infusions
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +15,7 @@ from datetime import datetime
 from db.base import get_db
 from db.models.user import User
 from db.models.player_state import PlayerState
-from db.models.player_item import PlayerItem
+from db.models.inventory import PlayerInventory
 from db.models.research_session import ResearchSession
 from db.models.research_stats import ResearchStats
 from routers.auth import get_current_user
@@ -66,28 +69,36 @@ async def run_experiment(
         player.gold += result.gp
     
     if result.blueprints > 0:
-        # Add blueprints to inventory
-        for _ in range(result.blueprints):
-            blueprint = PlayerItem(
-                player_id=player.id,
-                item_type="blueprint",
-                quantity=1,
-            )
-            db.add(blueprint)
+        # Add blueprints to inventory (upsert)
+        existing = db.query(PlayerInventory).filter(
+            PlayerInventory.user_id == current_user.id,
+            PlayerInventory.item_id == "blueprint"
+        ).first()
+        
+        if existing:
+            existing.quantity += result.blueprints
+        else:
+            db.add(PlayerInventory(
+                user_id=current_user.id,
+                item_id="blueprint",
+                quantity=result.blueprints
+            ))
     
     # Store experiment session in database
+    # Note: DB columns use old names but semantics are updated
+    # is_critical -> is_eureka, final_floor -> final_purity, ceiling -> potential
     session = ResearchSession(
         user_id=current_user.id,
         kingdom_id=kingdom_id,
         experiment_data=result.to_dict(),
         success=result.success,
-        is_critical=result.is_critical,
+        is_critical=result.is_eureka,  # Maps to is_eureka
         blueprints_earned=result.blueprints,
         gp_earned=result.gp,
-        main_tube_fill=int(result.main_tube_fill * 100),
-        final_floor=result.final_floor,
-        ceiling=result.ceiling,
-        landed_tier=result.landed_tier_id,
+        main_tube_fill=result.potential,  # Potential from phase 1
+        final_floor=result.final_purity,  # Final purity
+        ceiling=result.potential,  # Potential (max possible)
+        landed_tier=result.result_tier_id,
         science_level=science,
         philosophy_level=philosophy,
         building_level=building,
@@ -121,24 +132,20 @@ async def run_experiment(
         else:
             stats.current_success_streak = 0
         
-        # Update tier counters
-        tier_id = result.landed_tier_id
-        if tier_id == "critical":
-            stats.critical_hits = (stats.critical_hits or 0) + 1
-        elif tier_id == "excellent":
-            stats.excellent_hits = (stats.excellent_hits or 0) + 1
-        elif tier_id == "good":
-            stats.good_hits = (stats.good_hits or 0) + 1
-        elif tier_id == "poor":
-            stats.poor_hits = (stats.poor_hits or 0) + 1
-        else:
+        # Update tier counters (using new tier IDs)
+        tier_id = result.result_tier_id
+        if tier_id == "eureka":
+            stats.critical_hits = (stats.critical_hits or 0) + 1  # DB col is critical_hits
+        elif tier_id == "stable":
+            stats.excellent_hits = (stats.excellent_hits or 0) + 1  # Reuse for stable
+        elif tier_id == "unstable":
             stats.failures = (stats.failures or 0) + 1
         
         # Update highscores
-        if result.final_floor > (stats.best_floor or 0):
-            stats.best_floor = result.final_floor
-        if result.ceiling > (stats.best_ceiling or 0):
-            stats.best_ceiling = result.ceiling
+        if result.final_purity > (stats.best_floor or 0):
+            stats.best_floor = result.final_purity  # DB col is best_floor
+        if result.potential > (stats.best_ceiling or 0):
+            stats.best_ceiling = result.potential
         if result.blueprints > (stats.most_blueprints_single or 0):
             stats.most_blueprints_single = result.blueprints
         
@@ -155,9 +162,10 @@ async def run_experiment(
             "gold": player.gold,
         },
         "config": {
-            "fill_animation_ms": 1500,
-            "stabilize_animation_ms": 3000,
-            "tap_animation_ms": 200,
+            "preparation_animation_ms": 1500,
+            "synthesis_animation_ms": 3000,
+            "infusion_animation_ms": 200,
+            "final_infusion_animation_ms": 800,
         },
     }
 
@@ -188,18 +196,16 @@ async def get_stats(
                 "experiments_succeeded": stats.experiments_succeeded,
                 "total_blueprints_earned": stats.total_blueprints_earned,
                 "total_gp_earned": stats.total_gp_earned,
-                "critical_hits": stats.critical_hits,
-                "excellent_hits": stats.excellent_hits,
-                "good_hits": stats.good_hits,
-                "poor_hits": stats.poor_hits,
-                "failures": stats.failures,
-                "best_floor": stats.best_floor,
-                "best_ceiling": stats.best_ceiling,
+                "eureka_count": stats.critical_hits,  # Renamed from critical
+                "stable_count": stats.excellent_hits,  # Renamed
+                "unstable_count": stats.failures,
+                "best_purity": stats.best_floor,  # Renamed from best_floor
+                "best_potential": stats.best_ceiling,
                 "most_blueprints_single": stats.most_blueprints_single,
                 "current_success_streak": stats.current_success_streak,
                 "best_success_streak": stats.best_success_streak,
                 "success_rate": stats.success_rate,
-                "critical_rate": stats.critical_rate,
+                "eureka_rate": stats.critical_rate,  # Renamed
             }
     
     return {
@@ -232,13 +238,12 @@ async def get_history(
             {
                 "id": s.id,
                 "success": s.success,
-                "is_critical": s.is_critical,
+                "is_eureka": s.is_critical,  # Renamed
                 "blueprints_earned": s.blueprints_earned,
                 "gp_earned": s.gp_earned,
-                "main_tube_fill": s.main_tube_fill,
-                "final_floor": s.final_floor,
-                "ceiling": s.ceiling,
-                "landed_tier": s.landed_tier,
+                "potential": s.main_tube_fill,  # Renamed
+                "final_purity": s.final_floor,  # Renamed
+                "result_tier": s.landed_tier,
                 "science_level": s.science_level,
                 "philosophy_level": s.philosophy_level,
                 "created_at": s.created_at.isoformat() if s.created_at else None,
