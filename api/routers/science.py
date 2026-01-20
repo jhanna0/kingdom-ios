@@ -49,6 +49,8 @@ def get_config():
         "skill": SKILL_CONFIG,
         "ui": UI_STRINGS,
         "theme": THEME_CONFIG,
+        "min_level": MIN_SCIENCE_LEVEL,
+        "entry_cost": ENTRY_COST,
     }
 
 

@@ -86,13 +86,13 @@ class ScienceSession:
     
     @property
     def current_number(self) -> int:
-        """The number currently shown to the player."""
+        """The calibration number shown to the player (always 45-65 range)."""
         if self.current_round < len(self.rounds):
             return self.rounds[self.current_round].shown_number
-        # After all rounds, show the last hidden number
+        # After all rounds complete, show the last round's calibration
         if self.rounds:
-            return self.rounds[-1].hidden_number
-        return 5  # Fallback
+            return self.rounds[-1].shown_number
+        return 55  # Fallback - middle of 45-65 calibration range
     
     @property
     def can_guess(self) -> bool:
@@ -236,23 +236,29 @@ class ScienceManager:
             science_level: Player's science skill level
             
         Returns:
-            Session with 3 rounds pre-calculated
+            Session with rounds pre-calculated
         """
         session_id = f"science_{player_id}_{int(time.time() * 1000)}"
         
-        # PRE-CALCULATE ALL 4 NUMBERS!
-        # Start in tight middle range - harder to guess near 50
-        numbers = [self.rng.randint(45, 65)]  # Starting number (tight middle)
-        
-        # Generate 3 more numbers for the 3 rounds
-        for _ in range(MAX_GUESSES):
-            numbers.append(self.rng.randint(MIN_NUMBER, MAX_NUMBER))
+        # Calibration ranges get tighter each round (harder as you progress)
+        # Round 1: 30-70, Round 2: 35-65, Round 3: 40-60, Round 4: 45-55
+        calibration_ranges = [
+            (30, 70),  # Round 1 - easiest
+            (35, 65),  # Round 2
+            (40, 60),  # Round 3
+            (45, 55),  # Round 4 - hardest (very close to 50)
+        ]
         
         # Create rounds with pre-calculated answers
         rounds = []
         for i in range(MAX_GUESSES):
-            shown = numbers[i]
-            hidden = numbers[i + 1]
+            # Get calibration range for this round (use last range if more rounds than ranges)
+            cal_min, cal_max = calibration_ranges[min(i, len(calibration_ranges) - 1)]
+            
+            # Calibration roll in progressively tighter range
+            shown = self.rng.randint(cal_min, cal_max)
+            # Hidden number is always full range
+            hidden = self.rng.randint(MIN_NUMBER, MAX_NUMBER)
             
             # Determine correct answer
             if hidden > shown:

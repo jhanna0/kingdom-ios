@@ -107,6 +107,8 @@ struct ScienceConfig: Codable {
     let skill: ScienceSkillConfig
     let ui: ScienceUIStrings
     let theme: ScienceThemeConfig
+    let min_level: Int
+    let entry_cost: Int
 }
 
 // MARK: - API Responses
