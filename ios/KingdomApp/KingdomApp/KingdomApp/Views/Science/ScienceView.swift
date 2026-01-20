@@ -16,6 +16,10 @@ struct ScienceView: View {
     @State private var isCalibrating: Bool = true
     @State private var showNumber: Bool = false
     
+    // Marker state (keep calibration marker pinned after calibration ends)
+    @State private var calibrationMarkerValue: Double? = nil
+    @State private var calibrationAnimationTask: Task<Void, Never>? = nil
+    
     // Rewards popup
     @State private var showWinningsPopup: Bool = false
     @State private var pendingPlayAgainAfterWinnings: Bool = false
@@ -67,9 +71,6 @@ struct ScienceView: View {
             viewModel.configure(with: apiClient)
             await viewModel.loadConfig()
         }
-        .onChange(of: viewModel.currentNumber) { _, newValue in
-            runCalibrationAnimation()
-        }
         .onChange(of: viewModel.uiState) { _, newState in
             if newState == .correct || newState == .wonMax {
                 haptic(.success)
@@ -93,7 +94,8 @@ struct ScienceView: View {
     // MARK: - Calibration Animation
     
     private func runCalibrationAnimation() {
-        Task {
+        calibrationAnimationTask?.cancel()
+        calibrationAnimationTask = Task {
             await runCalibrationSequence()
         }
     }
@@ -104,6 +106,7 @@ struct ScienceView: View {
         
         isCalibrating = true
         showNumber = false
+        calibrationMarkerValue = nil
         
         // Sweep through random positions before landing
         let positions: [Double] = [
@@ -117,6 +120,7 @@ struct ScienceView: View {
         ]
         
         for (index, pos) in positions.enumerated() {
+            if Task.isCancelled { return }
             let duration = index == positions.count - 1 ? 0.35 : 0.12
             withAnimation(.easeInOut(duration: duration)) {
                 gaugeValue = pos
@@ -129,6 +133,9 @@ struct ScienceView: View {
             gaugeValue = targetValue
         }
         try? await Task.sleep(nanoseconds: 300_000_000)
+        
+        // Pin the calibration marker at the final position
+        calibrationMarkerValue = targetValue
         
         // Show the number
         withAnimation(.easeIn(duration: 0.2)) {
@@ -319,22 +326,30 @@ struct ScienceView: View {
                     .padding(.vertical, 8)
                 }
                 
-                // THE LINE MARKER
+                // MARKERS (calibration sticks, result animates separately)
                 GeometryReader { geo in
                     let inset: CGFloat = 8
                     let usableHeight = geo.size.height - (inset * 2)
-                    let yPos = inset + usableHeight * (1 - gaugeValue / 100)
                     
-                    Rectangle()
-                        .fill(labBlue)
-                        .frame(width: geo.size.width, height: 4)
-                        .position(x: geo.size.width / 2, y: yPos)
-                    
-                    Circle()
-                        .fill(labBlue)
-                        .frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                        .position(x: geo.size.width / 2, y: yPos)
+                    ZStack {
+                        // 1) Calibration marker (purple)
+                        // During result roll, NEVER follow gaugeValue (avoid "picking up" the purple marker).
+                        let calibrationDisplayValue: Double? = {
+                            if isAnalyzing || showingResult {
+                                return calibrationMarkerValue
+                            }
+                            return calibrationMarkerValue ?? gaugeValue
+                        }()
+                        
+                        if let calibrationDisplayValue {
+                            gaugeMarker(in: geo, value: calibrationDisplayValue, inset: inset, usableHeight: usableHeight, color: labPurple, lineHeight: 3)
+                        }
+                        
+                        // 2) Result marker (blue) - shows during/after guess animation
+                        if isAnalyzing || showingResult {
+                            gaugeMarker(in: geo, value: gaugeValue, inset: inset, usableHeight: usableHeight, color: labBlue, lineHeight: 4)
+                        }
+                    }
                 }
             }
             
@@ -342,6 +357,31 @@ struct ScienceView: View {
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(height: 16)
+        }
+    }
+    
+    private func gaugeMarker(
+        in geo: GeometryProxy,
+        value: Double,
+        inset: CGFloat,
+        usableHeight: CGFloat,
+        color: Color,
+        lineHeight: CGFloat
+    ) -> some View {
+        let clamped = min(100, max(0, value))
+        let yPos = inset + usableHeight * (1 - clamped / 100)
+        
+        return ZStack {
+            Rectangle()
+                .fill(color)
+                .frame(width: geo.size.width, height: lineHeight)
+                .position(x: geo.size.width / 2, y: yPos)
+            
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .position(x: geo.size.width / 2, y: yPos)
         }
     }
     
@@ -730,6 +770,14 @@ struct ScienceView: View {
     // MARK: - Actions
     
     private func makeGuess(_ direction: String) async {
+        // Ensure any in-flight calibration animation can't keep moving the gauge/marker
+        calibrationAnimationTask?.cancel()
+        isCalibrating = false
+        if calibrationMarkerValue == nil {
+            // If the player somehow guesses before pinning happens, pin baseline immediately
+            calibrationMarkerValue = Double(viewModel.currentNumber)
+        }
+        
         isAnalyzing = true
         
         // SUSPENSE ANIMATION - line bounces around before landing
