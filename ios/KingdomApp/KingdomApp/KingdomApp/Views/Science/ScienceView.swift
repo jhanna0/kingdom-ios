@@ -1,4 +1,4 @@
-import SwiftUI
+ import SwiftUI
 
 // MARK: - Science View
 // THE LABORATORY - High/Low guessing game
@@ -65,8 +65,7 @@ struct ScienceView: View {
         .navigationBarHidden(true)
         .task {
             viewModel.configure(with: apiClient)
-            await viewModel.startExperiment()
-            runCalibrationAnimation()
+            await viewModel.loadConfig()
         }
         .onChange(of: viewModel.currentNumber) { _, newValue in
             runCalibrationAnimation()
@@ -388,10 +387,10 @@ struct ScienceView: View {
                 .frame(height: 70)
                 
                 // Bottom label - always takes space
-                Text("Higher or Lower?")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .opacity(viewModel.canGuess && !isCalibrating && !isAnalyzing ? 1 : 0)
+                Text(cardBottomLabel)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(cardBottomLabelColor)
+                    .opacity(cardBottomLabelOpacity)
                     .frame(height: 16)
             }
             .padding(16)
@@ -440,6 +439,27 @@ struct ScienceView: View {
             return viewModel.lastGuessResult?.is_correct == true ? labGold : labOrange
         }
         return KingdomTheme.Colors.inkMedium
+    }
+    
+    private var cardBottomLabel: String {
+        if showingResult {
+            return viewModel.lastGuessResult?.is_correct == true ? "Confirmed" : "Rejected"
+        }
+        return "Higher or Lower?"
+    }
+    
+    private var cardBottomLabelColor: Color {
+        if showingResult {
+            return viewModel.lastGuessResult?.is_correct == true ? labGold : labOrange
+        }
+        return KingdomTheme.Colors.inkMedium
+    }
+    
+    private var cardBottomLabelOpacity: Double {
+        if isAnalyzing { return 0 }
+        if showingResult { return 1 }
+        // Show "Higher or Lower?" during calibration and when ready
+        return 1
     }
     
     // MARK: - Result Card (FIXED height, no shifting)
@@ -539,7 +559,7 @@ struct ScienceView: View {
     private var bottomButtonContent: some View {
         let showCalibrating = viewModel.uiState == .loading || (viewModel.uiState == .ready && isCalibrating)
         let showGuessButtons = (viewModel.uiState == .ready) && !isCalibrating && viewModel.canGuess
-        let showNewTrial = (viewModel.uiState == .collected) || ((viewModel.uiState == .ready) && !isCalibrating && !viewModel.canGuess)
+        let showNewTrial = viewModel.uiState == .notStarted || (viewModel.uiState == .collected) || ((viewModel.uiState == .ready) && !isCalibrating && !viewModel.canGuess)
         let showAnalyzing = viewModel.uiState == .guessing
         let showNext = viewModel.uiState == .correct
         let showWrong = viewModel.uiState == .wrong
@@ -693,11 +713,14 @@ struct ScienceView: View {
     
     private var newTrialButton: some View {
         Button {
-            Task { await viewModel.playAgain() }
+            Task {
+                await viewModel.startExperiment()
+                runCalibrationAnimation()
+            }
         } label: {
             HStack {
-                Image(systemName: "arrow.counterclockwise")
-                Text("New Trial (\(viewModel.entryCost)g)")
+                Image(systemName: "flask.fill")
+                Text("Start Trial (\(viewModel.entryCost)g)")
             }
             .frame(maxWidth: .infinity)
         }

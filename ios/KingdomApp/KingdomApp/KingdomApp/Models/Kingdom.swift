@@ -20,6 +20,8 @@ struct BuildingTierInfo: Hashable {
 struct BuildingClickAction: Hashable, Identifiable {
     let type: String  // e.g. "gathering", "market", "townhall"
     let resource: String?  // For gathering: "wood", "iron"
+    let exhausted: Bool  // True if daily limit reached (for gathering)
+    let exhaustedMessage: String?  // Message to show when exhausted
     
     // Identifiable for SwiftUI sheet binding
     var id: String { "\(type)_\(resource ?? "")" }

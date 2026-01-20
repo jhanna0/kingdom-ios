@@ -21,6 +21,8 @@ struct APIBuildingTierInfo: Codable {
 struct APIBuildingClickAction: Codable {
     let type: String  // e.g. "gathering", "market", "townhall"
     let resource: String?  // For gathering: "wood", "iron"
+    let exhausted: Bool?  // True if daily limit reached (for gathering)
+    let exhausted_message: String?  // Message to show when exhausted
 }
 
 /// Catch-up info for players who joined after building was constructed

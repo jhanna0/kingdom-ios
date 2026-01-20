@@ -1,12 +1,13 @@
 """
 Resource Gathering action - Click to gather wood/iron
 1 second backend cooldown to prevent scripted abuse
+Daily limit: 200 * hometown building level per resource
 """
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, date
 
-from db import get_db, User, ActionCooldown
+from db import get_db, User, ActionCooldown, Kingdom, DailyGathering
 from routers.auth import get_current_user
 from systems.gathering import GatherManager, GatherConfig
 from .utils import log_activity
@@ -18,6 +19,62 @@ _gather_manager = GatherManager()
 
 # 1 second cooldown to prevent scripted abuse (frontend uses 0.5s)
 GATHER_COOLDOWN_SECONDS = 1
+
+# Daily limit per building level
+DAILY_LIMIT_PER_LEVEL = 200
+
+
+def get_daily_limit(db: Session, user: User, resource_type: str) -> int:
+    """Get daily gathering limit based on hometown building level."""
+    state = user.player_state
+    if not state or not state.hometown_kingdom_id:
+        return 0  # No hometown = no gathering allowed
+    
+    hometown = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+    if not hometown:
+        return 0
+    
+    # Get building level based on resource type
+    if resource_type == "wood":
+        level = getattr(hometown, 'lumbermill_level', 0) or 0
+    elif resource_type == "iron":
+        level = getattr(hometown, 'mine_level', 0) or 0
+    else:
+        level = 0
+    
+    return level * DAILY_LIMIT_PER_LEVEL
+
+
+def get_gathered_today(db: Session, user_id: int, resource_type: str) -> int:
+    """Get amount gathered today for this resource."""
+    today = date.today()
+    record = db.query(DailyGathering).filter(
+        DailyGathering.user_id == user_id,
+        DailyGathering.resource_type == resource_type,
+        DailyGathering.gather_date == today
+    ).first()
+    return record.amount_gathered if record else 0
+
+
+def add_gathered_amount(db: Session, user_id: int, resource_type: str, amount: int):
+    """Add to today's gathered amount."""
+    today = date.today()
+    record = db.query(DailyGathering).filter(
+        DailyGathering.user_id == user_id,
+        DailyGathering.resource_type == resource_type,
+        DailyGathering.gather_date == today
+    ).with_for_update().first()
+    
+    if record:
+        record.amount_gathered += amount
+    else:
+        record = DailyGathering(
+            user_id=user_id,
+            resource_type=resource_type,
+            gather_date=today,
+            amount_gathered=amount
+        )
+        db.add(record)
 
 
 @router.post("/gather")
@@ -84,6 +141,34 @@ def gather_resource(
             detail=f"Invalid resource type: {resource_type}. Must be 'wood' or 'iron'."
         )
     
+    # CHECK DAILY LIMIT - wood uses lumbermill_level, iron uses mine_level
+    daily_limit = get_daily_limit(db, current_user, resource_type)
+    gathered_today = get_gathered_today(db, current_user.id, resource_type)
+    
+    if daily_limit <= 0:
+        # No building = can't gather
+        return {
+            "resource_type": resource_type,
+            "tier": "black",
+            "amount": 0,
+            "new_total": getattr(state, resource_config["player_field"], 0),
+            "exhausted": True,
+            "exhausted_message": f"Your hometown needs a {'lumbermill' if resource_type == 'wood' else 'mine'} to gather {resource_type}."
+        }
+    
+    if gathered_today >= daily_limit:
+        # Daily limit reached - get building level for message
+        building_level = daily_limit // DAILY_LIMIT_PER_LEVEL
+        resource_verb = "chopped" if resource_type == "wood" else "mined"
+        return {
+            "resource_type": resource_type,
+            "tier": "black", 
+            "amount": 0,
+            "new_total": getattr(state, resource_config["player_field"], 0),
+            "exhausted": True,
+            "exhausted_message": f"You've {resource_verb} all available {resource_type} for today ({daily_limit} per T{building_level})"
+        }
+    
     # Get current amount of this resource
     player_field = resource_config["player_field"]
     current_amount = getattr(state, player_field, 0)
@@ -91,9 +176,10 @@ def gather_resource(
     # Execute gather roll
     result = _gather_manager.gather(resource_type, current_amount)
     
-    # Add gathered resources to player's inventory
+    # Add gathered resources to player's inventory AND track daily gathering
     if result.amount > 0:
         setattr(state, player_field, result.new_total)
+        add_gathered_amount(db, current_user.id, resource_type, result.amount)
     
     db.commit()
     

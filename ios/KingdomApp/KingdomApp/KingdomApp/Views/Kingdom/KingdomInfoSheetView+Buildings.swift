@@ -122,7 +122,7 @@ extension KingdomInfoSheetView {
         .cornerRadius(8)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(needsCatchup ? KingdomTheme.Colors.buttonWarning : Color.black, lineWidth: needsCatchup ? 2 : 1.5))
         
-        // Handle click: catchup takes priority over normal action
+        // Handle click: catchup takes priority, then check exhaustion, then normal action
         if needsCatchup {
             Button {
                 catchupBuilding = building
@@ -130,7 +130,13 @@ extension KingdomInfoSheetView {
             .buttonStyle(.plain)
         } else if isClickable, let clickAction = building.clickAction {
             Button {
-                activeBuildingAction = clickAction
+                // Check if building is exhausted (daily limit reached)
+                if clickAction.exhausted, let message = clickAction.exhaustedMessage {
+                    exhaustedMessage = message
+                    showExhaustedAlert = true
+                } else {
+                    activeBuildingAction = clickAction
+                }
             } label: { content }
             .buttonStyle(.plain)
         } else {

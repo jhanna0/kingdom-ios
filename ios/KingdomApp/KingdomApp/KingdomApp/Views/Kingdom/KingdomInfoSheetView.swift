@@ -21,6 +21,9 @@ struct KingdomInfoSheetView: View {
     @State var activeBuildingAction: BuildingClickAction?
     // Catchup state - for buildings that need catch-up work
     @State var catchupBuilding: BuildingMetadata?
+    // Exhausted state - for buildings that have hit daily limit
+    @State var showExhaustedAlert = false
+    @State var exhaustedMessage = ""
     
     // MARK: - Battle State (Coups & Invasions)
     @State var showBattleView = false
@@ -117,6 +120,11 @@ struct KingdomInfoSheetView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(battleError ?? "Unknown error")
+        }
+        .alert("Resources Exhausted", isPresented: $showExhaustedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exhaustedMessage)
         }
     }
 }

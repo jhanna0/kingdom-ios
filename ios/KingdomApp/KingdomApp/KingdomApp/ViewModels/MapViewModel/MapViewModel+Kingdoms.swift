@@ -259,7 +259,7 @@ extension MapViewModel {
                     
                     // Convert click action if present
                     let clickAction: BuildingClickAction? = building.click_action.map {
-                        BuildingClickAction(type: $0.type, resource: $0.resource)
+                        BuildingClickAction(type: $0.type, resource: $0.resource, exhausted: $0.exhausted ?? false, exhaustedMessage: $0.exhausted_message)
                     }
                     
                     // Convert catchup info if present
@@ -408,7 +408,7 @@ extension MapViewModel {
                             
                             // Convert click action if present
                             let clickAction: BuildingClickAction? = building.click_action.map {
-                                BuildingClickAction(type: $0.type, resource: $0.resource)
+                                BuildingClickAction(type: $0.type, resource: $0.resource, exhausted: $0.exhausted ?? false, exhaustedMessage: $0.exhausted_message)
                             }
                             
                             // Convert catchup info if present

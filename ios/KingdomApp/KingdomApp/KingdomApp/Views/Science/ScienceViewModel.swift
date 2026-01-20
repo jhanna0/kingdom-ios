@@ -11,6 +11,7 @@ class ScienceViewModel: ObservableObject {
     // MARK: - State
     
     enum UIState: Equatable {
+        case notStarted      // Initial state - waiting for user to confirm start
         case loading
         case ready           // Waiting for first guess
         case guessing        // Processing a guess
@@ -22,7 +23,7 @@ class ScienceViewModel: ObservableObject {
         case error(String)
     }
     
-    @Published var uiState: UIState = .loading
+    @Published var uiState: UIState = .notStarted
     @Published var session: ScienceSession?
     @Published var skillInfo: ScienceSkillInfo?
     @Published var stats: SciencePlayerStats?
@@ -61,6 +62,18 @@ class ScienceViewModel: ObservableObject {
     }
     
     // MARK: - Actions
+    
+    func loadConfig() async {
+        guard let api = api else { return }
+        
+        do {
+            let config = try await api.getConfig()
+            entryCost = config.entry_cost
+        } catch {
+            // Use default entry cost if config fails
+            entryCost = 10
+        }
+    }
     
     func startExperiment() async {
         guard let api = api else { return }

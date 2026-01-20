@@ -119,8 +119,23 @@ def get_buildings_for_kingdom(
         if click_action_meta and level > 0:
             click_action = {
                 "type": click_action_meta.get("type", ""),
-                "resource": click_action_meta.get("resource")
+                "resource": click_action_meta.get("resource"),
+                "exhausted": False,
+                "exhausted_message": None
             }
+            
+            # Check daily gathering limits for gathering-type buildings
+            if click_action_meta.get("type") == "gathering" and current_user and is_hometown:
+                resource = click_action_meta.get("resource")
+                if resource:
+                    from routers.actions.gathering import get_daily_limit, get_gathered_today, DAILY_LIMIT_PER_LEVEL
+                    daily_limit = level * DAILY_LIMIT_PER_LEVEL
+                    gathered_today = get_gathered_today(db, current_user.id, resource)
+                    if gathered_today >= daily_limit:
+                        click_action["exhausted"] = True
+                        resource_verb = "chopped" if resource == "wood" else "mined"
+                        resource_name = "wood" if resource == "wood" else "iron"
+                        click_action["exhausted_message"] = f"You've {resource_verb} all available {resource_name} for today."
         
         # Get catch-up info ONLY for hometown (you can only contribute to your hometown's buildings)
         catchup_info = None

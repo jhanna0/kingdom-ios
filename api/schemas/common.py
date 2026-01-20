@@ -57,6 +57,9 @@ class BuildingClickAction(BaseModel):
     """Action triggered when building is clicked - DYNAMIC from backend"""
     type: str  # e.g. "gathering", "market", "townhall"
     resource: Optional[str] = None  # For gathering: "wood", "iron"
+    # Daily limit exhaustion (for gathering buildings)
+    exhausted: bool = False  # True if daily limit reached
+    exhausted_message: Optional[str] = None  # Message to show when exhausted
 
 
 class BuildingCatchupInfo(BaseModel):
