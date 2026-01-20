@@ -69,7 +69,7 @@ NOTIFICATION_TYPES = {
         "color": "buttonDanger"
     },
     "ally_under_attack": {
-        "icon": "handshake.fill",
+        "icon": "person.2.fill",
         "color": "buttonWarning"
     },
     "invasion_defense_needed": {
@@ -87,7 +87,7 @@ NOTIFICATION_TYPES = {
     
     # Alliance notifications
     "alliance_request_received": {
-        "icon": "handshake.fill",
+        "icon": "person.2.fill",
         "color": "buttonSuccess"
     },
     "alliance_request_sent": {
@@ -95,7 +95,7 @@ NOTIFICATION_TYPES = {
         "color": "inkMedium"
     },
     "alliance_accepted": {
-        "icon": "handshake.fill",
+        "icon": "person.2.fill",
         "color": "buttonSuccess"
     },
     "alliance_declined": {

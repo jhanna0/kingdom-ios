@@ -132,9 +132,25 @@ def get_quick_summary(
         Friend.status == 'pending'
     ).count()
     
+    # Count pending alliance requests received (where user is target ruler)
+    from db.models.alliance import Alliance
+    pending_alliance_requests = db.query(Alliance).filter(
+        Alliance.target_ruler_id == current_user.id,
+        Alliance.status == 'pending'
+    ).count()
+    
+    # Count pending trade offers received
+    from db.models.trade_offer import TradeOffer, TradeOfferStatus
+    pending_trade_requests = db.query(TradeOffer).filter(
+        TradeOffer.recipient_id == current_user.id,
+        TradeOffer.status == TradeOfferStatus.PENDING.value
+    ).count()
+    
     return {
         "has_unread": has_unread,
-        "pending_friend_requests": pending_friend_requests
+        "pending_friend_requests": pending_friend_requests,
+        "pending_alliance_requests": pending_alliance_requests,
+        "pending_trade_requests": pending_trade_requests
     }
 
 

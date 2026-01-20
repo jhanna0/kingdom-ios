@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Custom confirmation popup for battles (coups/invasions)
-/// Shows detailed explanation and risk warning with Confirm/Cancel buttons
-struct BattleConfirmationPopup: View {
-    let title: String
-    let isInvasion: Bool
+/// Custom confirmation popup for proposing alliances
+/// Shows detailed explanation of alliance benefits with Confirm/Cancel buttons
+struct AllianceConfirmationPopup: View {
+    let targetKingdomName: String
     @Binding var isShowing: Bool
     let onConfirm: () -> Void
     
@@ -17,7 +16,7 @@ struct BattleConfirmationPopup: View {
             
             ScrollView {
                 VStack(spacing: 16) {
-                    // Warning icon with brutalist style
+                    // Alliance icon with brutalist style
                     ZStack {
                         Circle()
                             .fill(Color.black)
@@ -25,42 +24,37 @@ struct BattleConfirmationPopup: View {
                             .offset(x: 3, y: 3)
                         
                         Circle()
-                            .fill(KingdomTheme.Colors.buttonDanger)
+                            .fill(KingdomTheme.Colors.buttonSuccess)
                             .frame(width: 60, height: 60)
                             .overlay(
                                 Circle()
                                     .stroke(Color.black, lineWidth: 3)
                             )
                         
-                        Image(systemName: isInvasion ? "flag.2.crossed.fill" : "bolt.fill")
+                        Image(systemName: "person.2.fill")
                             .font(.system(size: 28))
                             .foregroundColor(.white)
                     }
                     .padding(.top, 8)
                     
                     // Title
-                    Text(title)
+                    Text("Propose Alliance")
                         .font(FontStyles.headingLarge)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                         .multilineTextAlignment(.center)
                     
+                    Text("with \(targetKingdomName)")
+                        .font(FontStyles.bodyMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
                     // How it works section
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("How It Works")
+                        Text("How Alliances Work")
                             .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        if isInvasion {
-                            infoRow(icon: "clock.fill", text: "Battle scheduled 24 hours from now", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "person.3.fill", text: "Anyone can pledge troops to either side", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "dollarsign.circle.fill", text: "Pledge gold to add soldiers to your side", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "flag.fill", text: "Winner takes control of the territory", color: KingdomTheme.Colors.royalBlue)
-                        } else {
-                            infoRow(icon: "clock.fill", text: "Battle scheduled 24 hours from now", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "person.3.fill", text: "Citizens pledge to support or defend ruler", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "dollarsign.circle.fill", text: "Pledge gold to add soldiers to your side", color: KingdomTheme.Colors.royalBlue)
-                            infoRow(icon: "crown.fill", text: "Winner becomes the new ruler", color: KingdomTheme.Colors.royalBlue)
-                        }
+                        infoRow(icon: "envelope.fill", text: "Target ruler must accept your proposal", color: KingdomTheme.Colors.royalBlue)
+                        infoRow(icon: "calendar", text: "Alliance lasts 30 days once accepted", color: KingdomTheme.Colors.royalBlue)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -75,35 +69,30 @@ struct BattleConfirmationPopup: View {
                     )
                     .padding(.horizontal)
                     
-                    // Risk warning section
+                    // Benefits section
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Risks")
+                        Text("Alliance Benefits")
                             .font(FontStyles.bodyMediumBold)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         infoRow(
-                            icon: "exclamationmark.triangle.fill",
-                            text: "Losers forfeit all pledged gold",
-                            color: KingdomTheme.Colors.buttonDanger
+                            icon: "shield.fill",
+                            text: "Help defend allies during invasions",
+                            color: KingdomTheme.Colors.buttonSuccess
                         )
-                        
-                        if isInvasion {
-                            infoRow(
-                                icon: "exclamationmark.triangle.fill",
-                                text: "Defenders lose territory if defeated",
-                                color: KingdomTheme.Colors.buttonDanger
-                            )
-                        } else {
-                            infoRow(
-                                icon: "exclamationmark.triangle.fill",
-                                text: "Ruler loses crown if defeated",
-                                color: KingdomTheme.Colors.buttonDanger
-                            )
-                        }
-                        
                         infoRow(
-                            icon: "checkmark.circle.fill",
-                            text: "Winners split the enemy's pledged gold",
+                            icon: "flag.fill",
+                            text: "Join allies in attacking other kingdoms. Share the spoils of war",
+                            color: KingdomTheme.Colors.buttonSuccess
+                        )
+                        infoRow(
+                            icon: "building.2.fill",
+                            text: "Use buildings in allied territories",
+                            color: KingdomTheme.Colors.buttonSuccess
+                        )
+                        infoRow(
+                            icon: "bell.fill",
+                            text: "Receive alerts when allies are attacked",
                             color: KingdomTheme.Colors.buttonSuccess
                         )
                     }
@@ -112,10 +101,10 @@ struct BattleConfirmationPopup: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                            .fill(KingdomTheme.Colors.buttonSuccess.opacity(0.1))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(KingdomTheme.Colors.buttonDanger.opacity(0.3), lineWidth: 1)
+                                    .stroke(KingdomTheme.Colors.buttonSuccess.opacity(0.3), lineWidth: 1)
                             )
                     )
                     .padding(.horizontal)
@@ -155,7 +144,7 @@ struct BattleConfirmationPopup: View {
                             }
                             onConfirm()
                         }) {
-                            Text("Confirm")
+                            Text("Send Proposal")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -167,7 +156,7 @@ struct BattleConfirmationPopup: View {
                                     .fill(Color.black)
                                     .offset(x: 2, y: 2)
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(KingdomTheme.Colors.buttonDanger)
+                                    .fill(KingdomTheme.Colors.buttonSuccess)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
                                             .stroke(Color.black, lineWidth: 2)
@@ -180,7 +169,7 @@ struct BattleConfirmationPopup: View {
                 }
                 .padding(.vertical, 20)
             }
-            .frame(maxHeight: 500)
+            .frame(maxHeight: 520)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
@@ -236,19 +225,9 @@ struct BattleConfirmationPopup: View {
     }
 }
 
-#Preview("Invasion") {
-    BattleConfirmationPopup(
-        title: "Declare Invasion",
-        isInvasion: true,
-        isShowing: .constant(true),
-        onConfirm: {}
-    )
-}
-
-#Preview("Coup") {
-    BattleConfirmationPopup(
-        title: "Stage Coup",
-        isInvasion: false,
+#Preview {
+    AllianceConfirmationPopup(
+        targetKingdomName: "Henniker",
         isShowing: .constant(true),
         onConfirm: {}
     )

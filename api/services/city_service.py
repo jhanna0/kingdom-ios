@@ -14,8 +14,8 @@ import asyncio
 
 from db import CityBoundary, Kingdom, User, get_db, CoupEvent
 from db.models import Battle
-from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BuildingClickAction, BuildingCatchupInfo, BUILDING_COLORS, AllianceInfo, ActiveCoupData
-from routers.alliances import are_empires_allied, get_alliance_between
+from schemas import CityBoundaryResponse, BoundaryResponse, KingdomData, BuildingData, BuildingUpgradeCost, BuildingTierInfo, BuildingClickAction, BuildingCatchupInfo, BUILDING_COLORS, AllianceInfo, ActiveAllianceInfo, ActiveCoupData
+from routers.alliances import are_empires_allied, get_alliance_between, get_active_alliances_for_empire
 from services.catchup_service import get_catchup_status, EXEMPT_BUILDINGS
 from osm_service import (
     find_user_city_fast,
@@ -469,6 +469,25 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 battle_type=battle_to_show.type  # "coup" or "invasion"
             )
         
+        # Get active alliances for player's hometown only
+        active_alliances_data = []
+        print(f"🤝 Alliance check: kingdom.id={kingdom.id}, user_hometown_kingdom_id={user_hometown_kingdom_id}, match={kingdom.id == user_hometown_kingdom_id}")
+        if kingdom.id == user_hometown_kingdom_id:
+            # This is the player's hometown - fetch all active alliances
+            hometown_empire_id = kingdom.empire_id or kingdom.id
+            print(f"🤝 Fetching alliances for hometown empire: {hometown_empire_id}")
+            try:
+                alliance_list = get_active_alliances_for_empire(db, hometown_empire_id)
+                print(f"🤝 Found {len(alliance_list)} alliances: {alliance_list}")
+                active_alliances_data = [
+                    ActiveAllianceInfo(**a) for a in alliance_list
+                ]
+                print(f"🤝 Created {len(active_alliances_data)} ActiveAllianceInfo objects")
+            except Exception as e:
+                print(f"🤝 ERROR fetching alliances: {e}")
+                import traceback
+                traceback.print_exc()
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
@@ -487,6 +506,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             alliance_info=AllianceInfo(**alliance_info) if alliance_info else None,
             allies=list(kingdom.allies) if kingdom.allies else [],
             enemies=list(kingdom.enemies) if kingdom.enemies else [],
+            active_alliances=active_alliances_data,  # Only populated for player's hometown
             can_stage_coup=can_stage_coup,
             coup_ineligibility_reason=coup_ineligibility_reason,
             is_at_war=is_at_war,  # Backend is source of truth! (defending OR attacking)

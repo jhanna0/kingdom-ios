@@ -145,7 +145,7 @@ struct KingdomMarker: View {
                 HStack(spacing: 6) {
                     if !kingdom.allies.isEmpty {
                         StatusBadge(
-                            icon: "handshake.fill",
+                            icon: "person.2.fill",
                             color: KingdomTheme.Colors.buttonSuccess
                         )
                     }

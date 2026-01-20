@@ -132,6 +132,26 @@ class CityAPI {
                 )
             }
             
+            // Active alliances (only for player's hometown)
+            if let alliancesData = kingdomData.active_alliances {
+                print("🤝 iOS: Parsing \(alliancesData.count) active alliances for \(city.name)")
+                kingdom.activeAlliances = alliancesData.map { alliance in
+                    let expiresAt = alliance.expires_at.flatMap { ISO8601DateFormatter().date(from: $0) }
+                    print("🤝 iOS: Alliance with \(alliance.allied_kingdom_name)")
+                    return ActiveAlliance(
+                        id: alliance.id,
+                        alliedKingdomId: alliance.allied_kingdom_id,
+                        alliedKingdomName: alliance.allied_kingdom_name,
+                        alliedRulerName: alliance.allied_ruler_name,
+                        daysRemaining: alliance.days_remaining,
+                        expiresAt: expiresAt
+                    )
+                }
+                print("🤝 iOS: Kingdom \(city.name) now has \(kingdom.activeAlliances.count) alliances")
+            } else {
+                print("🤝 iOS: No active_alliances in response for \(city.name)")
+            }
+            
             // War state - Backend is source of truth!
             kingdom.isAtWar = kingdomData.is_at_war ?? false
             

@@ -16,7 +16,7 @@ struct AllianceRequestCard: View {
             // Header
             HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
                 // Icon in brutalist badge
-                Image(systemName: "handshake.fill")
+                Image(systemName: "person.2.fill")
                     .font(FontStyles.iconLarge)
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)

@@ -233,6 +233,15 @@ class KingdomEvents:
     PLAYER_LEFT = "player_left"
 
 
+class AllianceEvents:
+    """Events broadcasted to alliance network"""
+    ALLY_UNDER_ATTACK = "ally_under_attack"  # Coup or invasion started
+    ALLY_BATTLE_ENDED = "ally_battle_ended"  # Battle resolved
+    ALLY_RULER_CHANGED = "ally_ruler_changed"  # Ruler changed (any reason)
+    ALLIANCE_FORMED = "alliance_formed"  # New alliance in network
+    ALLIANCE_EXPIRED = "alliance_expired"  # Alliance ended
+
+
 class UserEvents:
     """Events sent to specific users"""
     GOLD_RECEIVED = "gold_received"
@@ -320,6 +329,64 @@ def notify_hunt_participants(
         user_ids=user_ids,
         message=message
     )
+
+
+def notify_alliance_network(
+    kingdom_ids: list,
+    event_type: str,
+    data: dict,
+    source_kingdom_id: str = None
+) -> int:
+    """
+    Broadcast an event to multiple kingdoms (typically an alliance network).
+    
+    Use this to notify allies when something important happens:
+    - Ally is under attack (coup/invasion)
+    - Battle resolved
+    - Ruler changed
+    
+    Args:
+        kingdom_ids: List of kingdom IDs to notify
+        event_type: Type of event (use AllianceEvents constants)
+        data: Event-specific data
+        source_kingdom_id: The kingdom where the event originated
+    
+    Returns:
+        Total number of connections notified
+    
+    Example:
+        # Get allied kingdom IDs (caller does DB lookup)
+        allied_kingdom_ids = get_allied_kingdom_ids(db, my_empire_id)
+        
+        notify_alliance_network(
+            kingdom_ids=allied_kingdom_ids,
+            event_type=AllianceEvents.ALLY_UNDER_ATTACK,
+            data={
+                "kingdom_name": "San Francisco",
+                "battle_type": "invasion",
+                "attacker_name": "EvilRuler"
+            },
+            source_kingdom_id="san-francisco"
+        )
+    """
+    if not kingdom_ids:
+        return 0
+    
+    total_sent = 0
+    for kingdom_id in kingdom_ids:
+        sent = notify_kingdom(
+            kingdom_id=kingdom_id,
+            event_type=event_type,
+            data={
+                **data,
+                "source_kingdom_id": source_kingdom_id,
+                "is_alliance_news": True
+            }
+        )
+        total_sent += sent
+    
+    logger.info(f"[Alliance News] {event_type} -> {len(kingdom_ids)} kingdoms")
+    return total_sent
 
 
 def broadcast_duel_event(

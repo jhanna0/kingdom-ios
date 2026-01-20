@@ -103,6 +103,16 @@ class AllianceInfo(BaseModel):
     expires_at: Optional[str] = None
 
 
+class ActiveAllianceInfo(BaseModel):
+    """Active alliance with another kingdom (for hometown display)"""
+    id: int
+    allied_kingdom_id: str
+    allied_kingdom_name: str
+    allied_ruler_name: Optional[str] = None
+    days_remaining: int
+    expires_at: Optional[str] = None
+
+
 class KingdomData(BaseModel):
     """
     Kingdom data attached to a city - FULLY DYNAMIC from backend!
@@ -131,6 +141,7 @@ class KingdomData(BaseModel):
     alliance_info: Optional[AllianceInfo] = None  # Details about alliance if is_allied is True
     allies: List[str] = []  # Kingdom IDs of allied kingdoms
     enemies: List[str] = []  # Kingdom IDs of enemy kingdoms
+    active_alliances: List['ActiveAllianceInfo'] = []  # All active alliances (only populated for player's hometown)
     
     # Coup eligibility
     can_stage_coup: bool = False  # Backend determines if current user can initiate a coup

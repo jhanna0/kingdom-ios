@@ -293,6 +293,37 @@ extension MapViewModel {
                     )
                 }
             }
+            
+            // Alliance data
+            kingdom.isAllied = kingdomData.is_allied
+            kingdom.isEnemy = kingdomData.is_enemy
+            kingdom.allies = Set(kingdomData.allies ?? [])
+            kingdom.enemies = Set(kingdomData.enemies ?? [])
+            
+            // Alliance info if allied
+            if let allianceData = kingdomData.alliance_info {
+                let expiresAt = allianceData.expires_at.flatMap { ISO8601DateFormatter().date(from: $0) }
+                kingdom.allianceInfo = KingdomAllianceInfo(
+                    id: allianceData.id,
+                    daysRemaining: allianceData.days_remaining,
+                    expiresAt: expiresAt
+                )
+            }
+            
+            // Active alliances (only for player's hometown)
+            if let alliancesData = kingdomData.active_alliances {
+                kingdom.activeAlliances = alliancesData.map { alliance in
+                    let expiresAt = alliance.expires_at.flatMap { ISO8601DateFormatter().date(from: $0) }
+                    return ActiveAlliance(
+                        id: alliance.id,
+                        alliedKingdomId: alliance.allied_kingdom_id,
+                        alliedKingdomName: alliance.allied_kingdom_name,
+                        alliedRulerName: alliance.allied_ruler_name,
+                        daysRemaining: alliance.days_remaining,
+                        expiresAt: expiresAt
+                    )
+                }
+            }
         }
         
         return kingdom

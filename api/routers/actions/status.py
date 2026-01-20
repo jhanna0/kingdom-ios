@@ -777,6 +777,73 @@ def get_action_status(
                     "endpoint": None,
                     "handler": None,
                 }
+            
+            # PROPOSE ALLIANCE - Available when in enemy kingdom, user is ruler, not already allied
+            can_propose_alliance = False
+            alliance_ineligibility_reason = None
+            
+            if not fiefs_ruled:
+                alliance_ineligibility_reason = "Must rule a kingdom to propose alliances"
+            elif not kingdom.ruler_id:
+                alliance_ineligibility_reason = "Cannot ally with unruled kingdom"
+            else:
+                # Check if already allied
+                my_empire_id = ruled_kingdoms[0].empire_id or ruled_kingdoms[0].id
+                target_empire_id = kingdom.empire_id or kingdom.id
+                
+                if are_empires_allied(db, my_empire_id, target_empire_id):
+                    alliance_ineligibility_reason = "Already allied with this empire"
+                else:
+                    # Check for existing pending proposal
+                    from db import Alliance
+                    existing_proposal = db.query(Alliance).filter(
+                        Alliance.status == 'pending',
+                        ((Alliance.initiator_empire_id == my_empire_id) & (Alliance.target_empire_id == target_empire_id)) |
+                        ((Alliance.initiator_empire_id == target_empire_id) & (Alliance.target_empire_id == my_empire_id))
+                    ).first()
+                    
+                    if existing_proposal:
+                        alliance_ineligibility_reason = "Alliance proposal already pending"
+                    else:
+                        can_propose_alliance = True
+            
+            if can_propose_alliance:
+                actions["propose_alliance"] = {
+                    "ready": True,
+                    "seconds_remaining": 0,
+                    "unlocked": True,
+                    "action_type": "propose_alliance",
+                    "requirements_met": True,
+                    "title": "Propose Alliance",
+                    "icon": "person.2.fill",
+                    "description": f"Form alliance with {kingdom.name}",
+                    "category": "political",
+                    "theme_color": "buttonSuccess",
+                    "display_order": 2,
+                    "slot": "political",
+                    "endpoint": "/alliances/propose",
+                    "handler": "propose_alliance",
+                    "kingdom_id": kingdom.id,
+                    "kingdom_name": kingdom.name,
+                }
+            else:
+                actions["propose_alliance"] = {
+                    "ready": False,
+                    "seconds_remaining": 0,
+                    "unlocked": False,
+                    "action_type": "propose_alliance",
+                    "requirements_met": False,
+                    "requirement_description": alliance_ineligibility_reason,
+                    "title": "Propose Alliance",
+                    "icon": "person.2.fill",
+                    "description": "Form strategic alliance",
+                    "category": "political",
+                    "theme_color": "buttonSuccess",
+                    "display_order": 2,
+                    "slot": "political",
+                    "endpoint": None,
+                    "handler": None,
+                }
     
     # VIEW BATTLE - Show when there's an active battle involving the user's hometown kingdom
     # This includes:

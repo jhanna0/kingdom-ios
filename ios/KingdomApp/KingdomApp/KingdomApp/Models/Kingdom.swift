@@ -108,6 +108,16 @@ struct KingdomAllianceInfo: Hashable {
     let expiresAt: Date?
 }
 
+// Active alliance for hometown display
+struct ActiveAlliance: Hashable, Identifiable {
+    let id: Int
+    let alliedKingdomId: String
+    let alliedKingdomName: String
+    let alliedRulerName: String?
+    let daysRemaining: Int
+    let expiresAt: Date?
+}
+
 
 struct Kingdom: Identifiable, Equatable, Hashable {
     let id: String  // OSM ID - matches city_boundary_osm_id in backend
@@ -124,6 +134,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var isAllied: Bool  // True if allied with any of player's kingdoms
     var isEnemy: Bool  // True if at war with any of player's kingdoms
     var allianceInfo: KingdomAllianceInfo?  // Details about alliance if isAllied is true
+    var activeAlliances: [ActiveAlliance] = []  // All active alliances (only populated for player's hometown)
     
     // Coup eligibility (from backend)
     var canStageCoup: Bool  // True if current user can initiate a coup

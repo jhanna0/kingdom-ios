@@ -151,6 +151,23 @@ ACTION_TYPES = {
             "must_be_ruler": True,
             "requirement_text": "Must rule a kingdom to invade. Must be at target kingdom."
         }
+    },
+    "propose_alliance": {
+        "display_name": "Propose Alliance",
+        "icon": "person.2.fill",
+        "description": "Form a strategic alliance with this empire",
+        "category": "political",
+        "cooldown_minutes": 0,  # No cooldown
+        "theme_color": "buttonSuccess",
+        "display_order": 2,
+        "endpoint": "/alliances/propose",
+        "always_unlocked": False,
+        "requirements": {
+            "location": "enemy_kingdom",
+            "must_be_ruler": True,
+            "not_allied": True,
+            "requirement_text": "Must rule a kingdom. Target must have a ruler. Cannot be already allied."
+        }
     }
 }
 
@@ -185,6 +202,9 @@ ACTION_SLOTS = {
     
     # WARFARE SLOT - External conquest (declare invasions)
     "declare_invasion": "warfare",
+    
+    # POLITICAL SLOT - Also includes alliance proposals (enemy territory)
+    "propose_alliance": "political",
     
     # ACTIVE BATTLES SLOT - View/participate in battles you've joined (shows ANYWHERE)
     "view_coup": "active_battles",
@@ -260,17 +280,17 @@ SLOT_DEFINITIONS = {
     },
     "political": {
         "id": "political",
-        "display_name": "⚔️ Political",
+        "display_name": "Political",
         "icon": "shield.lefthalf.filled.badge.checkmark",
         "color_theme": "buttonDanger",
-        "display_order": 0,  # Show at top - coups are important!
-        "description": "Seize power through political action",
-        "location": "home",  # Shows in "home" but action only added when not ruler
+        "display_order": 0,  # Show at top
+        "description": "Political actions - coups and alliances",
+        "location": "any",  # Shows in both home (coups) and enemy (alliances)
         "content_type": "actions",
     },
     "warfare": {
         "id": "warfare",
-        "display_name": "⚔️ Warfare",
+        "display_name": "Warfare",
         "icon": "flag.2.crossed.fill",
         "color_theme": "buttonDanger",
         "display_order": 0,  # Show at top - invasions are important!
@@ -280,7 +300,7 @@ SLOT_DEFINITIONS = {
     },
     "active_battles": {
         "id": "active_battles",
-        "display_name": "⚔️ Active Battle",
+        "display_name": "Active Battle",
         "icon": "flame.fill",
         "color_theme": "buttonDanger",
         "display_order": -1,  # Show FIRST - battles are urgent!

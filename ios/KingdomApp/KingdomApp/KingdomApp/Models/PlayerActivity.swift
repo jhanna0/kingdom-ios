@@ -116,21 +116,7 @@ extension ActivityLogEntry {
     }
     
     var timeAgo: String {
-        // Parse Python datetime format: "2025-12-30T01:33:19.756588"
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        
-        guard let date = formatter.date(from: createdAt) else {
-            // Fallback: try without fractional seconds
-            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            guard let date = formatter.date(from: createdAt) else {
-                return "recently"
-            }
-            return TimeFormatter.timeAgo(from: date)
-        }
-        
-        return TimeFormatter.timeAgo(from: date)
+        TimeFormatter.timeAgo(from: createdAt)
     }
 }
 

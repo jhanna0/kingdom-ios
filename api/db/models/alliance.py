@@ -1,7 +1,7 @@
 """
 Alliance model - Formal pacts between empires
 """
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, ForeignKey, Boolean
 from datetime import datetime, timedelta
 
 from ..base import Base
@@ -31,6 +31,9 @@ class Alliance(Base):
     proposal_expires_at = Column(DateTime, nullable=False)
     accepted_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
+    
+    # Track if expiry notification was sent (for lazy notification on login/fetch)
+    expiry_notified = Column(Boolean, nullable=False, default=False)
     
     # Constants
     PROPOSAL_EXPIRY_DAYS = 7

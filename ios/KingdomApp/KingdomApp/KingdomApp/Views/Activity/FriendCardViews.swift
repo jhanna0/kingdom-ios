@@ -1,0 +1,231 @@
+import SwiftUI
+
+// MARK: - Friend Card
+
+struct FriendCard: View {
+    let friend: Friend
+
+    var body: some View {
+        NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
+            HStack(spacing: 12) {
+                // Avatar with online indicator
+                ZStack(alignment: .bottomTrailing) {
+                    Text(String(friend.displayName.prefix(1)).uppercased())
+                        .font(FontStyles.headingSmall)
+                        .foregroundColor(.white)
+                        .frame(width: 48, height: 48)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
+                    
+                    // Online indicator
+                    if let isOnline = friend.isOnline, isOnline {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 14, height: 14)
+                            .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                            .offset(x: 4, y: 4)
+                    }
+                }
+                
+                // Friend info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(friend.displayName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    HStack(spacing: 8) {
+                        if let level = friend.level {
+                            Text("Lv\(level)")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                        
+                        if let activity = friend.activity {
+                            HStack(spacing: 4) {
+                                Image(systemName: activity.icon)
+                                    .font(FontStyles.iconMini)
+                                    .foregroundColor(activityColor(activity.color))
+                                
+                                Text(activity.displayText)
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .lineLimit(1)
+                            }
+                        } else if let kingdomName = friend.currentKingdomName {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(FontStyles.iconMini)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                
+                                Text(kingdomName)
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+            }
+            .padding()
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+    }
+    
+    private func activityColor(_ colorName: String) -> Color {
+        switch colorName {
+        case "green": return KingdomTheme.Colors.buttonSuccess
+        case "blue": return KingdomTheme.Colors.buttonPrimary
+        case "orange": return KingdomTheme.Colors.buttonWarning
+        case "red": return KingdomTheme.Colors.buttonDanger
+        case "yellow": return KingdomTheme.Colors.inkMedium
+        default: return KingdomTheme.Colors.inkMedium
+        }
+    }
+}
+
+// MARK: - Friend Request Card
+
+struct FriendRequestCard: View {
+    let friend: Friend
+    let onAccept: () async -> Void
+    let onReject: () async -> Void
+    
+    @State private var isProcessing = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack(spacing: 12) {
+                Text(String(friend.displayName.prefix(1)).uppercased())
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(friend.displayName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("wants to be friends")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+            }
+            
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onAccept()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Accept")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
+                .disabled(isProcessing)
+                
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onReject()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Decline")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
+                .disabled(isProcessing)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Pending Sent Card
+
+struct PendingSentCard: View {
+    let friend: Friend
+    let onCancel: () async -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(String(friend.displayName.prefix(1)).uppercased())
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .frame(width: 40, height: 40)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(friend.displayName)
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("Request pending")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                Task {
+                    await onCancel()
+                }
+            }) {
+                Text("Cancel")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - All Friends View
+
+struct AllFriendsView: View {
+    let friends: [Friend]
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    ForEach(friends) { friend in
+                        FriendCard(friend: friend)
+                    }
+                }
+                .padding(.vertical)
+            }
+        }
+        .navigationTitle("All Friends")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+    }
+}

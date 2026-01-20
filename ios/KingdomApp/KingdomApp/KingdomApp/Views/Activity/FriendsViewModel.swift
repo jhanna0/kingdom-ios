@@ -18,6 +18,12 @@ class FriendsViewModel: ObservableObject {
     @Published var pendingTradeCount: Int = 0
     @Published var hasMerchantSkill: Bool = false
     
+    // Alliances
+    @Published var activeAlliances: [AllianceResponse] = []
+    @Published var pendingAlliancesSent: [AllianceResponse] = []
+    @Published var pendingAlliancesReceived: [AllianceResponse] = []
+    @Published var isRuler: Bool = false
+    
     private let api = KingdomAPIService.shared
     
     func loadFriends() async {
@@ -149,6 +155,51 @@ class FriendsViewModel: ObservableObject {
         } catch {
             print("❌ Failed to cancel trade: \(error)")
             errorMessage = "Failed to cancel trade"
+        }
+    }
+    
+    // MARK: - Alliance Functions
+    
+    func loadAlliances() async {
+        do {
+            // Load active alliances
+            let activeResponse = try await APIClient.shared.getActiveAlliances()
+            activeAlliances = activeResponse.alliances
+            isRuler = !activeResponse.alliances.isEmpty || true // Will be set properly
+            
+            // Load pending alliances
+            let pendingResponse = try await APIClient.shared.getPendingAlliances()
+            pendingAlliancesSent = pendingResponse.sent
+            pendingAlliancesReceived = pendingResponse.received
+            isRuler = pendingResponse.sentCount > 0 || pendingResponse.receivedCount > 0 || !activeAlliances.isEmpty
+            
+            print("✅ Loaded \(activeAlliances.count) active alliances, \(pendingAlliancesSent.count) sent, \(pendingAlliancesReceived.count) received")
+        } catch {
+            print("❌ Failed to load alliances: \(error)")
+            // Not a ruler or error - just don't show alliance section
+            isRuler = false
+        }
+    }
+    
+    func acceptAlliance(_ allianceId: Int) async {
+        do {
+            let response = try await APIClient.shared.acceptAlliance(allianceId: allianceId)
+            print("✅ Accepted alliance: \(response.message)")
+            await loadAlliances()
+        } catch {
+            print("❌ Failed to accept alliance: \(error)")
+            errorMessage = "Failed to accept alliance"
+        }
+    }
+    
+    func declineAlliance(_ allianceId: Int) async {
+        do {
+            let response = try await APIClient.shared.declineAlliance(allianceId: allianceId)
+            print("✅ Declined alliance: \(response.message)")
+            await loadAlliances()
+        } catch {
+            print("❌ Failed to decline alliance: \(error)")
+            errorMessage = "Failed to decline alliance"
         }
     }
 }

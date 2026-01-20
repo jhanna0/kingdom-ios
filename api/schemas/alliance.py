@@ -42,7 +42,6 @@ class AllianceProposeResponse(BaseModel):
     success: bool
     message: str
     alliance_id: int
-    cost_paid: int
     proposal_expires_at: datetime
 
 
