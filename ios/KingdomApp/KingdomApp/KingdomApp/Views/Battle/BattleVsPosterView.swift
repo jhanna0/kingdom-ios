@@ -56,6 +56,9 @@ struct BattleVsPosterView: View {
     private var userSide: String? { battle.userSide }
     private var battleType: BattleType { battle.battleType }
     
+    // For invasions: attacking kingdom name
+    private var attackingKingdomName: String? { battle.attackingFromKingdomName }
+    
     private var challengerStats: FighterStats {
         battle.initiatorStats.map { FighterStats(from: $0) } ?? .empty
     }
@@ -163,6 +166,15 @@ struct BattleVsPosterView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             
+            // For invasions: show attacking kingdom name
+            if battle.isInvasion, let attackingKingdom = attackingKingdomName {
+                Text("of \(attackingKingdom)")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            
             // Stats row
             HStack(spacing: 12) {
                 if challengerStats.level > 0 {
@@ -213,6 +225,15 @@ struct BattleVsPosterView: View {
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+            
+            // For invasions: show defending kingdom name (symmetric with attacker)
+            if battle.isInvasion {
+                Text("of \(kingdomName)")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
             
             // Role label
             Text("THE CROWN")

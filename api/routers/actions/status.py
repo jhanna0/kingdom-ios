@@ -737,6 +737,13 @@ def get_action_status(
                     if not ok:
                         invasion_ineligibility_reason = msg
                 
+                # Check if user is already in an active battle
+                if not invasion_ineligibility_reason:
+                    from routers.battles import _check_user_in_active_battle
+                    in_battle, battle_msg = _check_user_in_active_battle(db, current_user.id)
+                    if in_battle:
+                        invasion_ineligibility_reason = battle_msg
+                
                 # If no reason to block, can invade!
                 if not invasion_ineligibility_reason:
                     can_declare_invasion = True
