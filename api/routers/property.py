@@ -191,6 +191,17 @@ def get_available_rooms(tier: int) -> list:
     """Get list of rooms/features available for a property tier"""
     rooms = []
     
+    # Tier 1+: Garden (first unlock!)
+    if tier >= 1:
+        rooms.append({
+            "id": "garden",
+            "name": "Garden",
+            "icon": "leaf.fill",
+            "color": "buttonSuccess",
+            "description": "Plant seeds and grow your garden",
+            "route": "/garden"
+        })
+    
     # Tier 3+: Workshop
     if tier >= 3:
         rooms.append({

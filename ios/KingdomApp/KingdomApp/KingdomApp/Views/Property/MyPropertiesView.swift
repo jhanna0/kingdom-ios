@@ -313,6 +313,11 @@ struct MyPropertiesView: View {
                 inlineRoomContent(room)
             }
             .buttonStyle(.plain)
+        } else if room.route == "/garden" {
+            NavigationLink(destination: GardenView()) {
+                inlineRoomContent(room)
+            }
+            .buttonStyle(.plain)
         } else {
             inlineRoomContent(room)
         }

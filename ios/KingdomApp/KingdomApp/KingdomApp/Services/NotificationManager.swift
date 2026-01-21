@@ -191,6 +191,65 @@ class NotificationManager {
         print("🗑️ Cancelled coup \(coupId) notifications")
     }
     
+    // MARK: - Garden Watering Notifications
+    
+    /// Schedule a notification for when a garden plant needs watering
+    /// - Parameters:
+    ///   - slotIndex: The garden slot index (0-5)
+    ///   - secondsUntilWater: Seconds until the plant can be watered
+    func scheduleGardenWateringNotification(slotIndex: Int, secondsUntilWater: Int) async {
+        // Don't schedule if too short
+        guard secondsUntilWater > 60 else {
+            print("⏭️ Skipping garden notification - too short (\(secondsUntilWater)s)")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule garden notification - permission not granted")
+            return
+        }
+        
+        let identifier = "garden_water_\(slotIndex)"
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Garden Needs Water! 💧"
+        content.body = "Your plant is ready to be watered. Don't let it wilt!"
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "GARDEN_WATER"
+        content.userInfo = ["slot_index": slotIndex]
+        
+        // Cancel existing notification for this slot
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(secondsUntilWater), repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let hours = secondsUntilWater / 3600
+            let minutes = (secondsUntilWater % 3600) / 60
+            print("✅ Scheduled garden watering notification for slot \(slotIndex) in \(hours)h \(minutes)m")
+        } catch {
+            print("❌ Error scheduling garden notification: \(error)")
+        }
+    }
+    
+    /// Cancel garden watering notification for a specific slot
+    func cancelGardenNotification(slotIndex: Int) {
+        let identifier = "garden_water_\(slotIndex)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        print("🗑️ Cancelled garden notification for slot \(slotIndex)")
+    }
+    
+    /// Cancel all garden watering notifications
+    func cancelAllGardenNotifications() {
+        let identifiers = (0..<6).map { "garden_water_\($0)" }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        print("🗑️ Cancelled all garden watering notifications")
+    }
+    
     // MARK: - Cancel Notifications
     
     /// Cancel all action cooldown notifications

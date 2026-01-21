@@ -46,6 +46,9 @@ from .models import (
     ForagingSession,
     FishingSession,
     DailyGathering,
+    GardenSlot,
+    PlantStatus,
+    PlantType,
 )
 
 __all__ = [
@@ -97,5 +100,8 @@ __all__ = [
     "ForagingSession",
     "FishingSession",
     "DailyGathering",
+    "GardenSlot",
+    "PlantStatus",
+    "PlantType",
 ]
 

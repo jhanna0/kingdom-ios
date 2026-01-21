@@ -58,6 +58,9 @@ from .building_catchup import BuildingCatchup
 # Daily gathering limits (anti-autoclick)
 from .daily_gathering import DailyGathering
 
+# Garden system
+from .garden import GardenSlot, PlantStatus, PlantType
+
 __all__ = [
     "User",
     "PlayerState",
@@ -140,5 +143,9 @@ __all__ = [
     "BuildingCatchup",
     # Daily gathering limits
     "DailyGathering",
+    # Garden system
+    "GardenSlot",
+    "PlantStatus",
+    "PlantType",
 ]
 
