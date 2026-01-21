@@ -974,6 +974,61 @@ def get_action_status(
                 "is_in_correct_kingdom": is_in_correct_kingdom_to_join or user_pledged,  # Once pledged, always "correct"
             }
     
+    # SPECTATE BATTLE - Show when visiting a kingdom with an active battle you're not part of
+    # This lets visitors watch battles in progress (read-only - can't fight)
+    if state.current_kingdom_id and "view_coup" not in actions:
+        from db.models import Battle
+        
+        # Check for active battle in the kingdom we're currently visiting
+        local_battle = db.query(Battle).filter(
+            Battle.kingdom_id == state.current_kingdom_id,
+            Battle.resolved_at.is_(None)
+        ).first()
+        
+        if local_battle:
+            attacker_ids = local_battle.get_attacker_ids()
+            defender_ids = local_battle.get_defender_ids()
+            user_involved = current_user.id in attacker_ids or current_user.id in defender_ids
+            
+            # Only show spectate if user is NOT involved
+            if not user_involved:
+                battle_type_name = "Coup" if local_battle.is_coup else "Invasion"
+                is_battle_phase = local_battle.is_battle_phase
+                
+                if is_battle_phase:
+                    title = f"⚔️ {battle_type_name} in Progress"
+                    description = f"Watch the battle unfold"
+                else:
+                    title = f"View {battle_type_name}"
+                    description = f"Pledge phase - {local_battle.time_remaining_seconds // 60}m remaining"
+                
+                actions["spectate_battle"] = {
+                    "ready": True,
+                    "seconds_remaining": 0,
+                    "unlocked": True,
+                    "action_type": "spectate_battle",
+                    "requirements_met": True,
+                    "title": title,
+                    "icon": "bolt.fill" if local_battle.is_coup else "flag.2.crossed.fill",
+                    "description": description,
+                    "category": "political",
+                    "theme_color": "inkMedium",  # Gray for spectator
+                    "display_order": 0,
+                    "endpoint": None,
+                    "handler": "view_battle",  # Same handler - frontend opens BattleView
+                    "button_text": "Watch",
+                    "button_color": "inkMedium",
+                    "battle_id": local_battle.id,
+                    "battle_type": local_battle.type,
+                    "can_pledge": False,  # Spectators can't pledge
+                    "user_side": None,
+                    "user_pledged": False,
+                    "battle_status": local_battle.current_phase,
+                    "attacker_count": len(attacker_ids),
+                    "defender_count": len(defender_ids),
+                    "is_spectator": True,  # NEW: Frontend knows this is spectate-only
+                }
+    
     # Add slot information to each action
     for action_key, action_data in actions.items():
         action_data["slot"] = get_action_slot(action_key)

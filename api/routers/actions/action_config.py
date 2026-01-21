@@ -210,6 +210,7 @@ ACTION_SLOTS = {
     "view_coup": "active_battles",
     "view_invasion": "active_battles",
     "view_battle": "active_battles",
+    "spectate_battle": "active_battles",  # Spectate battles in cities you're visiting
 }
 
 
