@@ -173,6 +173,34 @@ class AuthManager: ObservableObject {
         }
     }
     
+    // MARK: - Demo Login (App Review)
+    
+    @MainActor
+    func demoLogin(secret: String) async {
+        do {
+            struct DemoLoginRequest: Encodable {
+                let secret: String
+            }
+            
+            let body = DemoLoginRequest(secret: secret)
+            let request = try apiClient.request(endpoint: "/auth/demo-login", method: "POST", body: body)
+            let token: TokenResponse = try await apiClient.execute(request)
+            
+            authToken = token.access_token
+            saveToken(token.access_token)
+            await fetchUserProfile()
+            
+            if let user = currentUser, user.needsOnboarding {
+                needsOnboarding = true
+            } else {
+                isAuthenticated = true
+            }
+        } catch {
+            hasCriticalError = true
+            criticalErrorMessage = "Demo login failed: \(error.localizedDescription)"
+        }
+    }
+    
     // MARK: - Onboarding
     
     @MainActor

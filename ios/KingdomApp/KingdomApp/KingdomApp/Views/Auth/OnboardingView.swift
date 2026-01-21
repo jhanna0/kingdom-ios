@@ -580,7 +580,7 @@ struct HometownStep: View {
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         if locationManager.isLocationDenied {
-                            Text("Location access was denied. We need your location to find nearby cities and kingdoms. Please enable it in Settings.")
+                            Text("Location access is required to find nearby cities and kingdoms. You can enable it in Settings.")
                                 .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .multilineTextAlignment(.center)
@@ -600,7 +600,7 @@ struct HometownStep: View {
                         locationManager.requestPermissions()
                     }) {
                         HStack {
-                            Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
+                            Text(locationManager.isLocationDenied ? "Open Settings" : "Continue")
                                 .font(FontStyles.bodyLargeBold)
                             Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
                                 .font(FontStyles.iconSmall)

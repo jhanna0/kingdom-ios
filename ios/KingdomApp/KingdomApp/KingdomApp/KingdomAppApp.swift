@@ -149,7 +149,7 @@ struct LocationRequiredView: View {
                         .frame(height: 2)
                     
                     if locationManager.isLocationDenied {
-                        Text("Location access was denied. Please enable it in Settings to continue.")
+                        Text("Location access is required for this game. You can enable it in Settings.")
                             .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     } else {
@@ -182,7 +182,7 @@ struct LocationRequiredView: View {
                     locationManager.requestPermissions()
                 }) {
                     HStack {
-                        Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
+                        Text(locationManager.isLocationDenied ? "Open Settings" : "Continue")
                             .font(FontStyles.bodyLargeBold)
                         Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
                             .font(FontStyles.iconSmall)
