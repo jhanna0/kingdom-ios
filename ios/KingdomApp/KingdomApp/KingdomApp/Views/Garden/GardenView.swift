@@ -898,7 +898,6 @@ struct GardenView: View {
         
         do {
             let response = try await gardenAPI.waterPlant(slotIndex: slotIndex)
-            showResult(success: response.success, message: response.message)
             
             // Schedule notification for next watering (if not fully grown)
             if response.success && !response.isFullyGrown, let seconds = response.nextWaterInSeconds, seconds > 0 {
@@ -923,8 +922,7 @@ struct GardenView: View {
         actionInProgress = slotIndex
         
         do {
-            let response = try await gardenAPI.harvestPlant(slotIndex: slotIndex)
-            showResult(success: response.success, message: response.message)
+            _ = try await gardenAPI.harvestPlant(slotIndex: slotIndex)
             await refreshGardenStatus()
         } catch {
             showResult(success: false, message: error.localizedDescription)
@@ -938,7 +936,6 @@ struct GardenView: View {
         
         do {
             let response = try await gardenAPI.discardPlant(slotIndex: slotIndex)
-            showResult(success: response.success, message: response.message)
             
             // Cancel notification for this slot
             if response.success {
@@ -1479,17 +1476,10 @@ struct GardenReadySheet: View {
                 if let rarity = slot.rarity {
                     Text(rarity.capitalized)
                         .font(FontStyles.labelBold)
-                        .foregroundColor(rarityColor)
+                        .foregroundColor(.white)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(rarityColor.opacity(0.15))
-                                .overlay(
-                                    Capsule()
-                                        .stroke(rarityColor, lineWidth: 1)
-                                )
-                        )
+                        .padding(.vertical, 6)
+                        .brutalistBadge(backgroundColor: rarityColor)
                 }
                 
                 // Description

@@ -161,9 +161,9 @@ RESOURCES = {
     # ===== GARDEN RESOURCES =====
     "wheat": {
         "display_name": "Wheat",
-        "icon": "leaf.arrow.triangle.circlepath",
+        "icon": "leaf",
         "color": "goldLight",
-        "description": "Fresh wheat harvested from your garden. Used to bake bread!",
+        "description": "Fresh wheat. Used to bake bread.",
         "category": "material",
         "display_order": 21,
         "is_tradeable": True,

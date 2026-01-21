@@ -72,11 +72,8 @@ GARDEN_CONFIG = {
         },
         "wheat": {
             "probability": 0.25,  # 15% chance
-            "display_name": "Wheat",
-            "icon": "leaf.arrow.triangle.circlepath",
-            "color": "goldLight",
-            "description": "Fresh wheat! Harvest to get wheat.",
-            "reward_item": "wheat",  # TODO: Add wheat to resources
+            # icon, color, display_name, description pulled from RESOURCES["wheat"]
+            "reward_item": "wheat",
             "reward_amount_min": 1,
             "reward_amount_max": 2,
         },
@@ -262,6 +259,13 @@ def slot_to_response(slot: GardenSlot) -> dict:
         # Plant is ready to harvest - show what it became
         outcome_config = config["outcomes"].get(slot.plant_type.value, {})
         
+        # Pull icon/color/display from RESOURCES if this is a resource item, else use outcome_config
+        resource_config = RESOURCES.get(slot.plant_type.value, {})
+        icon = outcome_config.get("icon") or resource_config.get("icon", "leaf.fill")
+        color = outcome_config.get("color") or resource_config.get("color", "buttonSuccess")
+        display_name = outcome_config.get("display_name") or resource_config.get("display_name", "Ready")
+        description = outcome_config.get("description") or resource_config.get("description", "")
+        
         # Get rarity color from config
         rarity_color = None
         if slot.flower_rarity and "color_tiers" in outcome_config:
@@ -271,10 +275,10 @@ def slot_to_response(slot: GardenSlot) -> dict:
         return {
             **base,
             "plant_type": slot.plant_type.value,
-            "icon": outcome_config.get("icon", "leaf.fill"),
-            "color": slot.flower_color or outcome_config.get("color", "buttonSuccess"),
-            "label": outcome_config.get("display_name", "Ready"),
-            "description": outcome_config.get("description", ""),
+            "icon": icon,
+            "color": slot.flower_color or color,
+            "label": display_name,
+            "description": description,
             "rarity": slot.flower_rarity,
             "rarity_color": rarity_color,
             "can_plant": False,
@@ -500,7 +504,9 @@ def water_plant(
         slot.status = PlantStatus.READY
         
         outcome_config = GARDEN_CONFIG["outcomes"].get(slot.plant_type.value, {})
-        message = f"Your plant is fully grown! It's {outcome_config.get('display_name', 'something')}!"
+        resource_config = RESOURCES.get(slot.plant_type.value, {})
+        display_name = outcome_config.get("display_name") or resource_config.get("display_name", "something")
+        message = f"Your plant is fully grown! It's {display_name}!"
         next_water_in_seconds = None
     else:
         cycles_left = GARDEN_CONFIG["watering_cycles_required"] - slot.watering_cycles
@@ -635,19 +641,22 @@ def discard_plant(
 @router.get("/config")
 def get_garden_config():
     """Get garden configuration for frontend reference."""
+    outcomes_response = {}
+    for k, v in GARDEN_CONFIG["outcomes"].items():
+        # Pull from RESOURCES if this is a resource item, else use outcome config
+        resource_config = RESOURCES.get(k, {})
+        outcomes_response[k] = {
+            "display_name": v.get("display_name") or resource_config.get("display_name", k),
+            "icon": v.get("icon") or resource_config.get("icon", "leaf.fill"),
+            "color": v.get("color") or resource_config.get("color", "buttonSuccess"),
+            "description": v.get("description") or resource_config.get("description", ""),
+        }
+    
     return {
         "max_slots": GARDEN_CONFIG["max_slots"],
         "watering_interval_hours": GARDEN_CONFIG["watering_interval_hours"],
         "watering_cycles_required": GARDEN_CONFIG["watering_cycles_required"],
         "seed_item_id": GARDEN_CONFIG["seed_item_id"],
-        "outcomes": {
-            k: {
-                "display_name": v["display_name"],
-                "icon": v["icon"],
-                "color": v["color"],
-                "description": v["description"],
-            }
-            for k, v in GARDEN_CONFIG["outcomes"].items()
-        },
+        "outcomes": outcomes_response,
         "ui": GARDEN_CONFIG["ui"],
     }
