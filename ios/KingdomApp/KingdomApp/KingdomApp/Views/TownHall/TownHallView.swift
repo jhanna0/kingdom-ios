@@ -80,6 +80,20 @@ struct TownHallView: View {
                             badge: nil
                         )
                     }
+
+                    // The March (minigame) - moved from Settings
+                    // NavigationLink {
+                    //     MarchGameView(player: player)
+                    //         .navigationBarHidden(true)
+                    // } label: {
+                    //     TownHallActivityCard(
+                    //         icon: "figure.walk",
+                    //         title: "The March",
+                    //         description: "Endless runner minigame",
+                    //         color: KingdomTheme.Colors.buttonSuccess,
+                    //         badge: nil
+                    //     )
+                    // }
                     
                     // Science Lab - Requires min science level from backend
                     if scienceLevel >= scienceMinLevel {
