@@ -26,7 +26,15 @@ from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
 from systems.science.science_manager import ScienceManager, ScienceSession
-from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG, ENTRY_COST, MIN_SCIENCE_LEVEL
+from systems.science.config import (
+    SKILL_CONFIG,
+    UI_STRINGS,
+    THEME_CONFIG,
+    ENTRY_COST,
+    MIN_SCIENCE_LEVEL,
+    MAX_GUESSES,
+    REWARD_CONFIG,
+)
 
 
 router = APIRouter(prefix="/science", tags=["science"])
@@ -45,12 +53,23 @@ class GuessRequest(BaseModel):
 @router.get("/config")
 def get_config():
     """Get display config for frontend - ALL UI strings from backend!"""
+    streak_rewards = [
+        {
+            "streak": streak,
+            "gold": cfg.get("gold", 0),
+            "blueprint": cfg.get("blueprint", 0),
+            "message": cfg.get("message", ""),
+        }
+        for streak, cfg in sorted(REWARD_CONFIG.items(), key=lambda kv: kv[0])
+    ]
     return {
         "skill": SKILL_CONFIG,
         "ui": UI_STRINGS,
         "theme": THEME_CONFIG,
         "min_level": MIN_SCIENCE_LEVEL,
         "entry_cost": ENTRY_COST,
+        "max_guesses": MAX_GUESSES,
+        "streak_rewards": streak_rewards,
     }
 
 
@@ -211,9 +230,8 @@ def collect_rewards(
     Collect rewards from the session.
     
     Rewards based on streak:
-    - 1 correct: 5 gold + science bonus
-    - 2 correct: 10 gold + science bonus
-    - 3 correct: 1 blueprint!
+    - Early streaks: gold (scales by config + science bonus)
+    - Max streak: blueprint
     """
     player_id = user.id
     

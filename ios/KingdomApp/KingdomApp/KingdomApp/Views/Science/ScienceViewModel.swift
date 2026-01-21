@@ -17,7 +17,7 @@ class ScienceViewModel: ObservableObject {
         case guessing        // Processing a guess
         case correct         // Just got it right!
         case wrong           // Just got it wrong
-        case wonMax          // Got all 3 right - EUREKA!
+        case wonMax          // Got all max right - EUREKA!
         case collecting      // Collecting rewards
         case collected       // Rewards collected successfully
         case error(String)
@@ -29,6 +29,8 @@ class ScienceViewModel: ObservableObject {
     @Published var stats: SciencePlayerStats?
     @Published var collectResponse: ScienceCollectResponse?
     @Published var entryCost: Int = 10  // Default, updated from backend
+    @Published var configMaxGuesses: Int = 4
+    @Published var streakRewards: [ScienceStreakReward] = []
     
     // Last guess result (for animation)
     @Published var lastGuessResult: ScienceGuessResponse?
@@ -40,7 +42,7 @@ class ScienceViewModel: ObservableObject {
     
     var currentNumber: Int { session?.current_number ?? 5 }
     var streak: Int { session?.streak ?? 0 }
-    var maxStreak: Int { session?.max_streak ?? 3 }
+    var maxStreak: Int { session?.max_streak ?? configMaxGuesses }
     var canGuess: Bool { session?.can_guess ?? false }
     var canCollect: Bool { session?.can_collect ?? false }
     var isGameOver: Bool { session?.is_game_over ?? false }
@@ -69,6 +71,8 @@ class ScienceViewModel: ObservableObject {
         do {
             let config = try await api.getConfig()
             entryCost = config.entry_cost
+            configMaxGuesses = max(1, config.max_guesses ?? configMaxGuesses)
+            streakRewards = config.streak_rewards ?? []
         } catch {
             // Use default entry cost if config fails
             entryCost = 10

@@ -185,7 +185,10 @@ struct ScienceView: View {
     private func streakDot(index: Int) -> some View {
         let isComplete = index < viewModel.streak
         let isFinal = index == max(0, viewModel.maxStreak - 1)
-        let goldReward = (index + 1) * 5
+        let streakNum = index + 1
+        let rewardCfg = viewModel.streakRewards.first(where: { $0.streak == streakNum })
+        let goldReward = rewardCfg?.gold ?? 0
+        let hasBlueprint = (rewardCfg?.blueprint ?? 0) > 0
         
         return VStack(spacing: 4) {
             ZStack {
@@ -209,12 +212,12 @@ struct ScienceView: View {
                 Text("\(goldReward)g")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(isComplete ? labGold : KingdomTheme.Colors.inkMedium)
-                    .opacity(isFinal ? 0 : 1)
+                    .opacity((isFinal || hasBlueprint) ? 0 : 1)
                 
                 Image(systemName: "scroll.fill")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isComplete ? labGold : KingdomTheme.Colors.inkMedium)
-                    .opacity(isFinal ? 1 : 0)
+                    .opacity((isFinal || hasBlueprint) ? 1 : 0)
             }
         }
     }
@@ -225,7 +228,7 @@ struct ScienceView: View {
         let rounds = viewModel.playedRounds.filter { $0.is_revealed }
         
         return HStack(spacing: 8) {
-            // Show up to 3 history cards (one per round)
+            // One history card per round slot
             ForEach(0..<max(1, viewModel.maxStreak), id: \.self) { index in
                 historyCard(for: index, rounds: rounds)
             }
