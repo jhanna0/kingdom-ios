@@ -49,6 +49,7 @@ ROUND1_BUSH_TYPES = {
         "color": _get_resource("berries").get("color", "buttonDanger"),
         "is_target": True,
         "weight": 40,
+        "label": "Berry",
     },
     "seed_trail": {
         "name": "Seed Trail",
@@ -56,7 +57,7 @@ ROUND1_BUSH_TYPES = {
         "color": "gold",
         "is_target": False,
         "is_seed_trail": True,
-        "label": "BONUS",
+        "label": "SEED TRAIL",
         "weight": 0,
     },
     "rock": {

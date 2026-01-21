@@ -131,6 +131,8 @@ struct ScienceStartResponse: Codable {
     let session: ScienceSession
     let skill_info: ScienceSkillInfo?
     let cost: Int?
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceGuessResponse: Codable {
@@ -148,6 +150,8 @@ struct ScienceGuessResponse: Codable {
     let next_number: Int?
     let round: ScienceRound
     let session: ScienceSession
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceCollectResponse: Codable {
@@ -158,6 +162,8 @@ struct ScienceCollectResponse: Codable {
     let blueprint: Int
     let message: String?
     let stats: SciencePlayerStats?
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceEndResponse: Codable {

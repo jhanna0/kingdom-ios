@@ -48,7 +48,7 @@ GARDEN_CONFIG = {
             "display_name": "Flower",
             "icon": "camera.macro",
             "color": "buttonDanger",  # Default pink/red
-            "description": "A beautiful flower for your garden.",
+            "description": "A beautiful flower for your garden. Nice to look at!",
             "reward_item": None,
             "reward_amount": 0,
             # Color tiers with rarity - hex colors for unique flower look

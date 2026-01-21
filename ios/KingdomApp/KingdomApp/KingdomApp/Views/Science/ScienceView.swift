@@ -58,6 +58,14 @@ struct ScienceView: View {
                 }
                 .padding(.horizontal, KingdomTheme.Spacing.large)
                 
+                // Gold badge above bottom bar, right-aligned
+                HStack {
+                    Spacer()
+                    goldBadge
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.bottom, 8)
+                
                 bottomButtons
             }
             
@@ -235,7 +243,6 @@ struct ScienceView: View {
         }
         .padding(.horizontal, KingdomTheme.Spacing.large)
         .padding(.vertical, 8)
-        .background(KingdomTheme.Colors.parchment)
     }
     
     private func historyCard(for index: Int, rounds: [ScienceRound]) -> some View {
@@ -582,6 +589,49 @@ struct ScienceView: View {
         }
         .frame(height: 70)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
+    // MARK: - Resources Badge (Gold + Blueprints)
+    
+    private var goldBadge: some View {
+        HStack(spacing: 12) {
+            // Gold
+            HStack(spacing: 4) {
+                Text("\(viewModel.playerGold)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+                
+                Image(systemName: "g.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(KingdomTheme.Colors.goldLight)
+            }
+            
+            // Blueprints
+            HStack(spacing: 4) {
+                Text("\(viewModel.playerBlueprints)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+                
+                Image(systemName: "scroll.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(labBlue)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
     }
     
     // MARK: - Bottom Buttons

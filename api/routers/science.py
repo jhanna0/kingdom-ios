@@ -42,6 +42,15 @@ router = APIRouter(prefix="/science", tags=["science"])
 _manager = ScienceManager()
 
 
+def _get_player_blueprints(db: Session, player_id: int) -> int:
+    """Get player's current blueprint count from inventory."""
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == player_id,
+        PlayerInventory.item_id == "blueprint"
+    ).first()
+    return inv.quantity if inv else 0
+
+
 class EmptyRequest(BaseModel):
     pass
 
@@ -164,6 +173,8 @@ def start_science(
             "level": science_level,
         },
         "cost": ENTRY_COST,
+        "player_gold": state.gold,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 
@@ -212,11 +223,16 @@ def make_guess(
     
     db.commit()
     
+    # Get player state for current gold
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    
     # Return result (includes whether correct, the hidden number, etc.)
     return {
         "success": True,
         **result,
         "session": session.to_dict(),
+        "player_gold": state.gold if state else 0,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 
@@ -368,6 +384,8 @@ def collect_rewards(
         "blueprint": blueprint,
         "message": result.get("message", ""),
         "stats": stats.to_dict(),
+        "player_gold": state.gold if state else 0,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 

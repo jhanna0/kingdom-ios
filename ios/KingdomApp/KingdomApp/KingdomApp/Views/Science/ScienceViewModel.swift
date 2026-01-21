@@ -31,6 +31,8 @@ class ScienceViewModel: ObservableObject {
     @Published var entryCost: Int = 10  // Default, updated from backend
     @Published var configMaxGuesses: Int = 4
     @Published var streakRewards: [ScienceStreakReward] = []
+    @Published var playerGold: Int = 0  // Current player gold, updated each round
+    @Published var playerBlueprints: Int = 0  // Current blueprint count
     
     // Last guess result (for animation)
     @Published var lastGuessResult: ScienceGuessResponse?
@@ -91,6 +93,8 @@ class ScienceViewModel: ObservableObject {
             session = response.session
             skillInfo = response.skill_info
             entryCost = response.cost ?? 10
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             uiState = .ready
             
             // Non-blocking: stats are nice-to-have in the bottom bar.
@@ -112,6 +116,8 @@ class ScienceViewModel: ObservableObject {
             let response = try await api.makeGuess(direction)
             lastGuessResult = response
             session = response.session
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             
             // Determine UI state based on result
             if response.is_correct {
@@ -146,6 +152,8 @@ class ScienceViewModel: ObservableObject {
             let response = try await api.collectRewards()
             stats = response.stats
             collectResponse = response
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             uiState = .collected
         } catch {
             uiState = .error(error.localizedDescription)
