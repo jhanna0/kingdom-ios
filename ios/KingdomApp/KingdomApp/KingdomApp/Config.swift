@@ -13,13 +13,13 @@ enum AppConfig {
     }
     
     /// Set this to switch between local, Lambda, and production API
-    static let apiEnvironment: APIEnvironment = .local
+    static let apiEnvironment: APIEnvironment = .lambda
     
     /// Backend API base URL
     static var apiBaseURL: String {
         switch apiEnvironment {
         case .local:
-            return "http://192.168.1.8:8000"
+            return "http://10.1.10.158:8000"
         case .lambda:
             return "https://eu0qm86e1m.execute-api.us-east-1.amazonaws.com"
         case .production:
