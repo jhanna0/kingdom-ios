@@ -27,6 +27,11 @@ class PropertyAPI {
         let purchased_at: String
         let last_upgraded: String?
         let available_rooms: [PropertyRoom]?
+        // Fortification fields
+        let fortification_unlocked: Bool?
+        let fortification_percent: Int?
+        let fortification_base_percent: Int?
+        let fortification: FortificationInfo?
         
         // Convert to Property model
         func toProperty() -> Property {
@@ -42,9 +47,18 @@ class PropertyAPI {
                 tier: tier,
                 location: location,
                 purchasedAt: dateFormatter.date(from: purchased_at) ?? Date(),
-                lastUpgraded: last_upgraded != nil ? dateFormatter.date(from: last_upgraded!) : nil
+                lastUpgraded: last_upgraded != nil ? dateFormatter.date(from: last_upgraded!) : nil,
+                fortificationUnlocked: fortification_unlocked ?? (tier >= 2),
+                fortificationPercent: fortification?.percent ?? fortification_percent ?? 0,
+                fortificationBasePercent: fortification?.base_percent ?? fortification_base_percent ?? 0
             )
         }
+    }
+    
+    struct FortificationInfo: Codable {
+        let percent: Int
+        let base_percent: Int
+        let decays_per_day: Int
     }
     
     struct PurchaseLandRequest: Codable {
@@ -239,6 +253,133 @@ class PropertyAPI {
     func getPropertyUpgradeStatus(propertyId: String) async throws -> PropertyUpgradeStatus {
         let request = client.request(endpoint: "/properties/\(propertyId)/upgrade/status", method: "GET")
         let response: PropertyUpgradeStatus = try await client.execute(request)
+        return response
+    }
+    
+    // MARK: - Fortification
+    
+    struct FortifyOptionItem: Codable, Identifiable {
+        let id: Int
+        let item_id: String?
+        let display_name: String
+        let icon: String
+        let type: String
+        let tier: Int
+        let gain_min: Int
+        let gain_max: Int
+        let is_equipped: Bool
+        
+        var gainRange: String {
+            "+\(gain_min)-\(gain_max)%"
+        }
+    }
+    
+    struct FortificationTLDR: Codable {
+        let title: String
+        let icon: String
+        let points: [String]
+    }
+    
+    struct FortificationTierGain: Codable {
+        let tier: Int
+        let min: Int
+        let max: Int
+    }
+    
+    struct FortificationGainRanges: Codable {
+        let title: String
+        let icon: String
+        let color: String
+        let tiers: [FortificationTierGain]
+    }
+    
+    struct FortificationT5Bonus: Codable {
+        let base: Int
+        let text: String
+        let icon: String
+        let color: String
+    }
+    
+    struct FortificationUIStrings: Codable {
+        let convert_card_title: String
+        let convert_card_icon: String
+        let convert_card_accent_color: String
+        
+        let loading_eligible_items: String
+        let locked_message: String
+        let empty_title: String
+        let empty_message: String
+        let choose_item_message: String
+        
+        let weapons_label: String
+        let armor_label: String
+        
+        let primary_action_label: String
+        let confirmation_title: String
+        let confirmation_confirm_label: String
+        let confirmation_cancel_label: String
+        let confirmation_message_template: String
+        
+        let result_title: String
+        let result_ok_label: String
+        let result_message_template: String
+        
+        let generic_error_title: String
+        let generic_error_ok_label: String
+    }
+    
+    struct FortificationExplanation: Codable {
+        let title: String
+        let ui: FortificationUIStrings
+        let tldr: FortificationTLDR
+        let gain_ranges: FortificationGainRanges
+        let decay: String
+        let decay_icon: String
+        let decay_color: String
+        let cap: Int
+        let rules: String
+        let rules_icon: String
+        let rules_color: String
+        let tip: String
+        let tip_icon: String
+        let tip_color: String
+        let t5_bonus: FortificationT5Bonus?
+    }
+    
+    struct FortifyOptionsResponse: Codable {
+        let property_id: String
+        let fortification_unlocked: Bool
+        let current_fortification: Int
+        let base_fortification: Int
+        let eligible_items: [FortifyOptionItem]
+        let weapon_count: Int
+        let armor_count: Int
+        let explanation: FortificationExplanation
+    }
+    
+    struct FortifyRequest: Codable {
+        let player_item_id: Int
+    }
+    
+    struct FortifyResponse: Codable {
+        let success: Bool
+        let message: String
+        let fortification_before: Int
+        let fortification_gain: Int
+        let fortification_after: Int
+        let item_consumed: String
+    }
+    
+    func getFortifyOptions(propertyId: String) async throws -> FortifyOptionsResponse {
+        let request = client.request(endpoint: "/properties/\(propertyId)/fortify/options", method: "GET")
+        let response: FortifyOptionsResponse = try await client.execute(request)
+        return response
+    }
+    
+    func fortifyProperty(propertyId: String, itemId: Int) async throws -> FortifyResponse {
+        let body = FortifyRequest(player_item_id: itemId)
+        let request = try client.request(endpoint: "/properties/\(propertyId)/fortify", method: "POST", body: body)
+        let response: FortifyResponse = try await client.execute(request)
         return response
     }
 }

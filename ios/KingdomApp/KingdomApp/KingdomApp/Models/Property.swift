@@ -18,6 +18,11 @@ struct Property: Identifiable, Codable, Hashable {
     let purchasedAt: Date
     var lastUpgraded: Date?
     
+    // MARK: - Fortification (gear sink system)
+    var fortificationUnlocked: Bool = false  // Unlocked at T2+
+    var fortificationPercent: Int = 0  // 0-100%
+    var fortificationBasePercent: Int = 0  // T5 has 50% base
+    
     // MARK: - Computed Properties
     
     var name: String {
@@ -26,6 +31,11 @@ struct Property: Identifiable, Codable, Hashable {
     
     var tierName: String {
         TierManager.shared.propertyTierName(tier)
+    }
+    
+    /// Effective fortification (max of current and base)
+    var effectiveFortification: Int {
+        max(fortificationPercent, fortificationBasePercent)
     }
     
     // MARK: - T1: Land Benefits
