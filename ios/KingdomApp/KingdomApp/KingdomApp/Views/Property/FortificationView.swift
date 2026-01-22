@@ -20,57 +20,49 @@ struct FortificationView: View {
     private let fortificationColor = KingdomTheme.Colors.royalBlue
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                fortificationPercentageCard
-                sacrificeCard
-                howItWorksCard
-            }
-            .padding()
-        }
-        .parchmentBackground()
-        .navigationTitle(fortifyOptions?.explanation.title ?? "")
-        .navigationBarTitleDisplayMode(.inline)
-        .parchmentNavigationBar()
-        .task {
-            await loadFortifyOptions()
-        }
-        .alert(fortifyOptions?.explanation.ui.confirmation_title ?? "", isPresented: $showConfirmation) {
-            Button(fortifyOptions?.explanation.ui.confirmation_cancel_label ?? "", role: .cancel) {
-                selectedItem = nil
-            }
-            Button(fortifyOptions?.explanation.ui.confirmation_confirm_label ?? "", role: .destructive) {
-                if let item = selectedItem {
-                    Task { await sacrificeItem(item) }
+        ZStack {
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    fortificationPercentageCard
+                    sacrificeCard
+                    howItWorksCard
                 }
+                .padding()
             }
-        } message: {
-            if let item = selectedItem {
-                Text(renderTemplate(
-                    fortifyOptions?.explanation.ui.confirmation_message_template ?? "",
-                    vars: [
-                        "item_name": item.display_name,
-                        "gain_range": item.gainRange
-                    ]
-                ))
+            .parchmentBackground()
+            .navigationTitle(fortifyOptions?.explanation.title ?? "")
+            .navigationBarTitleDisplayMode(.inline)
+            .parchmentNavigationBar()
+            .task {
+                await loadFortifyOptions()
+            }
+            
+            // Custom Popups
+            if showConfirmation, let item = selectedItem, let explanation = fortifyOptions?.explanation {
+                FortifyConfirmationPopup(
+                    item: item,
+                    explanation: explanation,
+                    isShowing: $showConfirmation,
+                    onConfirm: {
+                        Task { await sacrificeItem(item) }
+                    }
+                )
+                .transition(.opacity)
+            }
+            
+            if showResult, let result = lastResult {
+                FortifyResultPopup(
+                    result: result,
+                    title: fortifyOptions?.explanation.ui.result_title ?? "Fortification Increased!",
+                    isShowing: $showResult
+                )
+                .transition(.opacity)
             }
         }
-        .alert(fortifyOptions?.explanation.ui.result_title ?? "", isPresented: $showResult) {
-            Button(fortifyOptions?.explanation.ui.result_ok_label ?? "", role: .cancel) {}
-        } message: {
-            if let result = lastResult {
-                Text(renderTemplate(
-                    fortifyOptions?.explanation.ui.result_message_template ?? "",
-                    vars: [
-                        "item_name": result.item_consumed,
-                        "gain_percent": "\(result.fortification_gain)",
-                        "before_percent": "\(result.fortification_before)",
-                        "after_percent": "\(result.fortification_after)"
-                    ]
-                ))
-            }
-        }
-        .alert(fortifyOptions?.explanation.ui.generic_error_title ?? "", isPresented: .constant(errorMessage != nil)) {
+        .alert(fortifyOptions?.explanation.ui.generic_error_title ?? "", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
             Button(fortifyOptions?.explanation.ui.generic_error_ok_label ?? "", role: .cancel) {
                 errorMessage = nil
             }
@@ -415,47 +407,71 @@ struct FortificationView: View {
                     borderWidth: 2
                 )
             
-            // Item info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Top row: Name
                 Text(item.display_name)
                     .font(KingdomTheme.Typography.body())
                     .fontWeight(.semibold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .lineLimit(1)
                 
+                // Bottom row: Badges
                 HStack(spacing: 8) {
-                    // Tier badge
-                    Text("T\(item.tier)")
-                        .font(KingdomTheme.Typography.caption2())
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(itemColor)
-                        )
+                    // Combined Tier & Gain Badge
+                    HStack(spacing: 6) {
+                        Text("T\(item.tier)")
+                            .font(KingdomTheme.Typography.caption2())
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(RoundedRectangle(cornerRadius: 3).fill(itemColor))
+                        
+                        Text(item.gainRange)
+                            .font(KingdomTheme.Typography.caption())
+                            .fontWeight(.bold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.parchmentLight,
+                        cornerRadius: 6,
+                        shadowOffset: 1,
+                        borderWidth: 1.5
+                    )
                     
-                    // Gain range
-                    Text(item.gainRange)
-                        .font(KingdomTheme.Typography.caption())
-                        .fontWeight(.bold)
-                        .foregroundColor(fortificationColor)
+                    // Count Badge
+                    if item.count > 1 {
+                        Text("x\(item.count)")
+                            .font(KingdomTheme.Typography.caption())
+                            .fontWeight(.bold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .padding(.horizontal, 8)
+                            .frame(height: 24)
+                            .brutalistBadge(
+                                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                                cornerRadius: 6,
+                                shadowOffset: 1,
+                                borderWidth: 1.5
+                            )
+                    }
                 }
             }
             
-            Spacer()
+            Spacer(minLength: 4)
             
             // Convert button
             Button {
                 selectedItem = item
                 showConfirmation = true
             } label: {
-                Text(fortifyOptions?.explanation.ui.primary_action_label ?? "")
+                Text(fortifyOptions?.explanation.ui.primary_action_label ?? "Convert")
                     .font(KingdomTheme.Typography.caption())
                     .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
             }
             .brutalistBadge(
                 backgroundColor: KingdomTheme.Colors.buttonDanger,
@@ -469,8 +485,6 @@ struct FortificationView: View {
         .padding(12)
         .parchmentCard(
             backgroundColor: KingdomTheme.Colors.parchment,
-            borderColor: KingdomTheme.Colors.borderDark,
-            borderWidth: KingdomTheme.BorderWidth.thin,
             cornerRadius: 10,
             hasShadow: false
         )

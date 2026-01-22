@@ -154,6 +154,7 @@ class FortifyOptionItem(BaseModel):
     gain_min: int
     gain_max: int
     is_equipped: bool
+    count: int = 1
 
 
 class FortifyOptionsResponse(BaseModel):
@@ -954,7 +955,7 @@ def get_item_display_info(item: PlayerItem) -> dict:
     # Add tier name prefix if not already in display name
     tier_name = tier_info.get("name", f"T{item.tier}")
     if tier_name.lower() not in display_name.lower():
-        display_name = f"{tier_name} {display_name}"
+        display_name = f"{display_name}"
     
     return {
         "display_name": display_name,
@@ -1081,8 +1082,8 @@ def get_fortify_options(
     weapon_count = len(all_weapons)
     armor_count = len(all_armor)
     
-    # Build eligible items list
-    eligible_items = []
+    # Build eligible items list (stacked by item_id, type, and tier)
+    eligible_items_map = {}
     
     for item in all_weapons + all_armor:
         # Skip if equipped (v1 simplification)
@@ -1095,21 +1096,30 @@ def get_fortify_options(
         if item.type == 'armor' and armor_count <= 1:
             continue
         
-        # Get display info and gain range
-        display_info = get_item_display_info(item)
-        min_gain, max_gain = get_fortification_gain_range(item.tier)
+        # Grouping key
+        key = (item.item_id, item.type, item.tier)
         
-        eligible_items.append(FortifyOptionItem(
-            id=item.id,
-            item_id=item.item_id,
-            display_name=display_info["display_name"],
-            icon=display_info["icon"],
-            type=item.type,
-            tier=item.tier,
-            gain_min=min_gain,
-            gain_max=max_gain,
-            is_equipped=item.is_equipped
-        ))
+        if key in eligible_items_map:
+            eligible_items_map[key]["count"] += 1
+        else:
+            # Get display info and gain range
+            display_info = get_item_display_info(item)
+            min_gain, max_gain = get_fortification_gain_range(item.tier)
+            
+            eligible_items_map[key] = {
+                "id": item.id,
+                "item_id": item.item_id,
+                "display_name": display_info["display_name"],
+                "icon": display_info["icon"],
+                "type": item.type,
+                "tier": item.tier,
+                "gain_min": min_gain,
+                "gain_max": max_gain,
+                "is_equipped": item.is_equipped,
+                "count": 1
+            }
+            
+    eligible_items = [FortifyOptionItem(**val) for val in eligible_items_map.values()]
     
     # Sort by tier (higher first), then by type
     eligible_items.sort(key=lambda x: (-x.tier, x.type))

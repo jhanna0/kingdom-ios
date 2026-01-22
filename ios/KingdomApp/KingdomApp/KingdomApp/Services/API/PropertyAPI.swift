@@ -268,6 +268,7 @@ class PropertyAPI {
         let gain_min: Int
         let gain_max: Int
         let is_equipped: Bool
+        let count: Int
         
         var gainRange: String {
             "+\(gain_min)-\(gain_max)%"
