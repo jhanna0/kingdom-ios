@@ -4,16 +4,18 @@ import SwiftUI
 // MARK: - Gather Action Response
 
 struct GatherResponse: Codable {
-    let success: Bool
+    let success: Bool?
     let resourceType: String
-    let resourceName: String
-    let resourceIcon: String
+    let resourceName: String?
+    let resourceIcon: String?
     let tier: String              // "black", "brown", "green", "gold"
     let amount: Int               // 0, 1, 2, or 3
-    let color: String             // Theme color name (e.g. "buttonSuccess")
-    let message: String
+    let color: String?            // Theme color name (e.g. "buttonSuccess")
+    let message: String?
     let newTotal: Int
     let haptic: String?           // "medium", "heavy", or null
+    let exhausted: Bool?          // True if daily limit reached
+    let exhaustedMessage: String? // Message to show when exhausted
     
     enum CodingKeys: String, CodingKey {
         case success
@@ -22,11 +24,14 @@ struct GatherResponse: Codable {
         case resourceIcon = "resource_icon"
         case tier, amount, color, message, haptic
         case newTotal = "new_total"
+        case exhausted
+        case exhaustedMessage = "exhausted_message"
     }
     
     /// Get SwiftUI Color from theme color name
     var tierColor: Color {
-        KingdomTheme.Colors.color(fromThemeName: color)
+        guard let color = color else { return .gray }
+        return KingdomTheme.Colors.color(fromThemeName: color)
     }
 }
 

@@ -347,3 +347,73 @@ def client_log(log_entry: ClientLogRequest):
     
     return {"status": "logged"}
 
+
+# ===== Demo Login for App Review =====
+
+from config import DEMO_LOGIN_SECRET
+
+class DemoLoginRequest(BaseModel):
+    """Demo login request for App Store review"""
+    secret: str
+
+@router.post("/demo-login", response_model=TokenResponse)
+def demo_login(request: DemoLoginRequest, db: Session = Depends(get_db)):
+    """
+    Demo login for App Store reviewers.
+    
+    Logs into a pre-seeded demo account without requiring Apple Sign In.
+    Protected by a secret code provided in App Review notes.
+    """
+    if request.secret != DEMO_LOGIN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid demo code"
+        )
+    
+    # Find or create the demo user
+    demo_apple_id = "demo_reviewer_account"
+    user = db.query(User).filter(User.apple_user_id == demo_apple_id).first()
+    
+    if not user:
+        # Create demo user with pre-seeded content
+        from db.models.player_state import PlayerState
+        
+        user = User(
+            email="demo@review.apple.com",
+            apple_user_id=demo_apple_id,
+            display_name="AppleReviewer",
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(user)
+        db.flush()
+        
+        # Create player state with good starting resources
+        player_state = PlayerState(
+            user_id=user.id,
+            hometown_kingdom_id=None,
+            gold=5000,
+            level=5,
+            experience=0,
+            attack_power=3,
+            defense_power=3,
+            leadership=2,
+            building_skill=2,
+        )
+        db.add(player_state)
+        db.commit()
+        db.refresh(user)
+        
+        print(f"✅ [DEMO] Created demo user: user_id={user.id}")
+    else:
+        print(f"✅ [DEMO] Existing demo user: user_id={user.id}")
+    
+    # Generate token
+    access_token = create_access_token(data={"sub": user.apple_user_id})
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=60 * 60 * 24 * 7
+    )
+

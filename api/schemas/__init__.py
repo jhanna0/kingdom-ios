@@ -38,6 +38,7 @@ from .common import (
     BuildingCatchupInfo,
     BUILDING_COLORS,
     AllianceInfo,
+    ActiveAllianceInfo,
     ActiveCoupData,
 )
 from .coup import (
@@ -111,6 +112,9 @@ __all__ = [
     "BuildingTierInfo",
     "BuildingCatchupInfo",
     "BUILDING_COLORS",
+    "AllianceInfo",
+    "ActiveAllianceInfo",
+    "ActiveCoupData",
     # Coup
     "CoupInitiateRequest",
     "CoupInitiateResponse",

@@ -6,6 +6,9 @@ struct TownHallView: View {
     let playerId: Int
     var scienceLevel: Int = 0  // Player's science skill level
     
+    @State private var scienceMinLevel: Int = 99  // Default high so it shows locked until loaded
+    @State private var scienceConfigLoaded: Bool = false
+    
     var body: some View {
         ScrollView {
             VStack(spacing: KingdomTheme.Spacing.xLarge) {
@@ -77,9 +80,23 @@ struct TownHallView: View {
                             badge: nil
                         )
                     }
+
+                    // The March (minigame) - moved from Settings
+                    // NavigationLink {
+                    //     MarchGameView(player: player)
+                    //         .navigationBarHidden(true)
+                    // } label: {
+                    //     TownHallActivityCard(
+                    //         icon: "figure.walk",
+                    //         title: "The March",
+                    //         description: "Endless runner minigame",
+                    //         color: KingdomTheme.Colors.buttonSuccess,
+                    //         badge: nil
+                    //     )
+                    // }
                     
-                    // Science Lab - Requires T2 Science
-                    if scienceLevel >= 2 {
+                    // Science Lab - Requires min science level from backend
+                    if scienceLevel >= scienceMinLevel {
                         NavigationLink {
                             ScienceView(apiClient: APIClient.shared)
                         } label: {
@@ -91,11 +108,11 @@ struct TownHallView: View {
                                 badge: nil
                             )
                         }
-                    } else {
+                    } else if scienceConfigLoaded {
                         TownHallLockedCard(
                             icon: "flask.fill",
                             title: "The Laboratory",
-                            requirement: "Requires Science T2"
+                            requirement: "Requires Science T\(scienceMinLevel)"
                         )
                     }
                     
@@ -172,6 +189,22 @@ struct TownHallView: View {
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .task {
+            await loadScienceConfig()
+        }
+    }
+    
+    private func loadScienceConfig() async {
+        do {
+            let api = ScienceAPI(client: APIClient.shared)
+            let config = try await api.getConfig()
+            scienceMinLevel = config.min_level
+            scienceConfigLoaded = true
+        } catch {
+            // On error, default to showing locked with T2 requirement
+            scienceMinLevel = 2
+            scienceConfigLoaded = true
+        }
     }
 }
 

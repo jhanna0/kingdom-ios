@@ -39,6 +39,10 @@ class GatheringViewModel: ObservableObject {
     @Published var sessionGathered: Int = 0
     @Published var sessionTaps: Int = 0
     
+    // Exhausted state (daily limit reached)
+    @Published var isExhausted: Bool = false
+    @Published var exhaustedMessage: String = ""
+    
     private let apiService = KingdomAPIService.shared
     
     // MARK: - Computed Properties
@@ -79,6 +83,13 @@ class GatheringViewModel: ObservableObject {
         
         do {
             let response = try await apiService.actions.gatherResource(resourceType: selectedResource)
+            
+            // Check if exhausted (daily limit reached)
+            if response.exhausted == true {
+                isExhausted = true
+                exhaustedMessage = response.exhaustedMessage ?? "You've gathered all available resources for today."
+                return
+            }
             
             // Update state
             lastResult = response

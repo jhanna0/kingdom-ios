@@ -4,6 +4,10 @@ struct NotificationsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = ActivityViewModel()
     
+    // Popup state for showing full notification details
+    @State private var showNotificationPopup = false
+    @State private var selectedNotification: ActivityNotification?
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -33,7 +37,8 @@ struct NotificationsSheet: View {
                         if !viewModel.notifications.isEmpty {
                             ForEach(viewModel.notifications) { notification in
                                 NotificationCard(notification: notification, onTap: {
-                                    viewModel.handleNotificationTap(notification)
+                                    selectedNotification = notification
+                                    showNotificationPopup = true
                                 })
                             }
                         } else if !viewModel.isLoading {
@@ -84,16 +89,19 @@ struct NotificationsSheet: View {
                 // Mark notifications as read when user views them
                 try? await NotificationsAPI(client: APIClient.shared).markRead()
             }
-            .sheet(item: $viewModel.selectedBattle) { battle in
-                BattleView(battleId: battle.id, onDismiss: {
-                    viewModel.selectedBattle = nil
-                })
+            .overlay {
+                if showNotificationPopup, let notification = selectedNotification {
+                    NotificationDetailPopup(
+                        notification: notification,
+                        isShowing: $showNotificationPopup
+                    )
+                }
             }
         }
     }
 }
 
-// Note: NotificationCard is already defined in ActivityView.swift, so we'll reuse it
+// Note: NotificationCard and NotificationDetailPopup are defined in ActivityView.swift
 
 #Preview {
     NotificationsSheet()

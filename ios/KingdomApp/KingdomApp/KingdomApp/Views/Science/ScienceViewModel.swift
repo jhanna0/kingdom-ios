@@ -11,23 +11,28 @@ class ScienceViewModel: ObservableObject {
     // MARK: - State
     
     enum UIState: Equatable {
+        case notStarted      // Initial state - waiting for user to confirm start
         case loading
         case ready           // Waiting for first guess
         case guessing        // Processing a guess
         case correct         // Just got it right!
         case wrong           // Just got it wrong
-        case wonMax          // Got all 3 right - EUREKA!
+        case wonMax          // Got all max right - EUREKA!
         case collecting      // Collecting rewards
         case collected       // Rewards collected successfully
         case error(String)
     }
     
-    @Published var uiState: UIState = .loading
+    @Published var uiState: UIState = .notStarted
     @Published var session: ScienceSession?
     @Published var skillInfo: ScienceSkillInfo?
     @Published var stats: SciencePlayerStats?
     @Published var collectResponse: ScienceCollectResponse?
     @Published var entryCost: Int = 10  // Default, updated from backend
+    @Published var configMaxGuesses: Int = 4
+    @Published var streakRewards: [ScienceStreakReward] = []
+    @Published var playerGold: Int = 0  // Current player gold, updated each round
+    @Published var playerBlueprints: Int = 0  // Current blueprint count
     
     // Last guess result (for animation)
     @Published var lastGuessResult: ScienceGuessResponse?
@@ -39,7 +44,7 @@ class ScienceViewModel: ObservableObject {
     
     var currentNumber: Int { session?.current_number ?? 5 }
     var streak: Int { session?.streak ?? 0 }
-    var maxStreak: Int { session?.max_streak ?? 3 }
+    var maxStreak: Int { session?.max_streak ?? configMaxGuesses }
     var canGuess: Bool { session?.can_guess ?? false }
     var canCollect: Bool { session?.can_collect ?? false }
     var isGameOver: Bool { session?.is_game_over ?? false }
@@ -62,6 +67,20 @@ class ScienceViewModel: ObservableObject {
     
     // MARK: - Actions
     
+    func loadConfig() async {
+        guard let api = api else { return }
+        
+        do {
+            let config = try await api.getConfig()
+            entryCost = config.entry_cost
+            configMaxGuesses = max(1, config.max_guesses ?? configMaxGuesses)
+            streakRewards = config.streak_rewards ?? []
+        } catch {
+            // Use default entry cost if config fails
+            entryCost = 10
+        }
+    }
+    
     func startExperiment() async {
         guard let api = api else { return }
         
@@ -74,6 +93,8 @@ class ScienceViewModel: ObservableObject {
             session = response.session
             skillInfo = response.skill_info
             entryCost = response.cost ?? 10
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             uiState = .ready
             
             // Non-blocking: stats are nice-to-have in the bottom bar.
@@ -95,6 +116,8 @@ class ScienceViewModel: ObservableObject {
             let response = try await api.makeGuess(direction)
             lastGuessResult = response
             session = response.session
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             
             // Determine UI state based on result
             if response.is_correct {
@@ -129,6 +152,8 @@ class ScienceViewModel: ObservableObject {
             let response = try await api.collectRewards()
             stats = response.stats
             collectResponse = response
+            playerGold = response.player_gold ?? playerGold
+            playerBlueprints = response.player_blueprints ?? playerBlueprints
             uiState = .collected
         } catch {
             uiState = .error(error.localizedDescription)

@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 
 from db import get_db, User, PlayerState, Kingdom, InvasionEvent, KingdomHistory, Alliance
-from routers.alliances import are_empires_allied
+from routers.alliances import are_empires_allied, get_allied_kingdom_ids
+from websocket.broadcast import notify_kingdom, KingdomEvents
+from db.models.kingdom_event import KingdomEvent
 from schemas.invasion import (
     InvasionDeclareRequest,
     InvasionDeclareResponse,
@@ -179,6 +181,32 @@ def declare_invasion(
     db.add(invasion)
     db.commit()
     db.refresh(invasion)
+    
+    # Broadcast to target kingdom
+    notify_kingdom(
+        kingdom_id=target_kingdom.id,
+        event_type=KingdomEvents.INVASION_STARTED,
+        data={
+            "invasion_id": invasion.id,
+            "attacker_name": current_user.username,
+            "attacking_from": attacking_kingdom.name,
+            "battle_time": battle_time.isoformat()
+        }
+    )
+    
+    # Notify allied kingdoms - "Your ally is under attack!"
+    target_empire_id = target_kingdom.empire_id or target_kingdom.id
+    allied_kingdom_ids = get_allied_kingdom_ids(db, target_empire_id)
+    for allied_kingdom_id in allied_kingdom_ids:
+        event = KingdomEvent(
+            kingdom_id=allied_kingdom_id,
+            title="Ally Under Attack!",
+            description=f"{target_kingdom.name} is being invaded by {current_user.username} from {attacking_kingdom.name}!"
+        )
+        db.add(event)
+    
+    if allied_kingdom_ids:
+        db.commit()
     
     return InvasionDeclareResponse(
         success=True,

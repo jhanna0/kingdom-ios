@@ -158,6 +158,17 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "inventory",
     },
+    # ===== GARDEN RESOURCES =====
+    "wheat": {
+        "display_name": "Wheat",
+        "icon": "leaf",
+        "color": "goldLight",
+        "description": "Fresh wheat. Used to bake bread.",
+        "category": "material",
+        "display_order": 21,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
 }
 
 

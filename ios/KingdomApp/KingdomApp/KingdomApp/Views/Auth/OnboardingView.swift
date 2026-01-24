@@ -48,17 +48,13 @@ struct OnboardingView: View {
                     DisplayNameStep(
                         displayName: $displayName,
                         selectedCity: selectedCity ?? "your city",
-                        onContinue: {
-                            DebugLogger.shared.log("onboarding_step", message: "Step 2 -> 3 (DisplayName -> Balance)", extra: [
-                                "displayName": displayName
-                            ])
-                            currentStep = 3
-                        }
+                        hometownId: selectedCityOsmId ?? authManager.currentUser?.hometown_kingdom_id,
+                        onContinue: { currentStep = 3 }
                     )
+                    .environmentObject(authManager)
                 } else if currentStep == 3 {
                     BalanceStep(onContinue: {
-                        DebugLogger.shared.log("onboarding_step", message: "Step 3 -> Finish (Balance -> Complete)")
-                        finishOnboarding()
+                        authManager.finishOnboarding()
                     })
                 }
             }
@@ -108,21 +104,6 @@ struct OnboardingView: View {
         }
     }
     
-    private func finishOnboarding() {
-        DebugLogger.shared.log("onboarding_finish", message: "Finishing onboarding", extra: [
-            "displayName": displayName,
-            "selectedCityOsmId": selectedCityOsmId ?? "nil"
-        ])
-        
-        Task {
-            // Use existing hometown if user already has one
-            let hometownId = selectedCityOsmId ?? authManager.currentUser?.hometown_kingdom_id
-            await authManager.completeOnboarding(
-                displayName: displayName,
-                hometownKingdomId: hometownId
-            )
-        }
-    }
 }
 
 // MARK: - Step 1: Welcome
@@ -340,30 +321,28 @@ struct BalanceStep: View {
 // MARK: - Step 2: Display Name
 
 struct DisplayNameStep: View {
+    @EnvironmentObject var authManager: AuthManager
     @Binding var displayName: String
     let selectedCity: String
+    let hometownId: String?
     let onContinue: () -> Void
     
     @State private var validationResult: UsernameValidator.ValidationResult = .valid
+    @State private var isSaving = false
     
     var isValid: Bool {
-        validationResult.isValid && !displayName.isEmpty
+        validationResult.isValid && !displayName.isEmpty && !isSaving
     }
     
     var body: some View {
         VStack(spacing: KingdomTheme.Spacing.xxLarge) {
-            // Header with brutalist icon
+            // Header
             VStack(spacing: KingdomTheme.Spacing.large) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.white)
                     .frame(width: 100, height: 100)
-                    .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.inkMedium,
-                        cornerRadius: 20,
-                        shadowOffset: 4,
-                        borderWidth: 3
-                    )
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 20, shadowOffset: 4, borderWidth: 3)
                 
                 Text("Choose Your Name")
                     .font(FontStyles.displayMedium)
@@ -397,72 +376,73 @@ struct DisplayNameStep: View {
                         .textFieldStyle(.plain)
                         .padding(KingdomTheme.Spacing.medium)
                         .submitLabel(.done)
+                        .disabled(isSaving)
                 }
                 .background(Color.white)
                 .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
                 .overlay(
                     RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
-                        .stroke(Color.black, lineWidth: 2)
+                        .stroke(authManager.onboardingError != nil ? Color.red : Color.black, lineWidth: 2)
                 )
                 .onChange(of: displayName) { _, newValue in
-                    // Limit to 20 characters
-                    if newValue.count > 20 {
-                        displayName = String(newValue.prefix(20))
-                    }
+                    if newValue.count > 20 { displayName = String(newValue.prefix(20)) }
                     validationResult = UsernameValidator.validate(displayName)
+                    authManager.onboardingError = nil
                 }
                 
-                // Requirements - always visible, static
+                // Error message
+                if let error = authManager.onboardingError {
+                    Text(error)
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(.red)
+                }
+                
+                // Requirements
                 VStack(alignment: .leading, spacing: 4) {
                     Text("• 3-20 characters")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     Text("• Letters and numbers only")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
+                .font(FontStyles.labelSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .padding(.top, 4)
                 
                 Text("Must be unique across all kingdoms")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
-                    .padding(.top, 4)
             }
             .padding(KingdomTheme.Spacing.large)
-            .brutalistCard(
-                backgroundColor: KingdomTheme.Colors.parchmentLight,
-                cornerRadius: 20
-            )
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 20)
             .padding(.horizontal, KingdomTheme.Spacing.large)
             
             Spacer()
             
             // Continue Button
-            Button(action: {
-                // Sanitize before sending
+            Button {
                 displayName = UsernameValidator.sanitize(displayName)
-                onContinue()
-            }) {
+                isSaving = true
+                Task {
+                    let success = await authManager.completeOnboarding(displayName: displayName, hometownKingdomId: hometownId)
+                    isSaving = false
+                    if success { onContinue() }
+                }
+            } label: {
                 HStack {
-                    Text("Establish Your Legacy")
-                        .font(FontStyles.bodyLargeBold)
-                    Image(systemName: "arrow.right")
-                        .font(FontStyles.iconSmall)
+                    if isSaving {
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Establish Your Legacy").font(FontStyles.bodyLargeBold)
+                        Image(systemName: "arrow.right").font(FontStyles.iconSmall)
+                    }
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, KingdomTheme.Spacing.large)
                 .background(
                     ZStack {
-                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                            .fill(Color.black)
-                            .offset(x: 4, y: 4)
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium).fill(Color.black).offset(x: 4, y: 4)
                         RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
                             .fill(isValid ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.disabled)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
-                                    .stroke(Color.black, lineWidth: 3)
-                            )
+                            .overlay(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium).stroke(Color.black, lineWidth: 3))
                     }
                 )
             }
@@ -580,7 +560,7 @@ struct HometownStep: View {
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
                         if locationManager.isLocationDenied {
-                            Text("Location access was denied. We need your location to find nearby cities and kingdoms. Please enable it in Settings.")
+                            Text("Location access is required to find nearby cities and kingdoms. You can enable it in Settings.")
                                 .font(FontStyles.bodyMedium)
                                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                                 .multilineTextAlignment(.center)
@@ -600,7 +580,7 @@ struct HometownStep: View {
                         locationManager.requestPermissions()
                     }) {
                         HStack {
-                            Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
+                            Text(locationManager.isLocationDenied ? "Open Settings" : "Continue")
                                 .font(FontStyles.bodyLargeBold)
                             Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
                                 .font(FontStyles.iconSmall)

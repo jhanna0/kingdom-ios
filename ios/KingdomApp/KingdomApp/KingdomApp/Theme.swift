@@ -113,8 +113,8 @@ struct KingdomTheme {
         static let territoryPlayerAtWar = buttonDanger
         /// Enemy kingdom - deep muted red (medieval vermillion)
         static let territoryEnemy = Color(red: 0.75, green: 0.30, blue: 0.25)
-        /// Allied kingdom - map blue-green (like cartographer's seas)
-        static let territoryAllied = Color(red: 0.35, green: 0.60, blue: 0.65)
+        /// Allied kingdom - lighter royal blue (clearly friendly, distinct from player)
+        static let territoryAllied = Color(red: 0.30, green: 0.50, blue: 0.80)
         
         // Neutral kingdom colors (hash-based assignment)
         static let territoryNeutral0 = Color(red: 0.40, green: 0.55, blue: 0.75)  // Ocean blue

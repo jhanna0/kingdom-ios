@@ -103,10 +103,25 @@ struct ScienceThemeConfig: Codable {
     let streak_colors: [String: String]
 }
 
+// MARK: - Streak Rewards (per streak tier)
+
+struct ScienceStreakReward: Codable, Identifiable {
+    let streak: Int
+    let gold: Int
+    let blueprint: Int
+    let message: String?
+    
+    var id: Int { streak }
+}
+
 struct ScienceConfig: Codable {
     let skill: ScienceSkillConfig
     let ui: ScienceUIStrings
     let theme: ScienceThemeConfig
+    let min_level: Int
+    let entry_cost: Int
+    let max_guesses: Int?
+    let streak_rewards: [ScienceStreakReward]?
 }
 
 // MARK: - API Responses
@@ -116,6 +131,8 @@ struct ScienceStartResponse: Codable {
     let session: ScienceSession
     let skill_info: ScienceSkillInfo?
     let cost: Int?
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceGuessResponse: Codable {
@@ -133,6 +150,8 @@ struct ScienceGuessResponse: Codable {
     let next_number: Int?
     let round: ScienceRound
     let session: ScienceSession
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceCollectResponse: Codable {
@@ -143,6 +162,8 @@ struct ScienceCollectResponse: Codable {
     let blueprint: Int
     let message: String?
     let stats: SciencePlayerStats?
+    let player_gold: Int?
+    let player_blueprints: Int?
 }
 
 struct ScienceEndResponse: Codable {

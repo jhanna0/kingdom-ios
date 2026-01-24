@@ -12,6 +12,7 @@ class AuthManager: ObservableObject {
     @Published var currentUser: UserData?
     @Published var hasCriticalError = false  // Blocks UI until resolved
     @Published var criticalErrorMessage: String?
+    @Published var onboardingError: String?  // Non-blocking error for onboarding (e.g., username taken)
     
     private let apiClient = APIClient.shared
     
@@ -40,11 +41,14 @@ class AuthManager: ObservableObject {
                 let device_id: String?  // For multi-account detection
             }
             
+            // Generate a placeholder name if Apple doesn't provide one
+            let defaultName = "Player\(UUID().uuidString.prefix(8))"
+            
             let body = AppleSignInRequest(
                 apple_user_id: userID,
                 identity_token: identityToken,
                 email: email,
-                display_name: name ?? "User",
+                display_name: name ?? defaultName,
                 device_id: UIDevice.current.identifierForVendor?.uuidString
             )
             
@@ -173,19 +177,41 @@ class AuthManager: ObservableObject {
         }
     }
     
-    // MARK: - Onboarding
+    // MARK: - Demo Login (App Review)
     
     @MainActor
-    func completeOnboarding(displayName: String, hometownKingdomId: String?) async {
-        guard authToken != nil else {
-            DebugLogger.shared.log("onboarding_error", message: "No auth token for onboarding")
-            return
+    func demoLogin(secret: String) async {
+        do {
+            struct DemoLoginRequest: Encodable {
+                let secret: String
+            }
+            
+            let body = DemoLoginRequest(secret: secret)
+            let request = try apiClient.request(endpoint: "/auth/demo-login", method: "POST", body: body)
+            let token: TokenResponse = try await apiClient.execute(request)
+            
+            authToken = token.access_token
+            saveToken(token.access_token)
+            await fetchUserProfile()
+            
+            if let user = currentUser, user.needsOnboarding {
+                needsOnboarding = true
+            } else {
+                isAuthenticated = true
+            }
+        } catch {
+            hasCriticalError = true
+            criticalErrorMessage = "Demo login failed: \(error.localizedDescription)"
         }
-        
-        DebugLogger.shared.log("onboarding_start", message: "Starting onboarding", extra: [
-            "displayName": displayName,
-            "hasHometownKingdomId": hometownKingdomId != nil
-        ])
+    }
+    
+    // MARK: - Onboarding
+    
+    /// Save profile and complete onboarding. Returns true on success.
+    /// If username is taken, sets onboardingError and returns false.
+    @MainActor
+    func completeOnboarding(displayName: String, hometownKingdomId: String?) async -> Bool {
+        guard authToken != nil else { return false }
         
         do {
             struct OnboardingRequest: Encodable {
@@ -198,23 +224,25 @@ class AuthManager: ObservableObject {
                 hometown_kingdom_id: hometownKingdomId
             )
             
-            DebugLogger.shared.log("onboarding_request", message: "Sending PATCH to /auth/me")
-            
             let request = try apiClient.request(endpoint: "/auth/me", method: "PATCH", body: body)
             currentUser = try await apiClient.execute(request)
+            onboardingError = nil
+            return true
             
-            DebugLogger.shared.log("onboarding_response", message: "Onboarding response received")
-            
-            needsOnboarding = false
-            isAuthenticated = true
-            
-            DebugLogger.shared.log("onboarding_complete", message: "Onboarding complete - user authenticated")
         } catch {
-            DebugLogger.shared.log("onboarding_error", message: "Onboarding failed: \(error.localizedDescription)")
-            // CRITICAL ERROR - onboarding failed, block everything
-            hasCriticalError = true
-            criticalErrorMessage = "Failed to complete onboarding: \(error.localizedDescription)"
+            if error.localizedDescription.contains("already taken") {
+                onboardingError = "That name is already taken. Please choose a different one."
+            } else {
+                onboardingError = "Failed to save: \(error.localizedDescription)"
+            }
+            return false
         }
+    }
+    
+    @MainActor
+    func finishOnboarding() {
+        needsOnboarding = false
+        isAuthenticated = true
     }
     
     // MARK: - User Profile
@@ -354,6 +382,16 @@ struct UserData: Codable {
         let trimmedName = display_name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedName.isEmpty || trimmedName == "User" {
             return true
+        }
+        
+        // Check for auto-generated placeholder names (e.g., "Player1A2B3C4D")
+        // These are 8 hex chars after "Player"
+        if trimmedName.hasPrefix("Player") && trimmedName.count == 14 {
+            let suffix = String(trimmedName.dropFirst(6))
+            let hexChars = CharacterSet(charactersIn: "0123456789ABCDEFabcdef")
+            if suffix.unicodeScalars.allSatisfy({ hexChars.contains($0) }) {
+                return true
+            }
         }
         
         return false

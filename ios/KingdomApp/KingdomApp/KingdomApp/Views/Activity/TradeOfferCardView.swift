@@ -1,0 +1,104 @@
+import SwiftUI
+
+// MARK: - Trade Offer Card
+
+struct TradeOfferCard: View {
+    let trade: TradeOffer
+    let onAccept: () async -> Void
+    let onDecline: () async -> Void
+    
+    @State private var isProcessing = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack(spacing: 12) {
+                // Sender avatar
+                Text(String(trade.senderName.prefix(1)).uppercased())
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 10)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trade.senderName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    // Offer description
+                    HStack(spacing: 4) {
+                        if trade.offerType == "gold" {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            Text("Sending \(trade.goldAmount)g")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else if let itemIcon = trade.itemIcon, let itemName = trade.itemDisplayName, let qty = trade.itemQuantity {
+                            Image(systemName: itemIcon)
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            if trade.goldAmount > 0 {
+                                Text("\(qty) \(itemName) for \(trade.goldAmount)g")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            } else {
+                                Text("\(qty) \(itemName) (gift)")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            }
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Message if any
+            if let message = trade.message, !message.isEmpty {
+                Text("\"\(message)\"")
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .italic()
+                    .padding(.horizontal, 4)
+            }
+            
+            // Accept/Decline buttons
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onAccept()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Accept")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
+                .disabled(isProcessing)
+                
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onDecline()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Decline")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
+                .disabled(isProcessing)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
+    }
+}

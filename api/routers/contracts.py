@@ -82,9 +82,9 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
     return {
         "id": str(contract.id),  # String for consistency with other contract endpoints
         "kingdom_id": contract.kingdom_id,
-        "kingdom_name": contract.kingdom_name,
-        "building_type": contract.type,
-        "building_level": contract.tier,
+        "kingdom_name": contract.kingdom_name or "",
+        "building_type": contract.type or "",
+        "building_level": contract.tier or 0,
         "building_benefit": building_benefit,  # e.g. "Gather 10 wood per action"
         "building_icon": building_icon,  # e.g. "tree.fill"
         "building_display_name": building_display_name,  # e.g. "Lumbermill"
@@ -97,7 +97,7 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "construction_cost": contract.gold_paid or 0,
         "reward_pool": contract.reward_pool or 0,
         "action_reward": contract.action_reward or 0,
-        "created_by": contract.user_id,  # The ruler who created it
+        "created_by": contract.user_id or 0,  # The ruler who created it
         "created_at": contract.created_at,
         "completed_at": contract.completed_at,
         "status": status,  # Computed from completed_at, not stored in DB

@@ -26,12 +26,29 @@ from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
 from systems.science.science_manager import ScienceManager, ScienceSession
-from systems.science.config import SKILL_CONFIG, UI_STRINGS, THEME_CONFIG, ENTRY_COST, MIN_SCIENCE_LEVEL
+from systems.science.config import (
+    SKILL_CONFIG,
+    UI_STRINGS,
+    THEME_CONFIG,
+    ENTRY_COST,
+    MIN_SCIENCE_LEVEL,
+    MAX_GUESSES,
+    REWARD_CONFIG,
+)
 
 
 router = APIRouter(prefix="/science", tags=["science"])
 
 _manager = ScienceManager()
+
+
+def _get_player_blueprints(db: Session, player_id: int) -> int:
+    """Get player's current blueprint count from inventory."""
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == player_id,
+        PlayerInventory.item_id == "blueprint"
+    ).first()
+    return inv.quantity if inv else 0
 
 
 class EmptyRequest(BaseModel):
@@ -45,10 +62,23 @@ class GuessRequest(BaseModel):
 @router.get("/config")
 def get_config():
     """Get display config for frontend - ALL UI strings from backend!"""
+    streak_rewards = [
+        {
+            "streak": streak,
+            "gold": cfg.get("gold", 0),
+            "blueprint": cfg.get("blueprint", 0),
+            "message": cfg.get("message", ""),
+        }
+        for streak, cfg in sorted(REWARD_CONFIG.items(), key=lambda kv: kv[0])
+    ]
     return {
         "skill": SKILL_CONFIG,
         "ui": UI_STRINGS,
         "theme": THEME_CONFIG,
+        "min_level": MIN_SCIENCE_LEVEL,
+        "entry_cost": ENTRY_COST,
+        "max_guesses": MAX_GUESSES,
+        "streak_rewards": streak_rewards,
     }
 
 
@@ -143,6 +173,8 @@ def start_science(
             "level": science_level,
         },
         "cost": ENTRY_COST,
+        "player_gold": state.gold,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 
@@ -191,11 +223,16 @@ def make_guess(
     
     db.commit()
     
+    # Get player state for current gold
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    
     # Return result (includes whether correct, the hidden number, etc.)
     return {
         "success": True,
         **result,
         "session": session.to_dict(),
+        "player_gold": state.gold if state else 0,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 
@@ -209,9 +246,8 @@ def collect_rewards(
     Collect rewards from the session.
     
     Rewards based on streak:
-    - 1 correct: 5 gold + science bonus
-    - 2 correct: 10 gold + science bonus
-    - 3 correct: 1 blueprint!
+    - Early streaks: gold (scales by config + science bonus)
+    - Max streak: blueprint
     """
     player_id = user.id
     
@@ -348,6 +384,8 @@ def collect_rewards(
         "blueprint": blueprint,
         "message": result.get("message", ""),
         "stats": stats.to_dict(),
+        "player_gold": state.gold if state else 0,
+        "player_blueprints": _get_player_blueprints(db, player_id),
     }
 
 

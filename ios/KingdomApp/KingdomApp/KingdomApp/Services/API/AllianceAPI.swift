@@ -57,13 +57,11 @@ struct AllianceProposeResponse: Codable {
     let success: Bool
     let message: String
     let allianceId: Int
-    let costPaid: Int
     let proposalExpiresAt: String
     
     enum CodingKeys: String, CodingKey {
         case success, message
         case allianceId = "alliance_id"
-        case costPaid = "cost_paid"
         case proposalExpiresAt = "proposal_expires_at"
     }
 }

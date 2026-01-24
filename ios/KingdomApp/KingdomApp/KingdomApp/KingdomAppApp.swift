@@ -149,7 +149,7 @@ struct LocationRequiredView: View {
                         .frame(height: 2)
                     
                     if locationManager.isLocationDenied {
-                        Text("Location access was denied. Please enable it in Settings to continue.")
+                        Text("Location access is required for this game. You can enable it in Settings.")
                             .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     } else {
@@ -182,7 +182,7 @@ struct LocationRequiredView: View {
                     locationManager.requestPermissions()
                 }) {
                     HStack {
-                        Text(locationManager.isLocationDenied ? "Open Settings" : "Enable Location")
+                        Text(locationManager.isLocationDenied ? "Open Settings" : "Continue")
                             .font(FontStyles.bodyLargeBold)
                         Image(systemName: locationManager.isLocationDenied ? "gear" : "location.fill")
                             .font(FontStyles.iconSmall)
@@ -226,6 +226,8 @@ struct AuthenticatedView: View {
     @State private var showNotifications = false
     @State private var hasUnreadNotifications = false
     @State private var pendingFriendRequestCount: Int = 0
+    @State private var pendingAllianceRequestCount: Int = 0
+    @State private var pendingTradeRequestCount: Int = 0
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
     @State private var displayedTravelEvent: TravelEvent?
@@ -314,7 +316,7 @@ struct AuthenticatedView: View {
                 showActions: $showActions,
                 showProperties: $showProperties,
                 showActivity: $showActivity,
-                pendingFriendRequests: pendingFriendRequestCount
+                pendingFriendRequests: pendingFriendRequestCount + pendingAllianceRequestCount + pendingTradeRequestCount
             )
             
             coupBadgeOverlay
@@ -438,6 +440,8 @@ struct AuthenticatedView: View {
             await MainActor.run {
                 hasUnreadNotifications = summary.hasUnread
                 pendingFriendRequestCount = summary.pendingFriendRequests
+                pendingAllianceRequestCount = summary.pendingAllianceRequests
+                pendingTradeRequestCount = summary.pendingTradeRequests
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")

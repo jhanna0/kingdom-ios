@@ -1,19 +1,108 @@
 """
 Property API - Land ownership and upgrades
 Uses unified contract system (no more JSONB!)
+
+Fortification System:
+- Unlocked at T2 (House)
+- Sacrifice weapons/armor to increase fortification %
+- Decays 1% per day (lazy decay - calculated on read)
+- T5 estates have 50% base that doesn't decay
+- Protects property tier during kingdom conquest
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime
+import random
+from datetime import datetime, timezone, timedelta
 
-from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution, UserKingdom
+from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution, UserKingdom, PlayerItem
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso
 
 router = APIRouter(prefix="/properties", tags=["properties"])
+
+
+# ===== Fortification Config =====
+
+# RNG fortification gain ranges by equipment tier
+FORTIFICATION_GAIN_RANGES = {
+    1: (3, 8),    # T1: +3..+8%
+    2: (6, 12),   # T2: +6..+12%
+    3: (10, 18),  # T3: +10..+18%
+    4: (15, 25),  # T4: +15..+25%
+    5: (20, 35),  # T5: +20..+35%
+}
+
+# Decay rate: 1% per day
+FORTIFICATION_DECAY_PER_DAY = 1
+
+# T5 base fortification (doesn't decay)
+T5_BASE_FORTIFICATION = 50
+
+
+# ===== Fortification Helpers =====
+
+def apply_fortification_decay(prop: Property, now: datetime = None) -> int:
+    """
+    Apply lazy decay to property fortification.
+    Returns the amount decayed.
+    
+    Lazy decay: Only calculate and apply decay when property is accessed.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    
+    # Ensure now is timezone-aware
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    
+    # If fortification is 0 or at base, nothing to decay
+    base = T5_BASE_FORTIFICATION if prop.tier >= 5 else 0
+    if prop.fortification_percent <= base:
+        prop.fortification_last_decay_at = now
+        return 0
+    
+    # If no last decay timestamp, initialize it now (no decay applied)
+    if prop.fortification_last_decay_at is None:
+        prop.fortification_last_decay_at = now
+        return 0
+    
+    # Ensure last_decay_at is timezone-aware
+    last_decay = prop.fortification_last_decay_at
+    if last_decay.tzinfo is None:
+        last_decay = last_decay.replace(tzinfo=timezone.utc)
+    
+    # Calculate days elapsed
+    time_elapsed = now - last_decay
+    days_elapsed = int(time_elapsed.total_seconds() / 86400)  # 86400 seconds per day
+    
+    if days_elapsed <= 0:
+        return 0
+    
+    # Calculate decay (1% per day)
+    decay_amount = days_elapsed * FORTIFICATION_DECAY_PER_DAY
+    old_percent = prop.fortification_percent
+    
+    # Decay to base minimum (T5 = 50%, others = 0%)
+    prop.fortification_percent = max(base, prop.fortification_percent - decay_amount)
+    
+    # Update timestamp (advance by whole days)
+    prop.fortification_last_decay_at = last_decay + timedelta(days=days_elapsed)
+    
+    return old_percent - prop.fortification_percent
+
+
+def roll_fortification_gain(tier: int) -> int:
+    """Roll random fortification gain based on item tier."""
+    min_gain, max_gain = FORTIFICATION_GAIN_RANGES.get(tier, (3, 8))
+    return random.randint(min_gain, max_gain)
+
+
+def get_fortification_gain_range(tier: int) -> tuple:
+    """Get the min/max gain range for an item tier."""
+    return FORTIFICATION_GAIN_RANGES.get(tier, (3, 8))
 
 
 # ===== Schemas =====
@@ -33,9 +122,51 @@ class PropertyResponse(BaseModel):
     location: str | None
     purchased_at: str
     last_upgraded: str | None
+    # Fortification fields
+    fortification_unlocked: bool = False
+    fortification_percent: int = 0
+    fortification_base_percent: int = 0
     
     class Config:
         from_attributes = True
+
+
+class FortifyRequest(BaseModel):
+    player_item_id: int
+
+
+class FortifyResponse(BaseModel):
+    success: bool
+    message: str
+    fortification_before: int
+    fortification_gain: int
+    fortification_after: int
+    item_consumed: str  # Display name of consumed item
+
+
+class FortifyOptionItem(BaseModel):
+    id: int
+    item_id: str | None
+    display_name: str
+    icon: str
+    type: str
+    tier: int
+    gain_min: int
+    gain_max: int
+    is_equipped: bool
+    count: int = 1
+
+
+class FortifyOptionsResponse(BaseModel):
+    property_id: str
+    fortification_unlocked: bool
+    current_fortification: int
+    base_fortification: int
+    eligible_items: list[FortifyOptionItem]
+    weapon_count: int
+    armor_count: int
+    # Explanation content (so we can update it without app release)
+    explanation: dict  # title, description, mechanics, decay_info, t5_bonus
 
 
 class PurchaseLandRequest(BaseModel):
@@ -188,8 +319,32 @@ def deduct_resource_costs(state, resource_costs: list):
 
 
 def get_available_rooms(tier: int) -> list:
-    """Get list of rooms/features available for a property tier"""
+    """Get list of rooms/features available for a property tier.
+    Rooms are ordered by importance/usage frequency.
+    """
     rooms = []
+    
+    # Tier 2+: Fortification (gear sink) - FIRST because it's the main defensive feature
+    if tier >= 2:
+        rooms.append({
+            "id": "fortification",
+            "name": "Fortification",
+            "icon": "shield.checkered",
+            "color": "royalBlue",
+            "description": "Sacrifice equipment to protect your property",
+            "route": "/fortify"
+        })
+    
+    # Tier 1+: Garden
+    if tier >= 1:
+        rooms.append({
+            "id": "garden",
+            "name": "Garden",
+            "icon": "leaf.fill",
+            "color": "buttonSuccess",
+            "description": "Plant seeds and grow your garden",
+            "route": "/garden"
+        })
     
     # Tier 3+: Workshop
     if tier >= 3:
@@ -209,8 +364,22 @@ def get_available_rooms(tier: int) -> list:
     return rooms
 
 
-def property_to_response(prop: Property) -> PropertyResponse:
-    """Convert Property model to response"""
+def property_to_response(prop: Property, apply_decay: bool = True) -> PropertyResponse:
+    """Convert Property model to response.
+    
+    Args:
+        prop: Property model
+        apply_decay: If True, applies lazy decay before returning (default True).
+                    Note: Caller must commit after if decay was applied.
+    """
+    # Apply lazy decay if requested
+    if apply_decay and prop.fortification_percent > 0:
+        apply_fortification_decay(prop)
+    
+    # Calculate fortification values
+    fortification_unlocked = prop.tier >= 2
+    base_fortification = T5_BASE_FORTIFICATION if prop.tier >= 5 else 0
+    
     return PropertyResponse(
         id=prop.id,
         kingdom_id=prop.kingdom_id,
@@ -220,7 +389,10 @@ def property_to_response(prop: Property) -> PropertyResponse:
         tier=prop.tier,
         location=prop.location,
         purchased_at=format_datetime_iso(prop.purchased_at),
-        last_upgraded=format_datetime_iso(prop.last_upgraded) if prop.last_upgraded else None
+        last_upgraded=format_datetime_iso(prop.last_upgraded) if prop.last_upgraded else None,
+        fortification_unlocked=fortification_unlocked,
+        fortification_percent=prop.fortification_percent,
+        fortification_base_percent=base_fortification
     )
 
 
@@ -284,11 +456,22 @@ def get_property_status(
     ).all()
     
     # Convert properties to response format and add available rooms
+    # Note: property_to_response applies lazy decay to fortification
     properties_list = []
     for p in properties:
         prop_dict = property_to_response(p).model_dump()
         prop_dict["available_rooms"] = get_available_rooms(p.tier)
+        # Add fortification info object for easier UI consumption
+        if p.tier >= 2:  # Fortification unlocked at T2
+            prop_dict["fortification"] = {
+                "percent": p.fortification_percent,
+                "base_percent": T5_BASE_FORTIFICATION if p.tier >= 5 else 0,
+                "decays_per_day": FORTIFICATION_DECAY_PER_DAY
+            }
         properties_list.append(prop_dict)
+    
+    # Commit any lazy decay changes
+    db.commit()
     
     # Get property contracts from unified_contracts
     property_contracts = get_property_contracts_for_user(db, current_user.id)
@@ -753,3 +936,299 @@ def get_property_upgrade_status(
         "active_contract": active_contract_data,
         "player_building_skill": state.building_skill
     }
+
+
+# ===== Fortification Endpoints =====
+
+def get_item_display_info(item: PlayerItem) -> dict:
+    """Get display info for a player item."""
+    from routers.tiers import EQUIPMENT_TIERS
+    from routers.workshop import CRAFTABLE_ITEMS
+    
+    # Try to get display info from CRAFTABLE_ITEMS config
+    item_info = CRAFTABLE_ITEMS.get(item.item_id, {}) if item.item_id else {}
+    tier_info = EQUIPMENT_TIERS.get(item.tier, {})
+    
+    display_name = item_info.get("display_name", f"T{item.tier} {item.type.capitalize()}")
+    icon = item_info.get("icon", "questionmark.circle")
+    
+    # Add tier name prefix if not already in display name
+    tier_name = tier_info.get("name", f"T{item.tier}")
+    if tier_name.lower() not in display_name.lower():
+        display_name = f"{display_name}"
+    
+    return {
+        "display_name": display_name,
+        "icon": icon,
+        "tier_name": tier_name
+    }
+
+
+def get_fortification_explanation(tier: int) -> dict:
+    """Get fortification explanation content.
+    Centralized here so we can update it without app releases.
+    """
+    return {
+        "title": "Fortification",
+        # UI strings + icons (so the frontend doesn't hardcode copy)
+        "ui": {
+            # Card titles / labels
+            "convert_card_title": "Convert Equipment",
+            "convert_card_icon": "arrow.triangle.2.circlepath",
+            "convert_card_accent_color": "buttondanger",
+            # States
+            "loading_eligible_items": "Loading eligible items…",
+            "locked_message": "Fortification is locked. Upgrade this property to a House (Tier 2) to unlock it.",
+            "empty_title": "No eligible equipment to convert right now.",
+            "empty_message": "You can only convert unequipped weapons or armor, and you can’t convert your last of each type.",
+            "choose_item_message": "Choose an item to convert into fortification.",
+            # Inventory labels
+            "weapons_label": "Weapons",
+            "armor_label": "Armor",
+            # Actions (use non-violent language)
+            "primary_action_label": "Convert",
+            "confirmation_title": "Convert Equipment",
+            "confirmation_confirm_label": "Convert",
+            "confirmation_cancel_label": "Cancel",
+            "confirmation_message_template": "Convert {item_name} into fortification?\n\nThis will consume the item and add {gain_range} fortification.",
+            "result_title": "Fortification Increased!",
+            "result_ok_label": "OK",
+            "result_message_template": "{item_name} was converted.\n\n+{gain_percent}% fortification\n{before_percent}% → {after_percent}%",
+            # Generic errors
+            "generic_error_title": "Error",
+            "generic_error_ok_label": "OK",
+        },
+        # TLDR - 3 bullet summary
+        "tldr": {
+            "title": "How It Works",
+            "icon": "info.circle.fill",
+            "points": [
+                "During wartimes, unprotected properties have a chance of being destroyed.",
+                "Your fortification % is the chance your property is NOT destroyed.",
+                "Convert weapons and armor below to increase your %."
+            ]
+        },
+        # Gain ranges by tier - displayed prominently
+        "gain_ranges": {
+            "title": "Fortification Gain by Tier",
+            "icon": "arrow.up.circle.fill",
+            "color": "buttonsuccess",
+            "tiers": [
+                {"tier": 1, "min": 3, "max": 8},
+                {"tier": 2, "min": 6, "max": 12},
+                {"tier": 3, "min": 10, "max": 18},
+                {"tier": 4, "min": 15, "max": 25},
+                {"tier": 5, "min": 20, "max": 35}
+            ]
+        },
+        # Key info
+        "decay": f"Drops {FORTIFICATION_DECAY_PER_DAY}% daily",
+        "decay_icon": "clock.arrow.circlepath",
+        "decay_color": "buttonwarning",
+        "cap": 100,
+        "rules": "Can't convert equipped items or your last weapon/armor.",
+        "rules_icon": "shield.slash",
+        "rules_color": "inkmedium",
+        "tip": "Lower tier gear/repeat drops stay value for their fortification value.",
+        "tip_icon": "lightbulb.fill",
+        "tip_color": "gold",
+        # T5 only
+        "t5_bonus": {
+            "base": T5_BASE_FORTIFICATION,
+            "text": f"{T5_BASE_FORTIFICATION}% base that never drops",
+            "icon": "crown.fill",
+            "color": "gold",
+        } if tier >= 5 else None
+    }
+
+
+@router.get("/{property_id}/fortify/options", response_model=FortifyOptionsResponse)
+def get_fortify_options(
+    property_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get list of items eligible for sacrifice to fortify property."""
+    # Get property
+    property = db.query(Property).filter(
+        Property.id == property_id,
+        Property.owner_id == current_user.id
+    ).first()
+    
+    if not property:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found or not owned by you"
+        )
+    
+    # Apply lazy decay
+    apply_fortification_decay(property)
+    db.commit()
+    
+    fortification_unlocked = property.tier >= 2
+    base_fortification = T5_BASE_FORTIFICATION if property.tier >= 5 else 0
+    
+    # Get player's weapons and armor
+    all_weapons = db.query(PlayerItem).filter(
+        PlayerItem.user_id == current_user.id,
+        PlayerItem.type == 'weapon'
+    ).all()
+    
+    all_armor = db.query(PlayerItem).filter(
+        PlayerItem.user_id == current_user.id,
+        PlayerItem.type == 'armor'
+    ).all()
+    
+    weapon_count = len(all_weapons)
+    armor_count = len(all_armor)
+    
+    # Build eligible items list (stacked by item_id, type, and tier)
+    eligible_items_map = {}
+    
+    for item in all_weapons + all_armor:
+        # Skip if equipped (v1 simplification)
+        if item.is_equipped:
+            continue
+        
+        # Check "can't sacrifice last" rule
+        if item.type == 'weapon' and weapon_count <= 1:
+            continue
+        if item.type == 'armor' and armor_count <= 1:
+            continue
+        
+        # Grouping key
+        key = (item.item_id, item.type, item.tier)
+        
+        if key in eligible_items_map:
+            eligible_items_map[key]["count"] += 1
+        else:
+            # Get display info and gain range
+            display_info = get_item_display_info(item)
+            min_gain, max_gain = get_fortification_gain_range(item.tier)
+            
+            eligible_items_map[key] = {
+                "id": item.id,
+                "item_id": item.item_id,
+                "display_name": display_info["display_name"],
+                "icon": display_info["icon"],
+                "type": item.type,
+                "tier": item.tier,
+                "gain_min": min_gain,
+                "gain_max": max_gain,
+                "is_equipped": item.is_equipped,
+                "count": 1
+            }
+            
+    eligible_items = [FortifyOptionItem(**val) for val in eligible_items_map.values()]
+    
+    # Sort by tier (higher first), then by type
+    eligible_items.sort(key=lambda x: (-x.tier, x.type))
+    
+    return FortifyOptionsResponse(
+        property_id=property_id,
+        fortification_unlocked=fortification_unlocked,
+        current_fortification=property.fortification_percent,
+        base_fortification=base_fortification,
+        eligible_items=eligible_items,
+        weapon_count=weapon_count,
+        armor_count=armor_count,
+        explanation=get_fortification_explanation(property.tier)
+    )
+
+
+@router.post("/{property_id}/fortify", response_model=FortifyResponse)
+def fortify_property(
+    property_id: str,
+    request: FortifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Convert a weapon or armor into property fortification."""
+    # Get property
+    property = db.query(Property).filter(
+        Property.id == property_id,
+        Property.owner_id == current_user.id
+    ).first()
+    
+    if not property:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found or not owned by you"
+        )
+    
+    # Check fortification is unlocked (T2+)
+    if property.tier < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Fortification requires a House (Tier 2+). Upgrade your property first."
+        )
+    
+    # Get the item to convert
+    item = db.query(PlayerItem).filter(
+        PlayerItem.id == request.player_item_id,
+        PlayerItem.user_id == current_user.id
+    ).first()
+    
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item not found or not owned by you"
+        )
+    
+    # Validate item type
+    if item.type not in ('weapon', 'armor'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only weapons and armor can be converted for fortification"
+        )
+    
+    # Check if equipped (v1: can't convert equipped items)
+    if item.is_equipped:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot convert equipped items. Unequip first."
+        )
+    
+    # Check "can't convert last" rule
+    same_type_count = db.query(func.count(PlayerItem.id)).filter(
+        PlayerItem.user_id == current_user.id,
+        PlayerItem.type == item.type
+    ).scalar()
+    
+    if same_type_count <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot convert your last {item.type}. Craft another first."
+        )
+    
+    # Apply lazy decay before calculating new value
+    apply_fortification_decay(property)
+    
+    fortification_before = property.fortification_percent
+    
+    # Roll fortification gain
+    gain = roll_fortification_gain(item.tier)
+    
+    # Apply gain (cap at 100%)
+    property.fortification_percent = min(100, property.fortification_percent + gain)
+    
+    # Update decay timestamp to now (fresh start after conversion)
+    property.fortification_last_decay_at = datetime.now(timezone.utc)
+    
+    # Get item display info before deleting
+    display_info = get_item_display_info(item)
+    item_name = display_info["display_name"]
+    
+    # Consume the item
+    db.delete(item)
+    
+    db.commit()
+    
+    return FortifyResponse(
+        success=True,
+        message=f"Converted {item_name} into fortification!",
+        fortification_before=fortification_before,
+        fortification_gain=gain,
+        fortification_after=property.fortification_percent,
+        item_consumed=item_name
+    )

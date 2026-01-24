@@ -117,7 +117,6 @@ functions:
     # Needs VPC access to validate user is in kingdom + get display name
 
 plugins:
-  - serverless-python-requirements
   - serverless-domain-manager
 
 custom:

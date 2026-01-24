@@ -295,68 +295,71 @@ private struct InAppNotificationWindowContent: View {
 
 // MARK: - Toast View
 
-/// The actual toast notification view
+/// The actual toast notification view - uses brutalist style matching TravelNotificationToast
 private struct InAppNotificationToastView: View {
     let notification: InAppNotification
     let onDismiss: () -> Void
     
-    @State private var isGlowing = false
-    
     var body: some View {
-        HStack(spacing: 14) {
-            // Icon with subtle accent
-            ZStack {
-                // Icon background with accent color
-                Circle()
-                    .fill(notification.type.backgroundColor.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                
-                Image(systemName: notification.type.icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(notification.type.backgroundColor)
-            }
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            // Icon with brutalist badge
+            Image(systemName: notification.type.icon)
+                .font(.title2)
+                .foregroundColor(.white)
+                .frame(width: 48, height: 48)
+                .brutalistBadge(
+                    backgroundColor: notification.type.backgroundColor,
+                    cornerRadius: 12,
+                    shadowOffset: 3,
+                    borderWidth: 2
+                )
             
             // Text content
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(notification.type.title)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 Text(notification.type.message)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer(minLength: 8)
             
             // Dismiss button
             Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(KingdomTheme.Spacing.medium)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(
-                            Color.white.opacity(0.2),
-                            lineWidth: 1
-                        )
-                )
+            ZStack {
+                // Offset shadow (brutalist style)
+                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                    .fill(Color.black)
+                    .offset(x: KingdomTheme.Brutalist.offsetShadow, y: KingdomTheme.Brutalist.offsetShadow)
+                
+                // Main card
+                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                            .stroke(Color.black, lineWidth: KingdomTheme.Brutalist.borderWidth)
+                    )
+            }
         )
-        .padding(.horizontal, 16)
-        .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 8)
-        .onAppear {
-            isGlowing = true
-        }
+        // Soft shadow for extra depth
+        .shadow(
+            color: KingdomTheme.Shadows.brutalistSoft.color,
+            radius: KingdomTheme.Shadows.brutalistSoft.radius,
+            x: KingdomTheme.Shadows.brutalistSoft.x,
+            y: KingdomTheme.Shadows.brutalistSoft.y
+        )
+        .padding(.horizontal)
     }
 }

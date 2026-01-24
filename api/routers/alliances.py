@@ -22,8 +22,6 @@ from routers.auth import get_current_user
 router = APIRouter(prefix="/alliances", tags=["Alliances"])
 
 # Constants
-ALLIANCE_PROPOSAL_COST = 500
-MAX_ACTIVE_ALLIANCES = 3
 PROPOSAL_EXPIRY_DAYS = 7
 ALLIANCE_DURATION_DAYS = 30
 
@@ -73,20 +71,62 @@ def _count_active_alliances(db: Session, empire_id: str) -> int:
 
 
 def _expire_old_alliances(db: Session):
-    """Expire any alliances past their expiry date"""
-    # Expire active alliances
-    db.query(Alliance).filter(
-        Alliance.status == 'active',
-        Alliance.expires_at <= datetime.utcnow()
-    ).update({"status": "expired"})
+    """
+    Expire alliances past their expiry date and create kingdom events.
     
-    # Expire pending proposals
+    Uses SELECT FOR UPDATE SKIP LOCKED to safely handle concurrent serverless requests.
+    Each expired alliance is processed exactly once across all Lambda invocations.
+    """
+    from db.models.kingdom_event import KingdomEvent
+    
+    # Find expired active alliances that haven't been notified yet
+    # SKIP LOCKED ensures concurrent requests don't process the same row
+    expired_alliances = db.query(Alliance).filter(
+        Alliance.status == 'active',
+        Alliance.expires_at <= datetime.utcnow(),
+        Alliance.expiry_notified == False
+    ).with_for_update(skip_locked=True).all()
+    
+    for alliance in expired_alliances:
+        # Mark as notified FIRST (before status change) to prevent double notifications
+        # Even if this request crashes after, another request won't re-notify
+        alliance.expiry_notified = True
+        alliance.status = 'expired'
+        db.flush()  # Write to DB immediately while we hold the lock
+        
+        # Get empire names for the notification
+        initiator_name = _get_empire_name(db, alliance.initiator_empire_id)
+        target_name = _get_empire_name(db, alliance.target_empire_id)
+        
+        # Create kingdom events for both empires
+        _create_alliance_expired_events(db, alliance.initiator_empire_id, target_name)
+        _create_alliance_expired_events(db, alliance.target_empire_id, initiator_name)
+    
+    # Expire pending proposals (no notification needed for these)
     db.query(Alliance).filter(
         Alliance.status == 'pending',
         Alliance.proposal_expires_at <= datetime.utcnow()
     ).update({"status": "expired"})
     
     db.commit()
+
+
+def _create_alliance_expired_events(db: Session, empire_id: str, ally_name: str):
+    """Create alliance expiry events for all kingdoms in an empire"""
+    from db.models.kingdom_event import KingdomEvent
+    
+    # Get all kingdoms in this empire
+    kingdoms = db.query(Kingdom).filter(
+        or_(Kingdom.empire_id == empire_id, Kingdom.id == empire_id)
+    ).all()
+    
+    for kingdom in kingdoms:
+        event = KingdomEvent(
+            kingdom_id=kingdom.id,
+            title="Alliance Expired",
+            description=f"Your alliance with {ally_name} has expired after 30 days."
+        )
+        db.add(event)
 
 
 def are_empires_allied(db: Session, empire_a_id: str, empire_b_id: str) -> bool:
@@ -122,6 +162,112 @@ def get_alliance_between(db: Session, empire_a_id: str, empire_b_id: str) -> Opt
             and_(Alliance.initiator_empire_id == empire_b_id, Alliance.target_empire_id == empire_a_id)
         )
     ).first()
+
+
+def get_allied_empire_ids(db: Session, empire_id: str) -> List[str]:
+    """
+    Get all empire IDs that are actively allied with the given empire.
+    Used for broadcasting alliance-wide news.
+    """
+    if not empire_id:
+        return []
+    
+    alliances = db.query(Alliance).filter(
+        Alliance.status == 'active',
+        Alliance.expires_at > datetime.utcnow(),
+        or_(
+            Alliance.initiator_empire_id == empire_id,
+            Alliance.target_empire_id == empire_id
+        )
+    ).all()
+    
+    allied_ids = []
+    for alliance in alliances:
+        if alliance.initiator_empire_id == empire_id:
+            allied_ids.append(alliance.target_empire_id)
+        else:
+            allied_ids.append(alliance.initiator_empire_id)
+    
+    return allied_ids
+
+
+def get_allied_kingdom_ids(db: Session, empire_id: str) -> List[str]:
+    """
+    Get all kingdom IDs in allied empires.
+    Used for broadcasting alliance-wide news to all kingdoms in the alliance network.
+    
+    Returns kingdom IDs (not empire IDs) for broadcasting to alliance network.
+    """
+    if not empire_id:
+        return []
+    
+    allied_empire_ids = get_allied_empire_ids(db, empire_id)
+    if not allied_empire_ids:
+        return []
+    
+    # Get all kingdoms belonging to allied empires
+    allied_kingdoms = db.query(Kingdom).filter(
+        or_(
+            Kingdom.empire_id.in_(allied_empire_ids),
+            Kingdom.id.in_(allied_empire_ids)  # For single-city empires
+        )
+    ).all()
+    
+    return [k.id for k in allied_kingdoms]
+
+
+def get_active_alliances_for_empire(db: Session, empire_id: str) -> List[dict]:
+    """
+    Get all active alliances for an empire with details about allied kingdoms.
+    Used for displaying alliances in the hometown KingdomInfoSheet.
+    
+    Returns list of dicts with:
+    - id: alliance ID
+    - allied_kingdom_id: the other kingdom's ID
+    - allied_kingdom_name: the other kingdom's name
+    - allied_ruler_name: the other kingdom's ruler name
+    - days_remaining: days until expiry
+    - expires_at: ISO timestamp
+    """
+    if not empire_id:
+        return []
+    
+    alliances = db.query(Alliance).filter(
+        Alliance.status == 'active',
+        Alliance.expires_at > datetime.utcnow(),
+        or_(
+            Alliance.initiator_empire_id == empire_id,
+            Alliance.target_empire_id == empire_id
+        )
+    ).order_by(Alliance.expires_at.asc()).all()
+    
+    result = []
+    for alliance in alliances:
+        # Determine which side is the "other" empire
+        if alliance.initiator_empire_id == empire_id:
+            other_empire_id = alliance.target_empire_id
+            other_ruler_name = alliance.target_ruler_name
+        else:
+            other_empire_id = alliance.initiator_empire_id
+            other_ruler_name = alliance.initiator_ruler_name
+        
+        # Get the other kingdom's name
+        other_kingdom = db.query(Kingdom).filter(
+            or_(Kingdom.empire_id == other_empire_id, Kingdom.id == other_empire_id)
+        ).first()
+        other_kingdom_name = other_kingdom.name if other_kingdom else other_empire_id
+        other_kingdom_id = other_kingdom.id if other_kingdom else other_empire_id
+        
+        result.append({
+            "id": alliance.id,
+            "allied_kingdom_id": other_kingdom_id,
+            "allied_kingdom_name": other_kingdom_name,
+            "allied_ruler_name": other_ruler_name,
+            "days_remaining": alliance.days_remaining,
+            "expires_at": alliance.expires_at.isoformat() if alliance.expires_at else None
+        })
+    
+    return result
 
 
 def _alliance_to_response(alliance: Alliance) -> AllianceResponse:
@@ -160,8 +306,6 @@ def propose_alliance(
     - Must be a ruler of at least one city
     - Cannot propose to your own empire
     - Cannot have existing pending/active alliance with target
-    - Max 3 active alliances per empire
-    - Costs 500g
     """
     state = _get_player_state(db, current_user)
     
@@ -221,24 +365,6 @@ def propose_alliance(
                 detail="Alliance proposal already pending with this empire"
             )
     
-    # Check max alliances
-    active_count = _count_active_alliances(db, my_empire_id)
-    if active_count >= MAX_ACTIVE_ALLIANCES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Maximum {MAX_ACTIVE_ALLIANCES} active alliances allowed"
-        )
-    
-    # Check gold
-    if state.gold < ALLIANCE_PROPOSAL_COST:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Need {ALLIANCE_PROPOSAL_COST}g to propose alliance. Have {int(state.gold)}g"
-        )
-    
-    # Deduct gold
-    state.gold -= ALLIANCE_PROPOSAL_COST
-    
     # Create alliance proposal
     proposal_expires = datetime.utcnow() + timedelta(days=PROPOSAL_EXPIRY_DAYS)
     
@@ -246,7 +372,7 @@ def propose_alliance(
         initiator_empire_id=my_empire_id,
         target_empire_id=request.target_empire_id,
         initiator_ruler_id=current_user.id,
-        initiator_ruler_name=current_user.username,
+        initiator_ruler_name=current_user.display_name,
         status='pending',
         created_at=datetime.utcnow(),
         proposal_expires_at=proposal_expires
@@ -262,7 +388,6 @@ def propose_alliance(
         success=True,
         message=f"Alliance proposed to {target_name}! They have {PROPOSAL_EXPIRY_DAYS} days to accept.",
         alliance_id=alliance.id,
-        cost_paid=ALLIANCE_PROPOSAL_COST,
         proposal_expires_at=proposal_expires
     )
 
@@ -313,16 +438,8 @@ def accept_alliance(
             detail="Only a ruler of the target empire can accept this alliance"
         )
     
-    # Check max alliances for acceptor
-    active_count = _count_active_alliances(db, my_empire_id)
-    if active_count >= MAX_ACTIVE_ALLIANCES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Maximum {MAX_ACTIVE_ALLIANCES} active alliances allowed. Decline or wait for one to expire."
-        )
-    
     # Accept the alliance
-    alliance.accept(current_user.id, current_user.username)
+    alliance.accept(current_user.id, current_user.display_name)
     db.commit()
     
     initiator_name = _get_empire_name(db, alliance.initiator_empire_id)

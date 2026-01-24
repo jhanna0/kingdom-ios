@@ -266,11 +266,11 @@ BUILDING_TYPES = {
         "benefit_formula": "Unlocks wood gathering at each level",
         "click_action": {"type": "gathering", "resource": "wood"},
         "tiers": {
-            1: {"name": "Logging Camp", "benefit": "Gather 10 wood per action", "wood_per_action": 10, "description": "Basic logging operation"},
-            2: {"name": "Sawmill", "benefit": "Gather 20 wood per action", "wood_per_action": 20, "description": "Improved wood processing"},
-            3: {"name": "Lumber Yard", "benefit": "Gather 35 wood per action", "wood_per_action": 35, "description": "Large-scale lumber operation"},
-            4: {"name": "Industrial Mill", "benefit": "Gather 50 wood per action", "wood_per_action": 50, "description": "Advanced lumber processing"},
-            5: {"name": "Lumber Empire", "benefit": "Gather 75 wood per action", "wood_per_action": 75, "description": "Massive wood production"},
+            1: {"name": "Logging Camp", "benefit": "Provides 200 wood per day", "wood_per_action": 10, "description": "Basic logging operation"},
+            2: {"name": "Sawmill", "benefit": "Provides 400 wood per day", "wood_per_action": 20, "description": "Improved wood processing"},
+            3: {"name": "Lumber Yard", "benefit": "Provides 600 wood per day", "wood_per_action": 35, "description": "Large-scale lumber operation"},
+            4: {"name": "Industrial Mill", "benefit": "Provides 800 wood per day", "wood_per_action": 50, "description": "Advanced lumber processing"},
+            5: {"name": "Lumber Empire", "benefit": "Provides 1000 wood per day", "wood_per_action": 75, "description": "Massive wood production"},
         }
     },
     "townhall": {

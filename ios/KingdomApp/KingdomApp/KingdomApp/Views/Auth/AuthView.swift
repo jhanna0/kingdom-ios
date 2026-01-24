@@ -4,6 +4,8 @@ import AuthenticationServices
 struct AuthView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var appleSignInCoordinator: AppleSignInCoordinator?
+    @State private var logoTapCount = 0
+    @State private var showDemoLogin = false
     
     var body: some View {
         ZStack {
@@ -16,7 +18,7 @@ struct AuthView: View {
                 
                 // Logo Section
                 VStack(spacing: KingdomTheme.Spacing.large) {
-                    // Crown with brutalist badge
+                    // Crown with brutalist badge - tap 5 times for demo login
                     Image(systemName: "crown.fill")
                         .font(.system(size: 64))
                         .foregroundColor(.white)
@@ -27,6 +29,13 @@ struct AuthView: View {
                             shadowOffset: 6,
                             borderWidth: 4
                         )
+                        .onTapGesture {
+                            logoTapCount += 1
+                            if logoTapCount >= 5 {
+                                logoTapCount = 0
+                                showDemoLogin = true
+                            }
+                        }
                     
                     Text("KINGDOM")
                         .font(FontStyles.displayLarge)
@@ -98,6 +107,9 @@ struct AuthView: View {
                 Spacer()
             }
         }
+        .sheet(isPresented: $showDemoLogin) {
+            DemoLoginSheet(authManager: authManager, isPresented: $showDemoLogin)
+        }
     }
     
     private func performAppleSignIn() {
@@ -153,4 +165,98 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate {
     }
 }
 
+// MARK: - Demo Login Sheet (App Review)
 
+struct DemoLoginSheet: View {
+    let authManager: AuthManager
+    @Binding var isPresented: Bool
+    @State private var secretCode = ""
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment.ignoresSafeArea()
+            
+            VStack(spacing: KingdomTheme.Spacing.xxLarge) {
+                HStack {
+                    Spacer()
+                    Button(action: { isPresented = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+                .padding(.top, KingdomTheme.Spacing.medium)
+                .padding(.horizontal, KingdomTheme.Spacing.medium)
+                
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    Text("Royal Access")
+                        .font(FontStyles.displayMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("Enter the code for App Review access.")
+                        .font(FontStyles.bodyMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                
+                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                    Text("Code")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    TextField("Code", text: $secretCode)
+                        .font(FontStyles.bodyLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .textFieldStyle(.plain)
+                        .padding(KingdomTheme.Spacing.medium)
+                        .background(Color.white)
+                        .cornerRadius(KingdomTheme.Brutalist.cornerRadiusSmall)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                        .autocapitalization(.allCharacters)
+                        .disableAutocorrection(true)
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+                
+                Button(action: {
+                    Task {
+                        await authManager.demoLogin(secret: secretCode)
+                        isPresented = false
+                    }
+                }) {
+                    HStack {
+                        Text("Enter the Kingdom")
+                            .font(FontStyles.bodyLargeBold)
+                        Image(systemName: "arrow.right")
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KingdomTheme.Spacing.large)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .fill(Color.black)
+                                .offset(x: 4, y: 4)
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .fill(secretCode.isEmpty ? KingdomTheme.Colors.disabled : KingdomTheme.Colors.buttonPrimary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                        .stroke(Color.black, lineWidth: 3)
+                                )
+                        }
+                    )
+                }
+                .disabled(secretCode.isEmpty)
+                .padding(.horizontal, KingdomTheme.Spacing.xxLarge)
+                .padding(.bottom, KingdomTheme.Spacing.xxLarge)
+                
+                Spacer()
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+}

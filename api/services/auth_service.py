@@ -136,7 +136,11 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
         return existing_user
     
     # Sanitize and validate display name
-    display_name = apple_data.display_name or "Player"
+    # If "User" is sent (iOS default when Apple doesn't provide name), generate unique placeholder
+    import uuid
+    display_name = apple_data.display_name
+    if not display_name or display_name == "User":
+        display_name = f"Player{uuid.uuid4().hex[:8]}"
     print(f"📝 [SIGNUP] Creating new user with display_name: {display_name}")
     
     if display_name != "Player":  # Don't validate default name

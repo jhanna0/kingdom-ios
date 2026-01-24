@@ -94,6 +94,13 @@ struct GatheringView: View {
             viewModel.selectResource(initialResource)
             await viewModel.loadConfig()
         }
+        .alert("Resources Exhausted", isPresented: $viewModel.isExhausted) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text(viewModel.exhaustedMessage)
+        }
     }
     
     // MARK: - Nav Bar

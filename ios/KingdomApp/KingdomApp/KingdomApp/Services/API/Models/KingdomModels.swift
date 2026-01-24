@@ -21,6 +21,8 @@ struct APIBuildingTierInfo: Codable {
 struct APIBuildingClickAction: Codable {
     let type: String  // e.g. "gathering", "market", "townhall"
     let resource: String?  // For gathering: "wood", "iron"
+    let exhausted: Bool?  // True if daily limit reached (for gathering)
+    let exhausted_message: String?  // Message to show when exhausted
 }
 
 /// Catch-up info for players who joined after building was constructed
@@ -111,6 +113,16 @@ struct AllianceInfo: Codable {
     let expires_at: String?
 }
 
+/// Active alliance info for hometown display
+struct ActiveAllianceData: Codable, Identifiable {
+    let id: Int
+    let allied_kingdom_id: String
+    let allied_kingdom_name: String
+    let allied_ruler_name: String?
+    let days_remaining: Int
+    let expires_at: String?
+}
+
 /// Kingdom data attached to a city boundary response
 /// FULLY DYNAMIC - buildings array contains all building data with upgrade costs
 struct CityKingdomData: Codable {
@@ -135,6 +147,7 @@ struct CityKingdomData: Codable {
     let alliance_info: AllianceInfo?  // Details about alliance if is_allied is true
     let allies: [String]?  // Kingdom IDs of allied kingdoms
     let enemies: [String]?  // Kingdom IDs of enemy kingdoms
+    let active_alliances: [ActiveAllianceData]?  // All active alliances (only for player's hometown)
     
     // Coup eligibility
     let can_stage_coup: Bool?  // Backend determines if current user can stage coup

@@ -45,6 +45,9 @@ from schemas.coup import (
 )
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso
+from websocket.broadcast import notify_kingdom, KingdomEvents
+from routers.alliances import get_allied_kingdom_ids
+from db.models.kingdom_event import KingdomEvent
 
 router = APIRouter(prefix="/coups", tags=["Coups"])
 
@@ -899,11 +902,36 @@ def initiate_coup(
     db.commit()
     db.refresh(coup)
     
+    # Broadcast to the kingdom
+    notify_kingdom(
+        kingdom_id=kingdom.id,
+        event_type=KingdomEvents.COUP_STARTED,
+        data={
+            "coup_id": coup.id,
+            "initiator_name": current_user.display_name,
+            "pledge_end_time": coup.pledge_end_time.isoformat()
+        }
+    )
+    
+    # Notify allied kingdoms - "Your ally is under attack!"
+    kingdom_empire_id = kingdom.empire_id or kingdom.id
+    allied_kingdom_ids = get_allied_kingdom_ids(db, kingdom_empire_id)
+    for allied_kingdom_id in allied_kingdom_ids:
+        event = KingdomEvent(
+            kingdom_id=allied_kingdom_id,
+            title="Ally Under Attack!",
+            description=f"A coup has been initiated in {kingdom.name} by {current_user.display_name}!"
+        )
+        db.add(event)
+    
+    if allied_kingdom_ids:
+        db.commit()
+    
     return CoupInitiateResponse(
         success=True,
         message=f"Coup initiated in {kingdom.name}! Citizens have {PLEDGE_DURATION_HOURS} hours to choose sides.",
         coup_id=coup.id,
-        pledge_end_time=pledge_end_time
+        pledge_end_time=coup.pledge_end_time
     )
 
 

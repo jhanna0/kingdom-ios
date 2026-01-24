@@ -24,5 +24,9 @@ if DEV_MODE:
 else:
     print("✅ Production mode - Full restrictions active")
 
+# ===== DEMO LOGIN =====
+# Secret code for App Store reviewers to access demo account
+DEMO_LOGIN_SECRET = "REVIEW_2026"
+
 
 

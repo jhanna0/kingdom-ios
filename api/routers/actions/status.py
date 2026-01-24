@@ -737,6 +737,13 @@ def get_action_status(
                     if not ok:
                         invasion_ineligibility_reason = msg
                 
+                # Check if user is already in an active battle
+                if not invasion_ineligibility_reason:
+                    from routers.battles import _check_user_in_active_battle
+                    in_battle, battle_msg = _check_user_in_active_battle(db, current_user.id)
+                    if in_battle:
+                        invasion_ineligibility_reason = battle_msg
+                
                 # If no reason to block, can invade!
                 if not invasion_ineligibility_reason:
                     can_declare_invasion = True
@@ -774,6 +781,73 @@ def get_action_status(
                     "category": "warfare",
                     "theme_color": "buttonDanger",
                     "display_order": 1,
+                    "endpoint": None,
+                    "handler": None,
+                }
+            
+            # PROPOSE ALLIANCE - Available when in enemy kingdom, user is ruler, not already allied
+            can_propose_alliance = False
+            alliance_ineligibility_reason = None
+            
+            if not fiefs_ruled:
+                alliance_ineligibility_reason = "Must rule a kingdom to propose alliances"
+            elif not kingdom.ruler_id:
+                alliance_ineligibility_reason = "Cannot ally with unruled kingdom"
+            else:
+                # Check if already allied
+                my_empire_id = ruled_kingdoms[0].empire_id or ruled_kingdoms[0].id
+                target_empire_id = kingdom.empire_id or kingdom.id
+                
+                if are_empires_allied(db, my_empire_id, target_empire_id):
+                    alliance_ineligibility_reason = "Already allied with this empire"
+                else:
+                    # Check for existing pending proposal
+                    from db import Alliance
+                    existing_proposal = db.query(Alliance).filter(
+                        Alliance.status == 'pending',
+                        ((Alliance.initiator_empire_id == my_empire_id) & (Alliance.target_empire_id == target_empire_id)) |
+                        ((Alliance.initiator_empire_id == target_empire_id) & (Alliance.target_empire_id == my_empire_id))
+                    ).first()
+                    
+                    if existing_proposal:
+                        alliance_ineligibility_reason = "Alliance proposal already pending"
+                    else:
+                        can_propose_alliance = True
+            
+            if can_propose_alliance:
+                actions["propose_alliance"] = {
+                    "ready": True,
+                    "seconds_remaining": 0,
+                    "unlocked": True,
+                    "action_type": "propose_alliance",
+                    "requirements_met": True,
+                    "title": "Propose Alliance",
+                    "icon": "person.2.fill",
+                    "description": f"Form alliance with {kingdom.name}",
+                    "category": "political",
+                    "theme_color": "buttonSuccess",
+                    "display_order": 2,
+                    "slot": "political",
+                    "endpoint": "/alliances/propose",
+                    "handler": "propose_alliance",
+                    "kingdom_id": kingdom.id,
+                    "kingdom_name": kingdom.name,
+                }
+            else:
+                actions["propose_alliance"] = {
+                    "ready": False,
+                    "seconds_remaining": 0,
+                    "unlocked": False,
+                    "action_type": "propose_alliance",
+                    "requirements_met": False,
+                    "requirement_description": alliance_ineligibility_reason,
+                    "title": "Propose Alliance",
+                    "icon": "person.2.fill",
+                    "description": "Form strategic alliance",
+                    "category": "political",
+                    "theme_color": "buttonSuccess",
+                    "display_order": 2,
+                    "slot": "political",
                     "endpoint": None,
                     "handler": None,
                 }
@@ -899,6 +973,61 @@ def get_action_status(
                 "defender_count": len(defender_ids),
                 "is_in_correct_kingdom": is_in_correct_kingdom_to_join or user_pledged,  # Once pledged, always "correct"
             }
+    
+    # SPECTATE BATTLE - Show when visiting a kingdom with an active battle you're not part of
+    # This lets visitors watch battles in progress (read-only - can't fight)
+    if state.current_kingdom_id and "view_coup" not in actions:
+        from db.models import Battle
+        
+        # Check for active battle in the kingdom we're currently visiting
+        local_battle = db.query(Battle).filter(
+            Battle.kingdom_id == state.current_kingdom_id,
+            Battle.resolved_at.is_(None)
+        ).first()
+        
+        if local_battle:
+            attacker_ids = local_battle.get_attacker_ids()
+            defender_ids = local_battle.get_defender_ids()
+            user_involved = current_user.id in attacker_ids or current_user.id in defender_ids
+            
+            # Only show spectate if user is NOT involved
+            if not user_involved:
+                battle_type_name = "Coup" if local_battle.is_coup else "Invasion"
+                is_battle_phase = local_battle.is_battle_phase
+                
+                if is_battle_phase:
+                    title = f"⚔️ {battle_type_name} in Progress"
+                    description = f"Watch the battle unfold"
+                else:
+                    title = f"View {battle_type_name}"
+                    description = f"Pledge phase - {local_battle.time_remaining_seconds // 60}m remaining"
+                
+                actions["spectate_battle"] = {
+                    "ready": True,
+                    "seconds_remaining": 0,
+                    "unlocked": True,
+                    "action_type": "spectate_battle",
+                    "requirements_met": True,
+                    "title": title,
+                    "icon": "bolt.fill" if local_battle.is_coup else "flag.2.crossed.fill",
+                    "description": description,
+                    "category": "political",
+                    "theme_color": "inkMedium",  # Gray for spectator
+                    "display_order": 0,
+                    "endpoint": None,
+                    "handler": "view_battle",  # Same handler - frontend opens BattleView
+                    "button_text": "Watch",
+                    "button_color": "inkMedium",
+                    "battle_id": local_battle.id,
+                    "battle_type": local_battle.type,
+                    "can_pledge": False,  # Spectators can't pledge
+                    "user_side": None,
+                    "user_pledged": False,
+                    "battle_status": local_battle.current_phase,
+                    "attacker_count": len(attacker_ids),
+                    "defender_count": len(defender_ids),
+                    "is_spectator": True,  # NEW: Frontend knows this is spectate-only
+                }
     
     # Add slot information to each action
     for action_key, action_data in actions.items():

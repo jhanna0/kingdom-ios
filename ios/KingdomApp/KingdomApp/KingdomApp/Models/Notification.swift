@@ -53,6 +53,11 @@ struct ActivityNotification: Codable, Identifiable {
     var isCoupNotification: Bool { type.hasPrefix("coup_") }
     var isInvasionNotification: Bool { type.hasPrefix("invasion_") }
     var isAllianceNotification: Bool { type.hasPrefix("alliance_") }
+    
+    /// Formatted relative time: "just now", "5m ago", "2h ago", "3d ago"
+    var timeAgo: String {
+        TimeFormatter.timeAgo(from: createdAt)
+    }
 }
 
 // MARK: - Coup V2 Models

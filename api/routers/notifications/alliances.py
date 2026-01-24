@@ -41,7 +41,7 @@ def get_alliance_notifications(db: Session, user: User, state: PlayerState) -> L
         notifications.append({
             "type": "alliance_request_received",
             "priority": "critical",  # Critical - ruler must respond
-            "title": "🤝 Alliance Proposal!",
+            "title": "Alliance Proposal!",
             "message": f"{proposal.initiator_ruler_name} of {initiator_name} seeks an alliance!",
             "action": "view_alliance_request",
             "action_id": str(proposal.id),
@@ -79,7 +79,7 @@ def get_alliance_notifications(db: Session, user: User, state: PlayerState) -> L
         notifications.append({
             "type": "alliance_request_sent",
             "priority": "medium",
-            "title": "⏳ Alliance Pending",
+            "title": "Alliance Pending",
             "message": f"Awaiting response from {target_name}",
             "action": "view_alliance_request",
             "action_id": str(proposal.id),
@@ -125,7 +125,7 @@ def get_alliance_notifications(db: Session, user: User, state: PlayerState) -> L
         notifications.append({
             "type": "alliance_accepted",
             "priority": "high",
-            "title": "✅ Alliance Formed!",
+            "title": "Alliance Formed!",
             "message": f"Alliance with {other_name} is now active!",
             "action": "view_alliance",
             "action_id": str(alliance.id),
@@ -161,7 +161,7 @@ def get_alliance_notifications(db: Session, user: User, state: PlayerState) -> L
         notifications.append({
             "type": "alliance_declined",
             "priority": "medium",
-            "title": "❌ Alliance Declined",
+            "title": "Alliance Declined",
             "message": f"{target_name} declined your alliance proposal",
             "action": "view_kingdom",
             "action_id": alliance.target_empire_id,

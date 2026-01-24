@@ -254,6 +254,16 @@ struct MyPropertiesView: View {
             
             // Footer - rooms & progress
             VStack(spacing: 14) {
+                // Fortification bar (if unlocked)
+                if property.fortificationUnlocked {
+                    FortificationBarView(
+                        percent: property.fortificationPercent,
+                        basePercent: property.fortificationBasePercent,
+                        showLabel: true,
+                        height: 14
+                    )
+                }
+                
                 // Your rooms - inside your home!
                 if !availableRooms.isEmpty {
                     VStack(spacing: 8) {
@@ -310,6 +320,16 @@ struct MyPropertiesView: View {
     private func inlineRoomButton(_ room: PropertyAPI.PropertyRoom) -> some View {
         if room.route == "/workshop" {
             NavigationLink(destination: WorkshopView()) {
+                inlineRoomContent(room)
+            }
+            .buttonStyle(.plain)
+        } else if room.route == "/garden" {
+            NavigationLink(destination: GardenView()) {
+                inlineRoomContent(room)
+            }
+            .buttonStyle(.plain)
+        } else if room.route == "/fortify", let prop = property {
+            NavigationLink(destination: FortificationView(player: player, property: prop)) {
                 inlineRoomContent(room)
             }
             .buttonStyle(.plain)
@@ -743,6 +763,9 @@ struct MyPropertiesView: View {
         case "buttonSuccess": return KingdomTheme.Colors.buttonSuccess
         case "buttonDanger": return KingdomTheme.Colors.buttonDanger
         case "buttonWarning": return KingdomTheme.Colors.buttonWarning
+        case "royalBlue": return KingdomTheme.Colors.royalBlue
+        case "royalPurple": return KingdomTheme.Colors.royalPurple
+        case "gold": return KingdomTheme.Colors.gold
         default: return KingdomTheme.Colors.buttonPrimary
         }
     }

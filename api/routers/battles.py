@@ -308,6 +308,33 @@ def _check_kingdom_invasion_cooldown(db: Session, kingdom_id: str) -> Tuple[bool
     return True, ""
 
 
+def _check_user_in_active_battle(db: Session, user_id: int) -> Tuple[bool, str]:
+    """Check if user is already participating in an active battle (coup or invasion).
+    
+    Returns (is_in_battle, message) - if is_in_battle is True, user cannot start new battles.
+    """
+    # Get all active (unresolved) battles
+    active_battles = db.query(Battle).filter(
+        Battle.resolved_at.is_(None)
+    ).all()
+    
+    for battle in active_battles:
+        attacker_ids = battle.get_attacker_ids()
+        defender_ids = battle.get_defender_ids()
+        
+        if user_id in attacker_ids or user_id in defender_ids:
+            battle_type = "coup" if battle.is_coup else "invasion"
+            kingdom = db.query(Kingdom).filter(Kingdom.id == battle.kingdom_id).first()
+            kingdom_name = kingdom.name if kingdom else "a kingdom"
+            
+            if user_id in attacker_ids:
+                return True, f"You are already attacking in a {battle_type} at {kingdom_name}. Finish that battle first."
+            else:
+                return True, f"You are already defending in a {battle_type} at {kingdom_name}. Finish that battle first."
+    
+    return False, ""
+
+
 # ===== Battle Phase Helpers =====
 
 def _ensure_territories_exist(db: Session, battle: Battle) -> List[BattleTerritory]:
@@ -1321,6 +1348,11 @@ def declare_invasion(
     if not can_invade:
         raise HTTPException(status_code=400, detail=msg)
     
+    # Check if user is already in an active battle
+    in_battle, battle_msg = _check_user_in_active_battle(db, current_user.id)
+    if in_battle:
+        raise HTTPException(status_code=400, detail=battle_msg)
+    
     now = datetime.utcnow()
     pledge_end_time = now + timedelta(hours=INVASION_DECLARATION_HOURS)
     
@@ -1611,6 +1643,13 @@ def check_battle_eligibility(
             if not ok:
                 can_invade = False
                 invasion_reason = msg
+        
+        # Check if user is already in an active battle
+        if can_invade:
+            in_battle, battle_msg = _check_user_in_active_battle(db, current_user.id)
+            if in_battle:
+                can_invade = False
+                invasion_reason = battle_msg
     
     # Can join active battle?
     can_join = False

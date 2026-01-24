@@ -1,93 +1,119 @@
 import SwiftUI
 
-struct ActivityView: View {
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = ActivityViewModel()
+// MARK: - Notification Components
+// Shared components used by NotificationsSheet
+
+// MARK: - Notification Detail Popup
+
+struct NotificationDetailPopup: View {
+    let notification: ActivityNotification
+    @Binding var isShowing: Bool
+    
+    @State private var scale: CGFloat = 0.8
+    @State private var opacity: Double = 0
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                KingdomTheme.Colors.parchment
-                    .ignoresSafeArea()
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 16) {
+                // Icon
+                Image(systemName: notification.icon ?? "bell.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.white)
+                    .frame(width: 60, height: 60)
+                    .brutalistBadge(backgroundColor: iconColor, cornerRadius: 14)
                 
-                ScrollView {
-                    VStack(spacing: KingdomTheme.Spacing.medium) {
-                        // Header
-                        HStack {
-                            Image(systemName: "bell.fill")
-                                .font(FontStyles.iconMedium)
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 10)
-                            
-                            Text("Activity Feed")
-                                .font(FontStyles.headingLarge)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, KingdomTheme.Spacing.small)
-                        
-                        // Notifications
-                        if !viewModel.notifications.isEmpty {
-                            ForEach(viewModel.notifications) { notification in
-                                NotificationCard(notification: notification, onTap: {
-                                    viewModel.handleNotificationTap(notification)
-                                })
-                            }
-                        } else if !viewModel.isLoading {
-                            VStack(spacing: KingdomTheme.Spacing.large) {
-                                Image(systemName: "checkmark.circle")
-                                    .font(FontStyles.iconExtraLarge)
-                                    .foregroundColor(.white)
-                                    .frame(width: 80, height: 80)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 20)
-                                
-                                Text("All Caught Up")
-                                    .font(FontStyles.headingLarge)
-                                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                                
-                                Text("No new activity")
-                                    .font(FontStyles.bodyMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(.top, 60)
-                        }
-                    }
-                    .padding(.vertical)
-                }
+                // Title
+                Text(notification.title)
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .multilineTextAlignment(.center)
                 
-                if viewModel.isLoading {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    MedievalLoadingView(status: "Loading...")
-                }
-            }
-            .navigationTitle("Activity")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                // Full message
+                Text(notification.message)
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Timestamp
+                Text(notification.timeAgo)
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                
+                // Dismiss button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isShowing = false
                     }
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.semibold)
-                    .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                }) {
+                    Text("Got it")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.buttonPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                    }
+                )
+                .padding(.top, 8)
             }
-            .task {
-                await viewModel.loadActivity()
-            }
-            .sheet(item: $viewModel.selectedBattle) { battle in
-                BattleView(battleId: battle.id, onDismiss: {
-                    viewModel.selectedBattle = nil
-                })
+            .padding(24)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(Color.black)
+                        .offset(x: KingdomTheme.Brutalist.offsetShadow, y: KingdomTheme.Brutalist.offsetShadow)
+                    
+                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                        .fill(KingdomTheme.Colors.parchmentLight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+                                .stroke(Color.black, lineWidth: KingdomTheme.Brutalist.borderWidth)
+                        )
+                }
+            )
+            .padding(.horizontal, 32)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .opacity(opacity)
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isShowing = false
+                    }
+                }
+        )
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                scale = 1.0
+                opacity = 1.0
             }
         }
+    }
+    
+    private var iconColor: Color {
+        if let colorName = notification.priorityColor {
+            return ThemeColorHelper.color(for: colorName)
+        }
+        return KingdomTheme.Colors.inkMedium
     }
 }
 
@@ -221,7 +247,7 @@ struct NotificationCard: View {
                         // Show alliance badge if applicable
                         if invasionData.isAllied == true {
                             HStack(spacing: 4) {
-                                Image(systemName: "handshake.fill")
+                                Image(systemName: "person.2.fill")
                                     .font(FontStyles.iconMini)
                                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                                 Text("Allied Empire")
@@ -287,10 +313,3 @@ struct ThemeColorHelper {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    ActivityView()
-}
-

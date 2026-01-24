@@ -1,4 +1,4 @@
-import SwiftUI
+ import SwiftUI
 
 // MARK: - Science View
 // THE LABORATORY - High/Low guessing game
@@ -15,6 +15,10 @@ struct ScienceView: View {
     @State private var gaugeValue: Double = 50
     @State private var isCalibrating: Bool = true
     @State private var showNumber: Bool = false
+    
+    // Marker state (keep calibration marker pinned after calibration ends)
+    @State private var calibrationMarkerValue: Double? = nil
+    @State private var calibrationAnimationTask: Task<Void, Never>? = nil
     
     // Rewards popup
     @State private var showWinningsPopup: Bool = false
@@ -54,6 +58,14 @@ struct ScienceView: View {
                 }
                 .padding(.horizontal, KingdomTheme.Spacing.large)
                 
+                // Gold badge above bottom bar, right-aligned
+                HStack {
+                    Spacer()
+                    goldBadge
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.large)
+                .padding(.bottom, 8)
+                
                 bottomButtons
             }
             
@@ -65,11 +77,7 @@ struct ScienceView: View {
         .navigationBarHidden(true)
         .task {
             viewModel.configure(with: apiClient)
-            await viewModel.startExperiment()
-            runCalibrationAnimation()
-        }
-        .onChange(of: viewModel.currentNumber) { _, newValue in
-            runCalibrationAnimation()
+            await viewModel.loadConfig()
         }
         .onChange(of: viewModel.uiState) { _, newState in
             if newState == .correct || newState == .wonMax {
@@ -94,7 +102,8 @@ struct ScienceView: View {
     // MARK: - Calibration Animation
     
     private func runCalibrationAnimation() {
-        Task {
+        calibrationAnimationTask?.cancel()
+        calibrationAnimationTask = Task {
             await runCalibrationSequence()
         }
     }
@@ -105,6 +114,7 @@ struct ScienceView: View {
         
         isCalibrating = true
         showNumber = false
+        calibrationMarkerValue = nil
         
         // Sweep through random positions before landing
         let positions: [Double] = [
@@ -118,6 +128,7 @@ struct ScienceView: View {
         ]
         
         for (index, pos) in positions.enumerated() {
+            if Task.isCancelled { return }
             let duration = index == positions.count - 1 ? 0.35 : 0.12
             withAnimation(.easeInOut(duration: duration)) {
                 gaugeValue = pos
@@ -130,6 +141,9 @@ struct ScienceView: View {
             gaugeValue = targetValue
         }
         try? await Task.sleep(nanoseconds: 300_000_000)
+        
+        // Pin the calibration marker at the final position
+        calibrationMarkerValue = targetValue
         
         // Show the number
         withAnimation(.easeIn(duration: 0.2)) {
@@ -179,7 +193,10 @@ struct ScienceView: View {
     private func streakDot(index: Int) -> some View {
         let isComplete = index < viewModel.streak
         let isFinal = index == max(0, viewModel.maxStreak - 1)
-        let goldReward = (index + 1) * 5
+        let streakNum = index + 1
+        let rewardCfg = viewModel.streakRewards.first(where: { $0.streak == streakNum })
+        let goldReward = rewardCfg?.gold ?? 0
+        let hasBlueprint = (rewardCfg?.blueprint ?? 0) > 0
         
         return VStack(spacing: 4) {
             ZStack {
@@ -203,12 +220,12 @@ struct ScienceView: View {
                 Text("\(goldReward)g")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(isComplete ? labGold : KingdomTheme.Colors.inkMedium)
-                    .opacity(isFinal ? 0 : 1)
+                    .opacity((isFinal || hasBlueprint) ? 0 : 1)
                 
                 Image(systemName: "scroll.fill")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isComplete ? labGold : KingdomTheme.Colors.inkMedium)
-                    .opacity(isFinal ? 1 : 0)
+                    .opacity((isFinal || hasBlueprint) ? 1 : 0)
             }
         }
     }
@@ -219,14 +236,13 @@ struct ScienceView: View {
         let rounds = viewModel.playedRounds.filter { $0.is_revealed }
         
         return HStack(spacing: 8) {
-            // Show up to 3 history cards (one per round)
+            // One history card per round slot
             ForEach(0..<max(1, viewModel.maxStreak), id: \.self) { index in
                 historyCard(for: index, rounds: rounds)
             }
         }
         .padding(.horizontal, KingdomTheme.Spacing.large)
         .padding(.vertical, 8)
-        .background(KingdomTheme.Colors.parchment)
     }
     
     private func historyCard(for index: Int, rounds: [ScienceRound]) -> some View {
@@ -320,22 +336,30 @@ struct ScienceView: View {
                     .padding(.vertical, 8)
                 }
                 
-                // THE LINE MARKER
+                // MARKERS (calibration sticks, result animates separately)
                 GeometryReader { geo in
                     let inset: CGFloat = 8
                     let usableHeight = geo.size.height - (inset * 2)
-                    let yPos = inset + usableHeight * (1 - gaugeValue / 100)
                     
-                    Rectangle()
-                        .fill(labBlue)
-                        .frame(width: geo.size.width, height: 4)
-                        .position(x: geo.size.width / 2, y: yPos)
-                    
-                    Circle()
-                        .fill(labBlue)
-                        .frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                        .position(x: geo.size.width / 2, y: yPos)
+                    ZStack {
+                        // 1) Calibration marker (purple)
+                        // During result roll, NEVER follow gaugeValue (avoid "picking up" the purple marker).
+                        let calibrationDisplayValue: Double? = {
+                            if isAnalyzing || showingResult {
+                                return calibrationMarkerValue
+                            }
+                            return calibrationMarkerValue ?? gaugeValue
+                        }()
+                        
+                        if let calibrationDisplayValue {
+                            gaugeMarker(in: geo, value: calibrationDisplayValue, inset: inset, usableHeight: usableHeight, color: labPurple, lineHeight: 3)
+                        }
+                        
+                        // 2) Result marker (blue) - shows during/after guess animation
+                        if isAnalyzing || showingResult {
+                            gaugeMarker(in: geo, value: gaugeValue, inset: inset, usableHeight: usableHeight, color: labBlue, lineHeight: 4)
+                        }
+                    }
                 }
             }
             
@@ -343,6 +367,31 @@ struct ScienceView: View {
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
                 .frame(height: 16)
+        }
+    }
+    
+    private func gaugeMarker(
+        in geo: GeometryProxy,
+        value: Double,
+        inset: CGFloat,
+        usableHeight: CGFloat,
+        color: Color,
+        lineHeight: CGFloat
+    ) -> some View {
+        let clamped = min(100, max(0, value))
+        let yPos = inset + usableHeight * (1 - clamped / 100)
+        
+        return ZStack {
+            Rectangle()
+                .fill(color)
+                .frame(width: geo.size.width, height: lineHeight)
+                .position(x: geo.size.width / 2, y: yPos)
+            
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .position(x: geo.size.width / 2, y: yPos)
         }
     }
     
@@ -388,10 +437,10 @@ struct ScienceView: View {
                 .frame(height: 70)
                 
                 // Bottom label - always takes space
-                Text("Higher or Lower?")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .opacity(viewModel.canGuess && !isCalibrating && !isAnalyzing ? 1 : 0)
+                Text(cardBottomLabel)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(cardBottomLabelColor)
+                    .opacity(cardBottomLabelOpacity)
                     .frame(height: 16)
             }
             .padding(16)
@@ -440,6 +489,27 @@ struct ScienceView: View {
             return viewModel.lastGuessResult?.is_correct == true ? labGold : labOrange
         }
         return KingdomTheme.Colors.inkMedium
+    }
+    
+    private var cardBottomLabel: String {
+        if showingResult {
+            return viewModel.lastGuessResult?.is_correct == true ? "Confirmed" : "Rejected"
+        }
+        return "Higher or Lower?"
+    }
+    
+    private var cardBottomLabelColor: Color {
+        if showingResult {
+            return viewModel.lastGuessResult?.is_correct == true ? labGold : labOrange
+        }
+        return KingdomTheme.Colors.inkMedium
+    }
+    
+    private var cardBottomLabelOpacity: Double {
+        if isAnalyzing { return 0 }
+        if showingResult { return 1 }
+        // Show "Higher or Lower?" during calibration and when ready
+        return 1
     }
     
     // MARK: - Result Card (FIXED height, no shifting)
@@ -521,6 +591,49 @@ struct ScienceView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
     
+    // MARK: - Resources Badge (Gold + Blueprints)
+    
+    private var goldBadge: some View {
+        HStack(spacing: 12) {
+            // Gold
+            HStack(spacing: 4) {
+                Text("\(viewModel.playerGold)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+                
+                Image(systemName: "g.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(KingdomTheme.Colors.goldLight)
+            }
+            
+            // Blueprints
+            HStack(spacing: 4) {
+                Text("\(viewModel.playerBlueprints)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+                
+                Image(systemName: "scroll.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(labBlue)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black)
+                    .offset(x: 2, y: 2)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
     // MARK: - Bottom Buttons
     
     private var bottomButtons: some View {
@@ -539,7 +652,7 @@ struct ScienceView: View {
     private var bottomButtonContent: some View {
         let showCalibrating = viewModel.uiState == .loading || (viewModel.uiState == .ready && isCalibrating)
         let showGuessButtons = (viewModel.uiState == .ready) && !isCalibrating && viewModel.canGuess
-        let showNewTrial = (viewModel.uiState == .collected) || ((viewModel.uiState == .ready) && !isCalibrating && !viewModel.canGuess)
+        let showNewTrial = viewModel.uiState == .notStarted || (viewModel.uiState == .collected) || ((viewModel.uiState == .ready) && !isCalibrating && !viewModel.canGuess)
         let showAnalyzing = viewModel.uiState == .guessing
         let showNext = viewModel.uiState == .correct
         let showWrong = viewModel.uiState == .wrong
@@ -693,11 +806,14 @@ struct ScienceView: View {
     
     private var newTrialButton: some View {
         Button {
-            Task { await viewModel.playAgain() }
+            Task {
+                await viewModel.startExperiment()
+                runCalibrationAnimation()
+            }
         } label: {
             HStack {
-                Image(systemName: "arrow.counterclockwise")
-                Text("New Trial (\(viewModel.entryCost)g)")
+                Image(systemName: "flask.fill")
+                Text("Start Trial (\(viewModel.entryCost)g)")
             }
             .frame(maxWidth: .infinity)
         }
@@ -707,6 +823,14 @@ struct ScienceView: View {
     // MARK: - Actions
     
     private func makeGuess(_ direction: String) async {
+        // Ensure any in-flight calibration animation can't keep moving the gauge/marker
+        calibrationAnimationTask?.cancel()
+        isCalibrating = false
+        if calibrationMarkerValue == nil {
+            // If the player somehow guesses before pinning happens, pin baseline immediately
+            calibrationMarkerValue = Double(viewModel.currentNumber)
+        }
+        
         isAnalyzing = true
         
         // SUSPENSE ANIMATION - line bounces around before landing
