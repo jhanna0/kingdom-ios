@@ -17,10 +17,20 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 #
 # is_tradeable: Can be sold on the market (default True)
 # storage_type: "column" = PlayerState column, "inventory" = player_inventory table
+#
+# ORGANIZED BY ORIGIN/TYPE:
+#   0-9:   Currency
+#   10-19: Core Materials (iron, steel, wood)
+#   20-29: Hunting Drops (meat, sinew, fur, trinkets)
+#   30-39: Fishing
+#   40-49: Foraging (wild gathering)
+#   50-59: Farming (cultivated outputs)
+#   90-99: Special/Crafting (blueprints, etc)
 
 # I DO NOT LIKE HOW WE HAVE THIS WEIRD HAVE RESOURCE HALF IN TABLE WITHOUT FK DESIGN!
 
 RESOURCES = {
+    # ===== CURRENCY (0-9) =====
     "gold": {
         "display_name": "Gold",
         "icon": "g.circle.fill",
@@ -31,13 +41,16 @@ RESOURCES = {
         "is_tradeable": False,  # Gold is currency, not a tradeable item
         "storage_type": "column",
     },
+
+    # ===== CORE MATERIALS (10-19) =====
+    # Basic crafting/building resources
     "iron": {
         "display_name": "Iron",
         "icon": "cube.fill",
         "color": "gray",
         "description": "Basic crafting material for weapons and armor",
         "category": "material",
-        "display_order": 1,
+        "display_order": 10,
         "is_tradeable": True,
         "storage_type": "column",
     },
@@ -47,7 +60,7 @@ RESOURCES = {
         "color": "blue",
         "description": "Advanced crafting material for superior equipment",
         "category": "material",
-        "display_order": 2,
+        "display_order": 11,
         "is_tradeable": True,
         "storage_type": "column",
     },
@@ -57,17 +70,20 @@ RESOURCES = {
         "color": "brown",
         "description": "Building material used for construction",
         "category": "material",
-        "display_order": 3,
+        "display_order": 12,
         "is_tradeable": True,
         "storage_type": "column",
     },
+
+    # ===== HUNTING DROPS (20-29) =====
+    # Resources from hunting animals
     "meat": {
         "display_name": "Meat",
         "icon": "flame.fill",
         "color": "red",
         "description": "Fresh game meat from hunting. Used for actions.",
         "category": "consumable",
-        "display_order": 4,
+        "display_order": 20,
         "is_tradeable": True,
         "storage_type": "inventory",
         "is_food": True,  # Can be consumed to pay action food costs
@@ -78,7 +94,7 @@ RESOURCES = {
         "color": "brown",
         "description": "Animal sinew. Rare drop from hunting - used to craft a hunting bow.",
         "category": "crafting",
-        "display_order": 5,
+        "display_order": 21,
         "is_tradeable": True,
         "storage_type": "inventory",
     },
@@ -88,7 +104,7 @@ RESOURCES = {
         "color": "orange",
         "description": "Animal fur. I can craft this into some armor.",
         "category": "crafting",
-        "display_order": 6,
+        "display_order": 22,
         "is_tradeable": True,
         "storage_type": "inventory",
     },
@@ -98,31 +114,35 @@ RESOURCES = {
         "color": "purple",
         "description": "A lucky charm from the hunt. Increases tracking success chance by 10%.",
         "category": "trinket",
-        "display_order": 7,
+        "display_order": 23,
         "is_tradeable": True,
         "storage_type": "inventory",
         "tracking_hit_chance_bonus": 0.10,  # +10% tracking hit chance
     },
-    # ===== FISHING RESOURCES =====
+
+    # ===== FISHING (30-39) =====
+    # Resources from fishing
     "pet_fish": {
         "display_name": "Pet Fish",
         "icon": "fish.circle.fill",
         "color": "cyan",
         "description": "A rare companion fish. Decorative trophy from fishing.",
         "category": "pet",  # Pets have their own category!
-        "display_order": 8,
+        "display_order": 30,
         "is_tradeable": True,
         "storage_type": "inventory",
         "is_pet": True,  # Flag to identify pets
     },
-    # ===== FORAGING RESOURCES =====
+
+    # ===== FORAGING (40-49) =====
+    # Wild gathering - seeds, berries, found items
     "wheat_seed": {
         "display_name": "Seed",
         "icon": "leaf.fill",
         "color": "gold",
         "description": "Seeds gathered from wild bushes. Used for farming.",
         "category": "material",
-        "display_order": 9,
+        "display_order": 40,
         "is_tradeable": True,
         "storage_type": "inventory",
     },
@@ -132,7 +152,7 @@ RESOURCES = {
         "color": "buttonDanger",
         "description": "Fresh wild berries gathered from bushes. A tasty source of food.",
         "category": "consumable",
-        "display_order": 10,
+        "display_order": 41,
         "is_tradeable": True,
         "storage_type": "inventory",
         "is_food": True,  # Can be consumed to pay action food costs
@@ -143,29 +163,33 @@ RESOURCES = {
         "color": "imperialGold",
         "description": "A mysterious golden egg found while foraging. Will hatch into a chicken pet!",
         "category": "material",
-        "display_order": 11,
+        "display_order": 42,
         "is_tradeable": False,
         "storage_type": "inventory",
     },
-    # ===== BLUEPRINT - Generic crafting token =====
-    "blueprint": {
-        "display_name": "Blueprint",
-        "icon": "scroll.fill",
-        "color": "royalBlue",
-        "description": "A crafting blueprint. Take to your Workshop to craft items.",
-        "category": "crafting",
-        "display_order": 20,
-        "is_tradeable": True,
-        "storage_type": "inventory",
-    },
-    # ===== GARDEN RESOURCES =====
+
+    # ===== FARMING (50-59) =====
+    # Cultivated crops - outputs from planting seeds
     "wheat": {
         "display_name": "Wheat",
         "icon": "leaf",
         "color": "goldLight",
         "description": "Fresh wheat. Used to bake bread.",
         "category": "material",
-        "display_order": 21,
+        "display_order": 50,
+        "is_tradeable": True,
+        "storage_type": "inventory",
+    },
+
+    # ===== SPECIAL / CRAFTING (90-99) =====
+    # Blueprints, tokens, special items
+    "blueprint": {
+        "display_name": "Blueprint",
+        "icon": "scroll.fill",
+        "color": "royalBlue",
+        "description": "A crafting blueprint. Take to your Workshop to craft items.",
+        "category": "crafting",
+        "display_order": 90,
         "is_tradeable": True,
         "storage_type": "inventory",
     },
@@ -252,7 +276,7 @@ def get_all_resources():
     return {
         "resources": RESOURCES,
         "hunting_bow": HUNTING_BOW,
-        "categories": ["currency", "material", "consumable", "crafting"],
+        "categories": ["currency", "material", "consumable", "crafting", "trinket", "pet"],
         "notes": {
             "dynamic_rendering": "Frontend should render all resources from this config",
             "storage": "gold/iron/steel/wood are PlayerState columns. meat/sinew use player_inventory table.",

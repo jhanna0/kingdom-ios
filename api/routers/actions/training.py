@@ -42,7 +42,7 @@ def calculate_training_cost(total_skill_points: int) -> int:
     """
     base_cost = 100.0
     # Use total + 1 because we're buying the NEXT skill point
-    cost_multiplier = pow(1.5, float(total_skill_points + 1))
+    cost_multiplier = pow(1.4, float(total_skill_points + 1))
     return int(base_cost * cost_multiplier)
 
 

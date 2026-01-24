@@ -18,6 +18,11 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 # This gives food a meaningful purpose and creates resource trade-offs
 
 FOOD_COST_PER_COOLDOWN_MINUTE = 0.5  # 0.5 food per minute of cooldown
+BUILDING_LEVEL_COST_EXPONENT = 1.7
+BUILDING_POPULATION_COST_DIVISOR = 50
+BUILDING_BASE_ACTIONS_REQUIRED = 100
+BUILDING_LEVEL_ACTIONS_EXPONENT = 1.7
+BUILDING_POPULATION_ACTIONS_DIVISOR = 30
 
 
 def calculate_food_cost(cooldown_minutes: float) -> int:
@@ -34,11 +39,6 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
     """
     import math
     return max(1, math.ceil(cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE))
-BUILDING_LEVEL_COST_EXPONENT = 1.7
-BUILDING_POPULATION_COST_DIVISOR = 50
-BUILDING_BASE_ACTIONS_REQUIRED = 100
-BUILDING_LEVEL_ACTIONS_EXPONENT = 1.7
-BUILDING_POPULATION_ACTIONS_DIVISOR = 30
 
 
 # ===== PROPERTY TIERS - FULLY DYNAMIC =====
@@ -65,7 +65,7 @@ PROPERTY_TIERS = {
         "icon": "house.fill",
         "description": "Basic dwelling",
         "benefits": ["All Land benefits", "Ability to train skills in this kingdom"],
-        "gold_cost": 1000,
+        "gold_cost": 750,
         "per_action_costs": [{"resource": "wood", "amount": 20}],
         "base_actions": 20
     },
@@ -74,7 +74,7 @@ PROPERTY_TIERS = {
         "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
-        "gold_cost": 2000,
+        "gold_cost": 1250,
         "per_action_costs": [{"resource": "wood", "amount": 35}, {"resource": "iron", "amount": 35}],
         "base_actions": 35
     },
@@ -83,7 +83,7 @@ PROPERTY_TIERS = {
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals, pets, and grow your garden"],
-        "gold_cost": 4000,
+        "gold_cost": 2500,
         "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 55}],
         "base_actions": 55
     },
@@ -92,7 +92,7 @@ PROPERTY_TIERS = {
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
-        "gold_cost": 8000,
+        "gold_cost": 4000,
         "per_action_costs": [{"resource": "wood", "amount": 80}, {"resource": "iron", "amount": 80}],
         "base_actions": 80
     }
