@@ -38,8 +38,8 @@ class GardenSlot(Base):
     user_id = Column(BigInteger, nullable=False, index=True)
     slot_index = Column(Integer, nullable=False)  # 0-5 for 6 slots
     
-    status = Column(SQLEnum(PlantStatus), nullable=False, default=PlantStatus.EMPTY)
-    plant_type = Column(SQLEnum(PlantType), nullable=True)  # Set when plant is ready
+    status = Column(SQLEnum(PlantStatus, name='plant_status', values_callable=lambda x: [e.value for e in x]), nullable=False, default=PlantStatus.EMPTY)
+    plant_type = Column(SQLEnum(PlantType, name='plant_type', values_callable=lambda x: [e.value for e in x]), nullable=True)  # Set when plant is ready
     
     # Growing progress
     planted_at = Column(DateTime, nullable=True)
