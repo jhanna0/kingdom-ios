@@ -1,6 +1,6 @@
 """
-GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 1 property
-=============================================================================
+GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 2 property (House)
+=====================================================================================
 Plant seeds → Water every 8 hours for 4 cycles → Harvest!
 Results: Weeds (common), Flowers (keep forever), Wheat (1-2 harvest)
 
@@ -303,10 +303,10 @@ def get_garden_status(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check property requirement (tier 1+)
+    # Check property requirement (tier 2+ = house)
     garden_property = db.query(Property).filter(
         Property.owner_id == current_user.id,
-        Property.tier >= 1
+        Property.tier >= 2
     ).first()
     
     has_garden = garden_property is not None
@@ -314,7 +314,7 @@ def get_garden_status(
     if not has_garden:
         return {
             "has_garden": False,
-            "garden_requirement": "Purchase property (Tier 1) to unlock your garden.",
+            "garden_requirement": "Build a house (Tier 2) to unlock your garden.",
             "slots": [],
             "seed_count": 0,
             "config": GARDEN_CONFIG["ui"],
@@ -372,14 +372,14 @@ def plant_seed(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check property requirement
+    # Check property requirement (tier 2+ = house)
     garden_property = db.query(Property).filter(
         Property.owner_id == current_user.id,
-        Property.tier >= 1
+        Property.tier >= 2
     ).first()
     
     if not garden_property:
-        raise HTTPException(status_code=400, detail="You need property (Tier 1+) to have a garden.")
+        raise HTTPException(status_code=400, detail="You need a house (Tier 2+) to have a garden.")
     
     # Validate slot index
     if slot_index < 0 or slot_index >= GARDEN_CONFIG["max_slots"]:

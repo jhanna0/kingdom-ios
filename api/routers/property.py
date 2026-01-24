@@ -324,7 +324,7 @@ def get_available_rooms(tier: int) -> list:
     """
     rooms = []
     
-    # Tier 2+: Fortification (gear sink) - FIRST because it's the main defensive feature
+    # Tier 2+: Fortification & Garden (requires house, not just land)
     if tier >= 2:
         rooms.append({
             "id": "fortification",
@@ -334,9 +334,6 @@ def get_available_rooms(tier: int) -> list:
             "description": "Sacrifice equipment to protect your property",
             "route": "/fortify"
         })
-    
-    # Tier 1+: Garden
-    if tier >= 1:
         rooms.append({
             "id": "garden",
             "name": "Garden",

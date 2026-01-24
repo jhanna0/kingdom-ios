@@ -63,8 +63,8 @@ PROPERTY_TIERS = {
     2: {
         "name": "House",
         "icon": "house.fill",
-        "description": "Basic dwelling",
-        "benefits": ["All Land benefits", "Ability to train skills in this kingdom"],
+        "description": "Basic dwelling with garden",
+        "benefits": ["All Land benefits", "A comfy home with garden"],
         "gold_cost": 750,
         "per_action_costs": [{"resource": "wood", "amount": 20}],
         "base_actions": 20
