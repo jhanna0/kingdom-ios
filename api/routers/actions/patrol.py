@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, log_activity, get_cooldown, set_cooldown, check_and_deduct_food_cost
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, get_cooldown, set_cooldown, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD, PATROL_COOLDOWN
 
 
@@ -108,20 +108,10 @@ def start_patrol(
         )
         db.add(user_kingdom)
     
-    # Log activity
-    log_activity(
-        db=db,
-        user_id=current_user.id,
-        action_type="patrol",
-        action_category="kingdom",
-        description="Patrolled",
-        kingdom_id=state.current_kingdom_id,
-        amount=PATROL_REPUTATION_REWARD,
-        details={
-            "reputation_earned": PATROL_REPUTATION_REWARD,
-            "duration_minutes": PATROL_DURATION_MINUTES
-        }
-    )
+    # NOTE: We intentionally don't log patrol to activity_log because:
+    # 1. It happens every 10 minutes (would spam the feed)
+    # 2. The player's status already shows "Patrolling" via _get_player_activity()
+    # 3. Recent activity is used for online detection anyway
     
     db.commit()
     

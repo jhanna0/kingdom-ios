@@ -24,11 +24,93 @@ from schemas.player import (
 router = APIRouter(prefix="/players", tags=["players"])
 
 
+# Import centralized activity icons
+from routers.actions.action_config import ACTIVITY_ICONS
+
+
 def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
     """Determine what a player is currently doing"""
     now = datetime.utcnow()
     
-    # Check patrol first (it's a duration-based activity)
+    # Check active minigame sessions first (these are real-time activities)
+    # These show as status WITHOUT spamming activity log
+    
+    # Check hunting session (highest priority - group activity)
+    # Check as creator first, then as participant
+    from db.models import HuntSession
+    active_hunt = db.query(HuntSession).filter(
+        HuntSession.created_by == state.user_id,
+        HuntSession.status.in_(['lobby', 'in_progress']),
+        HuntSession.expires_at > now
+    ).first()
+    
+    # Also check if they're a participant in someone else's hunt
+    if not active_hunt:
+        active_hunts = db.query(HuntSession).filter(
+            HuntSession.status.in_(['lobby', 'in_progress']),
+            HuntSession.expires_at > now
+        ).all()
+        for hunt in active_hunts:
+            participants = hunt.session_data.get("participants", {})
+            if str(state.user_id) in participants:
+                active_hunt = hunt
+                break
+    
+    if active_hunt:
+        hunt_status = "Waiting for hunters" if active_hunt.status == 'lobby' else "Tracking prey"
+        return PlayerActivity(
+            type="hunting",
+            details=hunt_status,
+            icon=ACTIVITY_ICONS["hunting"],
+            expires_at=active_hunt.expires_at
+        )
+    
+    # Check fishing session
+    from db.models import FishingSession
+    active_fishing = db.query(FishingSession).filter(
+        FishingSession.created_by == state.user_id,
+        FishingSession.status == 'active',
+        FishingSession.expires_at > now
+    ).first()
+    if active_fishing:
+        return PlayerActivity(
+            type="fishing",
+            details="Fishing",
+            icon=ACTIVITY_ICONS["fishing"],
+            expires_at=active_fishing.expires_at
+        )
+    
+    # Check foraging session
+    from db.models import ForagingSession
+    active_foraging = db.query(ForagingSession).filter(
+        ForagingSession.user_id == state.user_id,
+        ForagingSession.status == 'active',
+        ForagingSession.expires_at > now
+    ).first()
+    if active_foraging:
+        return PlayerActivity(
+            type="foraging",
+            details="Foraging for resources",
+            icon=ACTIVITY_ICONS["foraging"],
+            expires_at=active_foraging.expires_at
+        )
+    
+    # Check science/research session
+    from db.models import ScienceSession
+    active_science = db.query(ScienceSession).filter(
+        ScienceSession.user_id == state.user_id,
+        ScienceSession.status == 'active',
+        ScienceSession.expires_at > now
+    ).first()
+    if active_science:
+        return PlayerActivity(
+            type="researching",
+            details="Conducting research",
+            icon=ACTIVITY_ICONS["researching"],
+            expires_at=active_science.expires_at
+        )
+    
+    # Check patrol (it's a duration-based activity)
     from db.models.action_cooldown import ActionCooldown
     patrol_cooldown = db.query(ActionCooldown).filter(
         ActionCooldown.user_id == state.user_id,
@@ -39,6 +121,7 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         return PlayerActivity(
             type="patrolling",
             details="On patrol",
+            icon=ACTIVITY_ICONS["patrolling"],
             expires_at=patrol_cooldown.expires_at
         )
     
@@ -60,6 +143,7 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         return PlayerActivity(
             type="training",
             details=f"Training {active_training.type.capitalize()} ({actions_completed}/{active_training.actions_required})",
+            icon=ACTIVITY_ICONS["training"],
             training_type=active_training.type,  # "attack", "defense", etc.
             tier=active_training.tier
         )
@@ -79,6 +163,7 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         return PlayerActivity(
             type="crafting",
             details=f"Crafting T{active_crafting.tier} {active_crafting.type.capitalize()} ({actions_completed}/{active_crafting.actions_required})",
+            icon=ACTIVITY_ICONS["crafting"],
             equipment_type=active_crafting.type,  # "weapon", "armor"
             tier=active_crafting.tier
         )
@@ -120,26 +205,30 @@ def _get_player_activity(db: Session, state: PlayerState) -> PlayerActivity:
         if most_recent_active == "work":
             return PlayerActivity(
                 type="working",
-                details="Working on construction"
+                details="Working on construction",
+                icon=ACTIVITY_ICONS["working"]
             )
         elif most_recent_active == "scout":
             return PlayerActivity(
                 type="scouting",
-                details="Gathering intelligence"
+                details="Gathering intelligence",
+                icon=ACTIVITY_ICONS["scouting"]
             )
         elif most_recent_active == "sabotage":
             return PlayerActivity(
                 type="sabotage",
-                details="Sabotaging enemy"
+                details="Sabotaging enemy",
+                icon=ACTIVITY_ICONS["sabotage"]
             )
         elif most_recent_active == "farm":
             return PlayerActivity(
                 type="working",
-                details="Farming for gold"
+                details="Farming for gold",
+                icon=ACTIVITY_ICONS["working"]
             )
     
     # Default to idle only if no actions are on cooldown
-    return PlayerActivity(type="idle")
+    return PlayerActivity(type="idle", icon=ACTIVITY_ICONS["idle"])
 
 
 def _get_player_equipment(db: Session, user_id: int) -> PlayerEquipment:
@@ -168,10 +257,10 @@ def _get_player_equipment(db: Session, user_id: int) -> PlayerEquipment:
 
 
 def _is_player_online(user: User) -> bool:
-    """Check if player was active in last 5 minutes"""
+    """Check if player was active in last 10 minutes"""
     if not user.last_login:
         return False
-    return user.last_login > datetime.utcnow() - timedelta(minutes=5)
+    return user.last_login > datetime.utcnow() - timedelta(minutes=10)
 
 
 @router.get("/in-kingdom/{kingdom_id}", response_model=PlayersInKingdomResponse)

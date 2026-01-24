@@ -163,27 +163,23 @@ def apple_signin(apple_data: AppleSignIn, db: Session = Depends(get_db)):
 # ===== User Profile =====
 
 @router.get("/me", response_model=UserPrivate)
-def get_my_profile(current_user = Depends(get_current_user)):
+def get_my_profile(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Get current user's private profile
     
     Includes sensitive information like email, gold, etc.
+    Also updates last_login for online status tracking.
     """
-    print(f"\n{'='*80}")
-    print(f"🔍 [GET /auth/me] Request received:")
-    print(f"   - user_id: {current_user.id}")
-    print(f"   - display_name: {current_user.display_name}")
-    if current_user.player_state:
-        print(f"   - player_state.hometown_kingdom_id: {current_user.player_state.hometown_kingdom_id}")
-    else:
-        print(f"   - ⚠️ WARNING: No player_state found!")
-    print(f"{'='*80}\n")
+    from datetime import datetime
+    
+    # Update last_login for online status (called on every app load)
+    current_user.last_login = datetime.utcnow()
+    db.commit()
     
     response = user_to_private_response(current_user)
-    
-    print(f"📤 [GET /auth/me] Response:")
-    print(f"   - hometown_kingdom_id in response: {response.get('hometown_kingdom_id')}")
-    
     return response
 
 

@@ -1038,10 +1038,11 @@ def get_action_status(
     slots = []
     for slot_def in get_all_slot_definitions():
         slot_id = slot_def["id"]
-        # Get actions that belong to this slot (only those with endpoints - others are handled by contracts)
+        # Get actions that belong to this slot
+        # Include actions with endpoint OR handler (view_battle uses handler, not endpoint)
         slot_actions = [
             action_key for action_key, action_data in actions.items()
-            if action_data.get("slot") == slot_id and action_data.get("endpoint")
+            if action_data.get("slot") == slot_id and (action_data.get("endpoint") or action_data.get("handler"))
         ]
         slots.append({
             "id": slot_id,

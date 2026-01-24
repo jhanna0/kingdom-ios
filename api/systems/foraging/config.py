@@ -190,12 +190,12 @@ ROUND2_WIN_CONFIG = {
     "skill": "merchant",
     # Base rates (T0) - teasers dominate!
     "seed_win_base": 0.15,
-    "rare_egg_base": 0.01,
+    "rare_egg_base": 0.001,
     "seed_tease_base": 0.70,  # 70% - so close to seeds!
     # Nothing: only 14% at T0
     # Per tier bonus
     "seed_win_per_tier": 0.07,
-    "rare_egg_per_tier": 0.01,
+    "rare_egg_per_tier": 0.01,  # Flat 1% jackpot (Merchant still boosts seed wins in R2)
     "seed_tease_per_tier": -0.06,  # Teasers decrease as wins increase
 }
 
@@ -354,6 +354,9 @@ def is_target_type(bush_type: str, round_num: int = 1) -> bool:
     return bush_type == target
 
 
+ROUND2_ROLL_RANGE = 10000  # Roll 1-10000 for fine-grained rare egg probability
+
+
 def get_round1_probabilities(leadership: int = 0) -> dict:
     """
     Get Round 1 outcome probabilities adjusted for leadership skill.
@@ -395,7 +398,7 @@ def get_round2_probabilities(merchant: int = 0) -> dict:
     """
     Get Round 2 outcome probabilities adjusted for merchant skill.
     
-    Returns thresholds for roll 1-100:
+    Returns thresholds for roll 1-10000:
     - rare_egg: Find rare egg (jackpot!)
     - seed_win: Find 3 seeds
     - seed_tease: Find 1-2 seeds (near miss)
@@ -408,11 +411,11 @@ def get_round2_probabilities(merchant: int = 0) -> dict:
     seed_win = cfg["seed_win_base"] + (merchant * cfg["seed_win_per_tier"])
     seed_tease = max(0.05, cfg["seed_tease_base"] + (merchant * cfg["seed_tease_per_tier"]))
     
-    # Convert to cumulative thresholds (1-100 roll)
+    # Convert to cumulative thresholds (1-10000 roll)
     # Order: rare_egg, seed_win, seed_tease, nothing
-    t1 = int(rare_egg * 100)
-    t2 = t1 + int(seed_win * 100)
-    t3 = t2 + int(seed_tease * 100)
+    t1 = int(rare_egg * ROUND2_ROLL_RANGE)
+    t2 = t1 + int(seed_win * ROUND2_ROLL_RANGE)
+    t3 = t2 + int(seed_tease * ROUND2_ROLL_RANGE)
     
     return {
         "rare_egg_threshold": t1,

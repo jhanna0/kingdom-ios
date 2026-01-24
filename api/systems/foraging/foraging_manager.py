@@ -35,6 +35,7 @@ from .config import (
     ROUND2_RARE_DROP_CONFIG,
     ROUND1_WIN_CONFIG,
     ROUND2_WIN_CONFIG,
+    ROUND2_ROLL_RANGE,
     get_bush_type_weights,
     get_round_config,
     get_round1_probabilities,
@@ -311,8 +312,8 @@ class ForagingManager:
         # Get skill-adjusted probabilities
         probs = get_round2_probabilities(merchant)
         
-        # ONE ROLL - mutually exclusive outcomes
-        roll = self.rng.randint(1, 100)
+        # ONE ROLL - mutually exclusive outcomes (1-10000 for fine-grained rare egg odds)
+        roll = self.rng.randint(1, ROUND2_ROLL_RANGE)
         
         cells = []
         has_rare_drop = False

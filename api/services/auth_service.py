@@ -119,8 +119,7 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
                     detail=f"This device is linked to another account ({device_owner.display_name}). One account per device."
                 )
         
-        # Update last login and device_id
-        existing_user.last_login = datetime.utcnow()
+        # Update device_id (last_login is updated in /auth/me on every app load)
         if apple_data.device_id:
             existing_user.device_id = apple_data.device_id
         

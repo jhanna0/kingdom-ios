@@ -142,18 +142,21 @@ def broadcast_rare_loot(db: Session, player_id: int) -> None:
     Broadcast pet fish drop to activity feed.
     This shows up in friends' activity feeds!
     """
+    from routers.resources import RESOURCES
+    fish = RESOURCES["pet_fish"]
+    
     log_activity(
         db=db,
         user_id=player_id,
         action_type="rare_loot",
         action_category="fishing",
-        description="Caught a Pet Fish! 🐟",
+        description=f"Caught a {fish['display_name']}! 🐟",
         kingdom_id=None,
         amount=None,
         details={
             "item_id": "pet_fish",
-            "item_name": "Pet Fish",
-            "item_icon": "fish.circle.fill",
+            "item_name": fish["display_name"],
+            "item_icon": fish["icon"],
         },
         visibility="friends"
     )

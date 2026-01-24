@@ -82,7 +82,7 @@ PROPERTY_TIERS = {
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
-        "benefits": ["All Workshop benefits", "You can raise animals, pets, and grow your garden"],
+        "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
         "gold_cost": 2500,
         "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 55}],
         "base_actions": 55

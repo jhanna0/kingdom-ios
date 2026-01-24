@@ -4,7 +4,7 @@
   "description": "Kingdom Game API",
   "dependencies": {},
   "devDependencies": {
-    "serverless-python-requirements": "^6.1.0"
+    "serverless-domain-manager": "^7.0.0"
   }
 }
 

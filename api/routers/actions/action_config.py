@@ -3,6 +3,27 @@ ACTION CONFIGURATION - Single Source of Truth for ALL actions
 Defines cooldowns, metadata, requirements, and display info for every action in the game
 """
 
+# ===== ACTIVITY ICONS - For player status display =====
+# Maps activity type -> SF Symbol name
+# Used by players.py to show what players are currently doing
+ACTIVITY_ICONS = {
+    # Idle
+    "idle": "person.fill",
+    # Actions
+    "working": "hammer.fill",
+    "patrolling": "eye.fill",
+    "training": "figure.run",  # From ACTION_TYPES["training"]["icon"]
+    "crafting": "wrench.and.screwdriver.fill",
+    "scouting": "binoculars.fill",
+    "sabotage": "bolt.slash.fill",
+    # Minigames
+    "fishing": "fish.fill",  # From fishing/config.py
+    "foraging": "leaf.fill",
+    "hunting": "scope",  # From hunting/config.py
+    "researching": "flask.fill",  # From science/config.py
+}
+
+
 # ===== ACTION TYPES - SINGLE SOURCE OF TRUTH =====
 # Add new actions HERE and they'll appear everywhere with proper cooldowns!
 

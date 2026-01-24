@@ -23,8 +23,9 @@ def serialize_datetime_with_z(dt: Optional[datetime]) -> Optional[str]:
 
 class PlayerActivity(BaseModel):
     """Current activity status for a player"""
-    type: str  # "idle", "working", "patrolling", "training", "crafting", "scouting"
-    details: Optional[str] = None  # e.g., "Training Attack", "Working on Wall Level 5"
+    type: str  # "idle", "working", "patrolling", "training", "crafting", "scouting", "fishing", "foraging", "hunting", "researching"
+    details: Optional[str] = None  # e.g., "Training Attack", "Fishing", "Foraging for resources"
+    icon: Optional[str] = None  # SF Symbol name for display (e.g., "leaf.fill", "figure.hunting")
     expires_at: Optional[datetime] = None  # For time-limited activities
     
     # Structured data for specific activity types

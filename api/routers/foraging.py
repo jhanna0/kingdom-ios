@@ -22,11 +22,37 @@ from db.models.inventory import PlayerInventory
 from db.models.player_state import PlayerState
 from db.models.foraging_session import ForagingSession as ForagingSessionDB
 from routers.auth import get_current_user
+from routers.actions.utils import log_activity
 from systems.foraging.foraging_manager import ForagingManager
 from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG, ROUND1_WIN_CONFIG, ROUND2_WIN_CONFIG
 
 
 router = APIRouter(prefix="/foraging", tags=["foraging"])
+
+
+def broadcast_rare_egg(db: Session, player_id: int) -> None:
+    """
+    Broadcast rare egg drop to activity feed.
+    This shows up in friends' activity feeds!
+    """
+    from routers.resources import RESOURCES
+    egg = RESOURCES["rare_egg"]
+    
+    log_activity(
+        db=db,
+        user_id=player_id,
+        action_type="rare_loot",
+        action_category="foraging",
+        description=f"Found a {egg['display_name']} while foraging! 🥚",
+        kingdom_id=None,
+        amount=None,
+        details={
+            "item_id": "rare_egg",
+            "item_name": egg["display_name"],
+            "item_icon": egg["icon"],
+        },
+        visibility="friends"
+    )
 
 _manager = ForagingManager()
 
@@ -176,6 +202,8 @@ def collect_rewards(
                     "display_name": r.get("display_name", "Rare Egg"),
                     "is_rare": True,
                 })
+                # Broadcast to activity feed (friends can see this!)
+                broadcast_rare_egg(db, player_id)
     
     # Add ALL rewards to inventory
     for reward in rewards:
