@@ -402,6 +402,7 @@ class HuntSession:
                 "rarity": "rare",
             })
         
+        # what is this? LOOT_TIERS seems to have dead code now
         # Keep rare_drop for backwards compatibility (first item from "rare" tier)
         rare_drop = None
         rare_config = LOOT_TIERS.get("rare", {})
@@ -1104,7 +1105,7 @@ class HuntManager:
         
         # Build message based on outcome
         if loot_tier == "nothing":
-            message = "You didn't find anything this time."
+            message = "You trim what you can."
         elif loot_tier == "rare":
             items_str = ", ".join(session.items_dropped) if session.items_dropped else "Sinew"
             message = f"RARE LOOT! You found: {items_str}!"
@@ -1398,13 +1399,7 @@ class HuntManager:
 
         # Get loot tier config
         tier_config = LOOT_TIERS.get(loot_tier, {})
-        
-        # Check meat multiplier (nothing tier = 0)
-        meat_multiplier = tier_config.get("meat_multiplier", 1)
-        if meat_multiplier == 0:
-            session.total_meat = 0
-            session.bonus_meat = 0
-            return
+        meat_bonus = tier_config.get("meat_bonus", 1.0)
 
         animal = session.animal_data
         animal_tier = animal.get("tier", 0)
@@ -1414,15 +1409,11 @@ class HuntManager:
         animal_level = animal_tier + 1
         min_meat = animal_level
         max_meat = animal_level * 2
-        session.total_meat = random.randint(min_meat, max_meat)
-
-        # Bonus meat based on loot tier rarity
-        if loot_tier == "rare":
-            session.bonus_meat = int(session.total_meat * 0.25)
-        elif loot_tier == "uncommon":
-            session.bonus_meat = int(session.total_meat * 0.15)
-        else:
-            session.bonus_meat = 0
+        base_meat = random.randint(min_meat, max_meat)
+        
+        # Apply bonus from config
+        session.total_meat = max(1, int(base_meat * meat_bonus))
+        session.bonus_meat = session.total_meat - base_meat if session.total_meat > base_meat else 0
         
         # Drop items from animal's rare_items config - ONLY on rare rolls
         # Rabbit: lucky_rabbits_foot

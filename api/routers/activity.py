@@ -281,13 +281,19 @@ def _get_kingdom_visit_activities(db: Session, user_id: int, limit: int = 50) ->
     return activities
 
 
-def _get_action_log_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
+def _get_action_log_activities(db: Session, user_id: int, limit: int = 50, exclude_types: List[str] = None) -> List[ActivityLogEntry]:
     """Get logged activities from PlayerActivityLog (farm, patrol, scout, etc.)"""
     activities = []
     
-    logs = db.query(PlayerActivityLog).filter(
+    query = db.query(PlayerActivityLog).filter(
         PlayerActivityLog.user_id == user_id
-    ).order_by(desc(PlayerActivityLog.created_at)).limit(limit).all()
+    )
+    
+    # Exclude certain action types (e.g., travel_fee from friend feeds)
+    if exclude_types:
+        query = query.filter(~PlayerActivityLog.action_type.in_(exclude_types))
+    
+    logs = query.order_by(desc(PlayerActivityLog.created_at)).limit(limit).all()
     
     for log in logs:
         # Use the description as-is, amount will be shown separately on the right
@@ -423,7 +429,7 @@ def get_friend_activities(
         user_activities.extend(_get_invasion_activities(db, uid, 20))
         user_activities.extend(_get_property_activities(db, uid, 20))
         user_activities.extend(_get_training_activities(db, uid, user_state, 10))
-        user_activities.extend(_get_action_log_activities(db, uid, 20))
+        user_activities.extend(_get_action_log_activities(db, uid, 20, exclude_types=["travel_fee"]))
         
         # Add user info to activities
         for activity in user_activities:

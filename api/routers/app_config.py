@@ -8,26 +8,23 @@ Clients should call this endpoint on startup to check:
 - TestFlight or App Store update URLs
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from typing import Optional
-import psycopg2
-import os
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from db import get_db
 
 router = APIRouter()
 
 
-def get_db_connection():
-    """Get raw psycopg2 connection for simple queries"""
-    database_url = os.getenv("DATABASE_URL", "postgresql://admin:admin@localhost:5432/kingdom")
-    return psycopg2.connect(database_url)
-
-
 @router.get("/app-config")
-async def get_app_config(
+def get_app_config(
     platform: str = Query("ios", description="Platform: ios, android, or all"),
     app_version: Optional[str] = Query(None, description="Current app version"),
     build: Optional[str] = Query(None, description="Current build number"),
-    schema_version: Optional[str] = Query(None, description="API schema version")
+    schema_version: Optional[str] = Query(None, description="API schema version"),
+    db: Session = Depends(get_db)
 ):
     """
     Get app configuration for version checking and maintenance mode.
@@ -44,19 +41,13 @@ async def get_app_config(
     platform = platform.strip().lower()
     
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        query = """
+        query = text("""
             SELECT platform, min_version, maintenance, maintenance_message, link_url
             FROM app_config 
-            WHERE LOWER(platform) = %s
-        """
-        cur.execute(query, (platform,))
-        row = cur.fetchone()
-        
-        cur.close()
-        conn.close()
+            WHERE LOWER(platform) = :platform
+        """)
+        result = db.execute(query, {"platform": platform})
+        row = result.fetchone()
         
         if row is None:
             # Return safe defaults if no config found

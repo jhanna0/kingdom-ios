@@ -162,7 +162,7 @@ ATTACK_DROP_TABLE_DISPLAY = [
 ]
 
 BLESSING_DROP_TABLE_DISPLAY = [
-    {"key": "nothing", "icon": "●", "name": "Nothing", "color": "#6B5344"},    # Dark brown - no loot
+    {"key": "nothing", "icon": "●", "name": "Scraps", "color": "#6B5344"},     # Dark brown - minimal loot
     {"key": "common", "icon": "●", "name": "Meat", "color": "#A0826D"},        # Warm taupe - basic
     {"key": "uncommon", "icon": "●", "name": "Fur!", "color": "#D2691E"},      # Chocolate orange - uncommon!
     {"key": "rare", "icon": "●", "name": "Sinew!", "color": "#8B5A8B"},        # Plum purple - rare!
@@ -265,7 +265,7 @@ ANIMAL_WEIGHTS_BY_TIER = {
 # ============================================================
 # Two-tier loot system:
 # - COMMON: Just meat (always)
-# - RARE: Meat + Sinew (determined by blessing phase master roll)
+# - RARE: Meat + Sinew (determined by blLOOT_TIERSessing phase master roll)
 #
 # The blessing phase shifts odds from common to rare.
 # Sinew is used to craft hunting bow (10 wood + 3 sinew)
@@ -274,10 +274,10 @@ ANIMAL_WEIGHTS_BY_TIER = {
 # What drops for each loot tier (applied after blessing resolution)
 # Items come from animal's rare_items config (only on "rare" rolls)
 LOOT_TIERS = {
-    "nothing": {"meat_multiplier": 0},   # No meat
-    "common": {"meat_multiplier": 1},    # Meat only
-    "uncommon": {"meat_multiplier": 1},  # Meat + 15% bonus
-    "rare": {"meat_multiplier": 1},      # Meat + 25% bonus + animal's rare_items
+    "nothing": {"meat_bonus": 0.5},   # 50% meat
+    "common": {"meat_bonus": 1.0},    # 100% meat
+    "uncommon": {"meat_bonus": 1.15}, # 115% meat
+    "rare": {"meat_bonus": 1.25},     # 125% meat + animal's rare_items
 }
 
 # Legacy - kept for backwards compatibility

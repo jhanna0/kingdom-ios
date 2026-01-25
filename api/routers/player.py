@@ -453,7 +453,8 @@ def get_player_state(
             free_travel_reason = None
             
             # Charge travel fee if entering new kingdom (not ruler or property owner)
-            if is_entering_new_kingdom and kingdom.travel_fee > 0:
+            # Only charge if kingdom has a ruler - unclaimed kingdoms have no travel fee
+            if is_entering_new_kingdom and kingdom.travel_fee > 0 and kingdom.ruler_id is not None:
                 # Check if player is ruler (rulers don't pay)
                 is_ruler = kingdom.ruler_id == current_user.id
                 
