@@ -393,6 +393,7 @@ struct TradeOfferView: View {
             
             TextField("Add a note...", text: $viewModel.message)
                 .font(FontStyles.bodyMedium)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
                 .padding()
                 .background(Color.white)
                 .cornerRadius(8)

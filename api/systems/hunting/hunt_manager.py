@@ -1462,11 +1462,10 @@ class HuntManager:
         animal = session.animal_data
         animal_tier = animal.get("tier", 0)
 
-        # Meat reward based on animal level: min = level, max = 2x level
-        # Tier 0 = level 1 (1-2 meat), Tier 4 = level 5 (5-10 meat)
+        # Meat reward: min = half of max, max = config meat value
         animal_level = animal_tier + 1
-        min_meat = animal_level
-        max_meat = animal_level * 2
+        max_meat = animal.get("meat", animal_level * 2)
+        min_meat = max(animal_level, max_meat // 2)
         base_meat = random.randint(min_meat, max_meat)
         
         # Apply bonus from config
@@ -1492,11 +1491,9 @@ class HuntManager:
         session.bonus_meat = session.total_meat - base_meat if session.total_meat > base_meat else 0
         
         # Drop items based on loot tier
-        # uncommon = fur (from any animal)
-        # rare = animal's special item (rabbit foot, sinew, etc)
-        if loot_tier == "uncommon":
-            session.items_dropped.append("fur")
-        elif loot_tier == "rare":
+        # uncommon = just bonus meat (no items)
+        # rare = animal's special item (rabbit foot, fur, sinew)
+        if loot_tier == "rare":
             session.items_dropped.extend(animal.get("rare_items", []))
         
         # Distribute meat among participants

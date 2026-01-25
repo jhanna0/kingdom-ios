@@ -75,9 +75,9 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 5,                # Level 3: drops 3-5 meat
+        "meat": 8,                # Boosted: 3-7 meat
         "description": "Graceful and alert. A worthy hunt.",
-        "rare_items": ["fur"],    # Deer drops fur
+        "rare_items": ["fur"],    # Deer drops fur on RARE only
     },
     "boar": {
         "name": "Wild Boar",
@@ -86,9 +86,9 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 8,                # Level 4: drops 4-8 meat
+        "meat": 12,               # Boosted: 4-12 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
-        "rare_items": ["fur"],    # Boar drops fur
+        "rare_items": ["fur"],    # Boar drops fur on RARE only
     },
     "bear": {
         "name": "Bear",
@@ -97,7 +97,7 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 10,               # Level 5: drops 5-10 meat
+        "meat": 16,               # Boosted: 5-16 meat
         "description": "The king of the forest. Approach with caution.",
         "rare_items": ["sinew"],  # Bear drops sinew
     },
@@ -108,7 +108,7 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 12,               # Level 6: drops 6-12 meat
+        "meat": 22,               # Boosted: 6-20 meat
         "description": "Massive and unpredictable. Legendary game.",
         "rare_items": ["sinew"],  # Moose drops sinew
     },
@@ -123,12 +123,12 @@ ANIMALS = {
 # --- TRACKING: Which creature will you find? ---
 # ALL outcomes must be ON THE BAR! Including "no trail" (failure)
 TRACK_DROP_TABLE = {
-    "no_trail": 30,   # FAILURE - no creature found! Reduced from 40
-    "squirrel": 28,   # Common - 28 slots (was 25)
-    "rabbit": 24,     # Common - 24 slots (was 20)
-    "deer": 12,       # Uncommon - 12 slots (was 10)
-    "boar": 4,        # Rare - 4 slots
-    "bear": 2,        # Very Rare - 2 slots (was 1)
+    "no_trail": 24,   # FAILURE - no creature found! Reduced from 30
+    "squirrel": 22,   # Common - 22 slots (was 28)
+    "rabbit": 24,     # Common - 24 slots
+    "deer": 17,       # Uncommon - 17 slots (was 12)
+    "boar": 9,        # Rare - 9 slots (was 4)
+    "bear": 4,        # Very Rare - 4 slots (was 2)
     "moose": 0,       # Legendary - 0 slots (must earn it!)
 }  # Total: 100 slots
 
@@ -164,8 +164,8 @@ ATTACK_DROP_TABLE_DISPLAY = [
 BLESSING_DROP_TABLE_DISPLAY = [
     {"key": "nothing", "icon": "●", "name": "Scraps", "color": "#6B5344"},     # Dark brown - minimal loot
     {"key": "common", "icon": "●", "name": "Meat", "color": "#A0826D"},        # Warm taupe - basic
-    {"key": "uncommon", "icon": "●", "name": "Fur!", "color": "#D2691E"},      # Chocolate orange - uncommon!
-    {"key": "rare", "icon": "●", "name": "Sinew!", "color": "#8B5A8B"},        # Plum purple - rare!
+    {"key": "uncommon", "icon": "●", "name": "Bonus!", "color": "#D2691E"},    # Chocolate orange - bonus meat
+    {"key": "rare", "icon": "●", "name": "Rare!", "color": "#8B5A8B"},         # Plum purple - animal's rare_items!
 ]
 
 # --- ATTACK: Three sections - Scare / Miss / Hit ---
@@ -173,19 +173,19 @@ BLESSING_DROP_TABLE_DISPLAY = [
 # Higher tier = smaller HIT section
 
 # Base tables by animal tier
-# REBALANCED: Slightly smaller scare/miss = less frustrating hunt failures
+# REBALANCED: Slightly smaller scare/miss zones = more successful hunts
 # Trade-off: rare loot is harder to get (see BLESSING_DROP_TABLE)
 ATTACK_DROP_TABLE_BY_TIER = {
-    0: {"scare": 20, "miss": 25, "hit": 55},   # Squirrel - 55% hit (was 50)
-    1: {"scare": 22, "miss": 28, "hit": 50},   # Rabbit - 50% hit (was 45)
-    2: {"scare": 25, "miss": 30, "hit": 45},   # Deer - 45% hit (was 40)
-    3: {"scare": 28, "miss": 32, "hit": 40},   # Boar - 40% hit (was 35)
-    4: {"scare": 30, "miss": 40, "hit": 30},   # Bear - 30% hit (was 25)
-    5: {"scare": 35, "miss": 45, "hit": 20},   # Moose - 20% hit (was 15)
+    0: {"scare": 18, "miss": 22, "hit": 60},   # Squirrel - 60% hit (was 55)
+    1: {"scare": 20, "miss": 25, "hit": 55},   # Rabbit - 55% hit (was 50)
+    2: {"scare": 22, "miss": 28, "hit": 50},   # Deer - 50% hit (was 45)
+    3: {"scare": 25, "miss": 30, "hit": 45},   # Boar - 45% hit (was 40)
+    4: {"scare": 28, "miss": 37, "hit": 35},   # Bear - 35% hit (was 30)
+    5: {"scare": 32, "miss": 43, "hit": 25},   # Moose - 25% hit (was 20)
 }
 
 # Default for unknown tiers
-ATTACK_DROP_TABLE = {"scare": 25, "miss": 30, "hit": 45}
+ATTACK_DROP_TABLE = {"scare": 22, "miss": 28, "hit": 50}
 
 ATTACK_SHIFT_PER_SUCCESS = {
     "scare": -5,      # Each success: shrink scare
@@ -396,11 +396,11 @@ PHASE_CONFIG = {
         "drop_table_title_resolving": "REVEALING LOOT",
         "drop_table_display_type": "blessing",
         "master_roll_icon": "sparkles",
-        # Loot display info - sent to frontend (matches resources.py!)
-        "uncommon_item_name": "Fur",
-        "uncommon_item_icon": "square.stack.3d.up.fill",
-        "rare_item_name": "Sinew",
-        "rare_item_icon": "line.diagonal",
+        # Loot display info - sent to frontend
+        "uncommon_item_name": "Bonus Meat",
+        "uncommon_item_icon": "plus.circle.fill",
+        "rare_item_name": "Rare Drop",
+        "rare_item_icon": "sparkles",
         # Roll configuration
         "min_rolls": 1,
         # Legacy scoring
