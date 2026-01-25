@@ -5,7 +5,7 @@ Daily limit: 200 * hometown building level per resource
 """
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, time
 
 from db import get_db, User, ActionCooldown, Kingdom, DailyGathering
 from routers.auth import get_current_user
@@ -157,6 +157,14 @@ def gather_resource(
         }
     
     if gathered_today >= daily_limit:
+        # Calculate time until reset (midnight)
+        now = datetime.now()
+        tomorrow_midnight = datetime.combine(date.today() + timedelta(days=1), time.min)
+        remaining = tomorrow_midnight - now
+        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+        minutes, _ = divmod(remainder, 60)
+        time_str = f"{hours}h {minutes}m"
+
         # Daily limit reached - get building level for message
         building_level = daily_limit // DAILY_LIMIT_PER_LEVEL
         resource_verb = "chopped" if resource_type == "wood" else "mined"
@@ -166,7 +174,7 @@ def gather_resource(
             "amount": 0,
             "new_total": getattr(state, resource_config["player_field"], 0),
             "exhausted": True,
-            "exhausted_message": f"You've {resource_verb} all available {resource_type} for today ({daily_limit} per T{building_level})"
+            "exhausted_message": f"You've {resource_verb} all available {resource_type} for today. Resets in {time_str}."
         }
     
     # Get current amount of this resource

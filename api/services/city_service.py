@@ -8,7 +8,7 @@ FAST LOADING - TWO ENDPOINTS:
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 import math
 import asyncio
 
@@ -133,9 +133,18 @@ def get_buildings_for_kingdom(
                     gathered_today = get_gathered_today(db, current_user.id, resource)
                     if gathered_today >= daily_limit:
                         click_action["exhausted"] = True
+                        
+                        # Calculate time until reset
+                        now = datetime.now()
+                        tomorrow_midnight = datetime.combine(date.today() + timedelta(days=1), time.min)
+                        remaining = tomorrow_midnight - now
+                        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                        minutes, _ = divmod(remainder, 60)
+                        time_str = f"{hours}h {minutes}m"
+                        
                         resource_verb = "chopped" if resource == "wood" else "mined"
                         resource_name = "wood" if resource == "wood" else "iron"
-                        click_action["exhausted_message"] = f"You've {resource_verb} all available {resource_name} for today."
+                        click_action["exhausted_message"] = f"You've {resource_verb} all available {resource_name} for today. Resets in {time_str}."
         
         # Get catch-up info ONLY for hometown (you can only contribute to your hometown's buildings)
         catchup_info = None

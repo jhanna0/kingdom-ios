@@ -59,56 +59,56 @@ ANIMALS = {
     },
     "rabbit": {
         "name": "Rabbit",
-        "tier": 0,
+        "tier": 1,
         "icon": "🐰",
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "meat": 3,                # Level 1: drops 1-3 meat
+        "meat": 3,                # Level 2: drops 2-3 meat
         "description": "Fast but fragile. Common in meadows.",
         "rare_items": ["lucky_rabbits_foot"],
     },
     "deer": {
         "name": "Deer",
-        "tier": 1,
+        "tier": 2,
         "icon": "🦌",
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 5,                # Level 2: drops 2-5 meat
+        "meat": 5,                # Level 3: drops 3-5 meat
         "description": "Graceful and alert. A worthy hunt.",
         "rare_items": ["fur"],    # Deer drops fur
     },
     "boar": {
         "name": "Wild Boar",
-        "tier": 2,
+        "tier": 3,
         "icon": "🐗",
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 8,                # Level 3: drops 3-8 meat
+        "meat": 8,                # Level 4: drops 4-8 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
         "rare_items": ["fur"],    # Boar drops fur
     },
     "bear": {
         "name": "Bear",
-        "tier": 3,
+        "tier": 4,
         "icon": "🐻",
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 10,               # Level 4: drops 4-10 meat
+        "meat": 10,               # Level 5: drops 5-10 meat
         "description": "The king of the forest. Approach with caution.",
         "rare_items": ["sinew"],  # Bear drops sinew
     },
     "moose": {
         "name": "Moose",
-        "tier": 4,
+        "tier": 5,
         "icon": "🫎",
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 12,               # Level 5: drops 5-12 meat
+        "meat": 12,               # Level 6: drops 6-12 meat
         "description": "Massive and unpredictable. Legendary game.",
         "rare_items": ["sinew"],  # Moose drops sinew
     },
@@ -174,11 +174,12 @@ BLESSING_DROP_TABLE_DISPLAY = [
 
 # Base tables by animal tier
 ATTACK_DROP_TABLE_BY_TIER = {
-    0: {"scare": 40, "miss": 40, "hit": 40},   # Squirrel/Rabbit - 20% hit
-    1: {"scare": 25, "miss": 30, "hit": 45},   # Deer - 45% hit
-    2: {"scare": 30, "miss": 35, "hit": 35},   # Boar - 35% hit
-    3: {"scare": 35, "miss": 40, "hit": 25},   # Bear - 25% hit
-    4: {"scare": 40, "miss": 45, "hit": 15},   # Moose - 15% hit (legendary!)
+    0: {"scare": 25, "miss": 25, "hit": 50},   # Squirrel - 50% hit
+    1: {"scare": 25, "miss": 30, "hit": 45},   # Rabbit - 45% hit
+    2: {"scare": 30, "miss": 30, "hit": 40},   # Deer - 40% hit
+    3: {"scare": 30, "miss": 35, "hit": 35},   # Boar - 35% hit
+    4: {"scare": 35, "miss": 40, "hit": 25},   # Bear - 25% hit
+    5: {"scare": 40, "miss": 45, "hit": 15},   # Moose - 15% hit (legendary!)
 }
 
 # Default for unknown tiers
@@ -229,11 +230,12 @@ BLESSING_SHIFT_PER_SUCCESS = {
 #   - Deer/Boar (tier 1-2): fur
 #   - Bear/Moose (tier 3-4): sinew
 BLESSING_TIER_ADJUSTMENTS = {
-    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel/Rabbit: no fur/sinew possible
-    1: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: fur possible
-    2: {"nothing": -12, "common": 0, "uncommon": +6, "rare": 3},     # Boar: fur possible
-    3: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +5},  # Bear: sinew possible
-    4: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +8}, # Moose: sinew possible
+    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel: no fur/sinew possible
+    1: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Rabbit: no fur/sinew possible
+    2: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: fur possible
+    3: {"nothing": -12, "common": 0, "uncommon": +6, "rare": 3},      # Boar: fur possible
+    4: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +5},   # Bear: sinew possible
+    5: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +8},  # Moose: sinew possible
 }
 
 # Legacy - kept for backwards compatibility but not used
@@ -252,11 +254,12 @@ SLOTS_SHIFT_PER_SUCCESS = TRACK_SHIFT_PER_SUCCESS
 
 # Legacy - keeping for backwards compatibility
 ANIMAL_WEIGHTS_BY_TIER = {
-    0: {"squirrel": 60, "rabbit": 40},
-    1: {"rabbit": 30, "deer": 70},
-    2: {"deer": 40, "boar": 60},
-    3: {"boar": 30, "bear": 70},
-    4: {"bear": 40, "moose": 60},
+    0: {"squirrel": 100},
+    1: {"rabbit": 100},
+    2: {"deer": 100},
+    3: {"boar": 100},
+    4: {"bear": 100},
+    5: {"moose": 100},
 }
 
 
@@ -421,11 +424,12 @@ INJURY_DEFENSE_PENALTY = 1  # -1 defense while injured
 
 # Track phase: How many successes needed for each tier
 TRACK_TIER_THRESHOLDS = {
-    0: 0,    # Tier 0 (squirrel/rabbit) - always available
-    1: 1,    # Tier 1 (deer) - need 1 success
-    2: 2,    # Tier 2 (boar) - need 2 successes
-    3: 3,    # Tier 3 (bear) - need 3 successes
-    4: 5,    # Tier 4 (moose) - need 5 successes (full party rolling well)
+    0: 0,    # Tier 0 (squirrel) - always available
+    1: 0,    # Tier 1 (rabbit) - always available
+    2: 1,    # Tier 2 (deer) - need 1 success
+    3: 2,    # Tier 3 (boar) - need 2 successes
+    4: 3,    # Tier 4 (bear) - need 3 successes
+    5: 5,    # Tier 5 (moose) - need 5 successes (full party rolling well)
 }
 
 # How tracking score maps to tier (including partial scores)

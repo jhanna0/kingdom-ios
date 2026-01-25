@@ -81,7 +81,7 @@ from schemas.battle import (
     HowItWorksStep,
 )
 from routers.auth import get_current_user
-from routers.actions.utils import format_datetime_iso, log_activity
+from routers.actions.utils import format_datetime_iso, log_activity, check_and_deduct_food_cost
 
 router = APIRouter(prefix="/battles", tags=["Battles"])
 
@@ -1760,6 +1760,11 @@ def start_fight_session(
     cooldown_remaining = _get_battle_cooldown_seconds(db, current_user.id, battle_id)
     if cooldown_remaining > 0:
         raise HTTPException(status_code=400, detail=f"On cooldown. {cooldown_remaining}s remaining.")
+    
+    # Check and deduct food cost for fighting (10 min cooldown = 5 food)
+    food_result = check_and_deduct_food_cost(db, current_user.id, BATTLE_ACTION_COOLDOWN_MINUTES, "fighting")
+    if not food_result["success"]:
+        raise HTTPException(status_code=400, detail=food_result["error"])
     
     # Validate territory
     valid_territories = get_territories_for_type(battle.type)

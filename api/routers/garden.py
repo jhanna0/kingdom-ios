@@ -1,7 +1,7 @@
 """
 GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 2 property (House)
 =====================================================================================
-Plant seeds → Water every 8 hours for 4 cycles → Harvest!
+Plant seeds → Water within 16 hours (available after 4h) for 4 cycles → Harvest!
 Results: Weeds (common), Flowers (keep forever), Wheat (1-2 harvest)
 
 ALL LOGIC IS SERVER-SIDE! Frontend is a dumb renderer.
@@ -28,7 +28,8 @@ router = APIRouter(prefix="/garden", tags=["garden"])
 
 GARDEN_CONFIG = {
     "max_slots": 6,
-    "watering_interval_hours": 8,  # Must water within this window
+    "min_watering_hours": 4,  # Can water after this many hours
+    "death_timer_hours": 16,  # Plant dies after this many hours without water
     "watering_cycles_required": 4,  # Water this many times to grow
     "seed_item_id": "wheat_seed",  # Item consumed when planting
     
@@ -157,7 +158,7 @@ def check_and_update_slot_status(slot: GardenSlot) -> GardenSlot:
         return slot
     
     # Check if watering window has passed
-    watering_deadline = slot.last_watered_at + timedelta(hours=GARDEN_CONFIG["watering_interval_hours"])
+    watering_deadline = slot.last_watered_at + timedelta(hours=GARDEN_CONFIG["death_timer_hours"])
     if datetime.utcnow() > watering_deadline:
         slot.status = PlantStatus.DEAD
     
@@ -213,8 +214,8 @@ def slot_to_response(slot: GardenSlot) -> dict:
     
     elif slot.status == PlantStatus.GROWING:
         # Calculate watering deadline and if can water
-        watering_deadline = slot.last_watered_at + timedelta(hours=config["watering_interval_hours"])
-        next_water_available = slot.last_watered_at + timedelta(hours=config["watering_interval_hours"] // 2)
+        watering_deadline = slot.last_watered_at + timedelta(hours=config["death_timer_hours"])
+        next_water_available = slot.last_watered_at + timedelta(hours=config["min_watering_hours"])
         can_water_now = datetime.utcnow() >= next_water_available
         
         # Calculate seconds until next water for notifications
@@ -352,7 +353,8 @@ def get_garden_status(
         },
         "config": {
             **GARDEN_CONFIG["ui"],
-            "watering_interval_hours": GARDEN_CONFIG["watering_interval_hours"],
+            "min_watering_hours": GARDEN_CONFIG["min_watering_hours"],
+            "death_timer_hours": GARDEN_CONFIG["death_timer_hours"],
             "watering_cycles_required": GARDEN_CONFIG["watering_cycles_required"],
         },
     }
@@ -446,12 +448,13 @@ def plant_seed(
     
     return {
         "success": True,
-        "message": f"Planted a seed! Water it every {GARDEN_CONFIG['watering_interval_hours']} hours to help it grow.",
+        "message": f"Planted a seed! Water it within {GARDEN_CONFIG['death_timer_hours']} hours to keep it alive.",
         "slot": slot_to_response(slot),
         "seeds_remaining": get_player_seed_count(db, current_user.id),
-        # For notification scheduling - first water available after half interval
-        "next_water_in_seconds": GARDEN_CONFIG["watering_interval_hours"] * 3600 // 2,
-        "watering_interval_hours": GARDEN_CONFIG["watering_interval_hours"],
+        # For notification scheduling
+        "next_water_in_seconds": GARDEN_CONFIG["min_watering_hours"] * 3600,
+        "min_watering_hours": GARDEN_CONFIG["min_watering_hours"],
+        "death_timer_hours": GARDEN_CONFIG["death_timer_hours"],
     }
 
 
@@ -483,8 +486,8 @@ def water_plant(
             raise HTTPException(status_code=400, detail="This plant has died. Clear it to plant again.")
         raise HTTPException(status_code=400, detail="Nothing to water in this slot.")
     
-    # Check if watering is available (after half the interval has passed)
-    min_water_time = slot.last_watered_at + timedelta(hours=GARDEN_CONFIG["watering_interval_hours"] // 2)
+    # Check if watering is available
+    min_water_time = slot.last_watered_at + timedelta(hours=GARDEN_CONFIG["min_watering_hours"])
     if datetime.utcnow() < min_water_time:
         remaining = (min_water_time - datetime.utcnow()).total_seconds()
         hours = int(remaining // 3600)
@@ -512,7 +515,7 @@ def water_plant(
         cycles_left = GARDEN_CONFIG["watering_cycles_required"] - slot.watering_cycles
         message = f"Watered! {cycles_left} more watering{'s' if cycles_left > 1 else ''} until fully grown."
         # Calculate when next watering is available (for notification scheduling)
-        next_water_in_seconds = GARDEN_CONFIG["watering_interval_hours"] * 3600 // 2  # Half interval
+        next_water_in_seconds = GARDEN_CONFIG["min_watering_hours"] * 3600
     
     db.commit()
     
@@ -524,7 +527,8 @@ def water_plant(
         "plant_type": slot.plant_type.value if slot.plant_type else None,
         # For notification scheduling
         "next_water_in_seconds": next_water_in_seconds,
-        "watering_interval_hours": GARDEN_CONFIG["watering_interval_hours"],
+        "min_watering_hours": GARDEN_CONFIG["min_watering_hours"],
+        "death_timer_hours": GARDEN_CONFIG["death_timer_hours"],
     }
 
 
@@ -654,7 +658,8 @@ def get_garden_config():
     
     return {
         "max_slots": GARDEN_CONFIG["max_slots"],
-        "watering_interval_hours": GARDEN_CONFIG["watering_interval_hours"],
+        "min_watering_hours": GARDEN_CONFIG["min_watering_hours"],
+        "death_timer_hours": GARDEN_CONFIG["death_timer_hours"],
         "watering_cycles_required": GARDEN_CONFIG["watering_cycles_required"],
         "seed_item_id": GARDEN_CONFIG["seed_item_id"],
         "outcomes": outcomes_response,

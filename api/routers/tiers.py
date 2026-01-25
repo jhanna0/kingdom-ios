@@ -17,7 +17,7 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 # Actions cost food based on their cooldown duration
 # This gives food a meaningful purpose and creates resource trade-offs
 
-FOOD_COST_PER_COOLDOWN_MINUTE = 0.4  # 0.4 food per minute of cooldown (minutes / 2.5)
+FOOD_COST_PER_COOLDOWN_MINUTE = 0.5  # 0.4 food per minute of cooldown (minutes / 2.5)
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
 BUILDING_BASE_ACTIONS_REQUIRED = 100
