@@ -54,7 +54,7 @@ ANIMALS = {
         "track_threshold": 0,     # Always findable
         "hp": 1,
         "danger": 0,
-        "meat": 2,                # Level 1: drops 1-2 meat
+        "meat": 3,                # Level 1: drops 1-3 meat
         "description": "A quick little critter. Easy prey.",
     },
     "rabbit": {
@@ -64,7 +64,7 @@ ANIMALS = {
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "meat": 2,                # Level 1: drops 1-2 meat
+        "meat": 3,                # Level 1: drops 1-3 meat
         "description": "Fast but fragile. Common in meadows.",
         "rare_items": ["lucky_rabbits_foot"],
     },
@@ -75,7 +75,7 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 4,                # Level 2: drops 2-4 meat
+        "meat": 5,                # Level 2: drops 2-5 meat
         "description": "Graceful and alert. A worthy hunt.",
         "rare_items": ["fur"],    # Deer drops fur
     },
@@ -86,7 +86,7 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 6,                # Level 3: drops 3-6 meat
+        "meat": 8,                # Level 3: drops 3-8 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
         "rare_items": ["fur"],    # Boar drops fur
     },
@@ -97,7 +97,7 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 8,                # Level 4: drops 4-8 meat
+        "meat": 10,               # Level 4: drops 4-10 meat
         "description": "The king of the forest. Approach with caution.",
         "rare_items": ["sinew"],  # Bear drops sinew
     },
@@ -108,7 +108,7 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 10,               # Level 5: drops 5-10 meat
+        "meat": 12,               # Level 5: drops 5-12 meat
         "description": "Massive and unpredictable. Legendary game.",
         "rare_items": ["sinew"],  # Moose drops sinew
     },
@@ -442,6 +442,10 @@ def get_max_tier_from_track_score(track_score: float) -> int:
 # Consolation rewards for failed hunts
 NO_TRAIL_MEAT = 0           # No meat if tracking fails completely
 ESCAPED_MEAT_PERCENT = 0.3  # 30% of normal meat if animal escapes (wounded it at least)
+
+# Hunt streak bonus - 3 successful hunts in a row = double meat
+HUNT_STREAK_THRESHOLD = 3   # Number of consecutive successes needed
+HUNT_STREAK_MEAT_MULTIPLIER = 2  # Meat multiplier when streak is active
 
 
 # ============================================================

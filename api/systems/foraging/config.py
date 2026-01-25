@@ -89,8 +89,8 @@ ROUND1_TARGET_TYPE = "berries"
 # Round 1 reward - reads from RESOURCES
 ROUND1_REWARD_ITEM = "berries"
 ROUND1_REWARD_CONFIG = {
-    "min_reward": 1,           # Random roll 1-3 berries on win
-    "max_reward": 3,
+    "min_reward": 1,           # Random roll 2-4 berries on win
+    "max_reward": 4,
     "reward_item": ROUND1_REWARD_ITEM,
     "reward_item_display_name": _get_resource(ROUND1_REWARD_ITEM).get("display_name"),
     "reward_item_icon": _get_resource(ROUND1_REWARD_ITEM).get("icon"),

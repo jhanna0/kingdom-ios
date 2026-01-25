@@ -27,6 +27,8 @@ from .config import (
     MEAT_MARKET_VALUE,
     NO_TRAIL_MEAT,
     ESCAPED_MEAT_PERCENT,
+    HUNT_STREAK_THRESHOLD,
+    HUNT_STREAK_MEAT_MULTIPLIER,
     # Drop tables for all phases
     TRACK_DROP_TABLE,
     TRACK_SHIFT_PER_SUCCESS,
@@ -898,7 +900,7 @@ class HuntManager:
         elif state.phase == HuntPhase.STRIKE:
             result.update(self._resolve_strike_phase(session, state))
         elif state.phase == HuntPhase.BLESSING:
-            result.update(self._resolve_blessing_phase(session, state))
+            result.update(self._resolve_blessing_phase(db, session, state))
         
         state.is_resolved = True
         
@@ -1081,7 +1083,7 @@ class HuntManager:
                 },
             }
     
-    def _resolve_blessing_phase(self, session: HuntSession, state: PhaseState) -> dict:
+    def _resolve_blessing_phase(self, db, session: HuntSession, state: PhaseState) -> dict:
         """
         Resolve blessing phase using DROP TABLE!
         
@@ -1100,8 +1102,10 @@ class HuntManager:
         rare_chance = rare_slots / total_slots if total_slots > 0 else 0
         
         # Apply loot based on tier
+        streak_active = False
         if not session.animal_escaped and session.animal_data:
-            self._calculate_loot(session, loot_tier)
+            streak_active = self._check_hunt_streak(db, session.created_by)
+            self._calculate_loot(db, session, loot_tier)
         
         # Build message based on outcome
         if loot_tier == "nothing":
@@ -1115,6 +1119,10 @@ class HuntManager:
         else:
             message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
+        # Add streak bonus message
+        if streak_active:
+            message += f" 🔥 {HUNT_STREAK_THRESHOLD}x STREAK BONUS!"
+        
         return {
             "message": message,
             "effects": {
@@ -1126,6 +1134,9 @@ class HuntManager:
                 "bonus_meat": session.bonus_meat,
                 "master_roll": master_roll,
                 "drop_table_slots": state.drop_table_slots.copy(),
+                "streak_active": streak_active,
+                "streak_threshold": HUNT_STREAK_THRESHOLD,
+                "streak_multiplier": HUNT_STREAK_MEAT_MULTIPLIER if streak_active else 1,
             },
         }
     
@@ -1333,7 +1344,7 @@ class HuntManager:
             
             # Apply loot
             if not session.animal_escaped and session.animal_data:
-                self._calculate_loot(session, loot_tier)
+                self._calculate_loot(db, session, loot_tier)
             
             # Include items in effects so frontend can show them
             effects["items_dropped"] = session.items_dropped.copy()
@@ -1369,6 +1380,30 @@ class HuntManager:
         
         return result
     
+    def _check_hunt_streak(self, db, player_id: int) -> bool:
+        """
+        Check if player has a hunt streak (N-1 previous successful hunts).
+        
+        If they have N-1 consecutive successes, and current hunt succeeds,
+        that's N in a row = streak bonus active!
+        """
+        from db.models import HuntSession as HuntSessionModel
+        
+        # Need N-1 previous successes for a streak of N
+        required_previous = HUNT_STREAK_THRESHOLD - 1
+        
+        # Query last N-1 completed hunts for this player
+        last_hunts = db.query(HuntSessionModel).filter(
+            HuntSessionModel.created_by == player_id,
+            HuntSessionModel.status.in_(['completed', 'failed'])
+        ).order_by(HuntSessionModel.completed_at.desc()).limit(required_previous).all()
+        
+        # Check if we have enough hunts and all were successful
+        if len(last_hunts) < required_previous:
+            return False
+        
+        return all(h.status == 'completed' for h in last_hunts)
+    
     def _select_animal(self, session: HuntSession, force_tier: Optional[int] = None) -> None:
         """Select an animal based on tracking score."""
         tier = force_tier if force_tier is not None else session.max_tier_unlocked
@@ -1388,11 +1423,13 @@ class HuntManager:
                 session.animal_data = ANIMALS[animal_id].copy()
                 break
     
-    def _calculate_loot(self, session: HuntSession, loot_tier: str) -> None:
+    def _calculate_loot(self, db, session: HuntSession, loot_tier: str) -> None:
         """Calculate and assign loot based on hunt results - ALL FROM CONFIG.
 
         Loot tiers and their requirements come from LOOT_TIERS config.
         Gold drops equal to meat earned (taxed by kingdom).
+        
+        STREAK BONUS: 3 successful hunts in a row = double meat!
         """
         if not session.animal_data:
             return
@@ -1413,6 +1450,12 @@ class HuntManager:
         
         # Apply bonus from config
         session.total_meat = max(1, int(base_meat * meat_bonus))
+        
+        # Check hunt streak - query last N-1 hunts to see if they were successful
+        # If this hunt succeeds and last N-1 were successful, that's N in a row
+        streak_active = self._check_hunt_streak(db, session.created_by)
+        if streak_active:
+            session.total_meat *= HUNT_STREAK_MEAT_MULTIPLIER
         session.bonus_meat = session.total_meat - base_meat if session.total_meat > base_meat else 0
         
         # Drop items from animal's rare_items config - ONLY on rare rolls

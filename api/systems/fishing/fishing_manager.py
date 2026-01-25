@@ -104,6 +104,7 @@ class FishingSession:
     casts_attempted: int = 0
     successful_catches: int = 0
     fish_escaped: int = 0
+    consecutive_catches: int = 0  # Resets on escape, used for streak bonus
     
     def to_dict(self) -> dict:
         return {
@@ -117,6 +118,7 @@ class FishingSession:
                 "casts_attempted": self.casts_attempted,
                 "successful_catches": self.successful_catches,
                 "fish_escaped": self.fish_escaped,
+                "consecutive_catches": self.consecutive_catches,
             },
         }
 
@@ -306,8 +308,15 @@ class FishingManager:
         
         # Process outcome
         if outcome == "caught":
+            session.consecutive_catches += 1
+            
             # Success! Add rewards
             meat = get_fish_meat_reward(fish_id)
+            
+            # Streak bonus: 3+ catches in a row = double meat
+            if session.consecutive_catches >= 3:
+                meat *= 2
+            
             session.total_meat += meat
             session.fish_caught += 1
             session.successful_catches += 1
@@ -318,6 +327,8 @@ class FishingManager:
                 session.pet_fish_dropped = True
             
             outcome_display["meat_earned"] = meat
+            outcome_display["streak_bonus"] = session.consecutive_catches >= 3
+            outcome_display["consecutive_catches"] = session.consecutive_catches
             outcome_display["fish_data"] = fish_data
             outcome_display["rare_loot_dropped"] = pet_dropped  # Generic name
             
@@ -353,7 +364,8 @@ class FishingManager:
                 "master_roll": loot_roll_percent,
             }
         else:
-            # Escaped
+            # Escaped - reset streak
+            session.consecutive_catches = 0
             session.fish_escaped += 1
             outcome_display["fish_data"] = fish_data
         

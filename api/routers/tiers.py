@@ -17,7 +17,7 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 # Actions cost food based on their cooldown duration
 # This gives food a meaningful purpose and creates resource trade-offs
 
-FOOD_COST_PER_COOLDOWN_MINUTE = 0.5  # 0.5 food per minute of cooldown
+FOOD_COST_PER_COOLDOWN_MINUTE = 0.4  # 0.4 food per minute of cooldown (minutes / 2.5)
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
 BUILDING_BASE_ACTIONS_REQUIRED = 100
@@ -28,17 +28,17 @@ BUILDING_POPULATION_ACTIONS_DIVISOR = 30
 def calculate_food_cost(cooldown_minutes: float) -> int:
     """Calculate food cost for an action based on its cooldown duration.
     
-    Formula: cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE
+    Formula: floor(cooldown_minutes / 2.5)
     
-    Examples (at 0.5 food/min):
-    - 10 min cooldown (farm, patrol): 5 food
-    - 30 min cooldown (scout): 15 food  
-    - 120 min cooldown (work, training, crafting): 60 food
+    Examples (at 0.4 food/min):
+    - 10 min cooldown (farm, patrol): 4 food
+    - 30 min cooldown (scout): 12 food  
+    - 120 min cooldown (work, training, crafting): 48 food
     
-    Returns integer (rounded up to ensure non-zero cost for any action with cooldown)
+    Returns integer (floored, minimum 1)
     """
     import math
-    return max(1, math.ceil(cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE))
+    return max(1, math.floor(cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE))
 
 
 # ===== PROPERTY TIERS - FULLY DYNAMIC =====

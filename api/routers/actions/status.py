@@ -1069,7 +1069,7 @@ def get_action_status(
         "actions": actions,  # DYNAMIC ACTION LIST
         # Food system - actions cost food based on cooldown (0.5 food per minute)
         "player_food_total": player_food_total,
-        "food_cost_per_minute": 0.5,  # For frontend to calculate costs dynamically
+        "food_cost_per_minute": 0.4,  # For frontend to calculate costs dynamically (minutes / 2.5)
         # Legacy structure for backward compatibility
         "work": actions["work"],
         "patrol": actions["patrol"],

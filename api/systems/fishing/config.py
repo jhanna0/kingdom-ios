@@ -43,7 +43,7 @@ FISH = {
         "tier": 0,
         "icon": "🐟",
         "meat_min": 1,
-        "meat_max": 1,
+        "meat_max": 2,
         "description": "A tiny fish. Easy catch.",
     },
     "bass": {
@@ -51,31 +51,31 @@ FISH = {
         "tier": 1,
         "icon": "🐟",
         "meat_min": 2,
-        "meat_max": 3,
+        "meat_max": 4,
         "description": "A common lake fish.",
     },
     "salmon": {
         "name": "Salmon",
         "tier": 2,
         "icon": "🐠",
-        "meat_min": 3,
-        "meat_max": 4,
+        "meat_min": 4,
+        "meat_max": 5,
         "description": "A prized river fish.",
     },
     "catfish": {
         "name": "Catfish",
         "tier": 3,
         "icon": "🐡",
-        "meat_min": 4,
-        "meat_max": 5,
+        "meat_min": 5,
+        "meat_max": 7,
         "description": "A bottom-dwelling heavyweight.",
     },
     "legendary_carp": {
         "name": "Legendary Carp",
         "tier": 4,
         "icon": "🎣",
-        "meat_min": 5,
-        "meat_max": 8,
+        "meat_min": 7,
+        "meat_max": 10,
         "description": "The stuff of legends. Ancient and massive.",
     },
 }
@@ -90,11 +90,11 @@ FISH = {
 # --- CAST PHASE: What fish will you find? (Building stat) ---
 # ALL outcomes on the bar including "no_bite" (failure)
 CAST_DROP_TABLE = {
-    "no_bite": 33,           # FAILURE - nothing bites
-    "minnow": 27,            # Tier 0 - common
-    "bass": 22,              # Tier 1 - common
-    "salmon": 12,            # Tier 2 - uncommon
-    "catfish": 5,            # Tier 3 - rare
+    "no_bite": 25,           # FAILURE - nothing bites
+    "minnow": 25,            # Tier 0 - common
+    "bass": 27,              # Tier 1 - common
+    "salmon": 16,            # Tier 2 - uncommon
+    "catfish": 6,            # Tier 3 - rare
     "legendary_carp": 1,     # Tier 4 - legendary
 }  # Total: 100 slots
 
@@ -125,8 +125,8 @@ CAST_DROP_TABLE_DISPLAY = [
 # Rarer fish = harder to land = more rolls needed
 
 # Base reel odds (before fish difficulty applied)
-REEL_BASE_CAUGHT = 55
-REEL_BASE_ESCAPED = 45
+REEL_BASE_CAUGHT = 58
+REEL_BASE_ESCAPED = 42
 
 # Difficulty modifier per fish tier (reduces "caught" slots)
 # Higher tier = harder to catch

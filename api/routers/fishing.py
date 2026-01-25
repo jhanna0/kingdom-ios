@@ -100,6 +100,7 @@ def session_from_db(db_session: FishingSessionDB) -> FishingSession:
         casts_attempted=data.get("stats", {}).get("casts_attempted", 0),
         successful_catches=data.get("stats", {}).get("successful_catches", 0),
         fish_escaped=data.get("stats", {}).get("fish_escaped", 0),
+        consecutive_catches=data.get("stats", {}).get("consecutive_catches", 0),
     )
     return session
 
@@ -337,6 +338,7 @@ def reel_in(
     Frontend animates through them for a chill experience.
     
     If rare loot drops (pet fish), broadcasts to friends and adds to inventory immediately!
+    Streak bonus: 3 catches in a row = double meat!
     """
     player_id = user.id
     
