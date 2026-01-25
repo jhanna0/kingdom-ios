@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 // MARK: - Hunt Results View
 // Clean, focused results screen
@@ -45,12 +42,6 @@ struct HuntResultsView: View {
             }
             if let totalMeat = viewModel.hunt?.rewards?.total_meat {
                 animateMeatCountUp(to: totalMeat)
-            }
-            // Celebration haptics for successful hunt
-            if viewModel.hunt?.status == .completed {
-                successHapticBurst()
-            } else if viewModel.hunt?.status == .failed {
-                haptic(.warning)
             }
         }
     }
@@ -303,7 +294,6 @@ struct HuntResultsView: View {
             
             VStack(spacing: 10) {
                 Button {
-                    hapticImpact(.medium)
                     viewModel.resetForNewHunt()
                 } label: {
                     HStack(spacing: 8) {
@@ -315,7 +305,6 @@ struct HuntResultsView: View {
                 .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
                 
                 Button {
-                    hapticImpact(.light)
                     dismiss()
                 } label: {
                     Text("Return to Kingdom")
@@ -398,43 +387,6 @@ struct HuntResultsView: View {
                 meatCountUp = (target * i) / steps
             }
         }
-    }
-    
-    // MARK: - Haptics
-    
-    private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        #if canImport(UIKit)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
-        #endif
-    }
-    
-    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
-        #endif
-    }
-    
-    /// Celebration haptic burst for successful hunt
-    private func successHapticBurst() {
-        #if canImport(UIKit)
-        let heavy = UIImpactFeedbackGenerator(style: .heavy)
-        let rigid = UIImpactFeedbackGenerator(style: .rigid)
-        heavy.prepare()
-        rigid.prepare()
-        
-        // Initial success
-        haptic(.success)
-        heavy.impactOccurred(intensity: 1.0)
-        
-        // Celebration follow-up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            rigid.impactOccurred(intensity: 0.9)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-            heavy.impactOccurred(intensity: 0.8)
-        }
-        #endif
     }
 }
 

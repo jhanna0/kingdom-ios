@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 // MARK: - Main Hunt View
 // Routes between states based on the UI state machine
@@ -234,7 +231,6 @@ struct HuntStartView: View {
                     if needsPermit && !hasValidPermit {
                         // Show "Buy Permit" button
                         Button {
-                            hapticImpact(.medium)
                             Task {
                                 await viewModel.buyPermit(kingdomId: kingdomId)
                             }
@@ -257,7 +253,6 @@ struct HuntStartView: View {
                     } else {
                         // Show "Start Hunt" button
                         Button {
-                            hapticImpact(.heavy)
                             Task {
                                 await viewModel.createHunt(kingdomId: kingdomId)
                             }
@@ -277,14 +272,6 @@ struct HuntStartView: View {
                 .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
             }
         }
-    }
-    
-    // MARK: - Haptics
-    
-    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
-        #endif
     }
 }
 
