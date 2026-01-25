@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Hunt Lobby View
 // Waiting room for party members before the hunt starts
@@ -111,6 +114,7 @@ struct HuntLobbyView: View {
         VStack(spacing: KingdomTheme.Spacing.medium) {
             // Ready button
             Button {
+                hapticImpact(.medium)
                 Task {
                     await viewModel.toggleReady()
                 }
@@ -134,6 +138,7 @@ struct HuntLobbyView: View {
             // Start button (leader only)
             if viewModel.isLeader {
                 Button {
+                    hapticImpact(.heavy)
                     Task {
                         await viewModel.startHunt()
                     }
@@ -153,6 +158,7 @@ struct HuntLobbyView: View {
             
             // Leave button
             Button {
+                hapticImpact(.light)
                 Task {
                     await viewModel.leaveHunt()
                 }
@@ -165,6 +171,14 @@ struct HuntLobbyView: View {
             .font(KingdomTheme.Typography.subheadline())
             .foregroundColor(KingdomTheme.Colors.buttonDanger)
         }
+    }
+    
+    // MARK: - Haptics
+    
+    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        #endif
     }
     
     // MARK: - Helpers

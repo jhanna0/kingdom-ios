@@ -89,8 +89,8 @@ ROUND1_TARGET_TYPE = "berries"
 # Round 1 reward - reads from RESOURCES
 ROUND1_REWARD_ITEM = "berries"
 ROUND1_REWARD_CONFIG = {
-    "base_reward": 1,
-    "bonus_per_extra_match": 1,
+    "min_reward": 1,           # Random roll 1-3 berries on win
+    "max_reward": 3,
     "reward_item": ROUND1_REWARD_ITEM,
     "reward_item_display_name": _get_resource(ROUND1_REWARD_ITEM).get("display_name"),
     "reward_item_icon": _get_resource(ROUND1_REWARD_ITEM).get("icon"),
@@ -438,7 +438,15 @@ def calculate_reward(match_count: int, round_num: int = 1) -> int:
     Returns:
         Number of items to award
     """
+    import random
+    
     config = ROUND1_REWARD_CONFIG if round_num == 1 else ROUND2_REWARD_CONFIG
+    
+    # Round 1 (berries): random roll between min and max
+    if round_num == 1:
+        return random.randint(config["min_reward"], config["max_reward"])
+    
+    # Round 2 (seeds): fixed base + bonus for extra matches
     base = config["base_reward"]
     extra_matches = max(0, match_count - MATCHES_TO_WIN)
     bonus = extra_matches * config["bonus_per_extra_match"]

@@ -63,10 +63,13 @@ class FishingViewModel: ObservableObject {
     private var baseCastSlots: [String: Int] = [:]
     private var baseReelSlots: [String: Int] = [:]
     
+    // Pending session update (deferred until animation completes to avoid spoilers)
+    private var pendingSession: FishingSession?
+    
     // Animation timing
-    private let rollAnimationDelay: UInt64 = 1_600_000_000
-    private let masterRollDelay: UInt64 = 1_000_000_000
-    private let feedbackDelay: UInt64 = 2_000_000_000
+    private let rollAnimationDelay: UInt64 = 1_200_000_000  // Time between rolls (1.2s)
+    private let masterRollDelay: UInt64 = 700_000_000       // Pause before master roll (0.7s)
+    private let feedbackDelay: UInt64 = 1_600_000_000       // Time on escaped/idle before resetting
     
     // API
     private var fishingAPI: FishingAPI?
@@ -271,6 +274,9 @@ class FishingViewModel: ObservableObject {
     func cast() async {
         guard let api = fishingAPI, canCast else { return }
         
+        // Set casting state immediately to prevent double-taps
+        uiState = .casting
+        
         currentBarType = .cast
         currentSlots = baseCastSlots
         masterRollValue = 0
@@ -286,7 +292,6 @@ class FishingViewModel: ObservableObject {
             currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            uiState = .casting
             await animateRolls()
         } catch {
             uiState = .error("Cast failed: \(error.localizedDescription)")
@@ -296,6 +301,9 @@ class FishingViewModel: ObservableObject {
     func reel() async {
         guard let api = fishingAPI, canReel else { return }
         
+        // Set reeling state immediately to prevent double-taps
+        uiState = .reeling
+        
         currentBarType = .reel
         currentSlots = baseReelSlots
         masterRollValue = 0
@@ -304,13 +312,13 @@ class FishingViewModel: ObservableObject {
         
         do {
             let response = try await api.reel()
-            session = response.session
+            // Defer session update until animation completes (prevents fish count spoiler)
+            pendingSession = response.session
             currentPhaseResult = response.result
             currentRolls = response.result.rolls
             currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            uiState = .reeling
             await animateRolls()
         } catch {
             uiState = .error("Reel failed: \(error.localizedDescription)")
@@ -331,7 +339,7 @@ class FishingViewModel: ObservableObject {
         
         // Animate to result
         Task {
-            try? await Task.sleep(nanoseconds: 800_000_000) // Brief pause
+            try? await Task.sleep(nanoseconds: 550_000_000) // Brief pause before animation
             masterRollValue = lootResult.master_roll
             shouldAnimateMasterRoll = true
         }
@@ -365,7 +373,9 @@ class FishingViewModel: ObservableObject {
         currentRollIndex = -1
         
         for (index, roll) in currentRolls.enumerated() {
-            try? await Task.sleep(nanoseconds: rollAnimationDelay)
+            // Slightly shorter delay before first roll
+            let delay: UInt64 = index == 0 ? 750_000_000 : rollAnimationDelay
+            try? await Task.sleep(nanoseconds: delay)
             currentRollIndex = index
             
             if let slotsAfter = roll.slots_after, roll.is_success {
@@ -403,7 +413,12 @@ class FishingViewModel: ObservableObject {
                 showFeedback(state: .fishFound, thenLoot: false)
             }
         } else {
-            // Reel phase
+            // Reel phase - NOW apply the pending session (fish count updates here, not before)
+            if let pending = pendingSession {
+                session = pending
+                pendingSession = nil
+            }
+            
             if result.outcome == "caught" {
                 // Store loot result from backend
                 currentLootResult = result.outcome_display.loot

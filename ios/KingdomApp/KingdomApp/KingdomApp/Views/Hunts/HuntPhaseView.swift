@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Hunt Phase View
 
@@ -11,6 +14,10 @@ struct HuntPhaseView: View {
     @State private var masterRollDisplayValue: Int = 0
     @State private var showMasterRollMarker: Bool = false
     @State private var masterRollAnimationStarted: Bool = false
+    
+    // Haptic feedback tracking
+    @State private var lastRollResultId: Int? = nil
+    @State private var lastUIState: HuntUIState? = nil
     
     private var displayConfig: PhaseDisplayConfig? {
         viewModel.hunt?.phase_state?.display
@@ -31,10 +38,19 @@ struct HuntPhaseView: View {
                     config: viewModel.config,
                     hunt: viewModel.hunt,
                     onBegin: {
+                        hapticImpact(.medium)
                         Task { await viewModel.userTappedBeginPhase() }
                     }
                 )
             }
+        }
+        .onChange(of: viewModel.lastRollResult?.round) { _, newRound in
+            guard let newRound = newRound, newRound != lastRollResultId else { return }
+            lastRollResultId = newRound
+            handleRollResult()
+        }
+        .onChange(of: viewModel.uiState) { _, newState in
+            handleStateChange(newState)
         }
     }
     
@@ -542,6 +558,7 @@ struct HuntPhaseView: View {
     private var twoButtonRow: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
             Button {
+                hapticImpact(.medium)
                 Task { await viewModel.userTappedRollAgain() }
             } label: {
                 HStack {
@@ -558,6 +575,7 @@ struct HuntPhaseView: View {
             .disabled(!viewModel.canRoll)
             
             Button {
+                hapticImpact(.heavy)
                 Task { await viewModel.userTappedResolve() }
             } label: {
                 HStack {
@@ -588,6 +606,7 @@ struct HuntPhaseView: View {
     
     private var continueButton: some View {
         Button {
+            hapticImpact(.medium)
             Task { await viewModel.userTappedNextAfterMasterRoll() }
         } label: {
             HStack {
@@ -638,6 +657,89 @@ struct HuntPhaseView: View {
             return String(parts.compactMap { $0.first }.prefix(3)).uppercased()
         }
         return String(t.prefix(3)).uppercased()
+    }
+    
+    // MARK: - Haptics
+    
+    private func handleRollResult() {
+        guard let roll = viewModel.lastRollResult else { return }
+        
+        if roll.is_critical && roll.is_success {
+            // Critical hit - big celebration!
+            criticalHitHapticBurst()
+        } else if roll.is_success {
+            // Regular success
+            haptic(.success)
+            hapticImpact(.medium)
+        } else if roll.is_critical {
+            // Critical miss - dramatic but not punishing
+            hapticImpact(.heavy)
+        } else {
+            // Regular miss
+            hapticImpact(.light)
+        }
+    }
+    
+    private func handleStateChange(_ newState: HuntUIState) {
+        guard lastUIState != newState else { return }
+        
+        switch newState {
+        case .masterRollAnimation:
+            // Start of master roll - anticipation
+            hapticImpact(.medium)
+            
+        case .masterRollComplete:
+            // Master roll landed - satisfaction
+            haptic(.success)
+            hapticImpact(.heavy)
+            
+        case .phaseComplete:
+            // Phase done
+            hapticImpact(.medium)
+            
+        default:
+            break
+        }
+        
+        lastUIState = newState
+    }
+    
+    private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        #if canImport(UIKit)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(type)
+        #endif
+    }
+    
+    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        #endif
+    }
+    
+    /// Rapid-fire burst of heavy haptics for critical hits
+    private func criticalHitHapticBurst() {
+        #if canImport(UIKit)
+        let heavy = UIImpactFeedbackGenerator(style: .heavy)
+        let rigid = UIImpactFeedbackGenerator(style: .rigid)
+        heavy.prepare()
+        rigid.prepare()
+        
+        // Initial slam
+        haptic(.success)
+        heavy.impactOccurred(intensity: 1.0)
+        
+        // Rapid follow-up hits
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            rigid.impactOccurred(intensity: 1.0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            heavy.impactOccurred(intensity: 1.0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            rigid.impactOccurred(intensity: 0.8)
+        }
+        #endif
     }
 }
 

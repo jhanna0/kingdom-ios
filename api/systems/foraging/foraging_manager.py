@@ -40,6 +40,7 @@ from .config import (
     get_round_config,
     get_round1_probabilities,
     get_round2_probabilities,
+    calculate_reward,
 )
 
 
@@ -279,7 +280,7 @@ class ForagingManager:
         
         is_winner = berry_count >= ROUND1_WIN_CONFIG["guaranteed_cluster_size"]
         has_seed_trail = trail_count >= ROUND1_WIN_CONFIG["guaranteed_cluster_size"]
-        reward_amount = 1 if is_winner else 0
+        reward_amount = calculate_reward(berry_count, round_num=1) if is_winner else 0
         
         target_positions = [i for i, c in enumerate(cells) if c["is_seed"]]
         seed_trail_position = next((i for i, c in enumerate(cells) if c.get("is_seed_trail")), -1)
@@ -354,7 +355,7 @@ class ForagingManager:
         # Check results - only count actual wheat seeds, not eggs marked as is_seed for UI
         actual_seed_count = sum(1 for c in cells if c["bush_type"] == ROUND2_TARGET_TYPE)
         is_seed_winner = actual_seed_count >= ROUND2_WIN_CONFIG["guaranteed_cluster_size"]
-        reward_amount = 1 if is_seed_winner else 0
+        reward_amount = calculate_reward(actual_seed_count, round_num=2) if is_seed_winner else 0
         
         target_positions = [i for i, c in enumerate(cells) if c["is_seed"]]
         

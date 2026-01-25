@@ -90,11 +90,11 @@ FISH = {
 # --- CAST PHASE: What fish will you find? (Building stat) ---
 # ALL outcomes on the bar including "no_bite" (failure)
 CAST_DROP_TABLE = {
-    "no_bite": 35,           # FAILURE - nothing bites
-    "minnow": 30,            # Tier 0 - common
-    "bass": 20,              # Tier 1 - common
-    "salmon": 10,            # Tier 2 - uncommon
-    "catfish": 4,            # Tier 3 - rare
+    "no_bite": 33,           # FAILURE - nothing bites
+    "minnow": 27,            # Tier 0 - common
+    "bass": 22,              # Tier 1 - common
+    "salmon": 12,            # Tier 2 - uncommon
+    "catfish": 5,            # Tier 3 - rare
     "legendary_carp": 1,     # Tier 4 - legendary
 }  # Total: 100 slots
 
