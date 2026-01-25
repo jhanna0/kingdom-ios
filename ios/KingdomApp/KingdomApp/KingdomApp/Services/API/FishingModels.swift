@@ -86,6 +86,18 @@ struct FishingLootResult: Codable {
 
 // MARK: - Outcome Display
 
+// Streak info from backend - all display data comes from server!
+struct FishingStreakInfo: Codable, Equatable {
+    let title: String
+    let subtitle: String
+    let description: String
+    let multiplier: Int
+    let threshold: Int
+    let icon: String
+    let color: String
+    let dismiss_button: String
+}
+
 struct FishingOutcomeDisplay: Codable {
     let key: String
     let name: String
@@ -95,6 +107,13 @@ struct FishingOutcomeDisplay: Codable {
     let meat_earned: Int?
     let rare_loot_dropped: Bool?  // Generic - could be pet fish, could be anything
     let loot: FishingLootResult?  // Loot bar data (only on catch)
+    let streak_bonus: Bool?       // True if 2x bonus active (3 catches in a row)
+    let consecutive_catches: Int? // Current consecutive catch count
+    let show_streak_popup: Bool?  // True ONLY when streak just activated (exactly 3)
+    let streak_info: FishingStreakInfo?  // Display info from backend
+    
+    var hasStreakBonus: Bool { streak_bonus ?? false }
+    var shouldShowStreakPopup: Bool { show_streak_popup ?? false }
 }
 
 // MARK: - Phase Result (Pre-calculated rolls)

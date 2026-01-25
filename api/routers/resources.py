@@ -81,7 +81,7 @@ RESOURCES = {
         "display_name": "Meat",
         "icon": "flame.fill",
         "color": "red",
-        "description": "Fresh game meat from hunting. Used for actions.",
+        "description": "Fresh game meat from hunting. A filling food source.",
         "category": "consumable",
         "display_order": 20,
         "is_tradeable": True,

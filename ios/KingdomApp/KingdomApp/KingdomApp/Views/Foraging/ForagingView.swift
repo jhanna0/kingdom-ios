@@ -24,6 +24,9 @@ struct ForagingView: View {
     @State private var isTransitioning: Bool = false
     @State private var gridSlideOffset: CGFloat = 0
     
+    // Streak bonus popup - controlled by backend, not local state
+    @State private var showStreakPopup: Bool = false
+    
     var body: some View {
         ZStack {
             KingdomTheme.Colors.parchmentDark
@@ -32,7 +35,7 @@ struct ForagingView: View {
             VStack(spacing: 0) {
                 header
                 
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     statusCard
                     
                     Spacer()
@@ -48,6 +51,21 @@ struct ForagingView: View {
                 .padding(.vertical, KingdomTheme.Spacing.medium)
                 
                 bottomBar
+            }
+            
+            // Streak bonus popup
+            if showStreakPopup, let streakInfo = viewModel.streakInfo {
+                StreakBonusPopup(
+                    title: streakInfo.title,
+                    subtitle: streakInfo.subtitle,
+                    description: streakInfo.description,
+                    multiplier: streakInfo.multiplier,
+                    icon: streakInfo.icon,
+                    color: streakInfo.color,
+                    dismissButton: streakInfo.dismiss_button
+                ) {
+                    showStreakPopup = false
+                }
             }
         }
         .navigationBarHidden(true)
@@ -85,6 +103,12 @@ struct ForagingView: View {
         }
         .onChange(of: isResetting) { _, _ in
             recomputePulsingPositions()
+        }
+        .onChange(of: viewModel.shouldShowStreakPopup) { _, shouldShow in
+            // Backend tells us exactly when to show the popup
+            if shouldShow && !showStreakPopup {
+                showStreakPopup = true
+            }
         }
     }
     
@@ -218,124 +242,104 @@ struct ForagingView: View {
     // MARK: - Status
     
     private var statusCard: some View {
-        let isLoading = viewModel.uiState == .loading || viewModel.uiState == .transitioning
         let tapsLeft = max(0, viewModel.maxReveals - viewModel.revealedCount)
         
         return VStack(spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.black)
-                        .offset(x: 2, y: 2)
-                    
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(KingdomTheme.Colors.parchmentLight)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.black, lineWidth: 2)
-                        )
-                    
-                    Image(systemName: "leaf.fill")
+            // Top row: What to find + progress
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: displayedRewardConfig?.icon ?? "seal.fill")
                         .font(FontStyles.iconMedium)
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                }
-                .frame(width: 46, height: 46)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Match 3 to collect")
+                        .foregroundColor(KingdomTheme.Colors.color(fromThemeName: displayedRewardConfig?.color ?? "buttonDanger"))
+                    
+                    Text("Match 3 \(displayedRewardConfig?.display_name ?? "Berries")")
                         .font(FontStyles.headingSmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    HStack(spacing: 10) {
-                        if let config = displayedRewardConfig {
-                            HStack(spacing: 6) {
-                                Image(systemName: config.icon)
-                                    .font(FontStyles.iconTiny)
-                                Text(config.display_name)
-                                    .font(FontStyles.labelMedium)
-                            }
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .brutalistBadge(
-                                backgroundColor: KingdomTheme.Colors.parchmentLight,
-                                cornerRadius: 8,
-                                borderWidth: 2
-                            )
-                        } else {
-                            Text(isLoading ? "Preparing..." : "Target")
-                                .font(FontStyles.labelMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .brutalistBadge(
-                                    backgroundColor: KingdomTheme.Colors.parchmentLight,
-                                    cornerRadius: 8,
-                                    borderWidth: 2
-                                )
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(viewModel.revealedTargetCount)/\(viewModel.matchesToWin)")
-                                .font(FontStyles.statMedium)
-                                .foregroundColor(viewModel.isWarming ? KingdomTheme.Colors.color(fromThemeName: viewModel.rewardConfig?.color ?? "buttonSuccess") : KingdomTheme.Colors.inkDark)
-                            
-                            Text("found")
-                                .font(FontStyles.captionLarge)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                        .frame(width: 72, alignment: .trailing)
-                        .animation(.easeInOut(duration: 0.2), value: viewModel.revealedTargetCount)
-                    }
-                }
-            }
-            
-            HStack(spacing: 10) {
-                ForagingMiniStatPill(
-                    title: "Taps left",
-                    value: "\(tapsLeft)",
-                    color: tapsLeft <= 1 ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkDark
-                )
-                
-                ForagingMiniStatPill(
-                    title: "Collect",
-                    value: "\(max(0, viewModel.matchesToWin - viewModel.revealedTargetCount))",
-                    color: KingdomTheme.Colors.royalBlue
-                )
-                
-                // Show seed trail indicator in Round 1
-                if !displayedIsBonusRound && viewModel.foundSeedTrail {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(FontStyles.iconTiny)
-                        Text("Trail!")
-                            .font(FontStyles.captionMedium)
-                    }
-                    .foregroundColor(KingdomTheme.Colors.imperialGold)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.parchmentHighlight,
-                        cornerRadius: 8,
-                        borderWidth: 2
-                    )
                 }
                 
                 Spacer()
                 
-                if isLoading {
-                    ProgressView()
-                        .tint(KingdomTheme.Colors.loadingTint)
+                // Found progress badge
+                HStack(spacing: 6) {
+                    Text("\(viewModel.revealedTargetCount)/\(viewModel.matchesToWin)")
+                        .font(FontStyles.statLarge)
+                        .foregroundColor(viewModel.isWarming ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkDark)
+                    Text("found")
+                        .font(FontStyles.captionLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
+                .frame(height: 20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 10,
+                    borderWidth: 2
+                )
+            }
+            
+            // Bottom row: Taps left + session tallies
+            HStack(spacing: 10) {
+                // Taps left badge
+                HStack(spacing: 6) {
+                    Text("\(tapsLeft)")
+                        .font(FontStyles.statMedium)
+                        .foregroundColor(tapsLeft <= 1 ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkDark)
+                    Text("taps")
+                        .font(FontStyles.captionLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .frame(height: 20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 10,
+                    borderWidth: 2
+                )
+                
+                Spacer()
+                
+                // Berries collected badge
+                HStack(spacing: 6) {
+                    Image(systemName: "seal.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                    Text("\(viewModel.totalBerriesCollected)")
+                        .font(FontStyles.statMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                .frame(height: 20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 10,
+                    borderWidth: 2
+                )
+                
+                // Seed trails badge
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.imperialGold)
+                    Text("\(viewModel.totalSeedTrailsFound / 3)")
+                        .font(FontStyles.statMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                .frame(height: 20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 10,
+                    borderWidth: 2
+                )
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .frame(height: 132)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 16)
-        .opacity(isLoading ? 0.92 : 1.0)
     }
     
     // MARK: - Grid
@@ -843,33 +847,6 @@ private struct ForagingTilePressButtonStyle: ButtonStyle {
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: configuration.isPressed)
     }
 }
-
-// MARK: - Mini Stat Pill
-
-private struct ForagingMiniStatPill: View {
-    let title: String
-    let value: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(title.uppercased())
-                .font(FontStyles.captionMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            Text(value)
-                .font(FontStyles.statMedium)
-                .foregroundColor(color)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .brutalistBadge(
-            backgroundColor: KingdomTheme.Colors.parchmentLight,
-            cornerRadius: 10,
-            borderWidth: 2
-        )
-    }
-}
-
 
 #Preview {
     Text("Foraging Preview")

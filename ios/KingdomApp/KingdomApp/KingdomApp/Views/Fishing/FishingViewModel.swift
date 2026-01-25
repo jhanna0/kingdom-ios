@@ -81,6 +81,8 @@ class FishingViewModel: ObservableObject {
     var petFishDropped: Bool { session?.pet_fish_dropped ?? false }
     var currentFish: String? { session?.current_fish }
     var currentFishData: FishData? { session?.current_fish_data }
+    var currentStreakInfo: FishingStreakInfo? { currentPhaseResult?.outcome_display.streak_info }
+    var shouldShowStreakPopup: Bool { currentPhaseResult?.outcome_display.shouldShowStreakPopup ?? false }
     
     var castRolls: Int { config?.cast_rolls ?? 1 }
     var reelRolls: Int { config?.reel_rolls ?? 1 }
@@ -345,7 +347,7 @@ class FishingViewModel: ObservableObject {
         }
     }
     
-    /// Called when loot roll animation completes
+    /// Called when loot roll animation completes (legacy - now handled in onMasterRollAnimationComplete)
     func onLootAnimationComplete() {
         shouldAnimateMasterRoll = false
         uiState = .lootResult
@@ -397,6 +399,11 @@ class FishingViewModel: ObservableObject {
         
         // If animating loot roll, go to loot result
         if uiState == .looting {
+            // NOW apply the pending session - meat/fish counts update after the loot reveal
+            if let pending = pendingSession {
+                session = pending
+                pendingSession = nil
+            }
             uiState = .lootResult
             return
         }
@@ -413,17 +420,19 @@ class FishingViewModel: ObservableObject {
                 showFeedback(state: .fishFound, thenLoot: false)
             }
         } else {
-            // Reel phase - NOW apply the pending session (fish count updates here, not before)
-            if let pending = pendingSession {
-                session = pending
-                pendingSession = nil
-            }
-            
+            // Reel phase
             if result.outcome == "caught" {
                 // Store loot result from backend
+                // DON'T apply pending session yet - wait until loot animation completes
+                // so meat count doesn't spoil the reveal
                 currentLootResult = result.outcome_display.loot
                 showFeedback(state: .caught, thenLoot: false)
             } else {
+                // Escaped - apply session now (no loot animation coming)
+                if let pending = pendingSession {
+                    session = pending
+                    pendingSession = nil
+                }
                 showFeedback(state: .escaped, thenLoot: false)
             }
         }

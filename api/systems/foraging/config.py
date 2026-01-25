@@ -191,11 +191,13 @@ ROUND2_WIN_CONFIG = {
     # Base rates (T0) - teasers dominate!
     "seed_win_base": 0.15,
     "rare_egg_base": 0.001,
-    "seed_tease_base": 0.70,  # 70% - so close to seeds!
+    "rare_egg_tease_base": 0.02,  # 2% - glimpse of rare egg!
+    "seed_tease_base": 0.68,  # 68% - so close to seeds!
     # Nothing: only 14% at T0
     # Per tier bonus
     "seed_win_per_tier": 0.07,
     "rare_egg_per_tier": 0.01,  # Flat 1% jackpot (Merchant still boosts seed wins in R2)
+    "rare_egg_tease_per_tier": 0.005,  # Slight increase with merchant
     "seed_tease_per_tier": -0.06,  # Teasers decrease as wins increase
 }
 
@@ -400,6 +402,7 @@ def get_round2_probabilities(merchant: int = 0) -> dict:
     
     Returns thresholds for roll 1-10000:
     - rare_egg: Find rare egg (jackpot!)
+    - rare_egg_tease: Find 1-2 rare eggs (so close!)
     - seed_win: Find 3 seeds
     - seed_tease: Find 1-2 seeds (near miss)
     - nothing: Just junk
@@ -408,22 +411,26 @@ def get_round2_probabilities(merchant: int = 0) -> dict:
     
     # Calculate rates based on merchant tier
     rare_egg = cfg["rare_egg_base"] + (merchant * cfg["rare_egg_per_tier"])
+    rare_egg_tease = cfg["rare_egg_tease_base"] + (merchant * cfg["rare_egg_tease_per_tier"])
     seed_win = cfg["seed_win_base"] + (merchant * cfg["seed_win_per_tier"])
     seed_tease = max(0.05, cfg["seed_tease_base"] + (merchant * cfg["seed_tease_per_tier"]))
     
     # Convert to cumulative thresholds (1-10000 roll)
-    # Order: rare_egg, seed_win, seed_tease, nothing
+    # Order: rare_egg, rare_egg_tease, seed_win, seed_tease, nothing
     t1 = int(rare_egg * ROUND2_ROLL_RANGE)
-    t2 = t1 + int(seed_win * ROUND2_ROLL_RANGE)
-    t3 = t2 + int(seed_tease * ROUND2_ROLL_RANGE)
+    t2 = t1 + int(rare_egg_tease * ROUND2_ROLL_RANGE)
+    t3 = t2 + int(seed_win * ROUND2_ROLL_RANGE)
+    t4 = t3 + int(seed_tease * ROUND2_ROLL_RANGE)
     
     return {
         "rare_egg_threshold": t1,
-        "seed_win_threshold": t2,
-        "seed_tease_threshold": t3,
+        "rare_egg_tease_threshold": t2,
+        "seed_win_threshold": t3,
+        "seed_tease_threshold": t4,
         # Rates for display
         "seed_win_rate": seed_win,
         "rare_egg_rate": rare_egg,
+        "rare_egg_tease_rate": rare_egg_tease,
     }
 
 

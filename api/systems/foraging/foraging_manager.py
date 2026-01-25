@@ -326,6 +326,13 @@ class ForagingManager:
                 cell = self._make_cell(0, "rare_egg", round_num=2)
                 cell["is_seed"] = True  # Eggs ARE the winning match for this roll!
                 cells.append(cell)
+        elif roll <= probs["rare_egg_tease_threshold"]:
+            # RARE EGG TEASE - place 1-2 eggs (so close to jackpot!)
+            tease_count = self.rng.randint(1, 2)
+            for _ in range(tease_count):
+                cell = self._make_cell(0, "rare_egg", round_num=2)
+                cell["is_seed"] = True  # Highlight eggs like other targets
+                cells.append(cell)
         elif roll <= probs["seed_win_threshold"]:
             # SEEDS WIN - place 3 seeds
             for _ in range(ROUND2_WIN_CONFIG["guaranteed_cluster_size"]):

@@ -310,11 +310,41 @@ struct HuntRewards: Codable {
     let meat: Int
     let bonus_meat: Int
     let total_meat: Int
+    let meat_market_value: Int  // Gold earned (1 meat = 1 gold)
     let items: [String]
     let item_details: [ItemDetail]?  // Full item config from backend!
 }
 
+// MARK: - Hunting Stats (last hour totals)
+
+struct LastHourItemDetail: Codable {
+    let id: String
+    let display_name: String
+    let icon: String
+    let color: String
+    let count: Int
+}
+
+struct HuntingStats: Codable {
+    let meat: Int                           // Total meat in last hour
+    let gold: Int                           // Total gold in last hour
+    let item_details: [LastHourItemDetail]  // Full item info from backend
+    let hunt_count: Int                     // Number of hunts in last hour
+}
+
 // MARK: - Hunt Session
+
+// Streak info from backend - all display data comes from server!
+struct HuntStreakInfo: Codable, Equatable {
+    let title: String
+    let subtitle: String
+    let description: String
+    let multiplier: Int
+    let threshold: Int
+    let icon: String
+    let color: String
+    let dismiss_button: String
+}
 
 struct HuntSession: Codable, Identifiable {
     let hunt_id: String
@@ -331,12 +361,19 @@ struct HuntSession: Codable, Identifiable {
     let phase_state: PhaseState?  // Multi-roll phase tracking
     let phase_results: [PhaseResultData]
     let rewards: HuntRewards?
+    let hunting_stats: HuntingStats?  // Efficiency stats (only on hunt complete)
     let party_size: Int
     let created_at: String?
     let started_at: String?
     let completed_at: String?
+    // Streak bonus info (present at hunt completion)
+    let streak_active: Bool?
+    let show_streak_popup: Bool?  // Backend tells frontend when to show popup
+    let streak_info: HuntStreakInfo?  // Display info from backend
     
     var id: String { hunt_id }
+    var hasStreakBonus: Bool { streak_active ?? false }
+    var shouldShowStreakPopup: Bool { show_streak_popup ?? false }
     
     var currentHuntPhase: HuntPhase {
         HuntPhase(rawValue: current_phase) ?? .lobby

@@ -135,6 +135,76 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
     db.commit()
 
 
+def calculate_hunting_stats(db: Session, player_id: int) -> dict:
+    """
+    Get total loot from hunts completed in the LAST HOUR.
+    Just query the database and sum everything up.
+    """
+    from db.models import HuntSession as HuntSessionModel
+    from routers.resources import RESOURCES
+    from datetime import datetime, timedelta
+    
+    one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+    
+    # Get all completed hunts from last hour where player participated
+    hunts = db.query(HuntSessionModel).filter(
+        HuntSessionModel.status == 'completed',
+        HuntSessionModel.completed_at >= one_hour_ago
+    ).all()
+    
+    total_meat = 0
+    total_gold = 0
+    items_count = {}
+    hunt_count = 0
+    
+    player_id_str = str(player_id)
+    
+    for hunt in hunts:
+        data = hunt.session_data
+        if not data:
+            continue
+        
+        # Check if player was in this hunt
+        participants = data.get("participants", {})
+        if player_id_str not in participants:
+            continue
+        
+        hunt_count += 1
+        
+        # Get this player's loot from this hunt
+        participant = participants[player_id_str]
+        meat = participant.get("meat_earned", 0)
+        total_meat += meat
+        
+        # Gold = meat
+        total_gold += meat
+        
+        # Items are stored at top level as items_dropped, NOT in rewards
+        items = data.get("items_dropped", [])
+        for item_id in items:
+            if item_id:
+                items_count[item_id] = items_count.get(item_id, 0) + 1
+    
+    # Build item details from RESOURCES config
+    item_details = []
+    for item_id, count in items_count.items():
+        item_config = RESOURCES.get(item_id, {})
+        item_details.append({
+            "id": item_id,
+            "display_name": item_config.get("display_name", item_id.replace("_", " ").title()),
+            "icon": item_config.get("icon", "cube.fill"),
+            "color": item_config.get("color", "gray"),
+            "count": count,
+        })
+    
+    return {
+        "meat": total_meat,
+        "gold": total_gold,
+        "item_details": item_details,
+        "hunt_count": hunt_count,
+    }
+
+
 # ============================================================
 # ENDPOINTS - Static routes MUST come before dynamic routes!
 # ============================================================
@@ -955,6 +1025,9 @@ def advance_phase(
         final_result = manager.finalize_hunt(db, session)
         apply_hunt_rewards(db, final_result)
         
+        # Add hunting efficiency stats (loot per hour based on recent hunts)
+        final_result["hunting_stats"] = calculate_hunting_stats(db, user.id)
+        
         notify_hunt_participants(
             hunt_session=final_result,
             event_type=PartyEvents.HUNT_ENDED,
@@ -1058,6 +1131,10 @@ def execute_phase(
         
         # Apply rewards to database
         apply_hunt_rewards(db, final_result)
+    
+    # Add hunting efficiency stats when hunt ends
+    if hunt_ended and final_result:
+        final_result["hunting_stats"] = calculate_hunting_stats(db, user.id)
     
     # Broadcast phase completion
     hunt_dict = final_result if hunt_ended else session.to_dict()

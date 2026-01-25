@@ -30,6 +30,9 @@ struct FishingView: View {
     @State private var lastState: FishingViewModel.UIState? = nil
     @State private var lastRolledIndex: Int = -999
     
+    // Streak bonus popup - controlled by backend, not local state
+    @State private var showStreakPopup: Bool = false
+    
     var body: some View {
         ZStack {
             fishingBackdrop
@@ -52,6 +55,20 @@ struct FishingView: View {
             if showPetFishCelebration {
                 petFishCelebrationOverlay
             }
+            
+            if showStreakPopup, let streakInfo = viewModel.currentStreakInfo {
+                StreakBonusPopup(
+                    title: streakInfo.title,
+                    subtitle: streakInfo.subtitle,
+                    description: streakInfo.description,
+                    multiplier: streakInfo.multiplier,
+                    icon: streakInfo.icon,
+                    color: streakInfo.color,
+                    dismissButton: streakInfo.dismiss_button
+                ) {
+                    showStreakPopup = false
+                }
+            }
         }
         .navigationBarHidden(true)
         .task {
@@ -72,6 +89,12 @@ struct FishingView: View {
             guard newIndex != lastRolledIndex else { return }
             lastRolledIndex = newIndex
             handleRollBeat(index: newIndex)
+        }
+        .onChange(of: viewModel.shouldShowStreakPopup) { _, shouldShow in
+            // Backend tells us exactly when to show the popup
+            if shouldShow {
+                showStreakPopup = true
+            }
         }
     }
     

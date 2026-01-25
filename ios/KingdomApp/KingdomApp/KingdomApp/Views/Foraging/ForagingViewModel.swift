@@ -37,6 +37,10 @@ class ForagingViewModel: ObservableObject {
     // Seed trail discovery
     @Published var foundSeedTrail: Bool = false
     
+    // Running tallies (persist across rounds in same session)
+    @Published var totalBerriesCollected: Int = 0
+    @Published var totalSeedTrailsFound: Int = 0
+    
     // API
     private var api: ForagingAPI?
     
@@ -89,6 +93,9 @@ class ForagingViewModel: ObservableObject {
     var isWarming: Bool { revealedTargetCount >= 1 }
     var hasBonusRound: Bool { session?.has_bonus_round ?? false }
     var isBonusRound: Bool { currentRound == 2 }
+    var hasStreakBonus: Bool { session?.round1.hasStreakBonus ?? false }
+    var streakInfo: StreakInfo? { session?.round1.streak_info }
+    var shouldShowStreakPopup: Bool { session?.round1.shouldShowStreakPopup ?? false }
     
     var currentSkillInfo: ForagingSkillInfo? {
         guard let skills = skillsUsed else { return nil }
@@ -153,6 +160,7 @@ class ForagingViewModel: ObservableObject {
             // Check for seed trail (Round 1 only)
             if currentRound == 1 && cell.isSeedTrail && hasBonusRound {
                 foundSeedTrail = true
+                totalSeedTrailsFound += 1
                 // Don't immediately transition - let player see the trail
                 // View will show transition prompt after a moment
             }
@@ -195,6 +203,14 @@ class ForagingViewModel: ObservableObject {
     
     func collect() async {
         guard let api = api else { return }
+        
+        // Tally berries before collecting
+        for reward in allRewards {
+            // Count berries (check for berry-related rewards)
+            if reward.display_name.lowercased().contains("berr") {
+                totalBerriesCollected += reward.amount
+            }
+        }
         
         do {
             _ = try await api.collectRewards()

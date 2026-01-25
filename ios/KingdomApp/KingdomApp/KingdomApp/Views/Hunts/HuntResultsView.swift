@@ -7,6 +7,7 @@ struct HuntResultsView: View {
     @ObservedObject var viewModel: HuntViewModel
     @State private var showContent = false
     @State private var meatCountUp: Int = 0
+    @State private var showStreakPopup: Bool = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -19,6 +20,7 @@ struct HuntResultsView: View {
                 ScrollView {
                     VStack(spacing: KingdomTheme.Spacing.large) {
                         resultHeader
+                        
                         lootSection
                         partySection
                     }
@@ -35,6 +37,21 @@ struct HuntResultsView: View {
                 bottomButton
             }
             .opacity(showContent ? 1 : 0)
+            
+            // Streak bonus popup
+            if showStreakPopup, let streakInfo = viewModel.hunt?.streak_info {
+                StreakBonusPopup(
+                    title: streakInfo.title,
+                    subtitle: streakInfo.subtitle,
+                    description: streakInfo.description,
+                    multiplier: streakInfo.multiplier,
+                    icon: streakInfo.icon,
+                    color: streakInfo.color,
+                    dismissButton: streakInfo.dismiss_button
+                ) {
+                    showStreakPopup = false
+                }
+            }
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(0.2)) {
@@ -42,6 +59,12 @@ struct HuntResultsView: View {
             }
             if let totalMeat = viewModel.hunt?.rewards?.total_meat {
                 animateMeatCountUp(to: totalMeat)
+            }
+            // Backend tells us when to show streak popup
+            if viewModel.hunt?.shouldShowStreakPopup == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showStreakPopup = true
+                }
             }
         }
     }
@@ -94,77 +117,68 @@ struct HuntResultsView: View {
     // MARK: - Loot Section
     
     private var lootSection: some View {
-        VStack(spacing: 12) {
-            // Main loot row
+        VStack(spacing: 14) {
             if let rewards = viewModel.hunt?.rewards {
-                HStack(spacing: 16) {
-                    // Meat
-                    lootBadge(
-                        icon: "leaf.fill",
-                        value: "\(meatCountUp)",
-                        label: "Meat",
-                        color: KingdomTheme.Colors.buttonSuccess
-                    )
+                // THIS HUNT
+                VStack(spacing: 8) {
+                    Text("THIS HUNT")
+                        .font(FontStyles.captionSmall)
+                        .tracking(2)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
-                    // Bonus (if any)
-                    if rewards.bonus_meat > 0 {
-                        lootBadge(
-                            icon: "sparkles",
-                            value: "+\(rewards.bonus_meat)",
-                            label: "Blessed",
-                            color: KingdomTheme.Colors.regalPurple
-                        )
+                    HStack(spacing: 12) {
+                        lootBadge(icon: "flame.fill", value: "\(meatCountUp)", label: "Meat", color: KingdomTheme.Colors.buttonDanger)
+                        lootBadge(icon: "g.circle.fill", value: "\(rewards.meat_market_value)", label: "Gold", color: KingdomTheme.Colors.gold)
                     }
-                }
-                
-                // Special items - use item_details from backend if available
-                if let itemDetails = rewards.item_details, !itemDetails.isEmpty {
-                    VStack(spacing: 8) {
-                        Text("RARE LOOT")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(2)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        HStack(spacing: 10) {
+                    
+                    // Rare items
+                    if let itemDetails = rewards.item_details, !itemDetails.isEmpty {
+                        HStack(spacing: 8) {
                             ForEach(itemDetails, id: \.id) { item in
                                 itemBadge(item: item)
                             }
                         }
-                    }
-                } else if !rewards.items.isEmpty {
-                    // Fallback to legacy string array (backwards compat)
-                    VStack(spacing: 8) {
-                        Text("RARE LOOT")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(2)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        HStack(spacing: 10) {
+                    } else if !rewards.items.isEmpty {
+                        HStack(spacing: 8) {
                             ForEach(rewards.items, id: \.self) { item in
                                 legacyItemBadge(itemId: item)
                             }
                         }
                     }
-                    .padding(14)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.black)
-                                .offset(x: 3, y: 3)
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(KingdomTheme.Colors.parchmentLight)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(KingdomTheme.Colors.regalPurple.opacity(0.4), lineWidth: 2)
-                                )
+                }
+                
+                // LAST HOUR
+                if let stats = viewModel.hunt?.hunting_stats, stats.hunt_count > 0 {
+                    Divider()
+                    
+                    VStack(spacing: 8) {
+                        Text("LAST HOUR")
+                            .font(FontStyles.captionSmall)
+                            .tracking(2)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        HStack(spacing: 12) {
+                            lootBadge(icon: "flame.fill", value: "\(stats.meat)", label: "Meat", color: KingdomTheme.Colors.buttonDanger)
+                            lootBadge(icon: "g.circle.fill", value: "\(stats.gold)", label: "Gold", color: KingdomTheme.Colors.gold)
                         }
-                    )
+                        
+                        // Rare items from last hour
+                        if !stats.item_details.isEmpty {
+                            FlowLayout(spacing: 6) {
+                                ForEach(stats.item_details, id: \.id) { item in
+                                    lastHourItemBadge(item: item)
+                                }
+                            }
+                        }
+                        
+                        Text("\(stats.hunt_count) hunt\(stats.hunt_count == 1 ? "" : "s")")
+                            .font(FontStyles.captionLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                    }
                 }
             } else {
-                // No loot (failed hunt)
                 Text("No loot collected")
-                    .font(.system(size: 14, weight: .medium, design: .serif))
+                    .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .padding()
             }
@@ -172,6 +186,25 @@ struct HuntResultsView: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 14)
+    }
+    
+    private func lastHourItemBadge(item: LastHourItemDetail) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: item.icon)
+                .font(FontStyles.iconMini)
+            Text("\(item.count)x")
+                .font(FontStyles.labelBold)
+            Text(item.display_name)
+                .font(FontStyles.labelSmall)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(KingdomTheme.Colors.regalPurple)
+                .overlay(Capsule().stroke(Color.black, lineWidth: 2))
+        )
     }
     
     private func lootBadge(icon: String, value: String, label: String, color: Color) -> some View {
@@ -452,9 +485,9 @@ private struct CompactPlayerRow: View {
                 
                 // Meat earned
                 HStack(spacing: 2) {
-                    Image(systemName: "leaf.fill")
+                    Image(systemName: "flame.fill")
                         .font(.system(size: 10))
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
                     Text("\(participant.meat_earned)")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -470,11 +503,43 @@ private struct CompactPlayerRow: View {
     }
 }
 
-// MARK: - Preview
+// MARK: - Flow Layout (wrapping)
 
-#Preview {
-    NavigationStack {
-        HuntResultsView(viewModel: HuntViewModel())
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        for (index, frame) in result.frames.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: .init(frame.size))
+        }
+    }
+    
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+        let maxWidth = proposal.width ?? .infinity
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+        }
+        
+        return (CGSize(width: maxWidth, height: y + rowHeight), frames)
     }
 }
 

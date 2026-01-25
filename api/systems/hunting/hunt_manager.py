@@ -167,6 +167,10 @@ class PhaseState:
     max_rolls: int = 1
     stat_value: int = 0  # Player's stat value (also = max_rolls)
     
+    # Effective hit chance (base + item bonuses) - shown in UI
+    # Default to base rate, updated when items are checked
+    effective_hit_chance_percent: int = int(ROLL_HIT_CHANCE * 100)
+    
     # Phase-specific tracking (legacy)
     damage_dealt: int = 0          # Strike phase
     animal_remaining_hp: int = 0    # Strike phase
@@ -192,7 +196,8 @@ class PhaseState:
         Frontend is a DUMB TEMPLATE - no hardcoded logic!
         """
         config = PHASE_CONFIG.get(self.phase, {})
-        hit_chance_percent = int(ROLL_HIT_CHANCE * 100)
+        # Use effective hit chance (includes item bonuses like Lucky Rabbit's Foot)
+        hit_chance_percent = self.effective_hit_chance_percent
         
         # Get the correct drop table display config for this phase
         if self.phase == HuntPhase.TRACK:
@@ -314,6 +319,11 @@ class HuntSession:
     total_meat: int = 0
     bonus_meat: int = 0  # From blessing bonus
     items_dropped: List[str] = field(default_factory=list)
+    
+    # Streak bonus info
+    streak_active: bool = False
+    show_streak_popup: bool = False  # Backend tells frontend when to show
+    streak_info: Optional[dict] = None
     
     # Timing
     started_at: Optional[datetime] = None
@@ -476,6 +486,10 @@ class HuntSession:
             "created_at": _format_datetime_iso(self.created_at) if self.created_at else None,
             "started_at": _format_datetime_iso(self.started_at) if self.started_at else None,
             "completed_at": _format_datetime_iso(self.completed_at) if self.completed_at else None,
+            # Streak bonus info
+            "streak_active": self.streak_active,
+            "show_streak_popup": self.show_streak_popup,
+            "streak_info": self.streak_info,
         }
 
 
@@ -595,7 +609,7 @@ class HuntManager:
         session.started_at = datetime.utcnow()
         
         # Initialize first phase
-        self._init_phase_state(session, HuntPhase.TRACK)
+        self._init_phase_state(db, session, HuntPhase.TRACK)
         
         # Save to database
         self.save_hunt(db, session)
@@ -606,7 +620,7 @@ class HuntManager:
     # MULTI-ROLL PHASE SYSTEM
     # ============================================================
     
-    def _init_phase_state(self, session: HuntSession, phase: HuntPhase) -> None:
+    def _init_phase_state(self, db, session: HuntSession, phase: HuntPhase) -> None:
         """
         Initialize state for a new phase with its drop table.
         
@@ -628,10 +642,17 @@ class HuntManager:
         # Ensure at least 1 roll
         max_rolls = max(1, total_rolls)
         
+        # Calculate effective hit chance (base + item bonuses)
+        # Use the hunt creator's items for the display value
+        effective_hit_chance = ROLL_HIT_CHANCE
+        if phase == HuntPhase.TRACK:
+            effective_hit_chance += self._get_tracking_bonus_from_items(db, session.created_by)
+        
         state = PhaseState(
             phase=phase,
             max_rolls=max_rolls,
             stat_value=combined_stat,  # Actual combined stat for display
+            effective_hit_chance_percent=int(effective_hit_chance * 100),
         )
         
         if phase == HuntPhase.TRACK:
@@ -1219,7 +1240,7 @@ class HuntManager:
             current_idx = phase_order.index(current)
             if current_idx < len(phase_order) - 1:
                 next_phase = phase_order[current_idx + 1]
-                self._init_phase_state(session, next_phase)
+                self._init_phase_state(db, session, next_phase)
                 # Save to database
                 self.save_hunt(db, session)
                 return next_phase
@@ -1456,13 +1477,26 @@ class HuntManager:
         streak_active = self._check_hunt_streak(db, session.created_by)
         if streak_active:
             session.total_meat *= HUNT_STREAK_MEAT_MULTIPLIER
+            session.streak_active = True
+            session.show_streak_popup = True  # Backend tells frontend when to show
+            session.streak_info = {
+                "title": "HOT STREAK!",
+                "subtitle": "2x Meat",
+                "description": f"{HUNT_STREAK_THRESHOLD} hunts in a row!",
+                "multiplier": HUNT_STREAK_MEAT_MULTIPLIER,
+                "threshold": HUNT_STREAK_THRESHOLD,
+                "icon": "flame.fill",
+                "color": "buttonDanger",
+                "dismiss_button": "Claim",
+            }
         session.bonus_meat = session.total_meat - base_meat if session.total_meat > base_meat else 0
         
-        # Drop items from animal's rare_items config - ONLY on rare rolls
-        # Rabbit: lucky_rabbits_foot
-        # Deer/Boar: fur
-        # Bear/Moose: sinew
-        if loot_tier == "rare":
+        # Drop items based on loot tier
+        # uncommon = fur (from any animal)
+        # rare = animal's special item (rabbit foot, sinew, etc)
+        if loot_tier == "uncommon":
+            session.items_dropped.append("fur")
+        elif loot_tier == "rare":
             session.items_dropped.extend(animal.get("rare_items", []))
         
         # Distribute meat among participants

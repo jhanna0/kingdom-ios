@@ -9,10 +9,13 @@ Flow:
    - Round 2: Seeds (only if seed trail found in R1)
 2. Frontend reveals locally + animates transition if bonus round
 3. POST /foraging/collect - Claim ALL rewards (berries + seeds)
+
+STREAK BONUS: 3 berry wins in a row = 2x berries!
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -31,13 +34,9 @@ router = APIRouter(prefix="/foraging", tags=["foraging"])
 
 
 def broadcast_rare_egg(db: Session, player_id: int) -> None:
-    """
-    Broadcast rare egg drop to activity feed.
-    This shows up in friends' activity feeds!
-    """
+    """Broadcast rare egg drop to activity feed."""
     from routers.resources import RESOURCES
     egg = RESOURCES["rare_egg"]
-    
     log_activity(
         db=db,
         user_id=player_id,
@@ -46,15 +45,23 @@ def broadcast_rare_egg(db: Session, player_id: int) -> None:
         description=f"Found a {egg['display_name']} while foraging! 🥚",
         kingdom_id=None,
         amount=None,
-        details={
-            "item_id": "rare_egg",
-            "item_name": egg["display_name"],
-            "item_icon": egg["icon"],
-        },
+        details={"item_id": "rare_egg", "item_name": egg["display_name"], "item_icon": egg["icon"]},
         visibility="friends"
     )
 
 _manager = ForagingManager()
+
+
+def check_streak_bonus(db: Session, user_id: int) -> bool:
+    """Check if last 2 attempts both hit."""
+    last_two = db.query(ForagingSessionDB).filter(
+        ForagingSessionDB.user_id == user_id
+    ).order_by(desc(ForagingSessionDB.created_at)).limit(2).all()
+    
+    if len(last_two) < 2:
+        return False
+    
+    return all(s.round1_won or s.has_bonus_round for s in last_two)
 
 
 class EmptyRequest(BaseModel):
@@ -85,18 +92,15 @@ def start_foraging(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """
-    Start foraging - returns EVERYTHING pre-calculated for BOTH rounds.
-    """
+    """Start foraging - returns pre-calculated rounds. 3 berry wins in a row = 2x!"""
     player_id = user.id
     
-    # Get player skills
     state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
     leadership = state.leadership if state else 0
     merchant = state.merchant if state else 0
     kingdom_id = state.current_kingdom_id if state else None
     
-    # End any existing active session
+    # Cancel any existing active session
     existing = db.query(ForagingSessionDB).filter(
         ForagingSessionDB.user_id == player_id,
         ForagingSessionDB.status == 'active'
@@ -105,20 +109,42 @@ def start_foraging(
         existing.status = 'cancelled'
         db.commit()
     
-    # Create new session with skill-adjusted probabilities
-    session = _manager.create_session(
-        player_id=player_id,
-        leadership=leadership,
-        merchant=merchant,
-    )
+    # Create session
+    session = _manager.create_session(player_id=player_id, leadership=leadership, merchant=merchant)
+    session_dict = session.to_dict()
     
-    # Store in database
+    # Streak bonus: 3 hits in a row (berries OR trail) = 2x berries
+    streak_bonus = False
+    if session.round1.is_winner and check_streak_bonus(db, player_id):
+        streak_bonus = True
+        doubled = session.round1.reward_amount * 2
+        session_dict["round1"]["reward_amount"] = doubled
+        for r in session_dict["round1"].get("rewards", []):
+            if r.get("item") == "berries":
+                r["amount"] = doubled
+    
+    session_dict["round1"]["streak_bonus"] = streak_bonus
+    # show_streak_popup: backend tells frontend exactly when to show popup
+    session_dict["round1"]["show_streak_popup"] = streak_bonus
+    if streak_bonus:
+        session_dict["round1"]["streak_info"] = {
+            "title": "HOT STREAK!",
+            "subtitle": "2x Berries",
+            "description": "3 wins in a row!",
+            "multiplier": 2,
+            "threshold": 3,
+            "icon": "flame.fill",
+            "color": "buttonDanger",
+            "dismiss_button": "Collect",
+        }
+    
+    # Store
     db_session = ForagingSessionDB(
         session_id=session.session_id,
         user_id=player_id,
         kingdom_id=kingdom_id,
         status='active',
-        session_data=session.to_dict(),
+        session_data=session_dict,
         has_bonus_round=session.has_bonus_round,
         round1_won=session.round1.is_winner,
         round2_won=session.round2.is_winner if session.round2 else False,
@@ -130,7 +156,7 @@ def start_foraging(
     
     return {
         "success": True,
-        "session": session.to_dict(),
+        "session": session_dict,
         "skills_used": {
             "round1": {"skill": "leadership", "level": leadership},
             "round2": {"skill": "merchant", "level": merchant},

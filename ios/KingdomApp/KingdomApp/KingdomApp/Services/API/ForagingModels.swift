@@ -41,6 +41,18 @@ struct ForagingReward: Codable {
     let amount: Int
 }
 
+// Streak info from backend - all display data comes from server!
+struct StreakInfo: Codable, Equatable {
+    let title: String
+    let subtitle: String
+    let description: String
+    let multiplier: Int
+    let threshold: Int
+    let icon: String
+    let color: String
+    let dismiss_button: String
+}
+
 struct ForagingRoundData: Codable {
     let round_num: Int
     let grid: [ForagingBushCell]
@@ -51,6 +63,9 @@ struct ForagingRoundData: Codable {
     let rewards: [ForagingReward]?   // All rewards for this round - generic!
     let has_seed_trail: Bool?        // Only Round 1: did we find a trail?
     let seed_trail_position: Int?    // Where in the grid array
+    let streak_bonus: Bool?          // True if 2x bonus is active (3 wins in a row)
+    let show_streak_popup: Bool?     // Backend tells frontend when to show popup
+    let streak_info: StreakInfo?     // Display info from backend
     // Legacy fields
     let reward_amount: Int
     let reward_config: ForagingRewardConfig
@@ -59,6 +74,8 @@ struct ForagingRoundData: Codable {
     
     var hasSeedTrail: Bool { has_seed_trail ?? false }
     var seedTrailPosition: Int { seed_trail_position ?? -1 }
+    var hasStreakBonus: Bool { streak_bonus ?? false }
+    var shouldShowStreakPopup: Bool { show_streak_popup ?? false }
 }
 
 // MARK: - Session (pre-calculated, both rounds!)

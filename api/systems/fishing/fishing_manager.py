@@ -331,6 +331,19 @@ class FishingManager:
             outcome_display["consecutive_catches"] = session.consecutive_catches
             outcome_display["fish_data"] = fish_data
             outcome_display["rare_loot_dropped"] = pet_dropped  # Generic name
+            # Only show popup when streak JUST activates (exactly 3), not on every subsequent catch
+            if session.consecutive_catches == 3:
+                outcome_display["show_streak_popup"] = True
+                outcome_display["streak_info"] = {
+                    "title": "HOT STREAK!",
+                    "subtitle": "2x Meat",
+                    "description": "3 catches in a row!",
+                    "multiplier": 2,
+                    "threshold": 3,
+                    "icon": "flame.fill",
+                    "color": "buttonDanger",
+                    "dismiss_button": "Nice!",
+                }
             
             # Include loot bar display data - all from backend config
             loot_config = get_loot_config_for_fish(fish_id)

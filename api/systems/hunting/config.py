@@ -173,29 +173,30 @@ BLESSING_DROP_TABLE_DISPLAY = [
 # Higher tier = smaller HIT section
 
 # Base tables by animal tier
+# REBALANCED: Slightly smaller scare/miss = less frustrating hunt failures
+# Trade-off: rare loot is harder to get (see BLESSING_DROP_TABLE)
 ATTACK_DROP_TABLE_BY_TIER = {
-    0: {"scare": 25, "miss": 25, "hit": 50},   # Squirrel - 50% hit
-    1: {"scare": 25, "miss": 30, "hit": 45},   # Rabbit - 45% hit
-    2: {"scare": 30, "miss": 30, "hit": 40},   # Deer - 40% hit
-    3: {"scare": 30, "miss": 35, "hit": 35},   # Boar - 35% hit
-    4: {"scare": 35, "miss": 40, "hit": 25},   # Bear - 25% hit
-    5: {"scare": 40, "miss": 45, "hit": 15},   # Moose - 15% hit (legendary!)
+    0: {"scare": 20, "miss": 25, "hit": 55},   # Squirrel - 55% hit (was 50)
+    1: {"scare": 22, "miss": 28, "hit": 50},   # Rabbit - 50% hit (was 45)
+    2: {"scare": 25, "miss": 30, "hit": 45},   # Deer - 45% hit (was 40)
+    3: {"scare": 28, "miss": 32, "hit": 40},   # Boar - 40% hit (was 35)
+    4: {"scare": 30, "miss": 40, "hit": 30},   # Bear - 30% hit (was 25)
+    5: {"scare": 35, "miss": 45, "hit": 20},   # Moose - 20% hit (was 15)
 }
 
 # Default for unknown tiers
-ATTACK_DROP_TABLE = {"scare": 30, "miss": 30, "hit": 40}
+ATTACK_DROP_TABLE = {"scare": 25, "miss": 30, "hit": 45}
 
 ATTACK_SHIFT_PER_SUCCESS = {
     "scare": -5,      # Each success: shrink scare
     "miss": -5,       # Each success: shrink miss
     "hit": +10,       # Each success: grow hit
 }
-# Example on Boar (35% base):
-# 0 successes: 35% hit
-# 1 success: 45% hit
-# 2 successes: 55% hit
-# 3 successes: 65% hit
-# 5 successes (max): 85% hit
+# Example on Boar (40% base):
+# 0 successes: 40% hit
+# 1 success: 50% hit
+# 2 successes: 60% hit
+# 3 successes: 70% hit
 
 # --- BLESSING: Nothing vs Common vs Uncommon vs Rare loot ---
 # Four-tier system: prayers shift odds from nothing → meat → fur → sinew
@@ -206,36 +207,38 @@ ATTACK_SHIFT_PER_SUCCESS = {
 # !!! BLESSING_ORDER in hunt_manager.py _roll_on_drop_table() !!!
 # !!! Missing tiers cause drops to go to the WRONG tier. Game-breaking bug. !!!
 #
+# REBALANCED: Smaller uncommon/rare = rare loot is actually rare
+# Trade-off: hunt success rate is higher (see ATTACK_DROP_TABLE_BY_TIER)
 BLESSING_DROP_TABLE = {
-    "nothing": 25,    # No loot at all
+    "nothing": 30,    # No loot at all
     "common": 62,     # Just meat
-    "uncommon": 8,    # Meat + fur - slightly more than sinew
-    "rare": 5,        # Meat + sinew
+    "uncommon": 5,    # Meat + fur
+    "rare": 3,        # Meat + sinew
 }  # Total: 100 slots
 
+# REBALANCED: Lower shifts = harder to earn rare loot through prayers
 BLESSING_SHIFT_PER_SUCCESS = {
-    "nothing": -8,    # Each success: shrink nothing zone
-    "common": -2,     # Each success: slight loss from common
-    "uncommon": +5,   # Each success: gain fur slots
-    "rare": +5,       # Each success: gain sinew slots
+    "nothing": -5,    # Each success: shrink nothing zone (was -8)
+    "common": -1,     # Each success: slight loss from common (was -2)
+    "uncommon": +3,   # Each success: gain fur slots (was +5)
+    "rare": +3,       # Each success: gain sinew slots (was +5)
 }
-# 0 successes: 25% nothing, 62% meat, 8% fur, 5% sinew
-# 1 success: 17% nothing, 60% meat, 13% fur, 10% sinew  
-# 2 successes: 9% nothing, 58% meat, 18% fur, 15% sinew
-# 3 successes: 1% nothing, 56% meat, 23% fur, 20% sinew
+# 0 successes: 30% nothing, 62% meat, 5% fur, 3% sinew
+# 1 success: 25% nothing, 61% meat, 8% fur, 6% sinew  
+# 2 successes: 20% nothing, 60% meat, 11% fur, 9% sinew
+# 3 successes: 15% nothing, 59% meat, 14% fur, 12% sinew
 
 # Animal tier modifies the base drop table before blessing starts
-# Higher tier = less "nothing" slots, more guaranteed loot
-# Rare item drops:
-#   - Deer/Boar (tier 1-2): fur
-#   - Bear/Moose (tier 3-4): sinew
+# Higher tier = less "nothing" slots, slightly better loot odds
+# But rare should still feel RARE even on big game
+# NOTE: Use large negative values to prevent prayers from adding slots back!
 BLESSING_TIER_ADJUSTMENTS = {
-    0: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Squirrel: no fur/sinew possible
-    1: {"nothing": +5, "common": +10, "uncommon": -15, "rare": 0},    # Rabbit: no fur/sinew possible
-    2: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},       # Deer: fur possible
-    3: {"nothing": -12, "common": 0, "uncommon": +6, "rare": 3},      # Boar: fur possible
-    4: {"nothing": -18, "common": -5, "uncommon": +10, "rare": +5},   # Bear: sinew possible
-    5: {"nothing": -23, "common": -10, "uncommon": +15, "rare": +8},  # Moose: sinew possible
+    0: {"nothing": +5, "common": +25, "uncommon": -100, "rare": -100},  # Squirrel: NEVER fur/sinew
+    1: {"nothing": +5, "common": +25, "uncommon": -100, "rare": 0},     # Rabbit: no fur, but rare = rabbit foot
+    2: {"nothing": -5, "common": +5, "uncommon": 0, "rare": 0},         # Deer: fur possible
+    3: {"nothing": -8, "common": +5, "uncommon": +3, "rare": 0},        # Boar: 8% fur, 3% rare
+    4: {"nothing": -10, "common": +5, "uncommon": +3, "rare": +2},      # Bear: 8% fur, 5% rare
+    5: {"nothing": -12, "common": +5, "uncommon": +4, "rare": +3},      # Moose: 9% fur, 6% rare
 }
 
 # Legacy - kept for backwards compatibility but not used

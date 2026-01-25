@@ -50,6 +50,28 @@ struct CatchBox: View {
                 }
             }
             
+            // Meat earned tally
+            HStack(spacing: 8) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                
+                Text("\(meatCount)")
+                    .font(.system(size: 24, weight: .black, design: .monospaced))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("meat")
+                    .font(.system(size: 14, weight: .medium, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .brutalistBadge(
+                backgroundColor: KingdomTheme.Colors.parchmentLight,
+                cornerRadius: 12,
+                borderWidth: 2.5
+            )
+            
             Spacer()
             
             // Pet fish (rare drop!)
