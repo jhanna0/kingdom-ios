@@ -41,14 +41,17 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
     return max(1, math.floor(cooldown_minutes * FOOD_COST_PER_COOLDOWN_MINUTE))
 
 
-# ===== PROPERTY TIERS - FULLY DYNAMIC =====
+# ===== PROPERTY TIERS - FULLY DYNAMIC (Pay-As-You-Go) =====
 # Add new tiers here and they'll appear in iOS automatically!
-# gold_cost: Gold paid UPFRONT to start the contract
-# per_action_costs: Resources required PER WORK ACTION (wood, iron, etc.)
-# base_actions: Base actions required (reduced by building skill)
 #
-# RESOURCE COSTS: per_action = base_actions, so total = actions^2
-# e.g. Tier 5: 80 actions × 80 wood/action = 6,400 wood total
+# Pay-As-You-Go Model:
+# - NO upfront gold cost
+# - gold_per_action: Gold paid each work action (BASE burned, tax on top to kingdom)
+# - per_action_costs: Resources consumed each work action (wood, iron, etc.)
+# - base_actions: Base actions required (reduced by building skill)
+#
+# Gold formula: Simple linear based on tier
+# Resource costs scale with tier for meaningful progression
 
 PROPERTY_TIERS = {
     1: {
@@ -56,7 +59,7 @@ PROPERTY_TIERS = {
         "icon": "square.dashed",
         "description": "Cleared land with travel benefits",
         "benefits": ["Free travel to this kingdom"],
-        "gold_cost": 500,
+        "gold_per_action": 15,  # Pay-As-You-Go: 15g per action (burned + tax)
         "per_action_costs": [{"resource": "wood", "amount": 10}],
         "base_actions": 10
     },
@@ -65,7 +68,7 @@ PROPERTY_TIERS = {
         "icon": "house.fill",
         "description": "A comfy home with garden",
         "benefits": ["All Land benefits", "A comfy home with garden"],
-        "gold_cost": 750,
+        "gold_per_action": 20,  # 20g per action
         "per_action_costs": [{"resource": "wood", "amount": 20}],
         "base_actions": 20
     },
@@ -74,7 +77,7 @@ PROPERTY_TIERS = {
         "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
-        "gold_cost": 1250,
+        "gold_per_action": 25,  # 25g per action
         "per_action_costs": [{"resource": "wood", "amount": 35}, {"resource": "iron", "amount": 35}],
         "base_actions": 35
     },
@@ -83,7 +86,7 @@ PROPERTY_TIERS = {
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
-        "gold_cost": 2500,
+        "gold_per_action": 35,  # 35g per action
         "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 55}],
         "base_actions": 55
     },
@@ -92,9 +95,24 @@ PROPERTY_TIERS = {
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
-        "gold_cost": 4000,
+        "gold_per_action": 50,  # 50g per action
         "per_action_costs": [{"resource": "wood", "amount": 80}, {"resource": "iron", "amount": 80}],
         "base_actions": 80
+    }
+}
+
+
+# Property cost config (like TRAINING_CONFIG)
+PROPERTY_CONFIG = {
+    "model": "pay_as_you_go",
+    "description": "Property upgrades cost gold + resources per action. No upfront gold.",
+    "gold_per_action": {
+        "source": "tier_config",  # Read from PROPERTY_TIERS[tier].gold_per_action
+        "burned": True,  # Base gold is destroyed (deflationary)
+        "tax_on_top": True,  # Tax added on top, goes to kingdom
+    },
+    "resources_per_action": {
+        "source": "tier_config",  # Read from PROPERTY_TIERS[tier].per_action_costs
     }
 }
 
@@ -105,13 +123,24 @@ def get_property_max_tier() -> int:
 
 
 def get_property_gold_cost(to_tier: int) -> int:
-    """Get gold cost paid UPFRONT to start the upgrade"""
+    """DEPRECATED - Properties now use Pay-As-You-Go (no upfront gold).
+    Returns 0 for backward compatibility.
+    Use get_property_gold_per_action() instead.
+    """
+    return 0  # No upfront cost in Pay-As-You-Go model
+
+
+def get_property_gold_per_action(to_tier: int) -> int:
+    """Get gold cost per action for property upgrades (Pay-As-You-Go).
+    
+    This is the BASE COST that gets BURNED. Tax is added on top.
+    """
     tier_data = PROPERTY_TIERS.get(to_tier, {})
-    return tier_data.get("gold_cost", 0)
+    return tier_data.get("gold_per_action", 15)  # Default 15g
 
 
 def get_property_per_action_costs(to_tier: int) -> list:
-    """Get per-action costs required during each work action"""
+    """Get per-action resource costs (wood, iron, etc.) for each work action"""
     tier_data = PROPERTY_TIERS.get(to_tier, {})
     return tier_data.get("per_action_costs", [])
 
@@ -355,6 +384,78 @@ EQUIPMENT_TIERS = {
         "actions_required": 30
     }
 }
+
+
+# ===== TRAINING CONFIG - Pay-As-You-Go System =====
+# Single source of truth for ALL training costs!
+# Frontend reads this to display costs dynamically.
+
+TRAINING_CONFIG = {
+    "model": "pay_as_you_go",  # No upfront cost, pay per action
+    "description": "Training costs gold per action. Base cost is burned (deflationary). Tax goes to kingdom.",
+    
+    # Gold cost per action formula: base + (multiplier * total_skill_points)
+    # Linear scaling - predictable and fair
+    "gold_per_action": {
+        "base": 10,           # Minimum gold per action
+        "multiplier": 2,      # Additional gold per total skill point
+        "formula": "10 + 2 * total_skill_points",
+        "examples": {
+            0: 10,   # New player: 10g per action
+            5: 20,   # 5 total skill points: 20g per action
+            10: 30,  # 10 total skill points: 30g per action
+            20: 50,  # 20 total skill points: 50g per action
+            50: 110, # Endgame: 110g per action
+        }
+    },
+    
+    # Actions required formula (time sink)
+    # Exponential: base + (linear * level) + (quadratic * level^2)
+    "actions_required": {
+        "base": 10,
+        "linear": 18,
+        "quadratic": 3,
+        "formula": "10 + (18 * stat_level) + (3 * stat_level^2)",
+        "examples": {
+            0: 10,   # Level 0->1: 10 actions
+            1: 31,   # Level 1->2: 31 actions
+            2: 58,   # Level 2->3: 58 actions
+            3: 91,   # Level 3->4: 91 actions
+            4: 130,  # Level 4->5: 130 actions
+        }
+    },
+    
+    # Tax system: Base cost is BURNED, tax is ON TOP
+    "tax": {
+        "model": "on_top",  # Tax added on top of base (not split from base)
+        "base_burned": True,  # Base cost is destroyed (deflationary sink)
+        "tax_to_kingdom": True,  # Tax portion goes to kingdom treasury
+        "description": "Player pays: base_cost + (base_cost * tax_rate). Base is burned. Tax goes to king."
+    },
+    
+    # Reductions from skills/buildings
+    "reductions": {
+        "science_skill": {
+            "type": "actions_required",
+            "values": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
+            "description": "Science skill reduces actions required"
+        },
+        "education_building": {
+            "type": "actions_required",
+            "values": {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25},
+            "description": "Kingdom education building reduces actions required"
+        }
+    }
+}
+
+
+def calculate_training_gold_per_action(total_skill_points: int) -> int:
+    """Calculate gold cost per training action from TRAINING_CONFIG.
+    
+    This is the BASE COST that gets BURNED. Tax is added on top.
+    """
+    config = TRAINING_CONFIG["gold_per_action"]
+    return config["base"] + (config["multiplier"] * total_skill_points)
 
 
 # ===== TRAINING TIERS (1-10) =====
@@ -786,8 +887,10 @@ def get_all_tiers():
     """
     Get ALL tier information for the entire game
     Single source of truth - NO MORE HARDCODING IN FRONTEND!
+    
+    Includes all cost configurations so frontend can render costs dynamically.
     """
-    from .actions.action_config import ACTION_TYPES
+    from .actions.action_config import ACTION_TYPES, COST_MODELS
     from .resources import RESOURCES
     
     return {
@@ -796,7 +899,9 @@ def get_all_tiers():
         },
         "properties": {
             "max_tier": get_property_max_tier(),
-            "tiers": {str(k): v for k, v in PROPERTY_TIERS.items()}
+            "tiers": {str(k): v for k, v in PROPERTY_TIERS.items()},
+            "cost_model": "upfront_gold_per_action_resources",
+            "cost_description": "Gold paid upfront. Resources (wood, iron) consumed per action."
         },
         "skills": {
             "max_tier": 10,
@@ -807,16 +912,24 @@ def get_all_tiers():
         },
         "buildings": {
             "max_tier": 5,
-            "types": BUILDING_TYPES  # Full building info with icons, categories, etc.
+            "types": BUILDING_TYPES,  # Full building info with icons, categories, etc.
+            "cost_model": "per_action_resources",
+            "cost_description": "Resources per action from tier config. Gold earned from treasury."
         },
         "equipment": {
             "max_tier": 5,
-            "tiers": {str(k): v for k, v in EQUIPMENT_TIERS.items()}
+            "tiers": {str(k): v for k, v in EQUIPMENT_TIERS.items()},
+            "cost_model": "upfront_all",
+            "cost_description": "Gold and resources paid upfront to start crafting."
         },
         "training": {
             "max_tier": 10,
             "tier_names": SKILL_TIER_NAMES,
-            "actions_required": _get_training_actions_dict()
+            "actions_required": _get_training_actions_dict(),
+            # NEW: Full training cost config for dynamic rendering
+            "config": TRAINING_CONFIG,
+            "cost_model": "per_action_gold",
+            "cost_description": "Gold per action (base burned + tax to kingdom). No upfront cost."
         },
         "reputation": {
             "max_tier": 6,
@@ -824,7 +937,8 @@ def get_all_tiers():
         },
         "actions": {
             "types": ACTION_TYPES,
-            "categories": ["beneficial", "hostile", "training", "crafting", "property"]
+            "categories": ["beneficial", "hostile", "training", "crafting", "property"],
+            "cost_models": COST_MODELS  # Cost model definitions
         }
     }
 
@@ -1036,4 +1150,202 @@ def get_action_config_endpoint(action_type: str):
     return {
         "action_type": action_type,
         **config
+    }
+
+
+@router.get("/costs/training")
+def get_training_costs_for_skill_points(total_skill_points: int = 0, tax_rate: int = 0):
+    """
+    Calculate training costs for given total skill points.
+    Frontend can use this to preview costs without implementing formulas.
+    
+    Args:
+        total_skill_points: Sum of all skill levels
+        tax_rate: Kingdom tax rate (0-100)
+    
+    Returns:
+        Cost breakdown for training actions
+    """
+    base_cost = calculate_training_gold_per_action(total_skill_points)
+    tax_amount = int(base_cost * tax_rate / 100)
+    total_cost = base_cost + tax_amount
+    
+    return {
+        "total_skill_points": total_skill_points,
+        "tax_rate": tax_rate,
+        "costs": {
+            "base_cost_per_action": base_cost,  # This is BURNED
+            "tax_per_action": tax_amount,  # This goes to kingdom
+            "total_per_action": total_cost,  # What player pays
+        },
+        "formula": TRAINING_CONFIG["gold_per_action"]["formula"],
+        "tax_model": "on_top",
+        "explanation": f"Each action: {base_cost}g burned + {tax_amount}g tax = {total_cost}g total"
+    }
+
+
+@router.get("/costs/property/{tier}")
+def get_property_costs_for_tier(tier: int, building_skill: int = 1, tax_rate: int = 0):
+    """
+    Calculate property upgrade costs for a specific tier (Pay-As-You-Go).
+    
+    Args:
+        tier: Target tier (1-5)
+        building_skill: Player's building skill level
+        tax_rate: Kingdom tax rate (0-100)
+    
+    Returns:
+        Full cost breakdown - NO upfront gold, pay per action instead.
+    """
+    from routers.resources import RESOURCES
+    
+    if tier < 1 or tier > get_property_max_tier():
+        return {"error": f"Invalid tier. Must be 1-{get_property_max_tier()}"}
+    
+    tier_data = PROPERTY_TIERS.get(tier, {})
+    gold_per_action = tier_data.get("gold_per_action", 15)
+    base_actions = tier_data.get("base_actions", 5)
+    per_action_costs = tier_data.get("per_action_costs", [])
+    
+    # Apply building skill reduction
+    building_reduction = get_building_action_reduction(building_skill)
+    reduced_actions = max(1, int(base_actions * building_reduction))
+    
+    # Calculate gold with tax
+    tax_per_action = int(gold_per_action * tax_rate / 100)
+    total_gold_per_action = gold_per_action + tax_per_action
+    
+    # Enrich per-action costs with display info
+    enriched_costs = []
+    for cost in per_action_costs:
+        resource_id = cost["resource"]
+        amount = cost["amount"]
+        resource_info = RESOURCES.get(resource_id, {})
+        enriched_costs.append({
+            "resource": resource_id,
+            "amount_per_action": amount,
+            "total_amount": amount * reduced_actions,
+            "display_name": resource_info.get("display_name", resource_id.capitalize()),
+            "icon": resource_info.get("icon", "questionmark.circle")
+        })
+    
+    return {
+        "tier": tier,
+        "tier_name": tier_data.get("name", f"Tier {tier}"),
+        "building_skill": building_skill,
+        "costs": {
+            "gold_upfront": 0,  # DEPRECATED - No upfront cost
+            "per_action_costs": enriched_costs,
+            "actions_required": reduced_actions,
+            "base_actions": base_actions,
+            "building_skill_reduction": f"{int((1 - building_reduction) * 100)}%"
+        },
+        "pay_as_you_go": {
+            "gold_per_action": gold_per_action,  # Base (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # To kingdom
+            "total_gold_per_action": total_gold_per_action,  # What player pays
+            "estimated_total_gold": total_gold_per_action * reduced_actions
+        },
+        "cost_model": "pay_as_you_go"
+    }
+
+
+@router.get("/costs/equipment/{tier}")
+def get_equipment_costs_for_tier(tier: int):
+    """
+    Calculate equipment crafting costs for a specific tier.
+    
+    Args:
+        tier: Equipment tier (1-5)
+    
+    Returns:
+        Full cost breakdown for crafting this tier
+    """
+    if tier < 1 or tier > 5:
+        return {"error": "Invalid tier. Must be 1-5"}
+    
+    tier_data = EQUIPMENT_TIERS.get(tier, {})
+    
+    return {
+        "tier": tier,
+        "tier_name": tier_data.get("name", f"Tier {tier}"),
+        "costs": {
+            "gold": tier_data.get("gold_cost", 0),
+            "iron": tier_data.get("iron_cost", 0),
+            "steel": tier_data.get("steel_cost", 0),
+            "actions_required": tier_data.get("actions_required", 1)
+        },
+        "stat_bonus": tier_data.get("stat_bonus", 1),
+        "cost_model": "upfront_all"
+    }
+
+
+@router.get("/costs/building/{building_type}/{tier}")
+def get_building_costs_for_tier(building_type: str, tier: int, population: int = 100):
+    """
+    Calculate kingdom building costs for a specific type and tier.
+    
+    Args:
+        building_type: Type of building (wall, vault, mine, etc.)
+        tier: Target tier (1-5)
+        population: Kingdom population (affects costs)
+    
+    Returns:
+        Full cost breakdown for this building upgrade
+    """
+    from routers.resources import RESOURCES
+    
+    if building_type not in BUILDING_TYPES:
+        return {"error": f"Unknown building type: {building_type}"}
+    
+    building_data = BUILDING_TYPES[building_type]
+    max_tier = building_data.get("max_tier", 5)
+    
+    if tier < 1 or tier > max_tier:
+        return {"error": f"Invalid tier for {building_type}. Must be 1-{max_tier}"}
+    
+    tier_data = building_data["tiers"].get(tier, {})
+    per_action_costs = tier_data.get("per_action_costs", [])
+    
+    # Calculate construction cost (scales with level and population)
+    import math
+    base_cost = BUILDING_BASE_CONSTRUCTION_COST
+    level_multiplier = math.pow(tier, BUILDING_LEVEL_COST_EXPONENT)
+    population_factor = 1 + (population / BUILDING_POPULATION_COST_DIVISOR)
+    construction_cost = int(base_cost * level_multiplier * population_factor)
+    
+    # Calculate actions required
+    base_actions = BUILDING_BASE_ACTIONS_REQUIRED
+    level_actions_multiplier = math.pow(tier, BUILDING_LEVEL_ACTIONS_EXPONENT)
+    population_actions_factor = 1 + (population / BUILDING_POPULATION_ACTIONS_DIVISOR)
+    actions_required = int(base_actions * level_actions_multiplier * population_actions_factor)
+    
+    # Enrich per-action costs
+    enriched_costs = []
+    for cost in per_action_costs:
+        resource_id = cost["resource"]
+        amount = cost["amount"]
+        resource_info = RESOURCES.get(resource_id, {})
+        enriched_costs.append({
+            "resource": resource_id,
+            "amount_per_action": amount,
+            "total_amount": amount * actions_required,
+            "display_name": resource_info.get("display_name", resource_id.capitalize()),
+            "icon": resource_info.get("icon", "questionmark.circle")
+        })
+    
+    return {
+        "building_type": building_type,
+        "building_name": building_data["display_name"],
+        "tier": tier,
+        "tier_name": tier_data.get("name", f"Tier {tier}"),
+        "population": population,
+        "costs": {
+            "construction_cost": construction_cost,  # Gold from treasury
+            "per_action_costs": enriched_costs,
+            "actions_required": actions_required
+        },
+        "benefit": tier_data.get("benefit", ""),
+        "cost_model": "per_action_resources"
     }

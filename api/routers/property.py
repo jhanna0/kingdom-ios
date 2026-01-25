@@ -196,23 +196,26 @@ def get_tier_name(tier: int) -> str:
     return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
 
 
-def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_required: int = None) -> dict:
+def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_required: int = None, tax_rate: int = 0) -> dict:
     """
     Get ALL upgrade costs for next tier - FULLY DYNAMIC from PROPERTY_TIERS!
-    Returns dict with:
-      - gold_cost: Gold paid UPFRONT to start the contract
-      - per_action_costs: List of {resource, amount, display_name, icon} - required each action
-      - total_costs: Total resources needed over all actions (for display)
+    
+    Pay-As-You-Go Model:
+    - gold_per_action: Gold paid each action (BASE burned, tax on top to kingdom)
+    - per_action_costs: Resources consumed each action
+    - total_costs: Total resources needed over all actions (for display)
+    
+    Returns dict with all cost info for frontend to render.
     """
-    from routers.tiers import PROPERTY_TIERS, get_property_max_tier
+    from routers.tiers import PROPERTY_TIERS, get_property_max_tier, get_property_gold_per_action
     from routers.resources import RESOURCES
     
     next_tier = current_tier + 1
     if current_tier >= get_property_max_tier():
-        return {"gold_cost": 0, "per_action_costs": [], "total_costs": []}
+        return {"gold_per_action": 0, "per_action_costs": [], "total_costs": [], "pay_as_you_go": {}}
     
     tier_data = PROPERTY_TIERS.get(next_tier, {})
-    gold_cost = tier_data.get("gold_cost", 0)
+    gold_per_action = tier_data.get("gold_per_action", 15)
     base_per_action = tier_data.get("per_action_costs", [])
     base_actions = tier_data.get("base_actions", 5)
     
@@ -242,10 +245,25 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
             "per_action_amount": cost["amount"]
         })
     
+    # Calculate gold with tax
+    tax_per_action = int(gold_per_action * tax_rate / 100)
+    total_gold_per_action = gold_per_action + tax_per_action
+    estimated_total_gold = total_gold_per_action * total_actions
+    
     return {
-        "gold_cost": gold_cost,
+        "gold_cost": 0,  # DEPRECATED - No upfront gold
+        "gold_per_action": gold_per_action,  # Base cost (burned)
         "per_action_costs": per_action_costs,
-        "total_costs": total_costs
+        "total_costs": total_costs,
+        # Pay-As-You-Go breakdown
+        "pay_as_you_go": {
+            "gold_per_action": gold_per_action,  # Base (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # To kingdom
+            "total_gold_per_action": total_gold_per_action,  # What player pays
+            "estimated_total_gold": estimated_total_gold,  # Over all actions
+            "actions_required": total_actions
+        }
     }
 
 
@@ -394,7 +412,7 @@ def property_to_response(prop: Property, apply_decay: bool = True) -> PropertyRe
 
 
 def get_property_contracts_for_user(db: Session, user_id: int) -> list:
-    """Get property contracts from unified_contracts table - FULLY DYNAMIC"""
+    """Get property contracts from unified_contracts table - FULLY DYNAMIC with Pay-As-You-Go"""
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property'
@@ -406,9 +424,25 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Get tax rate for this contract's kingdom
+        tax_rate = 0
+        if contract.kingdom_id:
+            kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+            if kingdom:
+                tax_rate = kingdom.tax_rate
+        
         # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
         from_tier = (contract.tier or 1) - 1
-        all_costs = get_upgrade_costs_full(from_tier, actions_required=contract.actions_required)
+        all_costs = get_upgrade_costs_full(from_tier, actions_required=contract.actions_required, tax_rate=tax_rate)
+        
+        # Get gold_per_action from contract (locked in at purchase time)
+        gold_per_action = contract.cost_per_action or 0
+        tax_per_action = int(gold_per_action * tax_rate / 100)
+        total_gold_per_action = gold_per_action + tax_per_action
+        
+        # Calculate remaining costs
+        actions_remaining = max(0, contract.actions_required - actions_completed)
+        estimated_remaining_gold = total_gold_per_action * actions_remaining
         
         result.append({
             "contract_id": str(contract.id),
@@ -420,13 +454,22 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "target_tier_name": get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost": contract.gold_paid,
+            "gold_paid": contract.gold_paid,  # Total paid so far
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None,
-            # NEW: Per-action resource costs (required during work)
+            # Per-action resource costs
             "per_action_costs": all_costs["per_action_costs"],
-            "endpoint": f"/actions/work-property/{contract.id}" if not contract.completed_at else None
+            "endpoint": f"/actions/work-property/{contract.id}" if not contract.completed_at else None,
+            # Pay-As-You-Go info
+            "pay_as_you_go": {
+                "gold_per_action": gold_per_action,  # Base (burned)
+                "tax_rate": tax_rate,
+                "tax_per_action": tax_per_action,  # To kingdom
+                "total_gold_per_action": total_gold_per_action,  # What player pays
+                "actions_remaining": actions_remaining,
+                "estimated_remaining_gold": estimated_remaining_gold
+            }
         })
     
     return result
@@ -475,7 +518,7 @@ def get_property_status(
     
     # Get current kingdom info
     current_kingdom = None
-    land_price = None
+    land_purchase_info = None
     already_owns_property_in_current_kingdom = False
     
     if state.current_kingdom_id:
@@ -487,9 +530,24 @@ def get_property_status(
                 "population": kingdom.population
             }
             
-            # Get land price from dynamic resource costs (tier 0 -> 1)
-            land_costs = get_upgrade_resource_costs(0, population=kingdom.population)
-            land_price = next((c["amount"] for c in land_costs if c["resource"] == "gold"), 500)
+            # Get land purchase info (Pay-As-You-Go - no upfront cost)
+            from routers.tiers import get_property_gold_per_action
+            gold_per_action = get_property_gold_per_action(1)
+            tax_rate = kingdom.tax_rate
+            tax_per_action = int(gold_per_action * tax_rate / 100)
+            total_gold_per_action = gold_per_action + tax_per_action
+            actions_required = calculate_upgrade_actions_required(0, state.building_skill)
+            
+            land_purchase_info = {
+                "upfront_cost": 0,  # No upfront cost!
+                "gold_per_action": gold_per_action,
+                "tax_rate": tax_rate,
+                "tax_per_action": tax_per_action,
+                "total_gold_per_action": total_gold_per_action,
+                "actions_required": actions_required,
+                "estimated_total_gold": total_gold_per_action * actions_required,
+                "per_action_resources": get_upgrade_costs_full(0, actions_required=actions_required)["per_action_costs"]
+            }
             
             # Check if player already owns property in THIS kingdom
             already_owns_property_in_current_kingdom = any(
@@ -515,26 +573,61 @@ def get_property_status(
         current_kingdom_reputation = user_kingdom.local_reputation if user_kingdom else 0
     
     # Purchase validation flags
+    # Pay-As-You-Go: No upfront cost check needed! Just need to afford first action.
     meets_reputation_requirement = current_kingdom_reputation >= 50
-    can_afford = land_price is not None and state.gold >= land_price
+    can_afford_first_action = True
+    if land_purchase_info:
+        first_action_cost = land_purchase_info["total_gold_per_action"]
+        first_action_resources = land_purchase_info["per_action_resources"]
+        can_afford_first_action = state.gold >= first_action_cost
+        # Also check if they have resources for first action
+        for cost in first_action_resources:
+            player_amount = getattr(state, cost["resource"], 0) or 0
+            if player_amount < cost["amount"]:
+                can_afford_first_action = False
+                break
+    
     can_purchase = (
         current_kingdom is not None 
         and not already_owns_property_in_current_kingdom
         and meets_reputation_requirement 
-        and can_afford
+        and can_afford_first_action
     )
     
-    # Get upgrade status for each property - FULLY DYNAMIC
-    from routers.tiers import get_property_max_tier
+    # Get upgrade status for each property - Pay-As-You-Go
+    from routers.tiers import get_property_max_tier, get_property_gold_per_action
     max_tier = get_property_max_tier()
     
     properties_upgrade_status = []
     for prop in properties:
         if prop.tier < max_tier:
-            # Get dynamic resource costs
-            resource_costs = get_upgrade_resource_costs(prop.tier)
-            affordability = check_player_can_afford(state, resource_costs)
+            next_tier = prop.tier + 1
             actions_required = calculate_upgrade_actions_required(prop.tier, state.building_skill)
+            
+            # Get kingdom for tax rate
+            prop_kingdom = db.query(Kingdom).filter(Kingdom.id == prop.kingdom_id).first()
+            prop_tax_rate = prop_kingdom.tax_rate if prop_kingdom else 0
+            
+            # Get Pay-As-You-Go costs
+            gold_per_action = get_property_gold_per_action(next_tier)
+            tax_per_action = int(gold_per_action * prop_tax_rate / 100)
+            total_gold_per_action = gold_per_action + tax_per_action
+            
+            # Get per-action resource costs
+            all_costs = get_upgrade_costs_full(prop.tier, actions_required=actions_required, tax_rate=prop_tax_rate)
+            per_action_costs = all_costs["per_action_costs"]
+            
+            # Check if player can afford first action
+            can_afford = state.gold >= total_gold_per_action
+            missing_resources = []
+            for cost in per_action_costs:
+                player_amount = getattr(state, cost["resource"], 0) or 0
+                if player_amount < cost["amount"]:
+                    can_afford = False
+                    missing_resources.append({
+                        "resource": cost["resource"],
+                        "needed": cost["amount"] - player_amount
+                    })
             
             # Find active contract for this property
             active_contract = None
@@ -548,16 +641,25 @@ def get_property_status(
                 "current_tier": prop.tier,
                 "max_tier": max_tier,
                 "can_upgrade": prop.tier < max_tier,
-                "resource_costs": resource_costs,  # Dynamic list!
                 "actions_required": actions_required,
-                "can_afford": affordability["can_afford"],
-                "missing_resources": affordability["missing"],
-                "active_contract": active_contract
+                "per_action_costs": per_action_costs,  # Resource costs per action
+                "can_afford": can_afford,  # Can afford first action
+                "missing_resources": missing_resources,
+                "active_contract": active_contract,
+                # Pay-As-You-Go gold costs
+                "pay_as_you_go": {
+                    "gold_per_action": gold_per_action,
+                    "tax_rate": prop_tax_rate,
+                    "tax_per_action": tax_per_action,
+                    "total_gold_per_action": total_gold_per_action,
+                    "estimated_total_gold": total_gold_per_action * actions_required
+                }
             })
     
     return {
         "player_gold": int(state.gold),
         "player_wood": state.wood,
+        "player_iron": state.iron or 0,
         "player_reputation": current_kingdom_reputation,
         "player_level": state.level,
         "player_building_skill": state.building_skill,
@@ -565,8 +667,10 @@ def get_property_status(
         "property_upgrade_contracts": property_contracts,
         "properties_upgrade_status": properties_upgrade_status,
         "current_kingdom": current_kingdom,
-        "land_price": land_price,
-        "can_afford": can_afford,
+        # Pay-As-You-Go: Full purchase info instead of single price
+        "land_purchase_info": land_purchase_info,
+        "land_price": 0,  # DEPRECATED - No upfront cost
+        "can_afford": can_afford_first_action,
         "already_owns_property_in_current_kingdom": already_owns_property_in_current_kingdom,
         "meets_reputation_requirement": meets_reputation_requirement,
         "can_purchase": can_purchase
@@ -579,7 +683,10 @@ def purchase_land(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Purchase land and start construction contract"""
+    """Purchase land and start construction contract (Pay-As-You-Go).
+    
+    NO upfront gold cost! Gold is paid per action instead.
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -649,16 +756,6 @@ def purchase_land(
             detail="Kingdom not found"
         )
     
-    # Calculate price using dynamic resource costs (tier 0 -> 1)
-    land_costs = get_upgrade_resource_costs(0, population=kingdom.population)
-    land_price = next((c["amount"] for c in land_costs if c["resource"] == "gold"), 500)
-    
-    if state.gold < land_price:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {land_price}g, have {int(state.gold)}g"
-        )
-    
     # Validate location
     valid_locations = ["north", "south", "east", "west"]
     if request.location.lower() not in valid_locations:
@@ -669,6 +766,16 @@ def purchase_land(
     
     actions_required = calculate_upgrade_actions_required(0, state.building_skill)
     property_id = str(uuid.uuid4())
+    
+    # Get gold_per_action for tier 1 (locked in at purchase time)
+    from routers.tiers import get_property_gold_per_action
+    gold_per_action = get_property_gold_per_action(1)
+    
+    # Calculate tax info for display
+    tax_rate = kingdom.tax_rate
+    tax_per_action = int(gold_per_action * tax_rate / 100)
+    total_per_action = gold_per_action + tax_per_action
+    estimated_total = total_per_action * actions_required
     
     # Create property immediately with tier=0 (under construction)
     new_property = Property(
@@ -685,6 +792,7 @@ def purchase_land(
     db.add(new_property)
     
     # Create contract in unified_contracts
+    # NOTE: gold_paid starts at 0, cost_per_action stores the per-action cost
     contract = UnifiedContract(
         user_id=current_user.id,
         kingdom_id=request.kingdom_id,
@@ -692,27 +800,35 @@ def purchase_land(
         category='personal_property',
         type='property',
         tier=1,  # Building to tier 1
-        target_id=property_id,  # Just the property ID, no encoding needed
+        target_id=property_id,
         actions_required=actions_required,
-        gold_paid=land_price
+        gold_paid=0,  # Pay-As-You-Go: starts at 0
+        cost_per_action=gold_per_action  # Lock in the base cost
     )
     db.add(contract)
     
-    state.gold -= land_price
+    # NO gold charged upfront!
     
     db.commit()
     db.refresh(contract)
     
     return {
         "success": True,
-        "message": f"Started construction in {request.kingdom_name}! Complete {actions_required} actions to build your property.",
+        "message": f"Started construction in {request.kingdom_name}! Each action costs {total_per_action}g + resources.",
         "contract_id": str(contract.id),
         "property_id": property_id,
         "kingdom_id": request.kingdom_id,
         "kingdom_name": request.kingdom_name,
         "location": request.location.lower(),
         "actions_required": actions_required,
-        "cost_paid": land_price
+        # Pay-As-You-Go info
+        "pay_as_you_go": {
+            "gold_per_action": gold_per_action,  # Base (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # To kingdom
+            "total_gold_per_action": total_per_action,  # What player pays
+            "estimated_total_gold": estimated_total  # Over all actions
+        }
     }
 
 
@@ -722,8 +838,9 @@ def start_property_upgrade(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Purchase property upgrade contract.
-    Gold paid UPFRONT to start. Resources required per action during work.
+    """Start property upgrade contract (Pay-As-You-Go).
+    
+    NO upfront gold cost! Gold + resources paid per action.
     """
     state = current_user.player_state
     if not state:
@@ -745,7 +862,7 @@ def start_property_upgrade(
         )
     
     # FULLY DYNAMIC - check max tier from config
-    from routers.tiers import get_property_max_tier
+    from routers.tiers import get_property_max_tier, get_property_gold_per_action
     max_tier = get_property_max_tier()
     
     if property.tier >= max_tier:
@@ -770,19 +887,21 @@ def start_property_upgrade(
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill)
     next_tier = property.tier + 1
     
-    # Get cost breakdown from tiers
-    all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required)
-    gold_cost = all_costs["gold_cost"]
+    # Get gold_per_action for target tier (locked in at purchase time)
+    gold_per_action = get_property_gold_per_action(next_tier)
+    
+    # Get kingdom for tax rate
+    kingdom = db.query(Kingdom).filter(Kingdom.id == property.kingdom_id).first()
+    tax_rate = kingdom.tax_rate if kingdom else 0
+    tax_per_action = int(gold_per_action * tax_rate / 100)
+    total_gold_per_action = gold_per_action + tax_per_action
+    
+    # Get cost breakdown from tiers (includes per-action resource costs)
+    all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required, tax_rate=tax_rate)
     per_action_costs = all_costs["per_action_costs"]
     
-    # Check if player can afford GOLD upfront
-    if state.gold < gold_cost:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {gold_cost}g, have {int(state.gold)}g"
-        )
-    
     # Create contract
+    # NOTE: gold_paid starts at 0, cost_per_action stores the per-action cost
     contract = UnifiedContract(
         user_id=current_user.id,
         kingdom_id=property.kingdom_id,
@@ -792,35 +911,40 @@ def start_property_upgrade(
         tier=next_tier,
         target_id=property_id,
         actions_required=actions_required,
-        gold_paid=gold_cost
+        gold_paid=0,  # Pay-As-You-Go: starts at 0
+        cost_per_action=gold_per_action  # Lock in the base cost
     )
     db.add(contract)
     
-    # Deduct GOLD upfront (per-action costs deducted during work)
-    state.gold -= gold_cost
+    # NO gold charged upfront!
     
     db.commit()
     db.refresh(contract)
     
     tier_name = get_tier_name(next_tier)
+    estimated_total_gold = total_gold_per_action * actions_required
     
-    # Build warning message about per-action costs
-    per_action_warning = ""
-    if per_action_costs:
-        per_action_str = ", ".join([f"{c['amount']} {c['display_name']}" for c in per_action_costs])
-        per_action_warning = f" Each action requires: {per_action_str}."
+    # Build per-action costs message
+    per_action_str = ", ".join([f"{c['amount']} {c['display_name']}" for c in per_action_costs])
     
     return {
         "success": True,
-        "message": f"Started upgrade to {tier_name}! Complete {actions_required} actions to finish.{per_action_warning}",
+        "message": f"Started upgrade to {tier_name}! Each action: {total_gold_per_action}g + {per_action_str}.",
         "contract_id": str(contract.id),
         "property_id": property_id,
         "from_tier": property.tier,
         "to_tier": next_tier,
-        "gold_cost": gold_cost,  # What was paid upfront
-        "per_action_costs": per_action_costs,  # What each action will cost
+        "actions_required": actions_required,
+        "per_action_costs": per_action_costs,  # Resource costs per action
         "total_costs": all_costs["total_costs"],  # Total resources over all actions
-        "actions_required": actions_required
+        # Pay-As-You-Go info
+        "pay_as_you_go": {
+            "gold_per_action": gold_per_action,  # Base (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # To kingdom
+            "total_gold_per_action": total_gold_per_action,  # What player pays
+            "estimated_total_gold": estimated_total_gold  # Over all actions
+        }
     }
 
 
@@ -851,7 +975,7 @@ def get_property_upgrade_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current upgrade contract status for a property - FULLY DYNAMIC"""
+    """Get current upgrade contract status for a property - Pay-As-You-Go"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -870,9 +994,13 @@ def get_property_upgrade_status(
             detail="Property not found or not owned by you"
         )
     
-    from routers.tiers import get_property_max_tier
+    from routers.tiers import get_property_max_tier, get_property_gold_per_action
     max_tier = get_property_max_tier()
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill) if property.tier < max_tier else 0
+    
+    # Get kingdom for tax rate
+    kingdom = db.query(Kingdom).filter(Kingdom.id == property.kingdom_id).first()
+    tax_rate = kingdom.tax_rate if kingdom else 0
     
     # Find active upgrade contract
     active_contract_data = None
@@ -888,8 +1016,13 @@ def get_property_upgrade_status(
             ContractContribution.contract_id == contract.id
         ).scalar()
         
-        # Get per-action costs for this tier (for display on contract card)
-        contract_costs = get_upgrade_costs_full(contract.tier - 1, actions_required=contract.actions_required)
+        # Get costs for this contract
+        contract_gold_per_action = contract.cost_per_action or 0
+        contract_tax = int(contract_gold_per_action * tax_rate / 100)
+        contract_total_per_action = contract_gold_per_action + contract_tax
+        contract_costs = get_upgrade_costs_full(contract.tier - 1, actions_required=contract.actions_required, tax_rate=tax_rate)
+        
+        actions_remaining = max(0, contract.actions_required - actions_completed)
         
         active_contract_data = {
             "contract_id": str(contract.id),
@@ -898,38 +1031,66 @@ def get_property_upgrade_status(
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "status": "completed" if contract.completed_at else "in_progress",
-            "per_action_costs": contract_costs["per_action_costs"]  # What each action costs
+            "gold_paid": contract.gold_paid,
+            "per_action_costs": contract_costs["per_action_costs"],
+            "pay_as_you_go": {
+                "gold_per_action": contract_gold_per_action,
+                "tax_per_action": contract_tax,
+                "total_gold_per_action": contract_total_per_action,
+                "actions_remaining": actions_remaining,
+                "estimated_remaining_gold": contract_total_per_action * actions_remaining
+            }
         }
     
-    # FULLY DYNAMIC costs
+    # Get costs for NEXT upgrade (if not at max tier)
     if property.tier < max_tier:
-        all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required)
-        gold_cost = all_costs["gold_cost"]
+        next_tier = property.tier + 1
+        gold_per_action = get_property_gold_per_action(next_tier)
+        tax_per_action = int(gold_per_action * tax_rate / 100)
+        total_gold_per_action = gold_per_action + tax_per_action
+        
+        all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required, tax_rate=tax_rate)
         per_action_costs = all_costs["per_action_costs"]
         total_costs = all_costs["total_costs"]
         
-        # Check if player can afford gold upfront
-        can_afford_gold = state.gold >= gold_cost
+        # Can afford first action (gold + resources)?
+        can_afford = state.gold >= total_gold_per_action
+        for cost in per_action_costs:
+            player_amount = getattr(state, cost["resource"], 0) or 0
+            if player_amount < cost["amount"]:
+                can_afford = False
+                break
+        
+        pay_as_you_go = {
+            "gold_per_action": gold_per_action,  # Base (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # To kingdom
+            "total_gold_per_action": total_gold_per_action,  # What player pays per action
+            "estimated_total_gold": total_gold_per_action * actions_required
+        }
     else:
-        gold_cost = 0
         per_action_costs = []
         total_costs = []
-        can_afford_gold = False
+        can_afford = False
+        pay_as_you_go = None
     
     return {
         "property_id": property_id,
         "current_tier": property.tier,
         "max_tier": max_tier,
         "can_upgrade": property.tier < max_tier,
-        # Gold paid upfront to start
-        "gold_cost": gold_cost,
+        # Pay-As-You-Go info
+        "gold_cost": 0,  # DEPRECATED - No upfront cost
+        "pay_as_you_go": pay_as_you_go,
         # Resources required per action
         "per_action_costs": per_action_costs,
         # Total resources needed (for display)
         "total_costs": total_costs,
         "actions_required": actions_required,
-        "can_afford": can_afford_gold,  # Can afford gold to START
+        "can_afford": can_afford,  # Can afford first action
         "player_gold": int(state.gold),
+        "player_wood": state.wood or 0,
+        "player_iron": state.iron or 0,
         "active_contract": active_contract_data,
         "player_building_skill": state.building_skill
     }

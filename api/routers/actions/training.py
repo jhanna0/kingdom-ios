@@ -26,24 +26,17 @@ TRAINING_TYPES = SKILL_TYPES
 
 
 def calculate_training_cost(total_skill_points: int) -> int:
-    """Calculate gold cost to purchase training based ONLY on TOTAL SKILL POINTS across ALL skills
+    """DEPRECATED - Use calculate_training_gold_per_action() from tiers.py instead.
     
-    ALL skills cost the same for their next tier based on the SUM of all skill levels.
-    This prevents min-maxing - every skill point makes ALL skills more expensive.
-    
-    Formula: 100 * (1.5^(total_skill_points + 1))
-    
-    We use (total + 1) because we're calculating the cost for the NEXT skill point.
-    
-    Examples:
-    - 0 total skill points: 100 * 1.5^1 = 150g for ANY skill's first tier
-    - 3 total skill points: 100 * 1.5^4 = 506g for ANY skill's next tier
-    - 10 total skill points: 100 * 1.5^11 = 8659g for ANY skill's next tier
+    This function calculates the OLD upfront cost. Kept for reference/migration.
     """
     base_cost = 100.0
-    # Use total + 1 because we're buying the NEXT skill point
     cost_multiplier = pow(1.4, float(total_skill_points + 1))
     return int(base_cost * cost_multiplier)
+
+
+# Import the centralized function from tiers.py
+from routers.tiers import calculate_training_gold_per_action
 
 
 def calculate_training_actions_required(stat_level: int, education_level: int = 0, science_level: int = 0) -> int:
@@ -84,7 +77,14 @@ def get_training_costs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current training costs for all stats"""
+    """Get current training costs for all stats.
+    
+    Pay-As-You-Go model:
+    - No upfront cost to start training
+    - cost_per_action: Gold paid each training click (BASE COST, burned)
+    - tax_per_action: Additional gold going to kingdom treasury
+    - total_per_action: What player actually pays per click
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -94,10 +94,25 @@ def get_training_costs(
     
     # ALL skills cost the SAME based on total skill points
     total_skill_points = get_total_skill_points(state)
-    unified_cost = calculate_training_cost(total_skill_points)
     
-    # Generate costs dynamically for all skills
-    costs = {skill_type: unified_cost for skill_type in SKILL_TYPES}
+    # NEW: Pay-As-You-Go - cost per action instead of upfront
+    base_cost_per_action = calculate_training_gold_per_action(total_skill_points)
+    
+    # Get kingdom tax rate for display
+    tax_rate = 0
+    kingdom_name = None
+    if state.current_kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
+        if kingdom:
+            tax_rate = kingdom.tax_rate
+            kingdom_name = kingdom.name
+    
+    # Calculate tax on top of base cost
+    tax_per_action = int(base_cost_per_action * tax_rate / 100)
+    total_per_action = base_cost_per_action + tax_per_action
+    
+    # Generate costs dynamically for all skills (same cost for all)
+    costs = {skill_type: total_per_action for skill_type in SKILL_TYPES}
     
     # Get current stats dynamically for all skills
     current_stats = get_all_skill_values(state)
@@ -105,9 +120,18 @@ def get_training_costs(
     return {
         "total_skill_points": total_skill_points,
         "total_training_purchases": state.total_training_purchases or 0,
-        "costs": costs,
+        "costs": costs,  # Total cost per action (for backward compat, now means per-action)
         "current_stats": current_stats,
-        "gold": int(state.gold)
+        "gold": int(state.gold),
+        # NEW: Pay-As-You-Go breakdown
+        "pay_as_you_go": {
+            "base_cost_per_action": base_cost_per_action,  # This amount is BURNED
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # This goes to kingdom
+            "total_per_action": total_per_action,  # What player pays
+            "kingdom_name": kingdom_name,
+            "explanation": f"Each training action costs {base_cost_per_action}g (burned) + {tax_per_action}g tax = {total_per_action}g"
+        }
     }
 
 
@@ -116,7 +140,7 @@ def get_training_contracts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get user's training contracts"""
+    """Get user's training contracts with Pay-As-You-Go info"""
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -137,16 +161,44 @@ def get_training_contracts(
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Get tax rate for this contract's kingdom
+        tax_rate = 0
+        kingdom_name = None
+        if contract.kingdom_id:
+            kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+            if kingdom:
+                tax_rate = kingdom.tax_rate
+                kingdom_name = kingdom.name
+        
+        # Calculate per-action costs
+        base_cost = contract.cost_per_action or 0
+        tax_per_action = int(base_cost * tax_rate / 100)
+        total_per_action = base_cost + tax_per_action
+        
+        # Calculate remaining cost
+        actions_remaining = max(0, contract.actions_required - actions_completed)
+        estimated_remaining_cost = total_per_action * actions_remaining
+        
         result.append({
             "id": str(contract.id),
             "type": contract.type,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "status": "completed" if contract.completed_at else "in_progress",
-            "gold_paid": contract.gold_paid,
+            "gold_paid": contract.gold_paid,  # Total paid so far
             "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "completed_at": format_datetime_iso(contract.completed_at) if contract.completed_at else None,
-            "progress_percent": min(100, int((actions_completed / contract.actions_required) * 100)) if contract.actions_required > 0 else 100
+            "progress_percent": min(100, int((actions_completed / contract.actions_required) * 100)) if contract.actions_required > 0 else 100,
+            # Pay-As-You-Go info
+            "pay_as_you_go": {
+                "cost_per_action": base_cost,  # Base cost (burned)
+                "tax_rate": tax_rate,
+                "tax_per_action": tax_per_action,  # Tax (to kingdom)
+                "total_per_action": total_per_action,  # What player pays each action
+                "actions_remaining": actions_remaining,
+                "estimated_remaining_cost": estimated_remaining_cost,
+                "kingdom_name": kingdom_name
+            }
         })
     
     return {"contracts": result}
@@ -158,7 +210,12 @@ def purchase_training(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Purchase a training contract"""
+    """Start a training contract (Pay-As-You-Go model).
+    
+    NO upfront gold cost! Gold is paid per action instead.
+    - cost_per_action is locked in at purchase time
+    - Each training action costs: base_cost (burned) + tax (to kingdom)
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -191,38 +248,44 @@ def purchase_training(
     
     # Get kingdom education level for training bonus
     education_level = 0
+    tax_rate = 0
+    kingdom_name = None
     if state.current_kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         if kingdom:
             education_level = kingdom.education_level
+            tax_rate = kingdom.tax_rate
+            kingdom_name = kingdom.name
     
-    # Calculate cost based on TOTAL SKILL POINTS across ALL skills
+    # Calculate cost per action based on TOTAL SKILL POINTS (locked in at purchase time)
     total_skill_points = get_total_skill_points(state)
-    training_cost = calculate_training_cost(total_skill_points)
+    cost_per_action = calculate_training_gold_per_action(total_skill_points)
+    
+    # Calculate tax that will be added on top
+    tax_per_action = int(cost_per_action * tax_rate / 100)
+    total_per_action = cost_per_action + tax_per_action
     
     # Get player's science level for training reduction
     science_level = state.science or 1
     actions_required = calculate_training_actions_required(current_stat, education_level, science_level)
     
-    if state.gold < training_cost:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough gold. Need {training_cost}g, have {int(state.gold)}g"
-        )
+    # Calculate total estimated cost for display (not charged upfront!)
+    estimated_total_cost = total_per_action * actions_required
     
     # Create the contract in the database
+    # NOTE: gold_paid starts at 0 and accumulates as actions are performed
     contract = UnifiedContract(
         user_id=current_user.id,
         category='personal_training',
         type=training_type,
         actions_required=actions_required,
-        gold_paid=training_cost,
+        gold_paid=0,  # Pay-As-You-Go: starts at 0
+        cost_per_action=cost_per_action,  # Lock in the base cost
         kingdom_id=state.current_kingdom_id
     )
     db.add(contract)
     
-    # Spend gold and increment training counter
-    state.gold -= training_cost
+    # Increment training counter (no gold spent yet!)
     state.total_training_purchases = (state.total_training_purchases or 0) + 1
     
     db.commit()
@@ -230,11 +293,19 @@ def purchase_training(
     
     return {
         "success": True,
-        "message": f"Purchased {training_type} training! Complete {actions_required} actions to improve stat.",
+        "message": f"Started {training_type} training! Each action costs {total_per_action}g ({cost_per_action}g + {tax_per_action}g tax).",
         "training_type": training_type,
-        "cost": training_cost,
         "contract_id": str(contract.id),
-        "actions_required": actions_required
+        "actions_required": actions_required,
+        # Pay-As-You-Go info
+        "pay_as_you_go": {
+            "cost_per_action": cost_per_action,  # Base cost (burned)
+            "tax_rate": tax_rate,
+            "tax_per_action": tax_per_action,  # Goes to kingdom
+            "total_per_action": total_per_action,  # What player pays each action
+            "estimated_total": estimated_total_cost,  # Total if completed (for display only)
+            "kingdom_name": kingdom_name
+        }
     }
 
 
@@ -244,12 +315,57 @@ def work_on_training(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Work on a training contract (2 hour cooldown)"""
+    """Work on a training contract (2 hour cooldown).
+    
+    Pay-As-You-Go model:
+    - Charges gold PER ACTION (not upfront)
+    - Base cost is BURNED (destroyed from economy)
+    - Tax is added ON TOP and goes to kingdom treasury
+    """
     state = current_user.player_state
     if not state:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Player state not found"
+        )
+    
+    # Find the training contract FIRST (need cost_per_action)
+    contract = db.query(UnifiedContract).filter(
+        UnifiedContract.id == contract_id,
+        UnifiedContract.user_id == current_user.id
+    ).first()
+    
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Training contract not found"
+        )
+    
+    if contract.completed_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Training contract already completed"
+        )
+    
+    # Get base cost per action from contract (locked in at purchase time)
+    base_cost = contract.cost_per_action or 0
+    
+    # Calculate tax on top
+    tax_rate = 0
+    kingdom = None
+    if contract.kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+        if kingdom:
+            tax_rate = kingdom.tax_rate
+    
+    tax_amount = int(base_cost * tax_rate / 100)
+    total_cost = base_cost + tax_amount
+    
+    # Check if player can afford this action
+    if state.gold < total_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {total_cost}g ({base_cost}g + {tax_amount}g tax), have {int(state.gold)}g"
         )
     
     # Check and deduct food cost BEFORE cooldown check
@@ -283,24 +399,6 @@ def work_on_training(
         # DEV_MODE: still set cooldown for functionality, just skip the check
         set_cooldown(db, current_user.id, "training", cooldown_expires)
     
-    # Find the training contract
-    contract = db.query(UnifiedContract).filter(
-        UnifiedContract.id == contract_id,
-        UnifiedContract.user_id == current_user.id
-    ).first()
-    
-    if not contract:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Training contract not found"
-        )
-    
-    if contract.completed_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Training contract already completed"
-        )
-    
     # Count current actions completed
     actions_completed = db.query(func.count(ContractContribution.id)).filter(
         ContractContribution.contract_id == contract.id
@@ -312,12 +410,25 @@ def work_on_training(
             detail="Training contract already has all required actions"
         )
     
+    # === PAY-AS-YOU-GO: Charge gold for this action ===
+    # 1. Base cost is BURNED (removed from economy entirely)
+    # 2. Tax goes to kingdom treasury
+    state.gold -= total_cost  # Player pays total
+    
+    # Tax goes to kingdom treasury (if kingdom exists)
+    if kingdom and tax_amount > 0:
+        kingdom.treasury_gold += tax_amount
+    
+    # Track total gold paid on contract
+    contract.gold_paid = (contract.gold_paid or 0) + total_cost
+    
     # Add a contribution (= 1 action)
     xp_earned = 10
     contribution = ContractContribution(
         contract_id=contract.id,
         user_id=current_user.id,
-        xp_earned=xp_earned
+        xp_earned=xp_earned,
+        gold_earned=0  # Training doesn't earn gold, it costs gold
     )
     db.add(contribution)
     
@@ -371,7 +482,7 @@ def work_on_training(
     if is_complete:
         message = f"Training complete! {stat_name} increased to {new_value}"
     else:
-        message = f"You trained!"
+        message = f"You trained! (-{total_cost}g)"
     
     if cooldown_refunded:
         message += " Your scientific knowledge instantly refunded your training!"
@@ -399,5 +510,12 @@ def work_on_training(
             "gold": None,
             "reputation": None,
             "experience": xp_earned
+        },
+        # Pay-As-You-Go cost breakdown
+        "gold_cost": {
+            "base_cost": base_cost,  # Burned (destroyed)
+            "tax_amount": tax_amount,  # To kingdom treasury
+            "total_paid": total_cost,  # What player paid
+            "total_paid_contract": contract.gold_paid  # Cumulative on this contract
         }
     }

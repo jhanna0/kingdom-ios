@@ -283,7 +283,10 @@ def work_on_property_upgrade(
     db: Session = Depends(get_db)
 ):
     """Contribute one action to a property upgrade/construction contract.
-    CONSUMES PER-ACTION RESOURCES (wood, iron, etc.) - must have enough!
+    
+    Pay-As-You-Go model:
+    - Charges GOLD per action (base burned + tax to kingdom)
+    - Consumes RESOURCES per action (wood, iron, etc.)
     """
     state = current_user.player_state
     if not state:
@@ -292,7 +295,7 @@ def work_on_property_upgrade(
             detail="Player state not found"
         )
     
-    # Get contract FIRST (need tier to check per-action costs)
+    # Get contract FIRST (need tier and cost_per_action)
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
         UnifiedContract.user_id == current_user.id,
@@ -312,7 +315,28 @@ def work_on_property_upgrade(
             detail="Contract is already completed"
         )
     
-    # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
+    # Get base gold cost per action from contract (locked in at purchase time)
+    base_gold_cost = contract.cost_per_action or 0
+    
+    # Calculate tax on top
+    tax_rate = 0
+    kingdom = None
+    if contract.kingdom_id:
+        kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+        if kingdom:
+            tax_rate = kingdom.tax_rate
+    
+    tax_amount = int(base_gold_cost * tax_rate / 100)
+    total_gold_cost = base_gold_cost + tax_amount
+    
+    # Check if player can afford gold for this action
+    if state.gold < total_gold_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough gold. Need {total_gold_cost}g ({base_gold_cost}g + {tax_amount}g tax), have {int(state.gold)}g"
+        )
+    
+    # Get per-action RESOURCE costs for this tier (DYNAMIC from PROPERTY_TIERS)
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
     
@@ -396,6 +420,18 @@ def work_on_property_upgrade(
             detail="Contract already has all required actions"
         )
     
+    # === PAY-AS-YOU-GO: Charge gold for this action ===
+    # 1. Base cost is BURNED (removed from economy entirely)
+    # 2. Tax goes to kingdom treasury
+    state.gold -= total_gold_cost  # Player pays total
+    
+    # Tax goes to kingdom treasury (if kingdom exists)
+    if kingdom and tax_amount > 0:
+        kingdom.treasury_gold += tax_amount
+    
+    # Track total gold paid on contract
+    contract.gold_paid = (contract.gold_paid or 0) + total_gold_cost
+    
     # DEDUCT PER-ACTION RESOURCES
     resources_required = []
     for cost in per_action_costs:
@@ -412,7 +448,8 @@ def work_on_property_upgrade(
     # Add contribution
     contribution = ContractContribution(
         contract_id=contract.id,
-        user_id=current_user.id
+        user_id=current_user.id,
+        gold_earned=0  # Property work costs gold, doesn't earn it
     )
     db.add(contribution)
     
@@ -435,7 +472,7 @@ def work_on_property_upgrade(
     
     progress_percent = int((new_actions_completed / contract.actions_required) * 100)
     
-    # Build message with resource consumption info
+    # Build message with cost info
     if is_complete:
         if contract.tier == 1:
             message = f"Property construction complete! You now own land in the kingdom!"
@@ -443,11 +480,8 @@ def work_on_property_upgrade(
             message = f"Property upgraded to Tier {contract.tier}! Your land grows stronger!"
     else:
         action_word = "constructing" if contract.tier == 1 else "upgrading"
-        if resources_required:
-            required_str = ", ".join([f"-{c['amount']} {c['resource']}" for c in resources_required])
-            message = f"You worked on {action_word} your property! ({required_str})"
-        else:
-            message = f"You worked on {action_word} your property!"
+        resource_str = ", ".join([f"-{c['amount']} {c['resource']}" for c in resources_required])
+        message = f"You worked on {action_word} your property! (-{total_gold_cost}g, {resource_str})"
     
     return {
         "success": True,
@@ -462,7 +496,14 @@ def work_on_property_upgrade(
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "food_cost": food_result["food_cost"],
         "food_remaining": food_result["food_remaining"],
-        # NEW: Resources required this action (frontend can show)
+        # Resources consumed this action
         "resources_required": resources_required,
-        "per_action_costs": enriched_costs  # What future actions will cost
+        "per_action_costs": enriched_costs,  # What future actions will cost
+        # Pay-As-You-Go gold cost breakdown
+        "gold_cost": {
+            "base_cost": base_gold_cost,  # Burned (destroyed)
+            "tax_amount": tax_amount,  # To kingdom treasury
+            "total_paid": total_gold_cost,  # What player paid this action
+            "total_paid_contract": contract.gold_paid  # Cumulative on this contract
+        }
     }

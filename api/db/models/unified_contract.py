@@ -34,10 +34,14 @@ class UnifiedContract(Base):
     actions_required = Column(Integer, nullable=False, default=1)
     
     # Cost paid (denormalized for history)
-    gold_paid = Column(Integer, default=0)
+    gold_paid = Column(Integer, default=0)  # Upfront gold (property) or total gold paid over time (training)
     iron_paid = Column(Integer, default=0)
     steel_paid = Column(Integer, default=0)
     wood_paid = Column(Integer, default=0)
+    
+    # Pay-As-You-Go: Gold cost per action (for training contracts)
+    # Linear formula: 10 + 2 * total_skill_points at time of purchase
+    cost_per_action = Column(Integer, default=0)
     
     # Reward pool (for kingdom contracts)
     reward_pool = Column(Integer, default=0)

@@ -27,6 +27,42 @@ ACTIVITY_ICONS = {
 # ===== ACTION TYPES - SINGLE SOURCE OF TRUTH =====
 # Add new actions HERE and they'll appear everywhere with proper cooldowns!
 
+# ===== COST MODELS =====
+# Defines how costs are structured for different action types
+# Frontend uses this to render cost displays dynamically
+
+COST_MODELS = {
+    "none": {
+        "description": "No cost to perform this action",
+    },
+    "fixed_gold": {
+        "description": "Fixed gold cost per action",
+        "fields": ["gold"],
+    },
+    "per_action_gold": {
+        "description": "Gold cost per action (Pay-As-You-Go). Base burned, tax to kingdom.",
+        "fields": ["gold_per_action"],
+        "tax_model": "on_top",  # Tax added on top of base
+    },
+    "per_action_resources": {
+        "description": "Resources consumed per action (from tier config)",
+        "fields": ["per_action_costs"],  # List of {resource, amount}
+    },
+    "upfront_gold_per_action_resources": {
+        "description": "Gold paid upfront, resources per action",
+        "fields": ["gold_upfront", "per_action_costs"],
+    },
+    "upfront_all": {
+        "description": "All costs paid upfront (gold + resources)",
+        "fields": ["gold", "iron", "steel", "wood"],
+    },
+    "dynamic_formula": {
+        "description": "Cost calculated from formula (see config_ref)",
+        "fields": ["config_ref"],  # Reference to TRAINING_CONFIG, etc.
+    },
+}
+
+
 ACTION_TYPES = {
     "work": {
         "display_name": "Work on Contract",
@@ -38,7 +74,17 @@ ACTION_TYPES = {
         "display_order": 10,
         "endpoint": "/actions/contracts/{contract_id}/work",
         "always_unlocked": True,
-        "requirements": None
+        "requirements": None,
+        # COSTS: Resources per action (from building tier config) + gold reward from treasury
+        "costs": {
+            "model": "per_action_resources",
+            "config_ref": "BUILDING_TYPES[type].tiers[tier].per_action_costs",
+            "description": "Resources from tier config. Gold earned from treasury (ruler-set)."
+        },
+        "rewards": {
+            "gold": "from_contract",  # action_reward set by ruler
+            "experience": 10
+        }
     },
     "patrol": {
         "display_name": "Patrol",
@@ -52,6 +98,10 @@ ACTION_TYPES = {
         "endpoint": "/actions/patrol",
         "always_unlocked": True,
         "requirements": None,
+        "costs": {
+            "model": "none",
+            "description": "Free to patrol"
+        },
         "rewards": {
             "reputation": 5
         }
@@ -67,8 +117,12 @@ ACTION_TYPES = {
         "endpoint": "/actions/farm",
         "always_unlocked": True,
         "requirements": None,
+        "costs": {
+            "model": "none",
+            "description": "Free - earns gold"
+        },
         "rewards": {
-            "gold": 10  # Base reward
+            "gold": 10  # Base reward (taxed)
         }
     },
     "scout": {
@@ -85,27 +139,41 @@ ACTION_TYPES = {
             "skill": "intelligence",
             "skill_level": 1,
             "location": "enemy_kingdom",
-            "cost": 100,
             "requirement_text": "Intelligence T1+ (100g). T3: military intel, T5: disruption, T7: heist"
+        },
+        # COSTS: Fixed gold per scout action
+        "costs": {
+            "model": "fixed_gold",
+            "gold": 100,
+            "description": "100g to scout enemy kingdom"
         }
     },
     "training": {
         "display_name": "Training",
         "icon": "figure.run",
-        "description": "Train your skills",
+        "description": "Train your skills - Pay-As-You-Go",
         "category": "training",
         "cooldown_minutes": 120,  # 2 hours
         "theme_color": "buttonPrimary",
         "display_order": 1,
-        "endpoint": "/actions/training/{contract_id}/work",
+        "endpoint": "/actions/train/{contract_id}",
         "always_unlocked": True,
         "requirements": {
             "property": "house",
             "property_tier": 2,
             "requirement_text": "House (Tier 2 property) required in some kingdom"
         },
+        # COSTS: Dynamic gold per action (from TRAINING_CONFIG)
+        "costs": {
+            "model": "dynamic_formula",
+            "config_ref": "TRAINING_CONFIG",
+            "formula": "10 + 2 * total_skill_points",
+            "tax_model": "on_top",  # Tax added on top, base burned
+            "description": "Gold per action scales with total skill points. Base burned, tax to kingdom."
+        },
         "rewards": {
-            "experience": "varies_by_skill_level"
+            "experience": 10,
+            "experience_on_complete": 25
         }
     },
     "crafting": {
@@ -122,6 +190,12 @@ ACTION_TYPES = {
             "property": "workshop",
             "property_tier": 3,
             "requirement_text": "Workshop (Tier 3 property) required"
+        },
+        # COSTS: Upfront gold + resources (from EQUIPMENT_TIERS)
+        "costs": {
+            "model": "upfront_all",
+            "config_ref": "EQUIPMENT_TIERS[tier]",
+            "description": "Gold and resources paid upfront. Costs from equipment tier."
         }
     },
     "property_upgrade": {
@@ -137,6 +211,12 @@ ACTION_TYPES = {
         "requirements": {
             "property": "owned",
             "requirement_text": "Must own a property with active upgrade"
+        },
+        # COSTS: Gold upfront + resources per action (from PROPERTY_TIERS)
+        "costs": {
+            "model": "upfront_gold_per_action_resources",
+            "config_ref": "PROPERTY_TIERS[tier]",
+            "description": "Gold paid upfront to start. Wood/iron consumed each action."
         }
     },
     "stage_coup": {
@@ -155,6 +235,12 @@ ACTION_TYPES = {
             "kingdom_reputation": 500,
             "location": "not_ruler",
             "requirement_text": "Leadership T3+, 500 kingdom rep, not the ruler"
+        },
+        "costs": {
+            "model": "fixed_gold",
+            "gold": 1000,  # Base cost (reduced by Leadership 5)
+            "gold_with_leadership_5": 500,
+            "description": "1000g to initiate coup (500g with Leadership 5)"
         }
     },
     "declare_invasion": {
@@ -171,6 +257,11 @@ ACTION_TYPES = {
             "location": "enemy_kingdom",
             "must_be_ruler": True,
             "requirement_text": "Must rule a kingdom to invade. Must be at target kingdom."
+        },
+        "costs": {
+            "model": "fixed_gold",
+            "gold": 5000,
+            "description": "5000g from YOUR kingdom treasury to declare invasion"
         }
     },
     "propose_alliance": {
@@ -188,6 +279,10 @@ ACTION_TYPES = {
             "must_be_ruler": True,
             "not_allied": True,
             "requirement_text": "Must rule a kingdom. Target must have a ruler. Cannot be already allied."
+        },
+        "costs": {
+            "model": "none",
+            "description": "Free to propose alliance"
         }
     }
 }
