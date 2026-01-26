@@ -54,28 +54,31 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
 
 TRAINING_GOLD_BASE = 5           # Base gold per action
 TRAINING_GOLD_PER_TIER = 5       # Additional gold per target tier
+TRAINING_GOLD_PER_POINT = 2      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
 TRAINING_ACTIONS_PER_TIER = 5    # Extra actions per current tier level
-TRAINING_ACTIONS_PER_POINT = 10  # Extra actions per total skill point owned
+TRAINING_ACTIONS_PER_POINT = 8   # Extra actions per total skill point owned
 TRAINING_MIN_ACTIONS = 5         # Floor (never fewer than this)
 TRAINING_MAX_ACTIONS = 500       # Cap (never more than this)
 
 
-def calculate_training_gold_per_action(target_tier: int) -> float:
+def calculate_training_gold_per_action(target_tier: int, total_skill_points: int = 0) -> float:
     """Gold cost per training action.
     
-    Linear scaling by tier: higher tiers cost more gold.
+    Scales with BOTH tier AND total skill points owned.
     Tax is added on top at action time.
     
-    Formula: BASE + (target_tier × PER_TIER)
+    Formula: BASE + (target_tier × PER_TIER) + (total_points × PER_POINT)
     
-    Examples:
-    - Tier 1 (0→1): 5 + 5 = 10g per action
-    - Tier 2 (1→2): 5 + 10 = 15g per action
-    - Tier 3 (2→3): 5 + 15 = 20g per action
-    - Tier 5 (4→5): 5 + 25 = 30g per action
+    Examples (with 0 skill points):
+    - Tier 1 (0→1): 5 + 5 + 0 = 10g per action
+    - Tier 2 (1→2): 5 + 10 + 0 = 15g per action
+    
+    Examples (with 5 skill points, training 6th skill):
+    - Tier 1 (0→1): 5 + 5 + 5 = 15g per action
+    - Tier 2 (1→2): 5 + 10 + 5 = 20g per action
     """
-    return TRAINING_GOLD_BASE + (target_tier * TRAINING_GOLD_PER_TIER)
+    return TRAINING_GOLD_BASE + (target_tier * TRAINING_GOLD_PER_TIER) + (total_skill_points * TRAINING_GOLD_PER_POINT)
 
 
 def calculate_training_actions(current_tier: int, total_skill_points: int) -> int:
@@ -708,6 +711,46 @@ def get_all_skill_values(state) -> dict:
     }
 
 
+def get_training_costs_for_player(state) -> dict:
+    """CENTRALIZED: Get gold_per_action for each skill.
+    
+    This is the SINGLE SOURCE OF TRUTH for training costs.
+    All endpoints should use this function.
+    
+    Returns: {skill_type: gold_per_action}
+    """
+    current_stats = get_all_skill_values(state)
+    total_skill_points = get_total_skill_points(state)
+    
+    costs = {}
+    for skill_type in SKILL_TYPES:
+        current_tier = current_stats.get(skill_type, 0)
+        target_tier = current_tier + 1  # Training towards the NEXT tier
+        gold_per_action = calculate_training_gold_per_action(target_tier, total_skill_points)
+        costs[skill_type] = int(gold_per_action)
+    return costs
+
+
+def get_training_info_for_skill(state, skill_type: str) -> dict:
+    """CENTRALIZED: Get full training info for a specific skill.
+    
+    Returns: {current_tier, target_tier, gold_per_action, actions_required}
+    """
+    current_tier = get_stat_value(state, skill_type)
+    target_tier = current_tier + 1
+    total_skill_points = get_total_skill_points(state)
+    
+    gold_per_action = calculate_training_gold_per_action(target_tier, total_skill_points)
+    actions_required = calculate_training_actions(current_tier, total_skill_points)
+    
+    return {
+        "current_tier": current_tier,
+        "target_tier": target_tier,
+        "gold_per_action": gold_per_action,
+        "actions_required": actions_required,
+    }
+
+
 def get_skill_mechanic(skill_type: str, mechanic_name: str, tier: int) -> float:
     """Get a specific mechanic value for a skill at a given tier.
     
@@ -833,7 +876,7 @@ def get_skills_data_for_player(state, training_costs: dict = None) -> list:
         else:
             # Calculate dynamically: just gold_per_action (pay per action, not upfront)
             target_tier = current_value + 1
-            cost = int(calculate_training_gold_per_action(target_tier))
+            cost = int(calculate_training_gold_per_action(target_tier, total_skill_points))
         
         skills_data.append({
             "skill_type": skill_type,

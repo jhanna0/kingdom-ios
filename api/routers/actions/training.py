@@ -79,27 +79,24 @@ def get_training_costs(
     
     science_level = state.science or 1
     
-    # Generate costs dynamically for each skill (varies by current tier!)
+    # Generate costs dynamically for each skill using centralized logic
+    from routers.tiers import get_training_info_for_skill
     costs = {}
     for skill_type in SKILL_TYPES:
-        current_tier = current_stats.get(skill_type, 1)
-        target_tier = current_tier + 1
+        info = get_training_info_for_skill(state, skill_type)
         
-        # Get actions with reductions applied
+        # Apply education/science reductions to actions
         actions_required = get_training_actions_with_reductions(
-            current_tier - 1,  # current_tier in formula is 0-indexed
+            info["current_tier"],
             total_skill_points, 
             education_level, 
             science_level
         )
         
-        # Gold per action (linear by tier)
-        gold_per_action = calculate_training_gold_per_action(target_tier)
-        
         costs[skill_type] = {
             "actions_required": actions_required,
-            "gold_per_action": round(gold_per_action, 1),
-            "total_gold": round(gold_per_action * actions_required, 1)
+            "gold_per_action": round(info["gold_per_action"], 1),
+            "total_gold": round(info["gold_per_action"] * actions_required, 1)
         }
     
     # Get current kingdom tax rate for display
@@ -213,10 +210,12 @@ def purchase_training(
             detail=f"You must complete your current {active_contract.type} training before starting a new one"
         )
     
-    # Get current stat level (1-indexed, so subtract 1 for formula)
-    current_stat = get_stat_value(state, training_type)
-    current_tier = current_stat - 1  # 0-indexed for formula
-    target_tier = current_stat  # What they're training towards
+    # Use centralized function for training info
+    from routers.tiers import get_training_info_for_skill
+    info = get_training_info_for_skill(state, training_type)
+    current_tier = info["current_tier"]
+    target_tier = info["target_tier"]
+    gold_per_action = info["gold_per_action"]
     
     # Get kingdom education level for training bonus
     education_level = 0
@@ -232,8 +231,7 @@ def purchase_training(
     # Get player's science level for training reduction
     science_level = state.science or 1
     
-    # NEW FORMULAS: Gold scales by tier, actions scale by tier + total points
-    gold_per_action = calculate_training_gold_per_action(target_tier)
+    # Apply education/science reductions to actions
     actions_required = get_training_actions_with_reductions(
         current_tier, total_skill_points, education_level, science_level
     )

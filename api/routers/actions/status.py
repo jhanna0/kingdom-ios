@@ -19,20 +19,10 @@ from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_co
 
 def _get_training_costs_dict(state) -> dict:
     """Helper to generate training costs dict for all skills.
-    
-    NEW: Each skill has different cost based on its current tier.
-    Returns gold_per_action for each skill (no upfront payment!).
+    Uses centralized function from tiers.py.
     """
-    current_stats = get_all_skill_values(state)
-    
-    costs = {}
-    for skill_type in SKILL_TYPES:
-        current_tier = current_stats.get(skill_type, 1)
-        target_tier = current_tier + 1
-        gold_per_action = calculate_training_gold_per_action(target_tier)
-        # Return gold_per_action (pay per action, not upfront!)
-        costs[skill_type] = int(gold_per_action)
-    return costs
+    from routers.tiers import get_training_costs_for_player
+    return get_training_costs_for_player(state)
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (
     WORK_BASE_COOLDOWN,
