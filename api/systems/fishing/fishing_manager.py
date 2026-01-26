@@ -225,6 +225,10 @@ class FishingManager:
         if outcome != "no_bite":
             session.current_fish = outcome
             outcome_display["fish_data"] = FISH.get(outcome, {})
+        else:
+            # Cast failed (no_bite) - reset streak!
+            # A successful catch requires BOTH cast (find fish) AND reel (catch it)
+            session.consecutive_catches = 0
         
         return PhaseResult(
             phase="cast",

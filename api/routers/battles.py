@@ -489,8 +489,43 @@ def _pick_random_injury_target(
     return random.choice(available_targets)
 
 
+def _check_win_condition_sql(db: Session, battle_id: int, battle_type: str) -> Optional[str]:
+    """
+    Check win condition using raw SQL - avoids ORM caching issues.
+    Returns 'attackers', 'defenders', or None.
+    
+    This is the SAFE version that reads directly from the database.
+    """
+    from sqlalchemy import text
+    
+    win_threshold = 3 if battle_type == 'invasion' else 2
+    
+    result = db.execute(text("""
+        SELECT 
+            COUNT(*) FILTER (WHERE captured_by = 'attackers') as attacker_captures,
+            COUNT(*) FILTER (WHERE captured_by = 'defenders') as defender_captures
+        FROM battle_territories
+        WHERE battle_id = :battle_id
+    """), {"battle_id": battle_id}).fetchone()
+    
+    if not result:
+        return None
+    
+    if result[0] >= win_threshold:
+        return "attackers"
+    if result[1] >= win_threshold:
+        return "defenders"
+    
+    return None
+
+
 def _check_win_condition(db: Session, battle: Battle) -> Optional[str]:
-    """Check if the battle is won. Returns 'attackers', 'defenders', or None."""
+    """
+    DEPRECATED: Use _check_win_condition_sql for critical paths.
+    
+    This ORM version is OK for read-only display (GET requests with fresh sessions),
+    but should NOT be used after raw SQL updates in the same request.
+    """
     territories = db.query(BattleTerritory).filter(
         BattleTerritory.battle_id == battle.id
     ).all()
@@ -520,7 +555,7 @@ def _atomic_push_territory(
     Uses a single UPDATE with RETURNING to prevent race conditions.
     Two players pushing simultaneously will each get correct results.
     
-    Returns: {"bar_before": float, "bar_after": float, "captured_by": str|None, "newly_captured": bool}
+    Returns: {"bar_before": float, "bar_after": float, "captured_by": str|None}
     """
     from sqlalchemy import text
     
@@ -546,8 +581,7 @@ def _atomic_push_territory(
             RETURNING 
                 control_bar + :push_amount as bar_before,  -- Reconstruct original
                 control_bar as bar_after,
-                captured_by,
-                (captured_by = 'attackers' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+                captured_by
         """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
     else:
         # Push up: bar = bar + push, capture if >= 100
@@ -570,35 +604,94 @@ def _atomic_push_territory(
             RETURNING 
                 control_bar - :push_amount as bar_before,  -- Reconstruct original
                 control_bar as bar_after,
-                captured_by,
-                (captured_by = 'defenders' AND captured_at >= NOW() - INTERVAL '1 second') as newly_captured
+                captured_by
         """), {"territory_id": territory_id, "push_amount": push_amount}).fetchone()
     
     if not result:
-        return {"bar_before": 0, "bar_after": 0, "captured_by": None, "newly_captured": False}
+        return {"bar_before": 0, "bar_after": 0, "captured_by": None}
     
     return {
         "bar_before": result[0],
         "bar_after": result[1],
-        "captured_by": result[2],
-        "newly_captured": result[3] or False
+        "captured_by": result[2]
     }
+
+
+def _atomic_check_and_resolve_battle(db: Session, battle_id: int) -> Optional[str]:
+    """
+    INDUSTRY STANDARD: Single atomic operation to check win condition and resolve.
+    
+    This is the ONLY correct way to handle concurrent battle resolution:
+    1. Fresh read of territory captures (no ORM cache)
+    2. Check against win threshold
+    3. Atomically resolve if threshold met AND not already resolved
+    4. Only ONE concurrent Lambda can win due to resolved_at IS NULL check
+    
+    Returns: winner_side ('attackers'/'defenders') if THIS call resolved the battle,
+             None if not resolved (threshold not met OR already resolved by another request)
+    
+    This is IDEMPOTENT - safe to call after every territory push.
+    """
+    from sqlalchemy import text
+    
+    result = db.execute(text("""
+        WITH territory_counts AS (
+            -- Fresh count from database, no ORM cache
+            SELECT 
+                battle_id,
+                COUNT(*) FILTER (WHERE captured_by = 'attackers') as attacker_captures,
+                COUNT(*) FILTER (WHERE captured_by = 'defenders') as defender_captures
+            FROM battle_territories
+            WHERE battle_id = :battle_id
+            GROUP BY battle_id
+        ),
+        battle_info AS (
+            SELECT 
+                id,
+                type,
+                resolved_at,
+                CASE WHEN type = 'invasion' THEN 3 ELSE 2 END as win_threshold
+            FROM battles
+            WHERE id = :battle_id
+        ),
+        computed_winner AS (
+            SELECT 
+                bi.id as battle_id,
+                bi.win_threshold,
+                tc.attacker_captures,
+                tc.defender_captures,
+                CASE 
+                    WHEN tc.attacker_captures >= bi.win_threshold THEN 'attackers'
+                    WHEN tc.defender_captures >= bi.win_threshold THEN 'defenders'
+                    ELSE NULL
+                END as winner_side
+            FROM battle_info bi
+            LEFT JOIN territory_counts tc ON tc.battle_id = bi.id
+        )
+        UPDATE battles b
+        SET 
+            resolved_at = NOW(),
+            winner_side = cw.winner_side,
+            attacker_victory = (cw.winner_side = 'attackers')
+        FROM computed_winner cw
+        WHERE b.id = cw.battle_id
+          AND b.resolved_at IS NULL  -- CRITICAL: Only one Lambda wins this race
+          AND cw.winner_side IS NOT NULL  -- Only resolve if threshold met
+        RETURNING b.winner_side
+    """), {"battle_id": battle_id}).fetchone()
+    
+    return result[0] if result else None
 
 
 def _try_resolve_battle(db: Session, battle_id: int, winner_side: str) -> bool:
     """
-    Atomically try to claim and resolve a battle.
+    DEPRECATED: Use _atomic_check_and_resolve_battle instead.
     
-    Uses SELECT FOR UPDATE SKIP LOCKED to:
-    1. Lock the battle row (or skip if already locked)
-    2. Check if already resolved
-    3. Claim it if not
-    
-    Returns True if THIS call resolved it, False if already resolved or locked.
+    Kept for backward compatibility. Atomically marks battle as resolved.
+    Returns True if THIS call resolved it, False if already resolved.
     """
     from sqlalchemy import text
     
-    # Atomic claim: UPDATE only if not resolved, returns whether we got it
     result = db.execute(text("""
         UPDATE battles
         SET resolved_at = NOW(),
@@ -736,7 +829,7 @@ def _apply_battle_outcome_bulk(
             if winner_ids:
                 db.execute(text("""
                     INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
-                    SELECT unnest(:winner_ids::bigint[]), :kingdom_id, :rep_gain
+                    SELECT unnest(CAST(:winner_ids AS bigint[])), :kingdom_id, :rep_gain
                     ON CONFLICT (user_id, kingdom_id)
                     DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
                 """), {"winner_ids": winner_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
@@ -790,7 +883,7 @@ def _apply_battle_outcome_bulk(
                 if winner_ids:
                     db.execute(text("""
                         INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
-                        SELECT unnest(:winner_ids::bigint[]), :kingdom_id, :rep_gain
+                        SELECT unnest(CAST(:winner_ids AS bigint[])), :kingdom_id, :rep_gain
                         ON CONFLICT (user_id, kingdom_id)
                         DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
                     """), {"winner_ids": winner_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
@@ -859,7 +952,7 @@ def _apply_battle_outcome_bulk(
                 if defender_ids:
                     db.execute(text("""
                         INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)
-                        SELECT unnest(:defender_ids::bigint[]), :kingdom_id, :rep_gain
+                        SELECT unnest(CAST(:defender_ids AS bigint[])), :kingdom_id, :rep_gain
                         ON CONFLICT (user_id, kingdom_id)
                         DO UPDATE SET local_reputation = user_kingdoms.local_reputation + :rep_gain
                     """), {"defender_ids": defender_ids, "kingdom_id": kingdom.id, "rep_gain": WINNER_REP_GAIN})
@@ -924,28 +1017,27 @@ def _apply_battle_outcome_bulk(
     }
 
 
-def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bool:
+def _apply_battle_resolution_effects(db: Session, battle: Battle, winner_side: str) -> None:
     """
-    Resolve the battle when a side wins via territory capture.
+    Apply battle resolution effects AFTER the battle has been atomically resolved.
     
-    Uses atomic database operation to prevent race conditions.
-    Only ONE caller can successfully resolve - all others get False.
+    This handles:
+    - Recording combat strength stats
+    - Applying rewards/penalties to players
+    - Creating kingdom events
+    - Changing rulers (if applicable)
     
-    Returns: True if this call resolved the battle, False if already resolved.
+    This is called ONLY after _atomic_check_and_resolve_battle succeeds,
+    so we know we're the Lambda that won the resolution race.
     """
     from db.models.kingdom_event import KingdomEvent
+    from sqlalchemy import text
     
-    # ATOMIC CLAIM: Only one request can win this race
-    if not _try_resolve_battle(db, battle.id, winner_side):
-        return False
-    
-    # We won the race - proceed with resolution
     attacker_victory = (winner_side == "attackers")
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == battle.kingdom_id).first()
     if not kingdom:
-        db.commit()
-        return True
+        return
     
     wall_level = kingdom.wall_level or 0 if battle.is_invasion else 0
     
@@ -963,8 +1055,7 @@ def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bo
         wall_level=wall_level
     )
     
-    # Update battle stats (the resolved_at, winner_side, attacker_victory already set by _try_resolve_battle)
-    from sqlalchemy import text
+    # Update battle stats
     db.execute(text("""
         UPDATE battles
         SET attacker_strength = :atk_str,
@@ -999,6 +1090,22 @@ def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bo
     db.add(event)
     
     db.commit()
+
+
+def _resolve_battle_victory(db: Session, battle: Battle, winner_side: str) -> bool:
+    """
+    DEPRECATED: Use _atomic_check_and_resolve_battle + _apply_battle_resolution_effects instead.
+    
+    Kept for backward compatibility. Resolves battle and applies effects.
+    """
+    from db.models.kingdom_event import KingdomEvent
+    
+    # ATOMIC CLAIM: Only one request can win this race
+    if not _try_resolve_battle(db, battle.id, winner_side):
+        return False
+    
+    # Apply effects
+    _apply_battle_resolution_effects(db, battle, winner_side)
     return True
 
 
@@ -1910,8 +2017,13 @@ def resolve_fight_session(
     
     # Handle already captured territory
     if territory.is_captured:
-        winner_side = _check_win_condition(db, battle)
+        # Still try atomic resolution - catches edge case where territory was captured
+        # but battle wasn't resolved (e.g., previous request failed after capture)
+        winner_side = _atomic_check_and_resolve_battle(db, battle.id)
         battle_won = winner_side is not None
+        
+        if battle_won:
+            _apply_battle_resolution_effects(db, battle, winner_side)
         
         db.delete(session)
         _set_battle_cooldown(db, current_user.id, battle_id)
@@ -1963,7 +2075,6 @@ def resolve_fight_session(
     push_result = _atomic_push_territory(db, territory.id, session.side, push_amount)
     bar_before = push_result["bar_before"]
     bar_after = push_result["bar_after"]
-    newly_captured = push_result["newly_captured"]
     
     # Handle injury
     injured_player_name = None
@@ -1999,15 +2110,19 @@ def resolve_fight_session(
     
     _set_battle_cooldown(db, current_user.id, battle_id)
     
-    # Check win - only if THIS push captured a territory
-    battle_won = False
-    winner_side = None
+    # INDUSTRY STANDARD: Always try atomic resolution after every push.
+    # Single SQL operation that:
+    #   1. Counts captured territories (fresh from DB, no ORM cache)
+    #   2. Checks if win threshold met
+    #   3. Atomically resolves if threshold met AND not already resolved
+    # Only ONE Lambda wins the race due to resolved_at IS NULL check.
+    # This is IDEMPOTENT - safe to call on every push, no "newly_captured" gate needed.
+    winner_side = _atomic_check_and_resolve_battle(db, battle.id)
+    battle_won = winner_side is not None
     
-    if newly_captured:
-        winner_side = _check_win_condition(db, battle)
-        if winner_side:
-            # ATOMIC resolution - only ONE Lambda wins this race
-            battle_won = _resolve_battle_victory(db, battle, winner_side)
+    if battle_won:
+        # We won the resolution race - apply effects (rewards, events, ruler change)
+        _apply_battle_resolution_effects(db, battle, winner_side)
     
     # Save session data before deleting
     session_rolls = session.rolls or []
@@ -2036,6 +2151,9 @@ def resolve_fight_session(
             fight_description = f"Defended in Invasion of {kingdom_name}"
         action_type = "invasion_fought"
     
+    # Determine if territory is now captured (bar at 0 or 100)
+    territory_captured_by = push_result["captured_by"]
+    
     log_activity(
         db=db,
         user_id=current_user.id,
@@ -2050,7 +2168,7 @@ def resolve_fight_session(
             "territory": session_territory,
             "best_outcome": best_outcome,
             "push_amount": round(push_amount, 2),
-            "newly_captured": newly_captured,
+            "territory_captured_by": territory_captured_by,
         },
         visibility="friends"
     )
@@ -2059,8 +2177,8 @@ def resolve_fight_session(
     # Build message
     if battle_won:
         message = f"VICTORY! {winner_side.upper()} have won!"
-    elif newly_captured:
-        message = f"Territory captured by {push_result['captured_by']}!"
+    elif territory_captured_by:
+        message = f"Territory captured by {territory_captured_by}!"
     elif best_outcome == "miss":
         message = "All attacks missed. No progress."
     else:

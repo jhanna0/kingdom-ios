@@ -144,28 +144,28 @@ PROPERTY_TIERS = {
         "icon": "house.fill",
         "description": "A comfy home with garden",
         "benefits": ["All Land benefits", "A comfy home with garden"],
-        "per_action_costs": [{"resource": "wood", "amount": 8}],
+        "per_action_costs": [{"resource": "wood", "amount": 35}],  # Matches gold per action
     },
     3: {
         "name": "Workshop",
         "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
-        "per_action_costs": [{"resource": "wood", "amount": 10}, {"resource": "iron", "amount": 5}],
+        "per_action_costs": [{"resource": "wood", "amount": 45}, {"resource": "iron", "amount": 22}],
     },
     4: {
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
-        "per_action_costs": [{"resource": "wood", "amount": 12}, {"resource": "iron", "amount": 8}],
+        "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 27}],
     },
     5: {
         "name": "Defensive Walls",
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
-        "per_action_costs": [{"resource": "wood", "amount": 15}, {"resource": "iron", "amount": 10}],
+        "per_action_costs": [{"resource": "wood", "amount": 65}, {"resource": "iron", "amount": 32}],
     }
 }
 

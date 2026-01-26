@@ -284,7 +284,7 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     hometown_value = None
     
     for key, value in updates.items():
-        if key in player_state_fields and value is not None:
+        if key in player_states_fields and value is not None:
             print(f"   - Setting player_state.{key} = {value}")
             setattr(player_state, key, value)
             
