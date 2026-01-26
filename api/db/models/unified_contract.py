@@ -1,7 +1,7 @@
 """
 Unified Contract system - All contracts (training, crafting, property, buildings)
 """
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, ForeignKey, Index
+from sqlalchemy import Column, String, Integer, BigInteger, Float, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -34,10 +34,15 @@ class UnifiedContract(Base):
     actions_required = Column(Integer, nullable=False, default=1)
     
     # Cost paid (denormalized for history)
+    # OLD SYSTEM: gold_paid > 0 means player paid upfront, actions are free
     gold_paid = Column(Integer, default=0)
     iron_paid = Column(Integer, default=0)
     steel_paid = Column(Integer, default=0)
     wood_paid = Column(Integer, default=0)
+    
+    # NEW SYSTEM: gold_per_action > 0 means player pays per action (+ tax on top)
+    # Backwards compat: if gold_paid > 0 and gold_per_action = 0, actions are free
+    gold_per_action = Column(Float, default=0.0)
     
     # Reward pool (for kingdom contracts)
     reward_pool = Column(Integer, default=0)

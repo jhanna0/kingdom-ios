@@ -278,10 +278,250 @@ extension ActionStatus {
     }
 }
 
+// MARK: - Cost Item with Tax Support
+
+/// Extended cost item that can show tax breakdown
+struct CostItemWithTax: Identifiable {
+    let id = UUID()
+    let icon: String
+    let baseAmount: Double
+    let taxAmount: Double
+    let taxRate: Int  // Percentage (e.g., 10 for 10%)
+    let color: Color
+    let canAfford: Bool
+    
+    /// Total cost (base + tax)
+    var totalAmount: Double {
+        return baseAmount + taxAmount
+    }
+    
+    /// Whether this cost has tax
+    var hasTax: Bool {
+        return taxRate > 0 && taxAmount > 0
+    }
+    
+    init(icon: String, baseAmount: Double, taxRate: Int = 0, color: Color = KingdomTheme.Colors.goldLight, canAfford: Bool = true) {
+        self.icon = icon
+        self.baseAmount = baseAmount
+        self.taxRate = taxRate
+        self.taxAmount = baseAmount * Double(taxRate) / 100.0
+        self.color = color
+        self.canAfford = canAfford
+    }
+}
+
+// MARK: - Cost Row with Tax Display
+
+/// Displays costs with optional tax breakdown
+/// Shows: [COST 🍖5 💰10 (+2 tax)]
+struct ActionCostRowWithTax: View {
+    let costs: [CostItem]
+    let goldCost: CostItemWithTax?
+    
+    var body: some View {
+        if !costs.isEmpty || goldCost != nil {
+            HStack(spacing: 8) {
+                Text("COST")
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(width: 40, alignment: .leading)
+                
+                HStack(spacing: 6) {
+                    // Regular costs (food, resources)
+                    ForEach(costs) { cost in
+                        costBadge(cost: cost)
+                    }
+                    
+                    // Gold cost with tax
+                    if let gold = goldCost {
+                        goldCostBadge(gold: gold)
+                    }
+                }
+                
+                Spacer()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func costBadge(cost: CostItem) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: cost.icon)
+                .font(FontStyles.iconMini)
+                .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+            Text("\(cost.amount)")
+                .font(FontStyles.labelBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
+    }
+    
+    @ViewBuilder
+    private func goldCostBadge(gold: CostItemWithTax) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: gold.icon)
+                .font(FontStyles.iconMini)
+                .foregroundColor(gold.canAfford ? KingdomTheme.Colors.goldLight : .red)
+            
+            if gold.hasTax {
+                // Show total with tax breakdown
+                Text("\(Int(gold.totalAmount))")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                Text("(+\(Int(gold.taxAmount)) tax)")
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            } else {
+                Text("\(Int(gold.baseAmount))")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
+    }
+}
+
+// MARK: - Combined Cost/Reward Row with Tax Support
+
+/// Displays costs (with tax support) and rewards as two grouped badges
+struct ActionCostRewardRowWithTax: View {
+    let costs: [CostItem]
+    let goldCost: CostItemWithTax?
+    let rewards: [RewardItem]
+    
+    var body: some View {
+        if !costs.isEmpty || goldCost != nil || !rewards.isEmpty {
+            HStack(spacing: 12) {
+                // Cost badge - contains label + all costs
+                if !costs.isEmpty || goldCost != nil {
+                    costGroupBadge()
+                }
+                
+                // Earn badge - contains label + all rewards
+                if !rewards.isEmpty {
+                    earnGroupBadge()
+                }
+                
+                Spacer()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func costGroupBadge() -> some View {
+        HStack(spacing: 8) {
+            Text("COST")
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            // Regular costs (food, resources)
+            ForEach(costs) { cost in
+                HStack(spacing: 3) {
+                    Image(systemName: cost.icon)
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                    Text("\(cost.amount)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+            }
+            
+            // Gold cost with tax
+            if let gold = goldCost {
+                HStack(spacing: 3) {
+                    Image(systemName: gold.icon)
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(gold.canAfford ? KingdomTheme.Colors.goldLight : .red)
+                    
+                    if gold.hasTax {
+                        Text("\(Int(gold.totalAmount))")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        Text("(+\(Int(gold.taxAmount)) tax)")
+                            .font(FontStyles.labelTiny)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    } else {
+                        Text("\(Int(gold.baseAmount))")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
+    }
+    
+    @ViewBuilder
+    private func earnGroupBadge() -> some View {
+        HStack(spacing: 8) {
+            Text("EARN")
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            ForEach(rewards) { reward in
+                HStack(spacing: 3) {
+                    Image(systemName: reward.icon)
+                        .font(FontStyles.iconMini)
+                        .foregroundColor(reward.color)
+                    Text("\(reward.amount)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchment,
+            cornerRadius: 6,
+            shadowOffset: 1,
+            borderWidth: 1.5
+        )
+    }
+}
+
+// MARK: - Helper to build costs from TrainingContract
+
+extension TrainingContract {
+    /// Build gold cost item with tax for training actions
+    func buildGoldCostItem(canAfford: Bool = true) -> CostItemWithTax? {
+        guard isPayPerAction, let goldPerAction = goldPerAction else { return nil }
+        
+        return CostItemWithTax(
+            icon: "g.circle.fill",
+            baseAmount: goldPerAction,
+            taxRate: currentTaxRate ?? 0,
+            color: KingdomTheme.Colors.goldLight,
+            canAfford: canAfford
+        )
+    }
+}
+
 // MARK: - Helper to build costs from PropertyUpgradeContract
 
 extension PropertyUpgradeContract {
-    /// Build cost items for property upgrade work
+    /// Build cost items for property upgrade work (food + resources, NOT gold)
     func buildCostItems() -> [CostItem] {
         var items: [CostItem] = []
         
@@ -308,5 +548,18 @@ extension PropertyUpgradeContract {
         }
         
         return items
+    }
+    
+    /// Build gold cost item with tax for property upgrade actions
+    func buildGoldCostItem() -> CostItemWithTax? {
+        guard isPayPerAction, let goldPerAction = goldPerAction else { return nil }
+        
+        return CostItemWithTax(
+            icon: "g.circle.fill",
+            baseAmount: goldPerAction,
+            taxRate: currentTaxRate ?? 0,
+            color: KingdomTheme.Colors.goldLight,
+            canAfford: canAffordGold ?? true
+        )
     }
 }

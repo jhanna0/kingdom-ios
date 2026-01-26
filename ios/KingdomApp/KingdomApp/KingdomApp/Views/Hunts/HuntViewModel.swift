@@ -103,6 +103,11 @@ class HuntViewModel: ObservableObject {
         hunt?.phase_state?.can_resolve ?? false
     }
     
+    /// Backend tells us when to show streak popup
+    var shouldShowStreakPopup: Bool {
+        hunt?.shouldShowStreakPopup ?? false
+    }
+    
     /// Rolls completed in current phase
     var rollsCompleted: Int {
         hunt?.phase_state?.rounds_completed ?? 0

@@ -40,7 +40,7 @@ struct TrainingContractCard: View {
         skillConfig.color
     }
     
-    // Build cost items (food only for training)
+    // Build cost items (food for training)
     private func buildCostItems() -> [CostItem] {
         var items: [CostItem] = []
         
@@ -54,6 +54,18 @@ struct TrainingContractCard: View {
         }
         
         return items
+    }
+    
+    // Build gold cost with tax (for pay-per-action contracts)
+    private func buildGoldCost() -> CostItemWithTax? {
+        return contract.buildGoldCostItem(canAfford: canAffordGold)
+    }
+    
+    // Check if player can afford gold cost
+    private var canAffordGold: Bool {
+        // For now assume true - backend will validate
+        // Future: pass player gold from parent view
+        return true
     }
     
     
@@ -102,8 +114,8 @@ struct TrainingContractCard: View {
                 }
             }
             
-            // Cost and Reward Row
-            ActionCostRewardRow(costs: buildCostItems(), rewards: status.buildRewardItems())
+            // Cost and Reward Row (with tax support for pay-per-action)
+            ActionCostRewardRowWithTax(costs: buildCostItems(), goldCost: buildGoldCost(), rewards: status.buildRewardItems())
             
             // Progress bar - brutalist style
             GeometryReader { geometry in

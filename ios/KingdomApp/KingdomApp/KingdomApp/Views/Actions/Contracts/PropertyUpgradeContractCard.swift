@@ -86,8 +86,8 @@ struct PropertyUpgradeContractCard: View {
                 }
             }
             
-            // Cost Row (food + resources per action) - property upgrades have no rewards
-            ActionCostRewardRow(costs: contract.buildCostItems(), rewards: [])
+            // Cost Row (food + resources + gold per action) - property upgrades have no rewards
+            ActionCostRewardRowWithTax(costs: contract.buildCostItems(), goldCost: contract.buildGoldCostItem(), rewards: [])
             
             // Progress bar - brutalist style
             GeometryReader { geometry in

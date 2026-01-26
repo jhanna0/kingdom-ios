@@ -122,7 +122,9 @@ class PropertyAPI {
         let property_upgrade_contracts: [PropertyUpgradeContract]?
         let properties_upgrade_status: [PropertyUpgradeStatusItem]
         let current_kingdom: CurrentKingdomInfo?
-        let land_price: Int?
+        let land_price: Int?  // OLD: Total cost (backwards compat)
+        let gold_per_action_for_land: Double?  // NEW: Per-action cost
+        let actions_for_land: Int?  // NEW: Number of actions needed
         let can_afford: Bool
         let already_owns_property_in_current_kingdom: Bool
         let meets_reputation_requirement: Bool

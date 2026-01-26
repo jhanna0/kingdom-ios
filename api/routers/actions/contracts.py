@@ -283,7 +283,12 @@ def work_on_property_upgrade(
     db: Session = Depends(get_db)
 ):
     """Contribute one action to a property upgrade/construction contract.
-    CONSUMES PER-ACTION RESOURCES (wood, iron, etc.) - must have enough!
+    
+    PAY-PER-ACTION SYSTEM:
+    - NEW contracts (gold_per_action > 0): Pay gold_per_action + kingdom tax each action
+    - OLD contracts (gold_paid > 0, gold_per_action = 0): Actions are FREE (already paid upfront)
+    - Tax goes to kingdom treasury, base cost is burned
+    - Also consumes per-action resources (wood, iron, etc.)
     """
     state = current_user.player_state
     if not state:
@@ -311,6 +316,35 @@ def work_on_property_upgrade(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contract is already completed"
         )
+    
+    # === PAY-PER-ACTION GOLD COST ===
+    # Check if this is a new-style contract (pay per action) or old-style (already paid)
+    gold_per_action = contract.gold_per_action or 0
+    action_gold_cost = 0
+    tax_amount = 0
+    tax_rate = 0
+    
+    if gold_per_action > 0:
+        # NEW SYSTEM: Calculate action cost with tax
+        kingdom = None
+        if contract.kingdom_id:
+            kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+        
+        # Get tax rate (rulers don't pay tax)
+        is_ruler = kingdom and kingdom.ruler_id == current_user.id
+        tax_rate = 0 if is_ruler else (kingdom.tax_rate if kingdom else 0)
+        
+        # Total cost = base + tax
+        tax_amount = gold_per_action * tax_rate / 100
+        action_gold_cost = gold_per_action + tax_amount
+        
+        # Check if player can afford gold
+        if state.gold < action_gold_cost:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Not enough gold. Need {int(action_gold_cost)}g ({int(gold_per_action)}g + {int(tax_amount)}g tax), have {int(state.gold)}g"
+            )
+    # else: OLD SYSTEM - gold_paid > 0 means they paid upfront, action is FREE
     
     # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
     from routers.tiers import get_property_per_action_costs
@@ -396,6 +430,16 @@ def work_on_property_upgrade(
             detail="Contract already has all required actions"
         )
     
+    # === DEDUCT GOLD COST (if pay-per-action) ===
+    if action_gold_cost > 0:
+        state.gold -= action_gold_cost
+        
+        # Add tax to kingdom treasury (base cost is burned)
+        if tax_amount > 0 and contract.kingdom_id:
+            kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+            if kingdom:
+                kingdom.treasury_gold += tax_amount
+    
     # DEDUCT PER-ACTION RESOURCES
     resources_required = []
     for cost in per_action_costs:
@@ -443,9 +487,14 @@ def work_on_property_upgrade(
             message = f"Property upgraded to Tier {contract.tier}! Your land grows stronger!"
     else:
         action_word = "constructing" if contract.tier == 1 else "upgrading"
+        cost_parts = []
+        if action_gold_cost > 0:
+            cost_parts.append(f"-{int(action_gold_cost)}g")
         if resources_required:
-            required_str = ", ".join([f"-{c['amount']} {c['resource']}" for c in resources_required])
-            message = f"You worked on {action_word} your property! ({required_str})"
+            cost_parts.extend([f"-{c['amount']} {c['resource']}" for c in resources_required])
+        
+        if cost_parts:
+            message = f"You worked on {action_word} your property! ({', '.join(cost_parts)})"
         else:
             message = f"You worked on {action_word} your property!"
     
@@ -462,7 +511,14 @@ def work_on_property_upgrade(
         "next_work_available_at": format_datetime_iso(datetime.utcnow() + timedelta(minutes=cooldown_minutes)),
         "food_cost": food_result["food_cost"],
         "food_remaining": food_result["food_remaining"],
-        # NEW: Resources required this action (frontend can show)
+        # Gold cost info for new pay-per-action system
+        "gold_cost": {
+            "base": round(gold_per_action, 1),
+            "tax": round(tax_amount, 1),
+            "tax_rate": tax_rate,
+            "total": round(action_gold_cost, 1)
+        } if gold_per_action > 0 else None,
+        # Resources required this action (frontend can show)
         "resources_required": resources_required,
         "per_action_costs": enriched_costs  # What future actions will cost
     }

@@ -60,11 +60,13 @@ struct HuntResultsView: View {
             if let totalMeat = viewModel.hunt?.rewards?.total_meat {
                 animateMeatCountUp(to: totalMeat)
             }
-            // Backend tells us when to show streak popup
-            if viewModel.hunt?.shouldShowStreakPopup == true {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showStreakPopup = true
-                }
+            // Check streak popup on appear (if already true)
+            checkAndShowStreakPopup()
+        }
+        // Also listen for changes (handles timing issues where data loads after view appears)
+        .onChange(of: viewModel.shouldShowStreakPopup) { _, shouldShow in
+            if shouldShow {
+                checkAndShowStreakPopup()
             }
         }
     }
@@ -402,6 +404,13 @@ struct HuntResultsView: View {
             }
             return "Better luck next time"
         default: return ""
+        }
+    }
+    
+    private func checkAndShowStreakPopup() {
+        guard viewModel.shouldShowStreakPopup, !showStreakPopup else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            showStreakPopup = true
         }
     }
     

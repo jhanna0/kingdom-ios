@@ -56,16 +56,16 @@ struct PropertyMarketView: View {
         .task {
             await loadPurchaseInfo()
         }
-        .alert("Purchase Land", isPresented: $showingPurchaseConfirmation) {
+        .alert("Start Land Clearing", isPresented: $showingPurchaseConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Purchase") {
+            Button("Start") {
                 Task {
                     await purchaseProperty()
                 }
             }
         } message: {
-            if let price = propertyStatus?.land_price, let kingdom = propertyStatus?.current_kingdom {
-                Text("Clear the forest on the \(selectedLocation) side and claim this land in \(kingdom.name) for \(price)g?")
+            if let kingdom = propertyStatus?.current_kingdom, let actions = propertyStatus?.actions_for_land, let goldPerAction = propertyStatus?.gold_per_action_for_land {
+                Text("Clear the forest on the \(selectedLocation) side in \(kingdom.name)? This requires \(actions) actions at \(Int(goldPerAction))g each.")
             } else {
                 Text("Clear the forest on the \(selectedLocation) side and claim this land?")
             }
@@ -258,42 +258,48 @@ struct PropertyMarketView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Price info
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(propertyStatus?.land_price != nil ? "Land Price" : "No Kingdom")
+            // Cost Per Action info
+            VStack(alignment: .leading, spacing: 8) {
+                if propertyStatus?.gold_per_action_for_land != nil {
+                    Text("Cost Per Action")
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                     
-                    if let price = propertyStatus?.land_price {
+                    // Use consistent cost row styling
+                    HStack(spacing: 12) {
+                        // Gold per action
                         HStack(spacing: 4) {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 8))
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(price)g")
-                                .font(FontStyles.headingMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                            Text("\(Int(propertyStatus?.gold_per_action_for_land ?? 0))g")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
-                    } else {
-                        Text("Check in first")
-                            .font(FontStyles.headingMedium)
+                        
+                        Text("×")
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        // Actions required
+                        HStack(spacing: 4) {
+                            Image(systemName: "hammer.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("\(propertyStatus?.actions_for_land ?? 0) actions")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                        }
                     }
-                }
-                
-                Spacer()
-                
-                if propertyStatus?.current_kingdom != nil {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Population")
-                            .font(FontStyles.labelTiny)
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                        Text("\(propertyStatus?.current_kingdom?.population ?? 0)")
-                            .font(FontStyles.labelMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
+                } else if propertyStatus?.current_kingdom == nil {
+                    Text("No Kingdom")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    Text("Check in first")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
             

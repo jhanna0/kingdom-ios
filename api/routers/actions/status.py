@@ -13,15 +13,28 @@ from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
 from routers.alliances import are_empires_allied
 from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
-from .training import calculate_training_cost, TRAINING_TYPES
-from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost
+from .training import TRAINING_TYPES
+from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost, calculate_training_gold_per_action, calculate_training_actions, get_all_skill_values
 
 
 def _get_training_costs_dict(state) -> dict:
-    """Helper to generate training costs dict for all skills"""
-    total = get_total_skill_points(state)
-    cost = calculate_training_cost(total)
-    return {skill_type: cost for skill_type in SKILL_TYPES}
+    """Helper to generate training costs dict for all skills.
+    
+    NEW: Each skill has different cost based on its current tier.
+    Returns gold_per_action for each skill.
+    """
+    total_points = get_total_skill_points(state)
+    current_stats = get_all_skill_values(state)
+    
+    costs = {}
+    for skill_type in SKILL_TYPES:
+        current_tier = current_stats.get(skill_type, 1)
+        target_tier = current_tier + 1
+        gold_per_action = calculate_training_gold_per_action(target_tier)
+        actions = calculate_training_actions(current_tier - 1, total_points)
+        # Return total gold for backwards compatibility with status display
+        costs[skill_type] = int(gold_per_action * actions)
+    return costs
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (
     WORK_BASE_COOLDOWN,
@@ -39,7 +52,7 @@ from .scout import SCOUT_COST_GOLD, OUTCOMES_BY_TIER, OUTCOME_DESCRIPTIONS
 router = APIRouter()
 
 
-def get_training_contracts_for_status(db: Session, user_id: int) -> list:
+def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rate: int = 0) -> list:
     """Get training contracts from unified_contracts table for status endpoint"""
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
@@ -54,12 +67,17 @@ def get_training_contracts_for_status(db: Session, user_id: int) -> list:
             ContractContribution.contract_id == contract.id
         ).scalar()
         
+        # Get gold per action for pay-per-action system
+        gold_per_action = contract.gold_per_action or 0
+        
         result.append({
             "id": str(contract.id),  # String for backwards compatibility
             "type": contract.type,
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost_paid": contract.gold_paid,
+            "cost_paid": contract.gold_paid,  # OLD: upfront payment (backwards compat)
+            "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
+            "current_tax_rate": current_tax_rate if gold_per_action > 0 else None,  # For display
             "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "status": "completed" if contract.completed_at else "in_progress"
         })
@@ -181,7 +199,7 @@ def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
-def get_property_contracts_for_status(db: Session, user_id: int, player_state) -> list:
+def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0) -> list:
     """Get property contracts from unified_contracts table for status endpoint"""
     from routers.tiers import PROPERTY_TIERS
     from routers.resources import RESOURCES
@@ -222,6 +240,13 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state) -
                 "icon": resource_info.get("icon", "questionmark.circle")
             })
         
+        # Get gold per action for pay-per-action system
+        gold_per_action = contract.gold_per_action or 0
+        
+        # Check if player can afford gold cost (with tax)
+        gold_cost_with_tax = gold_per_action * (1 + current_tax_rate / 100.0) if gold_per_action > 0 else 0
+        can_afford_gold = player_state.gold >= gold_cost_with_tax
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": property_id,
@@ -232,7 +257,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state) -
             "target_tier_name": get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost": contract.gold_paid,
+            "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
+            "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
+            "current_tax_rate": current_tax_rate if gold_per_action > 0 else None,  # For display
+            "can_afford_gold": can_afford_gold if gold_per_action > 0 else None,  # NEW: gold affordability
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "endpoint": f"/actions/work-property/{contract.id}",
@@ -259,6 +287,9 @@ def get_action_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Player state not found"
         )
+    
+    # Get kingdom early - needed for tax rate in contracts and later for coup eligibility
+    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
     
     # Calculate cooldowns based on skills
     work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
@@ -391,7 +422,7 @@ def get_action_status(
         }
     
     # Load property upgrade contracts from unified_contracts table
-    property_contracts = get_property_contracts_for_status(db, current_user.id, state)
+    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward
@@ -474,8 +505,7 @@ def get_action_status(
         "endpoint": "/actions/farm"
     }
     
-    # Get kingdom for coup eligibility checks
-    kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
+    # kingdom already loaded earlier for tax rate in contracts
     
     training_food_cost = calculate_food_cost(training_cooldown)
     actions["training"] = {
@@ -1079,7 +1109,7 @@ def get_action_status(
         "crafting": actions["crafting"],
         "vault_heist": actions["scout"],  # Legacy - now "Covert Operation" (T5 unlocks heist outcome)
         "scout": actions["scout"],
-        "training_contracts": get_training_contracts_for_status(db, current_user.id),
+        "training_contracts": get_training_contracts_for_status(db, current_user.id, kingdom.tax_rate if kingdom else 0),
         "training_costs": _get_training_costs_dict(state),
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,

@@ -9,6 +9,9 @@ struct SkillDetailView: View {
     let trainingContracts: [TrainingContract]
     let onPurchase: () -> Void
     
+    // Optional: Tax rate from kingdom (0 if not provided - backwards compatible)
+    var currentTaxRate: Int = 0
+    
     @State private var selectedTier: Int = 1
     @State private var showSuccessToast: Bool = false
     
@@ -76,24 +79,42 @@ struct SkillDetailView: View {
                             .fill(skillColor.opacity(0.3))
                             .frame(height: 2)
                         
-                        // Cost - Show only for next tier
+                        // Cost Per Action - Show only for next tier
                         if tier == currentTier + 1 && currentTier < 5 {
                             VStack(alignment: .leading, spacing: 12) {
-                                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost")
+                                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost Per Action")
                                 
-                                ResourceRow(
-                                    icon: "g.circle.fill",
-                                    iconColor: KingdomTheme.Colors.goldLight,
-                                    label: "Gold",
-                                    required: unifiedTrainingCost,
-                                    available: player.gold
+                                // Use ActionCostRowWithTax for consistent styling
+                                // Note: Food cost is shown in the action card, not here at purchase time
+                                ActionCostRowWithTax(
+                                    costs: [],
+                                    goldCost: buildGoldCost()
                                 )
                                 
-                                // Show note about unified cost scaling
-                                Text("Cost scales with total skill points across all skills")
-                                    .font(FontStyles.labelTiny)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    .padding(.top, 4)
+                                // Show total estimate
+                                let actionsRequired = tierManager.trainingActionsFor(currentLevel: currentTier)
+                                let totalGold = Int(goldPerAction * Double(actionsRequired))
+                                let totalWithTax = Int(goldPerActionWithTax * Double(actionsRequired))
+                                
+                                HStack(spacing: 4) {
+                                    Text("Total for \(actionsRequired) actions:")
+                                        .font(FontStyles.labelTiny)
+                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    
+                                    if currentTaxRate > 0 {
+                                        Text("\(totalWithTax)g")
+                                            .font(FontStyles.labelBold)
+                                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                                        Text("(+\(Int(taxAmount * Double(actionsRequired)))g tax)")
+                                            .font(FontStyles.labelTiny)
+                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    } else {
+                                        Text("\(totalGold)g")
+                                            .font(FontStyles.labelBold)
+                                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                                    }
+                                }
+                                .padding(.top, 4)
                             }
                             
                             Rectangle()
@@ -217,7 +238,7 @@ struct SkillDetailView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
-                        Text("Training purchased! Level in actions menu.")
+                        Text("Training started! Complete actions to level up.")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                     }
@@ -299,15 +320,38 @@ struct SkillDetailView: View {
         }
     }
     
-    private var unifiedTrainingCost: Int {
-        // ALL skills cost the SAME - based on total skill points across ALL skills
-        print("🎯 SkillDetailView: \(skillType) costs \(player.trainingCost)g (unified cost for ALL skills)")
-        return player.trainingCost
+    /// Gold cost per action (derived from total cost / actions)
+    private var goldPerAction: Double {
+        let totalCost = player.trainingCost
+        let actionsRequired = tierManager.trainingActionsFor(currentLevel: currentTier)
+        guard actionsRequired > 0 else { return Double(totalCost) }
+        return Double(totalCost) / Double(actionsRequired)
     }
     
+    /// Tax amount per action
+    private var taxAmount: Double {
+        return goldPerAction * Double(currentTaxRate) / 100.0
+    }
+    
+    /// Gold cost per action with tax
+    private var goldPerActionWithTax: Double {
+        return goldPerAction + taxAmount
+    }
+    
+    /// Build gold cost item with tax
+    private func buildGoldCost() -> CostItemWithTax {
+        return CostItemWithTax(
+            icon: "g.circle.fill",
+            baseAmount: goldPerAction,
+            taxRate: currentTaxRate,
+            color: KingdomTheme.Colors.goldLight,
+            canAfford: player.gold >= Int(goldPerActionWithTax)
+        )
+    }
     
     private var canAffordSelectedTier: Bool {
-        return player.gold >= unifiedTrainingCost
+        // Check if player can afford at least one action
+        return player.gold >= Int(goldPerActionWithTax)
     }
     
     private var hasActiveTraining: Bool {
