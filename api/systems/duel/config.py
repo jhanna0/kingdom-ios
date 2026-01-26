@@ -3,36 +3,53 @@ DUEL CONFIG
 ===========
 Combat formulas for 1v1 PvP Arena duels.
 
-Uses same base formula as hunting/battles but tuned for 1v1:
+Uses same hit chance formula as battles:
   hit_chance = attack / (enemy_defense * 2)
 
-Differences from battles:
-- No territories, just one tug-of-war bar
-- Turn-based (alternating turns, not simultaneous)
-- Simpler: no injuries, no leadership multipliers
-- Faster matches (stronger pushes, quicker resolution)
-
-FORMULAS:
----------
-1. HIT CHANCE:
-   base_hit = attack / (enemy_defense * 2)
-   Capped between 10% and 90%
-   
-2. CRITICAL CHANCE:
-   critical = hit_chance * CRITICAL_MULTIPLIER (0.15 = 15% of hits are crits)
-   
-3. PUSH PER HIT:
-   hit_push = PUSH_BASE (10)
-   critical_push = hit_push * CRITICAL_PUSH_BONUS (1.5x)
-   
-4. BAR:
-   Starts at 50 (neutral)
-   Challenger pushes toward 0 (wins at 0)
-   Opponent pushes toward 100 (wins at 100)
+Push formula adapted for 1v1 (leadership matters!):
+  push = DUEL_PUSH_BASE * (1 + leadership * DUEL_LEADERSHIP_BONUS)
+  
+Higher leadership = harder push per hit.
 """
 
+# Import battle constants for consistency
+from systems.coup.config import (
+    INJURE_PUSH_MULTIPLIER,
+    HIT_MULTIPLIER,
+    INJURE_MULTIPLIER,
+    calculate_roll_chances,
+    calculate_max_rolls,
+)
+
+# Re-export as DUEL_ prefixed for consistency
+DUEL_HIT_MULTIPLIER = HIT_MULTIPLIER
+
 # ============================================================
-# COMBAT MECHANICS
+# DUEL PUSH FORMULA
+# ============================================================
+
+# Base push per hit (before leadership bonus)
+DUEL_PUSH_BASE = 4.0  # 4% base push
+
+# Leadership bonus: each level adds this much to the multiplier
+# push = BASE * (1 + leadership * BONUS)
+# Leadership is 0-5, so with 0.20 bonus per level:
+# leadership 0: push = 4.0 * 1.0 = 4.0%
+# leadership 1: push = 4.0 * 1.20 = 4.8%
+# leadership 2: push = 4.0 * 1.40 = 5.6%
+# leadership 3: push = 4.0 * 1.60 = 6.4%
+# leadership 4: push = 4.0 * 1.80 = 7.2%
+# leadership 5: push = 4.0 * 2.0 = 8.0%
+DUEL_LEADERSHIP_BONUS = 0.20  # 20% more push per leadership level
+
+# Critical hits push harder (same multiplier as battles)
+DUEL_CRITICAL_PUSH_BONUS = INJURE_PUSH_MULTIPLIER  # 1.5x
+
+# Miss gives no push
+DUEL_MISS_PUSH = 0.0
+
+# ============================================================
+# HIT CHANCE
 # ============================================================
 
 # Hit chance formula: attack / (defense * this)
@@ -42,22 +59,14 @@ DUEL_DEFENSE_MULTIPLIER = 2.0
 DUEL_MIN_HIT_CHANCE = 0.10  # 10% minimum
 DUEL_MAX_HIT_CHANCE = 0.90  # 90% maximum
 
-# Multipliers for hits
-DUEL_HIT_MULTIPLIER = 1.0    # Normal hit
-DUEL_CRITICAL_MULTIPLIER = 0.15  # 15% of successful hits are critical
-
-# Push amounts
-DUEL_PUSH_BASE = 10.0           # Base push per successful hit
-DUEL_CRITICAL_PUSH_BONUS = 1.5  # Critical hits push 50% more
-
-# Miss gives no push
-DUEL_MISS_PUSH = 0.0
+# Critical multiplier (15% of hits are crits)
+DUEL_CRITICAL_MULTIPLIER = 0.15
 
 # ============================================================
 # TIMING
 # ============================================================
 
-DUEL_TURN_TIMEOUT_SECONDS = 60     # 60 seconds per turn
+DUEL_TURN_TIMEOUT_SECONDS = 30     # 30 seconds per turn (strict enforcement)
 DUEL_INVITATION_TIMEOUT_MINUTES = 15  # Invitations expire after 15 min
 DUEL_MATCH_TIMEOUT_MINUTES = 30    # Matches expire if inactive for 30 min
 
@@ -67,8 +76,6 @@ DUEL_MATCH_TIMEOUT_MINUTES = 30    # Matches expire if inactive for 30 min
 
 DUEL_MAX_WAGER = 1000  # Max gold you can wager
 DUEL_MIN_WAGER = 0     # Wager is optional
-
-# Match code length
 DUEL_CODE_LENGTH = 6   # e.g., "ABC123"
 
 # ============================================================
@@ -78,67 +85,72 @@ DUEL_CODE_LENGTH = 6   # e.g., "ABC123"
 def calculate_duel_hit_chance(attack: int, enemy_defense: int) -> float:
     """
     Calculate hit chance for a duel attack.
-    
-    Formula: attack / (defense * 2)
-    +1 is added to both to give everyone baseline stats.
-    
-    Returns: Float 0.10 to 0.90
+    Same formula as battles.
     """
-    # Add 1 to ensure baseline chance
     effective_attack = attack + 1
     effective_defense = enemy_defense + 1
     
     hit_chance = effective_attack / (effective_defense * DUEL_DEFENSE_MULTIPLIER)
-    
-    # Clamp between min and max
     return max(DUEL_MIN_HIT_CHANCE, min(DUEL_MAX_HIT_CHANCE, hit_chance))
 
 
-def calculate_duel_push(is_hit: bool, is_critical: bool = False) -> float:
+def calculate_duel_max_rolls(attack: int) -> int:
+    """Calculate max rolls for a duel turn. Same as battles: 1 + attack."""
+    return calculate_max_rolls(attack)
+
+
+def calculate_duel_roll_chances(attack: int, enemy_defense: int) -> tuple:
     """
-    Calculate push amount for an attack.
-    
-    Returns:
-        0.0 for miss
-        PUSH_BASE (10.0) for hit
-        PUSH_BASE * 1.5 (15.0) for critical
+    Calculate miss/hit/crit probabilities (same as battles).
+    Returns: (miss_chance, hit_chance, crit_chance) as integers 0-100
     """
-    if not is_hit:
-        return DUEL_MISS_PUSH
+    miss_pct, hit_pct, injure_pct = calculate_roll_chances(attack, enemy_defense)
+    return (
+        int(round(miss_pct * 100)),
+        int(round(hit_pct * 100)),
+        int(round(injure_pct * 100)),
+    )
+
+
+def calculate_duel_push(leadership: int, is_critical: bool = False) -> float:
+    """
+    Calculate push amount for a duel attack.
     
-    push = DUEL_PUSH_BASE
+    Formula: DUEL_PUSH_BASE * (1 + leadership * DUEL_LEADERSHIP_BONUS)
+    
+    Higher leadership = harder push!
+    
+    Examples (leadership is 0-5):
+      leadership 0: hit=4.0%, crit=6.0%
+      leadership 3: hit=6.4%, crit=9.6%
+      leadership 5: hit=8.0%, crit=12.0%
+    """
+    multiplier = 1.0 + (leadership * DUEL_LEADERSHIP_BONUS)
+    base_push = DUEL_PUSH_BASE * multiplier
+    
     if is_critical:
-        push *= DUEL_CRITICAL_PUSH_BONUS
-    
-    return push
+        return base_push * DUEL_CRITICAL_PUSH_BONUS
+    return base_push
 
 
 def calculate_roll_outcome(
     roll_value: float,
-    hit_chance: float
+    hit_chance: float,
+    leadership: int = 0
 ) -> tuple[str, float]:
     """
     Determine outcome of a duel roll.
-    
-    Args:
-        roll_value: Random float 0.0-1.0
-        hit_chance: Probability of hitting (0.10-0.90)
-    
-    Returns:
-        (outcome, push_amount)
-        outcome is 'miss', 'hit', or 'critical'
     """
     if roll_value > hit_chance:
-        return ("miss", 0.0)
+        return ("miss", DUEL_MISS_PUSH)
     
     # It's a hit - check if critical
-    # Critical if roll is in the top 15% of the hit range
     critical_threshold = hit_chance * (1 - DUEL_CRITICAL_MULTIPLIER)
     
     if roll_value < critical_threshold:
-        return ("critical", DUEL_PUSH_BASE * DUEL_CRITICAL_PUSH_BONUS)
+        return ("critical", calculate_duel_push(leadership, is_critical=True))
     else:
-        return ("hit", DUEL_PUSH_BASE)
+        return ("hit", calculate_duel_push(leadership, is_critical=False))
 
 
 def generate_match_code() -> str:
@@ -146,9 +158,7 @@ def generate_match_code() -> str:
     import random
     import string
     
-    # Mix of uppercase letters and digits, easy to read
     chars = string.ascii_uppercase + string.digits
-    # Remove confusing characters
     chars = chars.replace('O', '').replace('0', '').replace('I', '').replace('1', '').replace('L', '')
     
     return ''.join(random.choice(chars) for _ in range(DUEL_CODE_LENGTH))

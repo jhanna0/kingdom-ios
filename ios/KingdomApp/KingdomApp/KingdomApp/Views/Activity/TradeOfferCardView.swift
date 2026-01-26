@@ -102,3 +102,112 @@ struct TradeOfferCard: View {
         .padding(.horizontal)
     }
 }
+
+// MARK: - Duel Challenge Card
+
+struct DuelChallengeCard: View {
+    let challenge: DuelInvitation
+    let onAccept: () async -> Void
+    let onDecline: () async -> Void
+    
+    @State private var isProcessing = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack(spacing: 12) {
+                // Challenger icon
+                Image(systemName: "figure.fencing")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 10)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(challenge.inviterName)
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("challenges you to a duel!")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    
+                    // Show challenger stats if available
+                    if let stats = challenge.challengerStats {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "burst.fill")
+                                    .font(.system(size: 9))
+                                Text("\(stats.attack)")
+                            }
+                            .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                            
+                            HStack(spacing: 2) {
+                                Image(systemName: "shield.fill")
+                                    .font(.system(size: 9))
+                                Text("\(stats.defense)")
+                            }
+                            .foregroundColor(KingdomTheme.Colors.royalBlue)
+                        }
+                        .font(FontStyles.labelTiny)
+                    }
+                    
+                    // Wager if any
+                    if challenge.wagerGold > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            Text("\(challenge.wagerGold) gold wager")
+                                .font(FontStyles.labelTiny)
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Accept/Decline buttons
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onAccept()
+                        isProcessing = false
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(FontStyles.iconMini)
+                        Text("Accept")
+                            .font(FontStyles.labelBold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
+                .disabled(isProcessing)
+                
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onDecline()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Decline")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
+                .disabled(isProcessing)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
+    }
+}

@@ -28,5 +28,3 @@ else:
 # Secret code for App Store reviewers to access demo account
 DEMO_LOGIN_SECRET = "REVIEW_2026"
 
-
-

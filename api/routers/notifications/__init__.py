@@ -146,11 +146,19 @@ def get_quick_summary(
         TradeOffer.status == TradeOfferStatus.PENDING.value
     ).count()
     
+    # Count pending duel challenges received
+    from db.models.duel import DuelInvitation
+    pending_duel_requests = db.query(DuelInvitation).filter(
+        DuelInvitation.invitee_id == current_user.id,
+        DuelInvitation.status == "pending"
+    ).count()
+    
     return {
         "has_unread": has_unread,
         "pending_friend_requests": pending_friend_requests,
         "pending_alliance_requests": pending_alliance_requests,
-        "pending_trade_requests": pending_trade_requests
+        "pending_trade_requests": pending_trade_requests,
+        "pending_duel_requests": pending_duel_requests
     }
 
 

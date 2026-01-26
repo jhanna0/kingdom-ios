@@ -96,6 +96,14 @@ class DuelsAPI {
         return try await client.execute(request)
     }
     
+    /// Claim victory due to opponent timeout
+    func claimTimeout(matchId: Int) async throws -> DuelResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let request = client.request(endpoint: "/duels/\(matchId)/claim-timeout", method: "POST")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Match Info
     
     /// Get match by ID

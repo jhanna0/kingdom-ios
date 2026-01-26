@@ -137,7 +137,10 @@ struct DuelMatch: Codable, Identifiable {
     
     let controlBar: Double
     let currentTurn: String?
+    let currentTurnPlayerId: Int?  // Direct player ID for convenience
     let turnExpiresAt: String?
+    let turnTimeoutSeconds: Int?  // How long each turn lasts
+    let firstTurnPlayerId: Int?   // Who went first (for history tracking)
     
     let wagerGold: Int
     
@@ -160,7 +163,10 @@ struct DuelMatch: Codable, Identifiable {
         case opponent
         case controlBar = "control_bar"
         case currentTurn = "current_turn"
+        case currentTurnPlayerId = "current_turn_player_id"
         case turnExpiresAt = "turn_expires_at"
+        case turnTimeoutSeconds = "turn_timeout_seconds"
+        case firstTurnPlayerId = "first_turn_player_id"
         case wagerGold = "wager_gold"
         case winner
         case createdAt = "created_at"
@@ -346,8 +352,32 @@ struct DuelAttackResponse: Codable {
     let success: Bool
     let message: String
     let action: DuelActionResult?
+    let rolls: [DuelRoll]?
+    let maxRolls: Int?
+    let missChance: Int?
+    let hitChancePct: Int?
+    let critChance: Int?
     let match: DuelMatch?
     let winner: DuelWinner?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, action, rolls, match, winner
+        case maxRolls = "max_rolls"
+        case missChance = "miss_chance"
+        case hitChancePct = "hit_chance_pct"
+        case critChance = "crit_chance"
+    }
+}
+
+struct DuelRoll: Codable {
+    let rollNumber: Int
+    let value: Double
+    let outcome: String
+    
+    enum CodingKeys: String, CodingKey {
+        case rollNumber = "roll_number"
+        case value, outcome
+    }
 }
 
 struct DuelActionResult: Codable {

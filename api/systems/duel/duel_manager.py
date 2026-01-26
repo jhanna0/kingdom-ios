@@ -3,15 +3,26 @@ DUEL MANAGER
 ============
 Orchestrates 1v1 PvP duels in the Town Hall arena.
 
-Simplified flow (like trades):
+ARCHITECTURE PRINCIPLE: Backend is authoritative.
+- Backend determines who goes first (based on pairing history)
+- Backend enforces turn order (can't attack if not your turn)
+- Backend manages turn timer (30s)
+- Backend broadcasts turn results to BOTH players
+- Frontend just renders what backend tells it
+
+Flow:
 1. Challenger picks a friend and creates challenge -> opponent gets notification
 2. Opponent accepts/declines
-3. Both players start fighting
+3. Backend starts match, determines first player from pairing history
+4. Players take turns (30s each), backend broadcasts results
+5. If turn expires, opponent can claim timeout win
 
 Handles:
 - Challenge creation (match + invitation atomically)
 - Opponent accepting/declining
-- Turn-based combat execution
+- Turn order history (alternating who goes first)
+- Turn-based combat execution with strict enforcement
+- Real-time WebSocket broadcasts to both players
 - Match resolution and rewards
 """
 import random
@@ -19,7 +30,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple, Any
 from sqlalchemy.orm import Session
 
-from db.models import User, PlayerState, DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, Friend
+from db.models import User, PlayerState, DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, Friend, DuelPairingHistory
 from .config import (
     DUEL_TURN_TIMEOUT_SECONDS,
     DUEL_INVITATION_TIMEOUT_MINUTES,
@@ -34,7 +45,12 @@ class DuelManager:
     """
     Manager for PvP duel matches.
     
-    Simplified usage (like trades):
+    Backend is authoritative - prevents all cheating:
+    - Turn order enforced server-side
+    - Turn timer enforced server-side
+    - All state changes happen on backend, then broadcast to clients
+    
+    Usage:
         manager = DuelManager()
         match, invitation = manager.create_challenge(db, challenger_id, opponent_id, kingdom_id)
         # opponent receives notification, accepts:
@@ -46,6 +62,72 @@ class DuelManager:
     
     def __init__(self):
         self.rng = random.Random()
+    
+    # ===== Turn Order History =====
+    
+    def determine_first_player(self, db: Session, player_1_id: int, player_2_id: int) -> int:
+        """
+        Determine who should go first based on pairing history.
+        
+        If these players have dueled before, the OTHER player goes first this time.
+        If no history, player_1 (challenger) goes first.
+        
+        Args:
+            db: Database session
+            player_1_id: One player (typically challenger)
+            player_2_id: Other player (typically opponent)
+        
+        Returns:
+            ID of player who should go first
+        """
+        # Normalize the pair for consistent lookup
+        a_id, b_id = DuelPairingHistory.normalize_pair(player_1_id, player_2_id)
+        
+        history = db.query(DuelPairingHistory).filter(
+            DuelPairingHistory.player_a_id == a_id,
+            DuelPairingHistory.player_b_id == b_id
+        ).first()
+        
+        if not history:
+            # No history - challenger goes first
+            return player_1_id
+        
+        # Alternate: whoever went first last time does NOT go first now
+        if history.last_first_player_id == player_1_id:
+            return player_2_id
+        else:
+            return player_1_id
+    
+    def _update_pairing_history(
+        self, 
+        db: Session, 
+        player_1_id: int, 
+        player_2_id: int, 
+        first_player_id: int,
+        match_id: int
+    ) -> None:
+        """
+        Record who went first in this match for future alternation.
+        """
+        a_id, b_id = DuelPairingHistory.normalize_pair(player_1_id, player_2_id)
+        
+        history = db.query(DuelPairingHistory).filter(
+            DuelPairingHistory.player_a_id == a_id,
+            DuelPairingHistory.player_b_id == b_id
+        ).first()
+        
+        if history:
+            history.last_first_player_id = first_player_id
+            history.last_match_id = match_id
+            history.updated_at = datetime.utcnow()
+        else:
+            history = DuelPairingHistory(
+                player_a_id=a_id,
+                player_b_id=b_id,
+                last_first_player_id=first_player_id,
+                last_match_id=match_id
+            )
+            db.add(history)
     
     # ===== Challenge Creation =====
     
@@ -313,10 +395,13 @@ class DuelManager:
     
     def start_match(self, db: Session, match_id: int, player_id: int) -> DuelMatch:
         """
-        Start the duel (both players confirm ready).
+        Start the duel - determines who goes first based on pairing history.
         
-        For simplicity, we auto-start when opponent joins.
-        Challenger attacks first.
+        The first player is determined by alternating from previous duels:
+        - If these players never dueled: challenger goes first
+        - If they dueled before: the OTHER player goes first this time
+        
+        Returns the match with turn info set.
         """
         match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
         if not match:
@@ -335,11 +420,103 @@ class DuelManager:
                 if state:
                     state.gold = max(0, state.gold - match.wager_gold)
         
-        # Start the match
+        # Determine who goes first based on pairing history (alternates)
+        first_player_id = self.determine_first_player(
+            db, match.challenger_id, match.opponent_id
+        )
+        
+        # Set first turn
+        if first_player_id == match.challenger_id:
+            match.current_turn = "challenger"
+        else:
+            match.current_turn = "opponent"
+        
+        # Record who went first for history
+        match.first_turn_player_id = first_player_id
+        
+        # Start the match with turn timer
         match.status = DuelStatus.FIGHTING.value
         match.started_at = datetime.utcnow()
-        match.current_turn = "challenger"  # Challenger goes first
         match.turn_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_TURN_TIMEOUT_SECONDS)
+        
+        # Update pairing history for next time
+        self._update_pairing_history(
+            db, 
+            match.challenger_id, 
+            match.opponent_id, 
+            first_player_id,
+            match.id
+        )
+        
+        db.commit()
+        db.refresh(match)
+        
+        return match
+    
+    # ===== Turn Management =====
+    
+    def _switch_turn(self, match: DuelMatch) -> None:
+        """
+        Switch to the other player's turn and reset timer.
+        Called internally after a successful attack.
+        """
+        match.switch_turn()
+        match.turn_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_TURN_TIMEOUT_SECONDS)
+    
+    def check_turn_timeout(self, db: Session, match_id: int) -> Optional[Dict]:
+        """
+        Check if the current turn has timed out.
+        
+        Returns None if turn is still valid, or timeout info if expired.
+        This can be called by a background job or the claim-timeout endpoint.
+        """
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        if not match or match.status != DuelStatus.FIGHTING.value:
+            return None
+        
+        if match.turn_expires_at and datetime.utcnow() > match.turn_expires_at:
+            # Turn has expired
+            return {
+                "expired": True,
+                "timed_out_player_id": match.get_current_turn_player_id(),
+                "current_turn": match.current_turn,
+                "expired_at": match.turn_expires_at
+            }
+        
+        return None
+    
+    def forfeit_by_timeout(self, db: Session, match_id: int, claiming_player_id: int) -> DuelMatch:
+        """
+        Award victory to claiming player because opponent timed out.
+        
+        Validates that:
+        1. It's NOT the claiming player's turn
+        2. The turn has actually expired
+        
+        Returns the completed match.
+        """
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        if not match:
+            raise ValueError("Match not found")
+        
+        if match.status != DuelStatus.FIGHTING.value:
+            raise ValueError("Match is not in progress")
+        
+        if claiming_player_id not in [match.challenger_id, match.opponent_id]:
+            raise ValueError("You are not in this match")
+        
+        # Can only claim if it's NOT your turn
+        if match.get_current_turn_player_id() == claiming_player_id:
+            raise ValueError("It's your turn - you can't claim timeout")
+        
+        # Check if turn actually expired
+        if not match.turn_expires_at or datetime.utcnow() < match.turn_expires_at:
+            remaining = (match.turn_expires_at - datetime.utcnow()).seconds if match.turn_expires_at else 0
+            raise ValueError(f"Turn hasn't expired yet ({remaining}s remaining)")
+        
+        # Award victory to claiming player (opponent timed out)
+        winner_side = "challenger" if claiming_player_id == match.challenger_id else "opponent"
+        self._resolve_match(db, match, winner_side)
         
         db.commit()
         db.refresh(match)
@@ -357,14 +534,27 @@ class DuelManager:
         """
         Execute an attack in the duel.
         
+        BACKEND IS AUTHORITATIVE:
+        - Validates it's actually this player's turn
+        - Validates the match is in FIGHTING status
+        - Processes the attack server-side
+        - Updates bar position
+        - Switches turn (or resolves winner)
+        - Returns complete state for broadcast
+        
+        Like battles: you get multiple rolls (1 + attack), best outcome is used.
+        
         Args:
             db: Database session
             match_id: The duel match ID
             player_id: ID of the attacking player
         
         Returns:
-            Attack result with outcome, push, bar state, and winner (if any)
+            Attack result with all rolls, best outcome, push, bar state, 
+            next turn info, and winner (if any). Ready for broadcast.
         """
+        from .config import calculate_duel_max_rolls, calculate_duel_roll_chances
+        
         match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
         if not match:
             raise ValueError("Match not found")
@@ -372,8 +562,10 @@ class DuelManager:
         if not match.is_fighting:
             raise ValueError(f"Match is {match.status}, not fighting")
         
+        # STRICT TURN ENFORCEMENT - prevent cheating
         if not match.is_players_turn(player_id):
-            raise ValueError("It's not your turn")
+            current_turn_player = match.get_current_turn_player_id()
+            raise ValueError(f"Not your turn. Current turn: player {current_turn_player}")
         
         # Get player's side and stats
         side = match.get_player_side(player_id)
@@ -382,46 +574,86 @@ class DuelManager:
         
         attack = attacker_stats.get("attack", 0)
         defense = defender_stats.get("defense", 0)
+        leadership = attacker_stats.get("leadership", 0)  # Leadership affects push!
         
-        # Calculate hit chance and roll
+        # Calculate max rolls based on attack (like battles)
+        max_rolls = calculate_duel_max_rolls(attack)
         hit_chance = calculate_duel_hit_chance(attack, defense)
-        roll_value = self.rng.random()
+        miss_pct, hit_pct, crit_pct = calculate_duel_roll_chances(attack, defense)
         
-        outcome, push_amount = calculate_roll_outcome(roll_value, hit_chance)
+        # Do all rolls, track best outcome
+        rolls = []
+        best_outcome = "miss"
+        best_push = 0.0
+        best_roll_value = 0.0
+        
+        outcome_rank = {"miss": 0, "hit": 1, "critical": 2}
+        
+        for i in range(max_rolls):
+            roll_value = self.rng.random()
+            outcome, push_amount = calculate_roll_outcome(roll_value, hit_chance, leadership)
+            
+            rolls.append({
+                "roll_number": i + 1,
+                "value": round(roll_value * 100, 1),  # 0-100 for display
+                "outcome": outcome,
+            })
+            
+            # Track best outcome
+            if outcome_rank[outcome] > outcome_rank[best_outcome]:
+                best_outcome = outcome
+                best_push = push_amount
+                best_roll_value = roll_value
+            elif outcome_rank[outcome] == outcome_rank[best_outcome] and push_amount > best_push:
+                best_push = push_amount
+                best_roll_value = roll_value
         
         # Record bar state before push
         bar_before = match.control_bar
         
-        # Apply push
-        winner_side = match.apply_push(side, push_amount)
+        # Apply push using best outcome
+        winner_side = match.apply_push(side, best_push)
         
-        # Record action
+        print(f"🎯 ATTACK: player={player_id}, side={side}, outcome={best_outcome}, push={best_push:.2f}")
+        print(f"🎯 BAR: before={bar_before:.2f}, after={match.control_bar:.2f}")
+        
+        # Record action (best outcome)
         action = DuelAction(
             match_id=match_id,
             player_id=player_id,
             side=side,
-            roll_value=roll_value,
-            outcome=outcome,
-            push_amount=push_amount,
+            roll_value=best_roll_value,
+            outcome=best_outcome,
+            push_amount=best_push,
             bar_before=bar_before,
             bar_after=match.control_bar,
         )
         db.add(action)
         
+        # Build the action result
+        action_result = {
+            "player_id": player_id,
+            "side": side,
+            "roll_value": round(best_roll_value, 4),
+            "hit_chance": round(hit_chance, 3),
+            "outcome": best_outcome,
+            "push_amount": round(best_push, 2),
+            "bar_before": round(bar_before, 2),
+            "bar_after": round(match.control_bar, 2),
+        }
+        
         result = {
             "success": True,
-            "action": {
-                "player_id": player_id,
-                "side": side,
-                "roll_value": round(roll_value, 4),
-                "hit_chance": round(hit_chance, 3),
-                "outcome": outcome,
-                "push_amount": round(push_amount, 2),
-                "bar_before": round(bar_before, 2),
-                "bar_after": round(match.control_bar, 2),
-            },
+            "action": action_result,
+            "rolls": rolls,
+            "max_rolls": max_rolls,
+            "miss_chance": miss_pct,
+            "hit_chance_pct": hit_pct,
+            "crit_chance": crit_pct,
             "match": None,  # Will be filled in
             "winner": None,
+            "turn_complete": True,  # Signal that turn is complete
+            "next_turn": None,  # Will be filled if game continues
         }
         
         # Check for winner
@@ -432,15 +664,26 @@ class DuelManager:
                 "player_id": match.winner_id,
                 "gold_earned": match.winner_gold_earned,
             }
+            result["game_over"] = True
         else:
-            # Switch turns
-            match.switch_turn()
-            match.turn_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_TURN_TIMEOUT_SECONDS)
+            # Switch turns using internal method
+            self._switch_turn(match)
+            result["game_over"] = False
+            result["next_turn"] = {
+                "player_id": match.get_current_turn_player_id(),
+                "side": match.current_turn,
+                "expires_at": match.turn_expires_at.isoformat() + "Z" if match.turn_expires_at else None,
+                "timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+            }
         
         db.commit()
         db.refresh(match)
         
-        result["match"] = match.to_dict()
+        print(f"🎯 AFTER REFRESH: control_bar={match.control_bar:.2f}")
+        
+        result["match"] = match.to_dict(include_actions=True)
+        
+        print(f"🎯 SERIALIZED: control_bar={result['match'].get('control_bar')}")
         
         return result
     
@@ -465,8 +708,18 @@ class DuelManager:
         stats = db.query(DuelStats).filter(DuelStats.user_id == user_id).first()
         
         if not stats:
-            stats = DuelStats(user_id=user_id)
+            stats = DuelStats(
+                user_id=user_id,
+                wins=0,
+                losses=0,
+                draws=0,
+                total_gold_won=0,
+                total_gold_lost=0,
+                win_streak=0,
+                best_win_streak=0,
+            )
             db.add(stats)
+            db.flush()  # Apply defaults before modifying
         
         if won:
             stats.record_win(gold)

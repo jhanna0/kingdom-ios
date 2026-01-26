@@ -87,6 +87,7 @@ class DuelMatch(Base):
     # Turn tracking
     current_turn = Column(String(20), nullable=True)  # 'challenger' or 'opponent'
     turn_expires_at = Column(DateTime, nullable=True)
+    first_turn_player_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who went first (for history)
     
     # Stats snapshots (frozen at match start for fairness)
     challenger_stats = Column(JSONB, nullable=True)
@@ -229,6 +230,8 @@ class DuelMatch(Base):
     
     def to_dict(self, include_actions: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for API response"""
+        from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS
+        
         result = {
             "id": self.id,
             "match_code": self.match_code,
@@ -248,7 +251,10 @@ class DuelMatch(Base):
             
             "control_bar": round(self.control_bar, 2),
             "current_turn": self.current_turn,
+            "current_turn_player_id": self.get_current_turn_player_id(),
             "turn_expires_at": _format_datetime_iso(self.turn_expires_at),
+            "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+            "first_turn_player_id": self.first_turn_player_id,
             
             "wager_gold": self.wager_gold,
             
@@ -341,6 +347,40 @@ class DuelAction(Base):
             "bar_after": round(self.bar_after, 2),
             "performed_at": _format_datetime_iso(self.performed_at),
         }
+
+
+class DuelPairingHistory(Base):
+    """
+    Tracks which player went first in previous duels between the same pair.
+    Used to alternate who starts when the same two players duel again.
+    
+    player_a_id is always the smaller ID (for consistent lookups).
+    """
+    __tablename__ = "duel_pairing_history"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Always store with player_a_id < player_b_id for consistent lookups
+    player_a_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    player_b_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Who went first in the last match
+    last_first_player_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # Reference to the match
+    last_match_id = Column(Integer, ForeignKey("duel_matches.id", ondelete="SET NULL"), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    def __repr__(self):
+        return f"<DuelPairingHistory(a={self.player_a_id}, b={self.player_b_id}, last_first={self.last_first_player_id})>"
+    
+    @staticmethod
+    def normalize_pair(player_1_id: int, player_2_id: int) -> tuple:
+        """Return (smaller_id, larger_id) for consistent lookups"""
+        return (min(player_1_id, player_2_id), max(player_1_id, player_2_id))
 
 
 class DuelStats(Base):

@@ -50,7 +50,7 @@ from .science_stats import ScienceStats
 from .trade_offer import TradeOffer, TradeOfferStatus
 
 # PvP Arena Duels
-from .duel import DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, DuelOutcome
+from .duel import DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, DuelOutcome, DuelPairingHistory
 
 # Building Catchup system
 from .building_catchup import BuildingCatchup
@@ -139,6 +139,7 @@ __all__ = [
     "DuelStats",
     "DuelStatus",
     "DuelOutcome",
+    "DuelPairingHistory",
     # Building Catchup
     "BuildingCatchup",
     # Daily gathering limits

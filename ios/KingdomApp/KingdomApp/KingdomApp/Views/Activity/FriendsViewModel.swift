@@ -24,7 +24,12 @@ class FriendsViewModel: ObservableObject {
     @Published var pendingAlliancesReceived: [AllianceResponse] = []
     @Published var isRuler: Bool = false
     
+    // Duel challenges
+    @Published var incomingDuelChallenges: [DuelInvitation] = []
+    @Published var pendingDuelCount: Int = 0
+    
     private let api = KingdomAPIService.shared
+    private let duelsApi = DuelsAPI()
     
     func loadFriends() async {
         isLoading = true
@@ -200,6 +205,42 @@ class FriendsViewModel: ObservableObject {
         } catch {
             print("❌ Failed to decline alliance: \(error)")
             errorMessage = "Failed to decline alliance"
+        }
+    }
+    
+    // MARK: - Duel Challenge Functions
+    
+    func loadDuelChallenges() async {
+        do {
+            let response = try await duelsApi.getInvitations()
+            incomingDuelChallenges = response.invitations
+            pendingDuelCount = response.invitations.count
+            print("✅ Loaded \(incomingDuelChallenges.count) duel challenges")
+        } catch {
+            print("❌ Failed to load duel challenges: \(error)")
+            // Don't show error to user, just fail silently
+        }
+    }
+    
+    func acceptDuelChallenge(_ invitationId: Int) async {
+        do {
+            let response = try await duelsApi.acceptInvitation(invitationId: invitationId)
+            print("✅ Accepted duel challenge: \(response.message)")
+            await loadDuelChallenges()
+        } catch {
+            print("❌ Failed to accept duel challenge: \(error)")
+            errorMessage = "Failed to accept challenge"
+        }
+    }
+    
+    func declineDuelChallenge(_ invitationId: Int) async {
+        do {
+            _ = try await duelsApi.declineInvitation(invitationId: invitationId)
+            print("✅ Declined duel challenge")
+            await loadDuelChallenges()
+        } catch {
+            print("❌ Failed to decline duel challenge: \(error)")
+            errorMessage = "Failed to decline challenge"
         }
     }
 }

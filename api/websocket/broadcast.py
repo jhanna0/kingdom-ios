@@ -268,14 +268,26 @@ class PartyEvents:
 
 
 class DuelEvents:
-    """Events for PvP Arena duels"""
+    """
+    Events for PvP Arena duels.
+    
+    The main event is DUEL_TURN_COMPLETE which contains everything:
+    - Who attacked
+    - The rolls and result
+    - New bar position
+    - Whose turn is next (or winner if game over)
+    
+    Frontend should just render what this event says.
+    """
     DUEL_INVITATION = "duel_invitation"
     DUEL_OPPONENT_JOINED = "duel_opponent_joined"
     DUEL_STARTED = "duel_started"
-    DUEL_ATTACK = "duel_attack"
-    DUEL_TURN_CHANGED = "duel_turn_changed"
+    DUEL_ATTACK = "duel_attack"  # Legacy - use TURN_COMPLETE instead
+    DUEL_TURN_CHANGED = "duel_turn_changed"  # Legacy
+    DUEL_TURN_COMPLETE = "duel_turn_complete"  # NEW: Complete turn info for frontend
     DUEL_ENDED = "duel_ended"
     DUEL_CANCELLED = "duel_cancelled"
+    DUEL_TIMEOUT = "duel_timeout"  # Player timed out
 
 
 def notify_hunt_participants(

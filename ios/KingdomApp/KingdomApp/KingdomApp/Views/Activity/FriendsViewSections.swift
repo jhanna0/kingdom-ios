@@ -220,6 +220,47 @@ extension FriendsView {
         }
     }
     
+    // MARK: - Duel Challenges Section
+    
+    var duelChallengesSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+            
+            HStack {
+                Image(systemName: "figure.fencing")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.royalCrimson)
+                
+                Text("Duel Challenges")
+                    .font(FontStyles.headingLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Text("\(viewModel.incomingDuelChallenges.count)")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 10, shadowOffset: 1, borderWidth: 1.5)
+            }
+            .padding(.horizontal)
+            
+            ForEach(viewModel.incomingDuelChallenges) { challenge in
+                DuelChallengeCard(
+                    challenge: challenge,
+                    onAccept: {
+                        await viewModel.acceptDuelChallenge(challenge.invitationId)
+                    },
+                    onDecline: {
+                        await viewModel.declineDuelChallenge(challenge.invitationId)
+                    }
+                )
+            }
+        }
+    }
+    
     // MARK: - Pending Trades Section
     
     var pendingTradesSection: some View {

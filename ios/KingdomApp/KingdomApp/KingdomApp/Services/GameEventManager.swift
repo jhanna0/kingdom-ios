@@ -3,14 +3,17 @@ import Combine
 import UIKit
 
 /// Event types for duels (matches API's DuelEvents)
+/// The main event is TURN_COMPLETE which contains everything frontend needs
 enum DuelEventType: String {
     case invitation = "duel_invitation"
     case opponentJoined = "duel_opponent_joined"
     case started = "duel_started"
-    case attack = "duel_attack"
-    case turnChanged = "duel_turn_changed"
+    case attack = "duel_attack"  // Legacy
+    case turnChanged = "duel_turn_changed"  // Legacy
+    case turnComplete = "duel_turn_complete"  // NEW: Complete turn info
     case ended = "duel_ended"
     case cancelled = "duel_cancelled"
+    case timeout = "duel_timeout"  // Player timed out
 }
 
 /// A duel event received via WebSocket
@@ -263,7 +266,6 @@ class GameEventManager: NSObject, ObservableObject {
     private func processDuelEvent(_ json: [String: Any]) {
         guard let eventTypeString = json["event_type"] as? String,
               let eventType = DuelEventType(rawValue: eventTypeString) else {
-            print("⚠️ Game Events WS: Unknown duel event type")
             return
         }
         
@@ -271,7 +273,6 @@ class GameEventManager: NSObject, ObservableObject {
         let eventData = json["data"] as? [String: Any] ?? [:]
         let timestamp = Date(timeIntervalSince1970: Double(json["timestamp"] as? Int ?? 0) / 1000.0)
         
-        // Try to parse the match if included
         var match: DuelMatch?
         if let matchDict = json["match"] as? [String: Any],
            let matchData = try? JSONSerialization.data(withJSONObject: matchDict) {
@@ -286,12 +287,7 @@ class GameEventManager: NSObject, ObservableObject {
             timestamp: timestamp
         )
         
-        print("🎮 Duel Event: \(eventType.rawValue) for match \(matchId ?? 0)")
-        
-        // Update published property
         lastDuelEvent = event
-        
-        // Send through subject for Combine subscribers
         duelEventSubject.send(event)
     }
 }

@@ -47,6 +47,18 @@ def get_duel_manager() -> DuelManager:
     return _duel_manager
 
 
+def _get_apple_user_ids(db: Session, user_ids: List[int]) -> List[str]:
+    """Convert database user IDs to Apple user IDs for WebSocket broadcast."""
+    if not user_ids:
+        return []
+    # Filter out None values
+    valid_ids = [uid for uid in user_ids if uid is not None]
+    if not valid_ids:
+        return []
+    users = db.query(User).filter(User.id.in_(valid_ids)).all()
+    return [u.apple_user_id for u in users if u.apple_user_id]
+
+
 # ============================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================
@@ -70,6 +82,10 @@ class AttackResponse(BaseModel):
     action: Optional[dict] = None
     match: Optional[dict] = None
     winner: Optional[dict] = None
+    rolls: Optional[List[dict]] = None
+    miss_chance: Optional[int] = None
+    hit_chance_pct: Optional[int] = None
+    crit_chance: Optional[int] = None
 
 
 class InvitationsResponse(BaseModel):
@@ -251,7 +267,7 @@ def create_duel(
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_INVITATION,
             match=match.to_dict() if match else None,
-            target_user_ids=[request.opponent_id],
+            target_user_ids=_get_apple_user_ids(db, [request.opponent_id]),
             data={
                 "inviter_name": user.display_name,
                 "invitation_id": invitation.id,
@@ -283,7 +299,7 @@ def accept_invitation(
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_OPPONENT_JOINED,
             match=match.to_dict(),
-            target_user_ids=[match.challenger_id],
+            target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
             data={"opponent_name": user.display_name}
         )
         
@@ -312,7 +328,7 @@ def decline_invitation(
             broadcast_duel_event(
                 event_type=DuelEvents.DUEL_CANCELLED,
                 match=match.to_dict() if match else None,
-                target_user_ids=[match.challenger_id],
+                target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
                 data={"message": f"{user.display_name} declined your duel challenge."}
             )
         
@@ -332,21 +348,41 @@ def start_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Start the duel (once opponent has joined)"""
+    """
+    Start the duel (once opponent has joined).
+    
+    BACKEND DETERMINES WHO GOES FIRST:
+    - Checks pairing history between these two players
+    - If they've dueled before, the OTHER player goes first this time
+    - This ensures fairness across rematches
+    """
     try:
         match = manager.start_match(db, match_id, user.id)
         
-        # Notify both players
+        from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS
+        
+        # Notify both players with full turn info
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_STARTED,
             match=match.to_dict(),
-            target_user_ids=[match.challenger_id, match.opponent_id],
-            data={"message": "The duel begins!"}
+            target_user_ids=_get_apple_user_ids(db, [match.challenger_id, match.opponent_id]),
+            data={
+                "message": "The duel begins!",
+                "first_turn": {
+                    "player_id": match.first_turn_player_id,
+                    "side": match.current_turn,
+                    "expires_at": match.turn_expires_at.isoformat() + "Z" if match.turn_expires_at else None,
+                    "timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+                }
+            }
         )
+        
+        # Determine message based on who goes first
+        goes_first = "You go first!" if match.first_turn_player_id == user.id else "Opponent goes first!"
         
         return DuelResponse(
             success=True,
-            message="The duel begins!",
+            message=f"The duel begins! {goes_first}",
             match=match.to_dict()
         )
     except ValueError as e:
@@ -363,32 +399,51 @@ def execute_attack(
     """
     Execute an attack during your turn.
     
-    This is the core combat action - rolls dice, calculates hit,
-    pushes the bar, and potentially determines a winner.
+    BACKEND IS AUTHORITATIVE:
+    - Validates it's actually your turn (prevents cheating)
+    - Processes the attack completely server-side
+    - Broadcasts result to BOTH players
+    - Switches turn to opponent (or declares winner)
+    
+    Frontend should just render the result and wait for next event.
     """
     try:
         result = manager.execute_attack(db, match_id, user.id)
         
         match = result.get("match", {})
+        action = result.get("action", {})
         
-        # Notify both players of the action
-        other_player_id = match.get("opponent", {}).get("id") if match.get("challenger", {}).get("id") == user.id else match.get("challenger", {}).get("id")
+        # Get both player IDs for broadcast
+        challenger_id = match.get("challenger", {}).get("id")
+        opponent_id = match.get("opponent", {}).get("id")
+        player_ids = [p for p in [challenger_id, opponent_id] if p]
         
+        # Build comprehensive turn complete event for both players
+        event_data = {
+            "attacker_id": user.id,
+            "action": action,
+            "rolls": result.get("rolls"),
+            "max_rolls": result.get("max_rolls"),
+            "miss_chance": result.get("miss_chance"),
+            "hit_chance_pct": result.get("hit_chance_pct"),
+            "crit_chance": result.get("crit_chance"),
+            "game_over": result.get("game_over", False),
+            "winner": result.get("winner"),
+            "next_turn": result.get("next_turn"),
+        }
+        
+        # Broadcast TURN_COMPLETE to both players - this is all they need
         broadcast_duel_event(
-            event_type=DuelEvents.DUEL_ATTACK if not result.get("winner") else DuelEvents.DUEL_ENDED,
+            event_type=DuelEvents.DUEL_TURN_COMPLETE if not result.get("winner") else DuelEvents.DUEL_ENDED,
             match=match,
-            target_user_ids=[user.id, other_player_id] if other_player_id else [user.id],
-            data={
-                "action": result.get("action"),
-                "winner": result.get("winner"),
-            }
+            target_user_ids=_get_apple_user_ids(db, player_ids),
+            data=event_data
         )
         
-        action = result.get("action", {})
+        # Build response message
         outcome = action.get("outcome", "miss")
-        
         if result.get("winner"):
-            message = f"VICTORY! You win the duel!" if result["winner"]["player_id"] == user.id else "Defeat... Better luck next time."
+            message = "VICTORY! You win the duel!" if result["winner"]["player_id"] == user.id else "Defeat... Better luck next time."
         elif outcome == "critical":
             message = f"CRITICAL HIT! Bar pushed {action.get('push_amount', 0):.1f}"
         elif outcome == "hit":
@@ -401,7 +456,11 @@ def execute_attack(
             message=message,
             action=result.get("action"),
             match=match,
-            winner=result.get("winner")
+            winner=result.get("winner"),
+            rolls=result.get("rolls"),
+            miss_chance=result.get("miss_chance"),
+            hit_chance_pct=result.get("hit_chance_pct"),
+            crit_chance=result.get("crit_chance"),
         )
     except ValueError as e:
         return AttackResponse(success=False, message=str(e))
@@ -422,7 +481,7 @@ def forfeit_match(
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_ENDED,
             match=match.to_dict(),
-            target_user_ids=[match.challenger_id, match.opponent_id],
+            target_user_ids=_get_apple_user_ids(db, [match.challenger_id, match.opponent_id]),
             data={
                 "forfeit_by": user.id,
                 "winner": {
@@ -435,6 +494,56 @@ def forfeit_match(
         return DuelResponse(
             success=True,
             message="You forfeited the match.",
+            match=match.to_dict()
+        )
+    except ValueError as e:
+        return DuelResponse(success=False, message=str(e))
+
+
+@router.post("/{match_id}/claim-timeout", response_model=DuelResponse)
+def claim_timeout(
+    match_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """
+    Claim victory due to opponent timeout.
+    
+    If it's the opponent's turn and their turn has expired (30s),
+    the calling player wins by timeout.
+    
+    BACKEND ENFORCES:
+    - Must be opponent's turn (not yours)
+    - Turn must actually be expired
+    - Match must be in FIGHTING status
+    """
+    try:
+        # Get current turn player before resolving (for broadcast)
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        timed_out_player_id = match.get_current_turn_player_id() if match else None
+        
+        # Use manager to validate and resolve timeout
+        match = manager.forfeit_by_timeout(db, match_id, user.id)
+        
+        # Notify both players
+        broadcast_duel_event(
+            event_type=DuelEvents.DUEL_TIMEOUT,
+            match=match.to_dict(),
+            target_user_ids=_get_apple_user_ids(db, [match.challenger_id, match.opponent_id]),
+            data={
+                "timed_out_player_id": timed_out_player_id,
+                "winner": {
+                    "side": match.winner_side,
+                    "player_id": match.winner_id,
+                },
+                "reason": "timeout"
+            }
+        )
+        
+        return DuelResponse(
+            success=True,
+            message="Victory! Opponent timed out.",
             match=match.to_dict()
         )
     except ValueError as e:

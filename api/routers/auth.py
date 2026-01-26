@@ -413,3 +413,4 @@ def demo_login(request: DemoLoginRequest, db: Session = Depends(get_db)):
         expires_in=60 * 60 * 24 * 7
     )
 
+

@@ -21,6 +21,11 @@ struct FriendsView: View {
                             pendingTradesSection
                         }
                         
+                        // Pending Duel Challenges
+                        if !viewModel.incomingDuelChallenges.isEmpty {
+                            duelChallengesSection
+                        }
+                        
                         // Alliance Requests Received (Rulers only)
                         if !viewModel.pendingAlliancesReceived.isEmpty {
                             allianceRequestsSection
@@ -79,6 +84,7 @@ struct FriendsView: View {
                 await viewModel.loadFriendActivity()
                 await viewModel.loadTrades()
                 await viewModel.loadAlliances()
+                await viewModel.loadDuelChallenges()
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {

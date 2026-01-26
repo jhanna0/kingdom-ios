@@ -55,7 +55,7 @@ class ArenaViewModel: ObservableObject {
             // Also refresh invitations in case it was an incoming invite
             Task { await loadInvitations() }
             
-        case .ended:
+        case .ended, .timeout:
             // Match ended - clear active match and refresh stats
             if event.matchId == activeMatch?.id {
                 activeMatch = nil
@@ -67,7 +67,7 @@ class ArenaViewModel: ObservableObject {
                 }
             }
             
-        case .started, .attack, .turnChanged:
+        case .started, .attack, .turnChanged, .turnComplete:
             // Combat events - update active match if it's ours
             if event.matchId == activeMatch?.id, let match = event.match {
                 activeMatch = match

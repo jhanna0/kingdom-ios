@@ -9,6 +9,8 @@ from .config import (
     DUEL_INVITATION_TIMEOUT_MINUTES,
     calculate_duel_hit_chance,
     calculate_duel_push,
+    calculate_duel_max_rolls,
+    calculate_duel_roll_chances,
 )
 from .duel_manager import DuelManager
 
@@ -21,4 +23,6 @@ __all__ = [
     "DUEL_INVITATION_TIMEOUT_MINUTES",
     "calculate_duel_hit_chance",
     "calculate_duel_push",
+    "calculate_duel_max_rolls",
+    "calculate_duel_roll_chances",
 ]
