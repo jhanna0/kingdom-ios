@@ -702,14 +702,14 @@ def _apply_battle_outcome_bulk(
             # Step 1: Calculate total gold to redistribute (50% from each loser)
             total_gold_result = db.execute(text("""
                 SELECT COALESCE(SUM(gold / 2), 0) as total_gold
-                FROM player_states
+                FROM player_state
                 WHERE user_id = ANY(:loser_ids)
             """), {"loser_ids": loser_ids}).fetchone()
             total_gold = total_gold_result[0] if total_gold_result else 0
             
             # Step 2: Deduct 50% gold from losers
             db.execute(text("""
-                UPDATE player_states
+                UPDATE player_state
                 SET gold = gold - (gold / 2),
                     updated_at = NOW()
                 WHERE user_id = ANY(:loser_ids)
@@ -726,7 +726,7 @@ def _apply_battle_outcome_bulk(
             if winner_ids and total_gold > 0:
                 gold_per_winner = total_gold // len(winner_ids)
                 db.execute(text("""
-                    UPDATE player_states
+                    UPDATE player_state
                     SET gold = gold + :gold_share,
                         updated_at = NOW()
                     WHERE user_id = ANY(:winner_ids)
@@ -748,14 +748,14 @@ def _apply_battle_outcome_bulk(
                 # Calculate total gold
                 total_gold_result = db.execute(text("""
                     SELECT COALESCE(SUM(gold / 2), 0) as total_gold
-                    FROM player_states
+                    FROM player_state
                     WHERE user_id = ANY(:loser_ids)
                 """), {"loser_ids": loser_ids}).fetchone()
                 total_gold = total_gold_result[0] if total_gold_result else 0
                 
                 # Deduct gold + skills from losers
                 db.execute(text("""
-                    UPDATE player_states
+                    UPDATE player_state
                     SET gold = gold - (gold / 2),
                         attack_power = GREATEST(1, attack_power - :atk_loss),
                         defense_power = GREATEST(1, defense_power - :def_loss),
@@ -780,7 +780,7 @@ def _apply_battle_outcome_bulk(
                 if winner_ids and total_gold > 0:
                     gold_per_winner = total_gold // len(winner_ids)
                     db.execute(text("""
-                        UPDATE player_states
+                        UPDATE player_state
                         SET gold = gold + :gold_share,
                             updated_at = NOW()
                         WHERE user_id = ANY(:winner_ids)
@@ -817,14 +817,14 @@ def _apply_battle_outcome_bulk(
             if attacker_ids:
                 total_for_defenders_result = db.execute(text("""
                     SELECT COALESCE(SUM(gold / 10), 0) as total_gold
-                    FROM player_states
+                    FROM player_state
                     WHERE user_id = ANY(:attacker_ids)
                 """), {"attacker_ids": attacker_ids}).fetchone()
                 total_for_defenders = total_for_defenders_result[0] if total_for_defenders_result else 0
                 
                 # Deduct 10% gold + skills from attackers
                 db.execute(text("""
-                    UPDATE player_states
+                    UPDATE player_state
                     SET gold = gold - (gold / 10),
                         attack_power = GREATEST(1, attack_power - :atk_loss),
                         defense_power = GREATEST(1, defense_power - :def_loss),
@@ -849,7 +849,7 @@ def _apply_battle_outcome_bulk(
                 if defender_ids and total_for_defenders > 0:
                     gold_per_winner = total_for_defenders // len(defender_ids)
                     db.execute(text("""
-                        UPDATE player_states
+                        UPDATE player_state
                         SET gold = gold + :gold_share,
                             updated_at = NOW()
                         WHERE user_id = ANY(:defender_ids)

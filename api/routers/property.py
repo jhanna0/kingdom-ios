@@ -752,9 +752,10 @@ def purchase_land(
         "kingdom_name": request.kingdom_name,
         "location": request.location.lower(),
         "actions_required": actions_required,
+        "cost_paid": 0,  # OLD: backwards compat (no upfront payment in new system)
         "total_cost": land_price,  # Total if paid upfront (for display)
-        "gold_per_action": round(gold_per_action, 1),  # Cost per action before tax
-        "current_tax_rate": current_tax_rate  # Current rate (may change)
+        "gold_per_action": round(gold_per_action, 1),  # NEW: Cost per action before tax
+        "current_tax_rate": current_tax_rate  # NEW: Current rate (may change)
     }
 
 

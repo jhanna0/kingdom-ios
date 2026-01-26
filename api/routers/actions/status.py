@@ -52,8 +52,11 @@ from .scout import SCOUT_COST_GOLD, OUTCOMES_BY_TIER, OUTCOME_DESCRIPTIONS
 router = APIRouter()
 
 
-def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rate: int = 0) -> list:
+def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
     """Get training contracts from unified_contracts table for status endpoint"""
+    # Rulers don't pay tax
+    effective_tax_rate = 0 if is_ruler else current_tax_rate
+    
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type.in_(TRAINING_TYPES),
@@ -77,7 +80,7 @@ def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rat
             "actions_completed": actions_completed,
             "cost_paid": contract.gold_paid,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
-            "current_tax_rate": current_tax_rate if gold_per_action > 0 else None,  # For display
+            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
             "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "status": "completed" if contract.completed_at else "in_progress"
         })
@@ -199,10 +202,13 @@ def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
-def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0) -> list:
+def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
     """Get property contracts from unified_contracts table for status endpoint"""
     from routers.tiers import PROPERTY_TIERS
     from routers.resources import RESOURCES
+    
+    # Rulers don't pay tax
+    effective_tax_rate = 0 if is_ruler else current_tax_rate
     
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
@@ -243,8 +249,8 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         # Get gold per action for pay-per-action system
         gold_per_action = contract.gold_per_action or 0
         
-        # Check if player can afford gold cost (with tax)
-        gold_cost_with_tax = gold_per_action * (1 + current_tax_rate / 100.0) if gold_per_action > 0 else 0
+        # Check if player can afford gold cost (with tax - rulers pay 0 tax)
+        gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
         can_afford_gold = player_state.gold >= gold_cost_with_tax
         
         result.append({
@@ -259,7 +265,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
-            "current_tax_rate": current_tax_rate if gold_per_action > 0 else None,  # For display
+            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
             "can_afford_gold": can_afford_gold if gold_per_action > 0 else None,  # NEW: gold affordability
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
@@ -422,7 +428,9 @@ def get_action_status(
         }
     
     # Load property upgrade contracts from unified_contracts table
-    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0)
+    # Rulers don't pay tax, so pass is_ruler flag
+    is_ruler = kingdom and kingdom.ruler_id == current_user.id
+    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward
@@ -1109,7 +1117,7 @@ def get_action_status(
         "crafting": actions["crafting"],
         "vault_heist": actions["scout"],  # Legacy - now "Covert Operation" (T5 unlocks heist outcome)
         "scout": actions["scout"],
-        "training_contracts": get_training_contracts_for_status(db, current_user.id, kingdom.tax_rate if kingdom else 0),
+        "training_contracts": get_training_contracts_for_status(db, current_user.id, kingdom.tax_rate if kingdom else 0, is_ruler),
         "training_costs": _get_training_costs_dict(state),
         "crafting_queue": get_crafting_contracts_for_status(db, current_user.id),
         "crafting_costs": crafting_costs,

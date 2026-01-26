@@ -134,7 +134,7 @@ PROPERTY_TIERS = {
         "icon": "square.dashed",
         "description": "Cleared land with travel benefits",
         "benefits": ["Free travel to this kingdom"],
-        "per_action_costs": [{"resource": "wood", "amount": 5}],
+        "per_action_costs": [],  # No resource cost for clearing land
     },
     2: {
         "name": "House",
