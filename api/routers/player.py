@@ -250,14 +250,14 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     total_skill_points = get_total_skill_points(state)
     current_stats = get_all_skill_values(state)
     
-    # Calculate per-skill training costs (gold_per_action * actions)
+    # Calculate per-skill training costs (gold_per_action - no upfront payment!)
     training_costs = {}
     for skill_type in SKILL_TYPES:
         current_tier = current_stats.get(skill_type, 1)
         target_tier = current_tier + 1
         gold_per_action = calculate_training_gold_per_action(target_tier)
-        actions = calculate_training_actions(current_tier - 1, total_skill_points)
-        training_costs[skill_type] = int(gold_per_action * actions)
+        # Return gold_per_action (pay per action, not upfront!)
+        training_costs[skill_type] = int(gold_per_action)
     
     # Build DYNAMIC resources data - frontend renders without hardcoding!
     # Maps resource keys to player state columns (gold is in state.gold, iron in state.iron, etc.)

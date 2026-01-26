@@ -21,9 +21,8 @@ def _get_training_costs_dict(state) -> dict:
     """Helper to generate training costs dict for all skills.
     
     NEW: Each skill has different cost based on its current tier.
-    Returns gold_per_action for each skill.
+    Returns gold_per_action for each skill (no upfront payment!).
     """
-    total_points = get_total_skill_points(state)
     current_stats = get_all_skill_values(state)
     
     costs = {}
@@ -31,9 +30,8 @@ def _get_training_costs_dict(state) -> dict:
         current_tier = current_stats.get(skill_type, 1)
         target_tier = current_tier + 1
         gold_per_action = calculate_training_gold_per_action(target_tier)
-        actions = calculate_training_actions(current_tier - 1, total_points)
-        # Return total gold for backwards compatibility with status display
-        costs[skill_type] = int(gold_per_action * actions)
+        # Return gold_per_action (pay per action, not upfront!)
+        costs[skill_type] = int(gold_per_action)
     return costs
 from .crafting import get_craft_cost, get_iron_required, get_steel_required, get_actions_required, get_stat_bonus, CRAFTING_TYPES
 from .constants import (

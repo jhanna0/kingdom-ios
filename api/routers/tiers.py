@@ -17,7 +17,7 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 # Actions cost food based on their cooldown duration
 # This gives food a meaningful purpose and creates resource trade-offs
 
-FOOD_COST_PER_COOLDOWN_MINUTE = 0.5  # 0.4 food per minute of cooldown (minutes / 2.5)
+FOOD_COST_PER_COOLDOWN_MINUTE = 0.25  # 0.4 food per minute of cooldown (minutes / 2.5)
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
 BUILDING_BASE_ACTIONS_REQUIRED = 100
@@ -827,16 +827,13 @@ def get_skills_data_for_player(state, training_costs: dict = None) -> list:
             skill_config["benefits"].get(5, [])
         )
         
-        # Calculate cost for this specific skill
+        # Calculate cost for this specific skill (gold_per_action - no upfront payment!)
         if training_costs and skill_type in training_costs:
             cost = training_costs[skill_type]
         else:
-            # Calculate dynamically: gold_per_action * actions
+            # Calculate dynamically: just gold_per_action (pay per action, not upfront)
             target_tier = current_value + 1
-            current_tier = current_value - 1  # 0-indexed
-            gold_per_action = calculate_training_gold_per_action(target_tier)
-            actions = calculate_training_actions(current_tier, total_skill_points)
-            cost = int(gold_per_action * actions)
+            cost = int(calculate_training_gold_per_action(target_tier))
         
         skills_data.append({
             "skill_type": skill_type,

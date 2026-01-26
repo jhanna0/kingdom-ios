@@ -320,12 +320,9 @@ struct SkillDetailView: View {
         }
     }
     
-    /// Gold cost per action (derived from total cost / actions)
+    /// Gold cost per action (direct from backend - no upfront payment!)
     private var goldPerAction: Double {
-        let totalCost = player.trainingCost
-        let actionsRequired = tierManager.trainingActionsFor(currentLevel: currentTier)
-        guard actionsRequired > 0 else { return Double(totalCost) }
-        return Double(totalCost) / Double(actionsRequired)
+        return Double(player.trainingCost)
     }
     
     /// Tax amount per action
