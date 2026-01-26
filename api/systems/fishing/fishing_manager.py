@@ -215,9 +215,9 @@ class FishingManager:
         total = sum(slots.values())
         probabilities = {k: v / total for k, v in slots.items()} if total > 0 else {}
         
-        # Get outcome display info
+        # Get outcome display info (MUST copy to avoid mutating the config!)
         outcome_display = next(
-            (item for item in CAST_DROP_TABLE_DISPLAY if item["key"] == outcome),
+            (item.copy() for item in CAST_DROP_TABLE_DISPLAY if item["key"] == outcome),
             {"key": outcome, "name": outcome, "icon": "questionmark", "color": "inkMedium"}
         )
         
@@ -300,9 +300,9 @@ class FishingManager:
         total = sum(slots.values())
         probabilities = {k: v / total for k, v in slots.items()} if total > 0 else {}
         
-        # Get outcome display info
+        # Get outcome display info (MUST copy to avoid mutating the config!)
         outcome_display = next(
-            (item for item in REEL_DROP_TABLE_DISPLAY if item["key"] == outcome),
+            (item.copy() for item in REEL_DROP_TABLE_DISPLAY if item["key"] == outcome),
             {"key": outcome, "name": outcome, "icon": "questionmark", "color": "inkMedium"}
         )
         
@@ -331,6 +331,8 @@ class FishingManager:
             outcome_display["consecutive_catches"] = session.consecutive_catches
             outcome_display["fish_data"] = fish_data
             outcome_display["rare_loot_dropped"] = pet_dropped  # Generic name
+            # Always explicitly set show_streak_popup to avoid stale state
+            outcome_display["show_streak_popup"] = False
             # Only show popup when streak JUST activates (exactly 3), not on every subsequent catch
             if session.consecutive_catches == 3:
                 outcome_display["show_streak_popup"] = True
