@@ -52,9 +52,6 @@ from systems.battle.config import (
     LOSER_GOLD_PERCENT,
     WINNER_REP_GAIN,
     LOSER_REP_LOSS,
-    LOSER_ATTACK_LOSS,
-    LOSER_DEFENSE_LOSS,
-    LOSER_LEADERSHIP_LOSS,
     # Invasion-specific
     INVASION_TREASURY_TRANSFER_PERCENT,
     INVASION_ATTACKER_GOLD_TO_DEFENDERS_PERCENT,
@@ -846,21 +843,13 @@ def _apply_battle_outcome_bulk(
                 """), {"loser_ids": loser_ids}).fetchone()
                 total_gold = total_gold_result[0] if total_gold_result else 0
                 
-                # Deduct gold + skills from losers
+                # Deduct gold from losers
                 db.execute(text("""
                     UPDATE player_state
                     SET gold = gold - (gold / 2),
-                        attack_power = GREATEST(1, attack_power - :atk_loss),
-                        defense_power = GREATEST(1, defense_power - :def_loss),
-                        leadership = GREATEST(0, leadership - :lead_loss),
                         updated_at = NOW()
                     WHERE user_id = ANY(:loser_ids)
-                """), {
-                    "loser_ids": loser_ids,
-                    "atk_loss": LOSER_ATTACK_LOSS,
-                    "def_loss": LOSER_DEFENSE_LOSS,
-                    "lead_loss": LOSER_LEADERSHIP_LOSS
-                })
+                """), {"loser_ids": loser_ids})
                 
                 # Deduct reputation
                 db.execute(text("""
@@ -915,21 +904,13 @@ def _apply_battle_outcome_bulk(
                 """), {"attacker_ids": attacker_ids}).fetchone()
                 total_for_defenders = total_for_defenders_result[0] if total_for_defenders_result else 0
                 
-                # Deduct 10% gold + skills from attackers
+                # Deduct 10% gold from attackers
                 db.execute(text("""
                     UPDATE player_state
                     SET gold = gold - (gold / 10),
-                        attack_power = GREATEST(1, attack_power - :atk_loss),
-                        defense_power = GREATEST(1, defense_power - :def_loss),
-                        leadership = GREATEST(0, leadership - :lead_loss),
                         updated_at = NOW()
                     WHERE user_id = ANY(:attacker_ids)
-                """), {
-                    "attacker_ids": attacker_ids,
-                    "atk_loss": LOSER_ATTACK_LOSS,
-                    "def_loss": LOSER_DEFENSE_LOSS,
-                    "lead_loss": LOSER_LEADERSHIP_LOSS
-                })
+                """), {"attacker_ids": attacker_ids})
                 
                 # Deduct reputation from attackers
                 db.execute(text("""

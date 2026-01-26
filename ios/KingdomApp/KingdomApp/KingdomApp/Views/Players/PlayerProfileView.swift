@@ -7,7 +7,6 @@ struct PlayerProfileView: View {
     @State private var profile: PlayerPublicProfile?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var showTradeSheet = false
     
     var body: some View {
         Group {
@@ -63,9 +62,6 @@ struct PlayerProfileView: View {
         .task {
             await loadProfile()
         }
-        .sheet(isPresented: $showTradeSheet) {
-            TradeOfferView(recipientId: userId, recipientName: profile?.display_name ?? "Player")
-        }
     }
     
     private func profileContent(_ profile: PlayerPublicProfile) -> some View {
@@ -118,7 +114,7 @@ struct PlayerProfileView: View {
                 .frame(height: 2)
             
             // Trade Button (requires Merchant skill)
-            Button(action: { showTradeSheet = true }) {
+            NavigationLink(destination: TradeOfferView(recipientId: userId, recipientName: profile.display_name)) {
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.left.arrow.right")
                         .font(FontStyles.iconMedium)

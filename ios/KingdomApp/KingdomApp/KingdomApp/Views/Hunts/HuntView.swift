@@ -61,11 +61,6 @@ struct HuntView: View {
             await viewModel.loadPreview()
             await viewModel.checkForActiveHunt(kingdomId: kingdomId)
         }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(viewModel.error ?? "Unknown error")
-        }
     }
     
     @ViewBuilder
@@ -106,14 +101,8 @@ struct HuntView: View {
             )
             
         case .creatureReveal:
-            CreatureRevealOverlay(
-                viewModel: viewModel,
-                onContinue: {
-                    Task {
-                        await viewModel.userTappedContinueAfterCreatureReveal()
-                    }
-                }
-            )
+            // No longer used - animal info shows in arena card
+            EmptyView()
             
         case .results:
             HuntResultsView(viewModel: viewModel)
