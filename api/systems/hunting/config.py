@@ -458,7 +458,7 @@ HUNT_STREAK_MEAT_MULTIPLIER = 2  # Meat multiplier when streak is active
 # ============================================================
 # MEAT VALUE (for market selling)
 # ============================================================
-MEAT_MARKET_VALUE = 0.5  # 1 meat = 1 gold (gold is awarded directly from hunts now)
+MEAT_MARKET_VALUE = 1  # 1 meat = 1 gold (gold is awarded directly from hunts now)
 
 
 # ============================================================
