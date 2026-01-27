@@ -22,6 +22,10 @@ struct DuelCombatView: View {
     // Bar - ONLY animate when we explicitly trigger it
     @State private var animatedBarValue: Double = 50
     
+    // Critical hit popup
+    @State private var showCritPopup: Bool = false
+    @State private var critPopupData: CritPopupData? = nil
+    
     @Environment(\.dismiss) private var dismiss
 
     private var currentMatch: DuelMatch { viewModel.match ?? match }
@@ -50,6 +54,12 @@ struct DuelCombatView: View {
                 mainContent
             }
             
+            // Critical hit popup overlay
+            if showCritPopup, let data = critPopupData {
+                criticalHitPopup(data: data)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(100)
+            }
         }
         .navigationTitle("Duel")
         .navigationBarTitleDisplayMode(.inline)
@@ -132,6 +142,17 @@ struct DuelCombatView: View {
         
         try? await Task.sleep(nanoseconds: 700_000_000)
         
+        // Check if this was a critical hit - show popup!
+        if let roll = rolls.first, roll.outcome == "critical" {
+            // Calculate push amount from bar change
+            let oldBar = viewModel.match?.barForPlayer(playerId: playerId) ?? 50
+            let pushAmount = abs(newBarValue - oldBar)
+            showCriticalHit(attackerId: playerId, pushAmount: pushAmount)
+            
+            // Wait for popup to show before finishing
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+        }
+        
         // Done
         print("✅ Animation complete")
         viewModel.finishYourAttackAnimation()
@@ -190,12 +211,24 @@ struct DuelCombatView: View {
         try? await Task.sleep(nanoseconds: 800_000_000)
         
         // Animate bar
+        let oldBarValue = animatedBarValue
         let newBarValue = viewModel.pendingBarValueForOpponent(playerId: playerId)
         withAnimation(.easeInOut(duration: 0.6)) {
             animatedBarValue = newBarValue
         }
         
         try? await Task.sleep(nanoseconds: 700_000_000)
+        
+        // Check if opponent got a critical hit - show popup!
+        if viewModel.opponentOutcome == "critical" {
+            let pushAmount = abs(newBarValue - oldBarValue)
+            // Get opponent ID
+            let opponentId = opponent?.id ?? 0
+            showCriticalHit(attackerId: opponentId, pushAmount: pushAmount)
+            
+            // Wait for popup
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+        }
         
         // Done
         showOpponentRollMarker = false
@@ -261,14 +294,17 @@ struct DuelCombatView: View {
             chip(label: "ATTACK", value: "\(myStats?.attack ?? 0)", icon: "burst.fill", tint: myColor)
             
             let maxRolls = 1 + (myStats?.attack ?? 0)
+            let usedSwings = viewModel.allRolls.isEmpty ? 0 : (maxRolls - viewModel.swingsRemaining)
             HStack(spacing: 8) {
                 Image(systemName: "dice.fill").font(FontStyles.iconTiny).foregroundColor(.white)
                     .frame(width: 28, height: 28).background(KingdomTheme.Colors.inkDark).clipShape(RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SWINGS").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
                     HStack(spacing: 3) {
-                        ForEach(0..<max(1, maxRolls), id: \.self) { _ in
-                            Circle().fill(KingdomTheme.Colors.buttonSuccess).frame(width: 8, height: 8)
+                        ForEach(0..<max(1, maxRolls), id: \.self) { i in
+                            Circle()
+                                .fill(i < usedSwings ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.buttonSuccess)
+                                .frame(width: 8, height: 8)
                         }
                     }
                 }
@@ -276,13 +312,14 @@ struct DuelCombatView: View {
             .frame(maxWidth: .infinity, alignment: .leading).padding(10)
             .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
             
-            let isMyTurn = viewModel.isMyTurn && !viewModel.isAnimating
+            let canAct = viewModel.canAttack
+            let hasSwingsLeft = viewModel.swingsRemaining > 0
             HStack(spacing: 8) {
-                Image(systemName: isMyTurn ? "bolt.fill" : "hourglass").font(FontStyles.iconTiny).foregroundColor(.white)
-                    .frame(width: 28, height: 28).background(isMyTurn ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium).clipShape(RoundedRectangle(cornerRadius: 8))
+                Image(systemName: canAct ? "bolt.fill" : "hourglass").font(FontStyles.iconTiny).foregroundColor(.white)
+                    .frame(width: 28, height: 28).background(canAct ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium).clipShape(RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TURN").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
-                    Text(isMyTurn ? "YOUR" : "WAIT").font(FontStyles.labelBold).foregroundColor(KingdomTheme.Colors.inkDark)
+                    Text(canAct ? (hasSwingsLeft ? "SWING!" : "YOUR") : "WAIT").font(FontStyles.labelBold).foregroundColor(KingdomTheme.Colors.inkDark)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading).padding(10)
@@ -310,9 +347,9 @@ struct DuelCombatView: View {
             LinearGradient(colors: [KingdomTheme.Colors.parchmentRich, KingdomTheme.Colors.parchmentDark], startPoint: .topLeading, endPoint: .bottomTrailing)
             VStack {
                 HStack {
-                    nameplate(title: myDisplayName, subtitle: "ATK \(myStats?.attack ?? 0) / DEF \(myStats?.defense ?? 0)", isYou: true)
+                    nameplate(name: myDisplayName, subtitle: "ATK \(myStats?.attack ?? 0) / DEF \(myStats?.defense ?? 0)", isYou: true)
                     Spacer()
-                    nameplate(title: opponentDisplayName, subtitle: "ATK \(opponentStats?.attack ?? 0) / DEF \(opponentStats?.defense ?? 0)", isYou: false)
+                    nameplate(name: opponentDisplayName, subtitle: "ATK \(opponentStats?.attack ?? 0) / DEF \(opponentStats?.defense ?? 0)", isYou: false)
                 }.padding(12)
                 Spacer()
                 HStack {
@@ -327,9 +364,9 @@ struct DuelCombatView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
     }
     
-    private func nameplate(title: String, subtitle: String, isYou: Bool) -> some View {
+    private func nameplate(name: String, subtitle: String, isYou: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(isYou ? "YOU" : "ENEMY").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkDark)
+            Text(isYou ? "YOU" : name).font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkDark)
             Text(subtitle).font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
         }
         .padding(.horizontal, 10).padding(.vertical, 8)
@@ -357,29 +394,40 @@ struct DuelCombatView: View {
     private var statusIcon: String {
         if viewModel.opponentAnimationPhase == .rolling { return "scope" }
         if viewModel.animationPhase == .rolling { return "scope" }
-        if viewModel.isMyTurn { return "arrow.right.circle.fill" }
+        if viewModel.isMyTurn || viewModel.swingsRemaining > 0 { return "arrow.right.circle.fill" }
         return "hourglass.circle.fill"
     }
     private var statusColor: Color {
         if viewModel.opponentAnimationPhase == .rolling { return enemyColor }
-        if viewModel.animationPhase == .rolling || viewModel.isMyTurn { return myColor }
+        if viewModel.animationPhase == .rolling || viewModel.isMyTurn || viewModel.swingsRemaining > 0 { return myColor }
         return KingdomTheme.Colors.inkMedium
     }
     private var statusTitle: String {
-        if viewModel.opponentAnimationPhase == .rolling { return "ENEMY ATTACKING..." }
+        if viewModel.opponentAnimationPhase == .rolling { return "\(opponentDisplayName.uppercased()) ATTACKING..." }
         if viewModel.animationPhase == .rolling { return "ATTACKING..." }
+        // Show swing count during multi-swing
+        if viewModel.swingsRemaining > 0 {
+            let total = viewModel.allRolls.count
+            let done = viewModel.currentSwingIndex
+            return "SWING \(done)/\(total)"
+        }
         if let a = viewModel.lastAction, viewModel.animationPhase == .none {
             return a.outcome == "critical" ? "CRITICAL!" : (a.outcome == "hit" ? "HIT!" : "BLOCKED")
         }
         return viewModel.isMyTurn ? "Your turn" : "Waiting..."
     }
     private var statusSubtitle: String {
-        if viewModel.opponentAnimationPhase == .rolling { return "Enemy is rolling..." }
+        if viewModel.opponentAnimationPhase == .rolling { return "\(opponentDisplayName) is rolling..." }
         if viewModel.animationPhase == .rolling { return "Rolling..." }
+        // Show last roll result during multi-swing
+        if viewModel.swingsRemaining > 0, let lastRoll = viewModel.lastRolls.last {
+            let result = lastRoll.outcome == "critical" ? "CRIT!" : (lastRoll.outcome == "hit" ? "Hit!" : "Miss")
+            return "\(result) - \(viewModel.swingsRemaining) swing\(viewModel.swingsRemaining == 1 ? "" : "s") left"
+        }
         if let a = viewModel.lastAction, viewModel.animationPhase == .none {
             return a.pushAmount > 0 ? "Pushed \(Int(a.pushAmount))%" : "No damage"
         }
-        return viewModel.isMyTurn ? "Tap Attack to swing" : "Opponent's turn"
+        return viewModel.isMyTurn ? "Tap Attack to swing" : "\(opponentDisplayName)'s turn"
     }
     
     private func outcomeBadge(_ outcome: String) -> some View {
@@ -397,22 +445,22 @@ struct DuelCombatView: View {
                 Text(barTitle).font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
                 Spacer()
                 if showRollMarker { Text("Rolled: \(rollDisplayValue)").font(FontStyles.labelBadge).foregroundColor(markerColor(rollDisplayValue)) }
-                if showOpponentRollMarker { Text("Enemy: \(opponentRollDisplayValue)").font(FontStyles.labelBadge).foregroundColor(enemyColor) }
+                if showOpponentRollMarker { Text("\(opponentDisplayName): \(opponentRollDisplayValue)").font(FontStyles.labelBadge).foregroundColor(enemyColor) }
             }
             
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     HStack(spacing: 0) {
-                        Rectangle().fill(Color(white: 0.35)).frame(width: CGFloat(missChance) / 100.0 * geo.size.width)
-                        Rectangle().fill(myColor.opacity(0.7)).frame(width: CGFloat(hitChance) / 100.0 * geo.size.width)
-                        Rectangle().fill(myColor)
+                        Rectangle().fill(Color(white: 0.35)).frame(width: CGFloat(displayMissChance) / 100.0 * geo.size.width)
+                        Rectangle().fill(displayBarColor.opacity(0.7)).frame(width: CGFloat(displayHitChance) / 100.0 * geo.size.width)
+                        Rectangle().fill(displayBarColor)
                     }.clipShape(RoundedRectangle(cornerRadius: 6))
                     
                     RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2)
                     
                     HStack(spacing: 0) {
-                        Text("MISS").font(FontStyles.labelBadge).foregroundColor(.white).lineLimit(1).frame(width: CGFloat(missChance) / 100.0 * geo.size.width)
-                        Text("HIT").font(FontStyles.labelBadge).foregroundColor(.white).lineLimit(1).frame(width: CGFloat(hitChance) / 100.0 * geo.size.width)
+                        Text("MISS").font(FontStyles.labelBadge).foregroundColor(.white).lineLimit(1).frame(width: CGFloat(displayMissChance) / 100.0 * geo.size.width)
+                        Text("HIT").font(FontStyles.labelBadge).foregroundColor(.white).lineLimit(1).frame(width: CGFloat(displayHitChance) / 100.0 * geo.size.width)
                         Text("CRIT").font(FontStyles.labelBadge).foregroundColor(.white).lineLimit(1).frame(maxWidth: .infinity)
                     }
                     
@@ -433,9 +481,39 @@ struct DuelCombatView: View {
     }
     
     private var barTitle: String {
-        if viewModel.opponentAnimationPhase == .rolling { return "ENEMY ROLLING..." }
+        if viewModel.opponentAnimationPhase == .rolling { return "\(opponentDisplayName.uppercased()) ROLLING..." }
         if viewModel.animationPhase == .rolling { return "YOUR ROLL" }
-        return "ATTACK ODDS"
+        if viewModel.isMyTurn || viewModel.swingsRemaining > 0 { return "YOUR ATTACK ODDS" }
+        return "\(opponentDisplayName.uppercased())'S ODDS"
+    }
+    
+    // Show different odds based on whose turn it is
+    private var displayMissChance: Int {
+        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
+            return missChance
+        }
+        return viewModel.opponentMissChance
+    }
+    
+    private var displayHitChance: Int {
+        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
+            return hitChance
+        }
+        return viewModel.opponentHitChance
+    }
+    
+    private var displayCritChance: Int {
+        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
+            return critChance
+        }
+        return viewModel.opponentCritChance
+    }
+    
+    private var displayBarColor: Color {
+        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
+            return myColor
+        }
+        return enemyColor
     }
     
     private func markerColor(_ value: Int) -> Color {
@@ -457,11 +535,8 @@ struct DuelCombatView: View {
     // MARK: - Your Swings Card
     
     private var rollsToShow: [DuelRoll] {
-        if viewModel.animationPhase == .rolling {
-            return Array(viewModel.pendingRolls.prefix(max(0, currentRollIndex + 1)))
-        } else {
-            return viewModel.lastRolls
-        }
+        // Always show lastRolls which accumulates during multi-swing
+        return viewModel.lastRolls
     }
     
     private var yourSwingsCard: some View {
@@ -489,10 +564,10 @@ struct DuelCombatView: View {
     
     private var opponentSwingsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("ENEMY SWINGS").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
+            Text("\(opponentDisplayName.uppercased())'S SWINGS").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
             
             if viewModel.opponentLastRolls.isEmpty {
-                Text("Waiting for enemy...").font(FontStyles.labelTiny).foregroundColor(KingdomTheme.Colors.inkLight)
+                Text("Waiting for \(opponentDisplayName)...").font(FontStyles.labelTiny).foregroundColor(KingdomTheme.Colors.inkLight)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -576,9 +651,11 @@ struct DuelCombatView: View {
                         HStack { Image(systemName: "figure.fencing"); Text("Start Duel") }.frame(maxWidth: .infinity)
                     }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
                 } else if currentMatch.isFighting {
+                    let swingsLeft = viewModel.swingsRemaining
+                    let buttonText = swingsLeft > 0 ? "Swing! (\(swingsLeft) left)" : "Attack!"
                     HStack(spacing: KingdomTheme.Spacing.medium) {
                         Button { Task { await viewModel.attack() } } label: {
-                            HStack { Image(systemName: "figure.fencing"); Text("Attack!") }.frame(maxWidth: .infinity)
+                            HStack { Image(systemName: "figure.fencing"); Text(buttonText) }.frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.brutalist(backgroundColor: viewModel.canAttack ? myColor : KingdomTheme.Colors.disabled, foregroundColor: .white, fullWidth: true))
                         .disabled(!viewModel.canAttack)
@@ -588,7 +665,7 @@ struct DuelCombatView: View {
                         }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonDanger.opacity(0.8), foregroundColor: .white, fullWidth: true))
                     }
                 } else {
-                    Button { onComplete() } label: {
+                    Button { onComplete(); dismiss() } label: {
                         HStack { Text("Continue"); Image(systemName: "arrow.right") }.frame(maxWidth: .infinity)
                     }.buttonStyle(.brutalist(backgroundColor: myColor, foregroundColor: .white, fullWidth: true))
                 }
@@ -614,12 +691,88 @@ struct DuelCombatView: View {
                     HStack { Image(systemName: "bitcoinsign.circle.fill"); Text("+\(gold) gold") }
                         .font(FontStyles.headingMedium).foregroundColor(KingdomTheme.Colors.imperialGold)
                 }
-                Button(action: { onComplete() }) { Text("Continue").frame(maxWidth: .infinity) }
+                Button(action: { onComplete(); dismiss() }) { Text("Continue").frame(maxWidth: .infinity) }
                     .buttonStyle(.brutalist(backgroundColor: resultColor, foregroundColor: .white, fullWidth: true))
                     .padding(.horizontal, 40).padding(.top, 20)
             }.padding(30)
         }
     }
+    
+    // MARK: - Critical Hit Popup
+    
+    private func criticalHitPopup(data: CritPopupData) -> some View {
+        let isPlayer = data.attackerId == playerId
+        let color = isPlayer ? myColor : enemyColor
+        let attackerName = isPlayer ? "YOU" : opponentDisplayName.uppercased()
+        
+        return ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
+                .onTapGesture { dismissCritPopup() }
+            
+            VStack(spacing: 16) {
+                // Flame icon
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.orange)
+                    .shadow(color: .red, radius: 10)
+                
+                Text("CRITICAL HIT!")
+                    .font(FontStyles.displaySmall)
+                    .foregroundColor(.white)
+                
+                Text("\(attackerName) landed a devastating blow!")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                
+                // Push amount
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundColor(color)
+                    Text("+\(Int(data.pushAmount))% BAR PUSH")
+                        .font(FontStyles.headingSmall)
+                        .foregroundColor(color)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .brutalistBadge(backgroundColor: Color.black.opacity(0.5), cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+                
+                // 1.5x bonus indicator
+                Text("1.5× CRITICAL BONUS")
+                    .font(FontStyles.labelBadge)
+                    .foregroundColor(.orange)
+            }
+            .padding(30)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.inkDark.opacity(0.95), cornerRadius: 20)
+            .padding(.horizontal, 40)
+        }
+        .onAppear {
+            // Auto-dismiss after 1.5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                dismissCritPopup()
+            }
+        }
+    }
+    
+    private func dismissCritPopup() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            showCritPopup = false
+            critPopupData = nil
+        }
+    }
+    
+    private func showCriticalHit(attackerId: Int, pushAmount: Double) {
+        critPopupData = CritPopupData(attackerId: attackerId, pushAmount: pushAmount)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showCritPopup = true
+        }
+    }
+}
+
+// MARK: - Critical Hit Data
+struct CritPopupData {
+    let attackerId: Int
+    let pushAmount: Double
 }
 
 // MARK: - Animation Phase
@@ -654,6 +807,13 @@ class DuelCombatViewModel: ObservableObject {
     @Published var pendingRolls: [DuelRoll] = []
     @Published var pendingBarValue: Double = 50
     
+    // Multi-swing tracking - click for each swing
+    @Published var allRolls: [DuelRoll] = []        // All rolls from backend
+    @Published var currentSwingIndex: Int = 0       // Which swing we're on
+    @Published var swingsRemaining: Int = 0         // How many clicks left
+    @Published var turnPendingMatch: DuelMatch?     // Final match state after all swings
+    @Published var turnAction: DuelActionResult?    // Final action (best outcome)
+    
     // OPPONENT animation (when they attack - from WS event)
     @Published var opponentAnimationPhase: OpponentAnimationPhase = .none
     @Published var opponentRollValue: Double = 0      // 0.0-1.0
@@ -665,10 +825,15 @@ class DuelCombatViewModel: ObservableObject {
     @Published var turnTimeoutSeconds: Int = 30
     @Published var turnExpiresAt: Date?
     
-    // Chances (display only)
+    // Chances (display only) - YOUR attack odds
     @Published var missChance: Int = 50
     @Published var hitChance: Int = 40
     @Published var critChance: Int = 10
+    
+    // OPPONENT's attack odds (when they attack you)
+    @Published var opponentMissChance: Int = 50
+    @Published var opponentHitChance: Int = 40
+    @Published var opponentCritChance: Int = 10
     
     private let api = DuelsAPI()
     private var matchId: Int?
@@ -685,8 +850,8 @@ class DuelCombatViewModel: ObservableObject {
     
     var isAnimating: Bool { animationPhase != .none || opponentAnimationPhase != .none }
     
-    /// Can I attack? Only if backend says it's my turn AND we're not animating
-    var canAttack: Bool { isMyTurn && !isAnimating }
+    /// Can I attack? Either it's my turn OR I have swings remaining (and not animating)
+    var canAttack: Bool { (isMyTurn || swingsRemaining > 0) && !isAnimating }
     
     func pendingBarValueForOpponent(playerId: Int) -> Double {
         pendingMatch?.barForPlayer(playerId: playerId) ?? 50
@@ -697,7 +862,52 @@ class DuelCombatViewModel: ObservableObject {
         self.matchId = match.id
         self.playerId = playerId
         await refresh()
+        calculateInitialOdds()
         subscribeToEvents()
+    }
+    
+    /// Calculate initial odds from stats (approximation until backend sends real values)
+    private func calculateInitialOdds() {
+        guard let m = match, let pid = playerId else { return }
+        
+        let isChallenger = m.challenger.id == pid
+        let myStats = isChallenger ? m.challenger.stats : m.opponent?.stats
+        let oppStats = isChallenger ? m.opponent?.stats : m.challenger.stats
+        
+        // Calculate YOUR odds (your attack vs their defense)
+        if let myAtk = myStats?.attack, let oppDef = oppStats?.defense {
+            let (miss, hit, crit) = calculateOdds(attack: myAtk, defense: oppDef)
+            missChance = miss
+            hitChance = hit
+            critChance = crit
+        }
+        
+        // Calculate OPPONENT odds (their attack vs your defense)
+        if let oppAtk = oppStats?.attack, let myDef = myStats?.defense {
+            let (miss, hit, crit) = calculateOdds(attack: oppAtk, defense: myDef)
+            opponentMissChance = miss
+            opponentHitChance = hit
+            opponentCritChance = crit
+        }
+    }
+    
+    /// Approximate odds calculation based on attack vs defense
+    /// Base: 50% miss, 40% hit, 10% crit
+    /// Each point of attack over defense shifts 5% from miss to hit/crit
+    /// Each point of defense over attack shifts 5% from crit/hit to miss
+    private func calculateOdds(attack: Int, defense: Int) -> (miss: Int, hit: Int, crit: Int) {
+        let diff = attack - defense
+        let shift = diff * 5  // 5% per point difference
+        
+        var miss = 50 - shift
+        var crit = 10 + (shift / 2)
+        
+        // Clamp values
+        miss = max(10, min(80, miss))  // 10-80% miss
+        crit = max(5, min(40, crit))   // 5-40% crit
+        let hit = 100 - miss - crit
+        
+        return (miss, hit, crit)
     }
     
     private func subscribeToEvents() {
@@ -761,6 +971,13 @@ class DuelCombatViewModel: ObservableObject {
                 opponentOutcome = actionDict["outcome"] as? String ?? "miss"
                 opponentPushAmount = actionDict["push_amount"] as? Double ?? 0
                 
+                // Extract opponent's odds if backend sends them
+                if let odds = event.data["odds"] as? [String: Any] {
+                    opponentMissChance = odds["miss_chance"] as? Int ?? 50
+                    opponentHitChance = odds["hit_chance"] as? Int ?? 40
+                    opponentCritChance = odds["crit_chance"] as? Int ?? 10
+                }
+                
                 pendingMatch = event.match
                 opponentAnimationPhase = .rolling
             }
@@ -801,23 +1018,37 @@ class DuelCombatViewModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
     
-    /// Send attack command to backend
+    /// Send attack command to backend OR animate next swing
     func attack() async {
         guard let matchId = matchId, canAttack else { return }
+        
+        // If we have swings remaining, animate the next one (no API call)
+        if swingsRemaining > 0 {
+            animateNextSwing()
+            return
+        }
+        
+        // First click - fetch all rolls from backend
         do {
             let r = try await api.attack(matchId: matchId)
             if r.success {
-                lastAction = r.action
-                lastRolls = r.rolls ?? []
+                // Clear previous rolls for new attack sequence
+                lastRolls = []
+                
+                // Store everything for multi-swing
+                allRolls = r.rolls ?? []
+                turnAction = r.action
+                turnPendingMatch = r.match
                 missChance = r.missChance ?? 50
                 hitChance = r.hitChancePct ?? 40
                 critChance = r.critChance ?? 10
                 
-                pendingRolls = r.rolls ?? []
-                pendingMatch = r.match
-                pendingBarValue = r.match?.barForPlayer(playerId: playerId ?? 0) ?? 50
+                // Setup multi-swing state
+                currentSwingIndex = 0
+                swingsRemaining = allRolls.count
                 
-                animationPhase = .rolling
+                // Animate just the first swing
+                animateNextSwing()
             } else {
                 errorMessage = r.message
             }
@@ -826,9 +1057,47 @@ class DuelCombatViewModel: ObservableObject {
         }
     }
     
+    /// Animate a single swing
+    private func animateNextSwing() {
+        guard currentSwingIndex < allRolls.count else { return }
+        
+        // Get just this one roll to animate
+        let roll = allRolls[currentSwingIndex]
+        pendingRolls = [roll]
+        
+        // Add to displayed rolls
+        lastRolls.append(roll)
+        
+        // Calculate intermediate bar value (proportional progress toward final)
+        if let finalMatch = turnPendingMatch, let pid = playerId {
+            let startBar = match?.barForPlayer(playerId: pid) ?? 50
+            let endBar = finalMatch.barForPlayer(playerId: pid)
+            let progress = Double(currentSwingIndex + 1) / Double(allRolls.count)
+            pendingBarValue = startBar + (endBar - startBar) * progress
+        }
+        
+        currentSwingIndex += 1
+        swingsRemaining -= 1
+        
+        animationPhase = .rolling
+    }
+    
     func finishYourAttackAnimation() {
         animationPhase = .none
-        if let m = pendingMatch { match = m; pendingMatch = nil }
+        
+        // If all swings are done, apply final result
+        if swingsRemaining == 0 {
+            lastAction = turnAction
+            if let m = turnPendingMatch { 
+                match = m 
+                turnPendingMatch = nil
+            }
+            // Reset for next turn
+            allRolls = []
+            currentSwingIndex = 0
+            turnAction = nil
+        }
+        // Otherwise, wait for next click to animate next swing
     }
     
     func cancel() async {
