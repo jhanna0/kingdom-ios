@@ -275,6 +275,9 @@ class DuelEvents:
     - DUEL_SWING: Broadcast for EVERY swing so opponent sees them in real-time
     - DUEL_TURN_COMPLETE: Final turn summary (bar push, next turn info)
     
+    Style system events:
+    - DUEL_STYLE_LOCKED: Player locked in their attack style (doesn't reveal WHICH style)
+    
     Frontend should animate each DUEL_SWING as it arrives.
     """
     DUEL_INVITATION = "duel_invitation"
@@ -282,6 +285,9 @@ class DuelEvents:
     DUEL_STARTED = "duel_started"
     DUEL_SWING = "duel_swing"  # NEW: Real-time swing broadcast to opponent
     DUEL_TURN_COMPLETE = "duel_turn_complete"  # Turn finished, bar pushed
+    DUEL_STYLE_LOCKED = "duel_style_locked"  # Player locked their style (not revealed yet)
+    DUEL_ROUND_SUBMITTED = "duel_round_submitted"  # One player submitted their round
+    DUEL_ROUND_RESOLVED = "duel_round_resolved"  # Both submitted; reveal + push applied
     DUEL_ENDED = "duel_ended"
     DUEL_CANCELLED = "duel_cancelled"
     DUEL_TIMEOUT = "duel_timeout"  # Player timed out

@@ -10,6 +10,7 @@ from .config import (
     calculate_duel_hit_chance,
     calculate_duel_push,
     calculate_duel_max_rolls,
+    calculate_duel_round_rolls,
     calculate_duel_roll_chances,
     get_duel_game_config,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "calculate_duel_hit_chance",
     "calculate_duel_push",
     "calculate_duel_max_rolls",
+    "calculate_duel_round_rolls",
     "calculate_duel_roll_chances",
     "get_duel_game_config",
 ]

@@ -71,6 +71,146 @@ DUEL_INVITATION_TIMEOUT_MINUTES = 15  # Invitations expire after 15 min
 DUEL_MATCH_TIMEOUT_MINUTES = 30    # Matches expire if inactive for 30 min
 
 # ============================================================
+# ROUND SYSTEM (Simultaneous submission)
+# ============================================================
+
+# Round submission timeout (shared for both players)
+DUEL_ROUND_TIMEOUT_SECONDS = 30
+
+# Cap rolls per round for pacing/UI even if attack is high
+DUEL_MAX_ROLLS_PER_ROUND_CAP = 4
+
+# Style selection phase timeout (first 10s of the round)
+DUEL_STYLE_LOCK_TIMEOUT_SECONDS = 10
+
+# ============================================================
+# ATTACK STYLES
+# ============================================================
+# 6 techniques that map directly to existing stats/math.
+# All modifiers are intentionally small so stats still matter.
+
+class AttackStyle:
+    """Attack style modifiers for dueling."""
+    
+    # Style names
+    BALANCED = "balanced"
+    AGGRESSIVE = "aggressive"
+    PRECISE = "precise"
+    POWER = "power"
+    GUARD = "guard"
+    FEINT = "feint"
+    
+    ALL_STYLES = [BALANCED, AGGRESSIVE, PRECISE, POWER, GUARD, FEINT]
+    
+    # Default style if not selected
+    DEFAULT = BALANCED
+
+# Style modifier constants (intentionally small)
+STYLE_MODIFIERS = {
+    # Balanced - no modifiers, the default
+    AttackStyle.BALANCED: {
+        "roll_bonus": 0,           # +/- to number of rolls
+        "hit_chance_mod": 0.0,     # +/- to hit chance (additive, e.g., 0.05 = +5%)
+        "crit_rate_mult": 1.0,     # Multiplier on crit rate (1.0 = normal)
+        "push_mult_win": 1.0,      # Push multiplier if you win the round
+        "push_mult_lose": 1.0,     # Opponent push multiplier if you lose
+        "opponent_hit_mod": 0.0,   # +/- to opponent's hit chance
+        "tie_advantage": False,    # Win ties if True
+        "description": "No modifiers. The safe choice.",
+        "icon": "equal.circle.fill",
+    },
+    
+    # Aggressive - more rolls, less accurate
+    AttackStyle.AGGRESSIVE: {
+        "roll_bonus": 1,           # +1 roll this round (capped by max)
+        "hit_chance_mod": -0.05,   # -5% hit chance (overextending)
+        "crit_rate_mult": 1.0,
+        "push_mult_win": 1.0,
+        "push_mult_lose": 1.0,
+        "opponent_hit_mod": 0.0,
+        "tie_advantage": False,
+        "description": "More chances to spike, slightly less accurate.",
+        "icon": "flame.fill",
+    },
+    
+    # Precise - more accurate, fewer crits
+    AttackStyle.PRECISE: {
+        "roll_bonus": 0,
+        "hit_chance_mod": 0.08,    # +8% hit chance
+        "crit_rate_mult": 0.75,    # -25% crit rate (not swinging for fences)
+        "push_mult_win": 1.0,
+        "push_mult_lose": 1.0,
+        "opponent_hit_mod": 0.0,
+        "tie_advantage": False,
+        "description": "Fewer all-miss rounds, fewer crits.",
+        "icon": "scope",
+    },
+    
+    # Power - high risk/reward push multipliers
+    AttackStyle.POWER: {
+        "roll_bonus": 0,
+        "hit_chance_mod": 0.0,
+        "crit_rate_mult": 1.0,
+        "push_mult_win": 1.25,     # +25% push if you win
+        "push_mult_lose": 1.10,    # Opponent gets +10% if you lose
+        "opponent_hit_mod": 0.0,
+        "tie_advantage": False,
+        "description": "Higher drama. Win big or lose bigger.",
+        "icon": "bolt.fill",
+    },
+    
+    # Guard - defensive, reduces opponent's chances
+    AttackStyle.GUARD: {
+        "roll_bonus": -1,          # -1 roll (min 1)
+        "hit_chance_mod": 0.0,
+        "crit_rate_mult": 1.0,
+        "push_mult_win": 1.0,
+        "push_mult_lose": 1.0,
+        "opponent_hit_mod": -0.08, # Opponent gets -8% hit chance
+        "tie_advantage": False,
+        "description": "Reduces opponent spike potential. Trade offense for defense.",
+        "icon": "shield.fill",
+    },
+    
+    # Feint - wins ties
+    AttackStyle.FEINT: {
+        "roll_bonus": 0,
+        "hit_chance_mod": 0.0,
+        "crit_rate_mult": 1.0,
+        "push_mult_win": 1.0,
+        "push_mult_lose": 1.0,
+        "opponent_hit_mod": 0.0,
+        "tie_advantage": True,     # Wins outcome ties
+        "description": "Win tiebreakers. Predict your opponent.",
+        "icon": "arrow.triangle.branch",
+    },
+}
+
+def get_style_modifiers(style: str) -> dict:
+    """Get modifiers for an attack style."""
+    return STYLE_MODIFIERS.get(style, STYLE_MODIFIERS[AttackStyle.BALANCED])
+
+def get_all_styles_config() -> list:
+    """Get all styles with their config for frontend display."""
+    return [
+        {
+            "id": style,
+            "name": style.replace("_", " ").title(),
+            "description": STYLE_MODIFIERS[style]["description"],
+            "icon": STYLE_MODIFIERS[style]["icon"],
+            # Include key modifiers for UI display
+            "roll_bonus": STYLE_MODIFIERS[style]["roll_bonus"],
+            "hit_chance_mod": int(STYLE_MODIFIERS[style]["hit_chance_mod"] * 100),  # As percentage
+            "crit_rate_mod": int((STYLE_MODIFIERS[style]["crit_rate_mult"] - 1.0) * 100),  # As percentage change
+            "push_mult_win": STYLE_MODIFIERS[style]["push_mult_win"],
+            "push_mult_lose": STYLE_MODIFIERS[style]["push_mult_lose"],
+            "opponent_hit_mod": int(STYLE_MODIFIERS[style]["opponent_hit_mod"] * 100),
+            "wins_ties": STYLE_MODIFIERS[style]["tie_advantage"],
+        }
+        for style in AttackStyle.ALL_STYLES
+    ]
+
+# ============================================================
 # MATCH SETTINGS
 # ============================================================
 
@@ -97,6 +237,14 @@ def calculate_duel_hit_chance(attack: int, enemy_defense: int) -> float:
 def calculate_duel_max_rolls(attack: int) -> int:
     """Calculate max rolls for a duel turn. Same as battles: 1 + attack."""
     return calculate_max_rolls(attack)
+
+
+def calculate_duel_round_rolls(attack: int) -> int:
+    """
+    Rolls per round in the simultaneous round system.
+    Keeps the familiar rule (1 + attack) but caps it for pacing.
+    """
+    return min(calculate_max_rolls(attack), DUEL_MAX_ROLLS_PER_ROUND_CAP)
 
 
 def calculate_duel_roll_chances(attack: int, enemy_defense: int) -> tuple:
@@ -175,8 +323,13 @@ def get_duel_game_config() -> dict:
     - No app redeployment needed
     """
     return {
+        # Mode
+        "duel_mode": "rounds",
+
         # Timing
         "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+        "round_timeout_seconds": DUEL_ROUND_TIMEOUT_SECONDS,
+        "style_lock_timeout_seconds": DUEL_STYLE_LOCK_TIMEOUT_SECONDS,
         "invitation_timeout_minutes": DUEL_INVITATION_TIMEOUT_MINUTES,
         
         # Combat multipliers (for display)
@@ -199,4 +352,13 @@ def get_duel_game_config() -> dict:
         "roll_pause_between_ms": 400,  # Pause between consecutive rolls
         "crit_popup_duration_ms": 1500,
         "roll_sweep_step_ms": 15,
+        "style_reveal_duration_ms": 1500,  # How long to show style reveal
+
+        # Round pacing
+        "max_rolls_per_round_cap": DUEL_MAX_ROLLS_PER_ROUND_CAP,
+        
+        # Attack styles - ALL style definitions come from server
+        # Frontend just renders this list, no hardcoded styles
+        "attack_styles": get_all_styles_config(),
+        "default_style": AttackStyle.DEFAULT,
     }

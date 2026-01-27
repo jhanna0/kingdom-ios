@@ -17,6 +17,10 @@ class DuelsAPI {
         let wager_gold: Int
     }
     
+    private struct LockStyleRequest: Codable {
+        let style: String
+    }
+    
     // MARK: - Challenge Creation
     
     /// Challenge a friend to a duel
@@ -77,6 +81,24 @@ class DuelsAPI {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
         let request = client.request(endpoint: "/duels/\(matchId)/attack", method: "POST")
+        return try await client.execute(request)
+    }
+
+    /// Submit a FULL round of swings (simultaneous rounds; no turns)
+    func submitRoundSwing(matchId: Int) async throws -> DuelRoundSwingResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let request = client.request(endpoint: "/duels/\(matchId)/round-swing", method: "POST")
+        return try await client.execute(request)
+    }
+    
+    /// Lock in an attack style for the current round
+    /// Must be called during style selection phase (first 10s of round)
+    func lockStyle(matchId: Int, style: String) async throws -> DuelLockStyleResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let body = LockStyleRequest(style: style)
+        let request = try client.request(endpoint: "/duels/\(matchId)/lock-style", method: "POST", body: body)
         return try await client.execute(request)
     }
     

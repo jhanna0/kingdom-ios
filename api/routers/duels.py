@@ -101,6 +101,44 @@ class AttackResponse(BaseModel):
     crit_chance: Optional[int] = None
 
 
+class RoundSwingResponse(BaseModel):
+    success: bool
+    status: Optional[str] = None  # waiting_for_opponent | resolved
+    message: str
+
+    round_number: Optional[int] = None
+    round_expires_at: Optional[str] = None
+
+    your_rolls: Optional[List[dict]] = None
+    opponent_rolls: Optional[List[dict]] = None
+
+    result: Optional[dict] = None
+    push: Optional[dict] = None
+    styles: Optional[dict] = None  # Style reveal after resolution
+
+    match: Optional[dict] = None
+    winner: Optional[dict] = None
+    game_over: Optional[bool] = None
+
+    # Odds (per-roll odds for the submitting player)
+    miss_chance: Optional[int] = None
+    hit_chance_pct: Optional[int] = None
+    crit_chance: Optional[int] = None
+
+
+class LockStyleRequest(BaseModel):
+    """Lock in an attack style for the current round"""
+    style: str  # balanced, aggressive, precise, power, guard, feint
+
+
+class LockStyleResponse(BaseModel):
+    success: bool
+    message: str
+    style: Optional[str] = None
+    both_styles_locked: Optional[bool] = None
+    match: Optional[dict] = None
+
+
 class InvitationsResponse(BaseModel):
     success: bool
     invitations: List[dict]
@@ -570,6 +608,158 @@ def execute_attack(
     except ValueError as e:
         return AttackResponse(success=False, message=str(e))
 
+
+@router.post("/{match_id}/lock-style", response_model=LockStyleResponse)
+def lock_style(
+    match_id: int,
+    request: LockStyleRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """
+    Lock in an attack style for the current round.
+    
+    Must be called during the style selection phase (first 10s of round).
+    If you don't lock a style before submitting swings, defaults to 'balanced'.
+    
+    Styles:
+    - balanced: No modifiers (default)
+    - aggressive: +1 roll, -5% hit chance
+    - precise: +8% hit chance, -25% crit rate
+    - power: +25% push if win, opponent +10% push if lose
+    - guard: -1 roll, opponent -8% hit chance
+    - feint: Win ties
+    """
+    try:
+        result = manager.lock_style(db, match_id, user.id, request.style)
+        db_match = manager.get_match(db, match_id)
+        
+        # Notify opponent that we locked a style (but not WHICH style)
+        if db_match:
+            opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_STYLE_LOCKED,
+                match=db_match.to_dict_for_player(opponent_id),
+                target_user_ids=_get_apple_user_ids(db, [opponent_id]),
+                data={
+                    "locker_id": user.id,
+                    "locker_name": user.display_name,
+                    "both_locked": result.get("both_styles_locked", False),
+                }
+            )
+        
+        return LockStyleResponse(
+            success=True,
+            message=f"Locked in {request.style} style!",
+            style=result.get("style"),
+            both_styles_locked=result.get("both_styles_locked"),
+            match=db_match.to_dict_for_player(user.id) if db_match else None,
+        )
+    except ValueError as e:
+        return LockStyleResponse(success=False, message=str(e))
+
+
+@router.post("/{match_id}/round-swing", response_model=RoundSwingResponse)
+def submit_round_swing(
+    match_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """
+    Submit a FULL round of swings (simultaneous rounds; no turns).
+
+    - Each player submits once per round
+    - Server rolls N times (N = min(1 + attack, cap) + style bonus)
+    - Attack style modifiers are applied to hit chance, crit rate, and push
+    - When both have submitted, server resolves once and broadcasts a full reveal to BOTH players
+    """
+    try:
+        result = manager.submit_round_swing(db, match_id, user.id)
+        db_match = manager.get_match(db, match_id)
+        if not db_match:
+            return RoundSwingResponse(success=False, message="Match not found")
+
+        # Identify opponent
+        opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
+        attacker_name = db_match.challenger_name if db_match.challenger_id == user.id else db_match.opponent_name
+        attacker_side = db_match.get_player_side(user.id)
+
+        # Odds for the response/match rendering
+        odds = {
+            "miss": result.get("miss_chance", 50),
+            "hit": result.get("hit_chance_pct", 40),
+            "crit": result.get("crit_chance", 10),
+        }
+
+        # Broadcasts
+        if result.get("status") == "waiting_for_opponent":
+            # Notify opponent that a submission happened (so they can feel the pressure)
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_ROUND_SUBMITTED,
+                match=db_match.to_dict_for_player(opponent_id, odds=odds),
+                target_user_ids=_get_apple_user_ids(db, [opponent_id]),
+                data={
+                    "round_number": result.get("round_number"),
+                    "submitter_id": user.id,
+                    "submitter_name": attacker_name,
+                },
+            )
+        elif result.get("status") == "resolved":
+            # Build canonical reveal payload (always challenger/opponent)
+            challenger_rolls = result.get("your_rolls") if attacker_side == "challenger" else result.get("opponent_rolls")
+            opponent_rolls = result.get("opponent_rolls") if attacker_side == "challenger" else result.get("your_rolls")
+            
+            # Get styles from result
+            styles = result.get("styles") or {}
+
+            reveal = {
+                "round_number": result.get("round_number"),
+                "challenger_name": db_match.challenger_name,
+                "opponent_name": db_match.opponent_name,
+                "challenger_rolls": challenger_rolls or [],
+                "opponent_rolls": opponent_rolls or [],
+                # Style reveal - both players see both styles after resolution
+                "challenger_style": styles.get("challenger"),
+                "opponent_style": styles.get("opponent"),
+                "result": result.get("result") or {},
+                "push": result.get("push") or {},
+                "game_over": result.get("game_over", False),
+            }
+
+            # Send to both players with their own perspective match dict
+            for pid in [db_match.challenger_id, db_match.opponent_id]:
+                broadcast_duel_event(
+                    event_type=DuelEvents.DUEL_ROUND_RESOLVED if not result.get("winner") else DuelEvents.DUEL_ENDED,
+                    match=db_match.to_dict_for_player(pid, odds=odds),
+                    target_user_ids=_get_apple_user_ids(db, [pid]),
+                    data=reveal,
+                )
+
+        # Return submitter's perspective
+        match_dict = db_match.to_dict_for_player(user.id, odds=odds)
+        return RoundSwingResponse(
+            success=True,
+            status=result.get("status"),
+            message=result.get("message", "OK"),
+            round_number=result.get("round_number"),
+            round_expires_at=match_dict.get("round_expires_at"),
+            # Reveal happens via WebSocket when both submitted (simultaneous reveal)
+            your_rolls=None,
+            opponent_rolls=None,
+            result=result.get("result"),
+            push=result.get("push"),
+            styles=result.get("styles"),  # Style info
+            match=match_dict,
+            winner=result.get("winner"),
+            game_over=result.get("game_over"),
+            miss_chance=result.get("miss_chance"),
+            hit_chance_pct=result.get("hit_chance_pct"),
+            crit_chance=result.get("crit_chance"),
+        )
+    except ValueError as e:
+        return RoundSwingResponse(success=False, message=str(e))
 
 @router.post("/{match_id}/forfeit", response_model=DuelResponse)
 def forfeit_match(

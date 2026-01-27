@@ -39,9 +39,11 @@ struct DuelCombatView: View {
     // Server config (no hardcoded values!)
     private var gameConfig: DuelGameConfig? { currentMatch.config }
     private var turnTimeout: Int { gameConfig?.turnTimeoutSeconds ?? 30 }  // Fallback only for loading state
+    private var roundTimeout: Int { gameConfig?.roundTimeoutSeconds ?? turnTimeout }
     private var critMultiplier: Double { gameConfig?.criticalMultiplier ?? 1.5 }
     private var critPopupDurationMs: Int { gameConfig?.critPopupDurationMs ?? 1500 }
     private var rollSweepStepMs: Int { gameConfig?.rollSweepStepMs ?? 15 }
+    private var isRoundMode: Bool { (gameConfig?.duelMode ?? "") == "rounds" }
     
     @Environment(\.dismiss) private var dismiss
 
@@ -102,6 +104,13 @@ struct DuelCombatView: View {
                 criticalHitPopup(data: data)
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
+            }
+            
+            // Style reveal overlay (shows both styles before push)
+            if viewModel.showStyleReveal, let data = viewModel.styleRevealData {
+                styleRevealOverlay(data: data)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(55)
             }
             
             // Push popup overlay (shows bar push dramatically)
@@ -181,6 +190,10 @@ struct DuelCombatView: View {
         .onChange(of: currentMatch.turnExpiresAt) { _, _ in
             updateTimerFromServer()
         }
+        // Round timer (new system)
+        .onChange(of: currentMatch.roundExpiresAt) { _, _ in
+            updateTimerFromServer()
+        }
         // Also update when turn changes (backup if turnExpiresAt didn't change)
         .onChange(of: currentMatch.isYourTurn) { _, _ in
             updateTimerFromServer()
@@ -200,10 +213,17 @@ struct DuelCombatView: View {
     /// This ensures correct timeout state on reconnect and after opponent swings
     private func updateTimerFromServer() {
         timerActive = currentMatch.isFighting
-        
-        guard let expiresAtStr = currentMatch.turnExpiresAt else {
+
+        let expiresAtStr: String? = {
+            if isRoundMode {
+                return currentMatch.roundExpiresAt ?? currentMatch.turnExpiresAt
+            }
+            return currentMatch.turnExpiresAt
+        }()
+
+        guard let expiresAtStr else {
             // No expiration set, use default
-            secondsRemaining = turnTimeout
+            secondsRemaining = isRoundMode ? roundTimeout : turnTimeout
             return
         }
         
@@ -219,7 +239,7 @@ struct DuelCombatView: View {
         }
         
         guard let expiry = expiresAt else {
-            secondsRemaining = turnTimeout
+            secondsRemaining = isRoundMode ? roundTimeout : turnTimeout
             return
         }
         
@@ -235,7 +255,7 @@ struct DuelCombatView: View {
         guard let roll = viewModel.currentRoll else { return }
         
         // Trigger character swing animation
-        let isMySwing = currentMatch.isYourTurn ?? false
+        let isMySwing = (roll.attackerName ?? "") == currentMatch.myName
         triggerSwingAnimation(isMySwing: isMySwing, outcome: roll.outcome)
         
         showRollMarker = true
@@ -276,6 +296,12 @@ struct DuelCombatView: View {
                     compactHeader
                     duelArenaView
                     heroControlBar
+                    
+                    // Style selection (shown during style phase)
+                    if currentMatch.inStylePhase == true || currentMatch.canLockStyle == true {
+                        styleSelectionCard
+                    }
+                    
                     probabilityBar
                     turnSwingsCard
                 }
@@ -289,31 +315,110 @@ struct DuelCombatView: View {
         }
     }
     
+    // MARK: - Style Selection Card
+    
+    private var styleSelectionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with timer
+            HStack {
+                Text("CHOOSE YOUR STYLE")
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                // Style phase timer
+                if let expiresAt = currentMatch.styleLockExpiresAt {
+                    StylePhaseTimer(expiresAt: expiresAt)
+                }
+            }
+            
+            // Locked status
+            if currentMatch.myStyleLocked == true {
+                if let myStyle = currentMatch.myStyle {
+                    let styleName = gameConfig?.attackStyles?.first(where: { $0.id == myStyle })?.name ?? myStyle.capitalized
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(myColor)
+                        Text("Locked: \(styleName)")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(myColor)
+                    }
+                }
+            } else {
+                // Style selection grid (from server config)
+                if let styles = gameConfig?.attackStyles {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        ForEach(styles) { style in
+                            StyleButton(style: style, isSelected: currentMatch.myStyle == style.id, myColor: myColor) {
+                                Task { await viewModel.lockStyle(style.id) }
+                            }
+                            .disabled(currentMatch.myStyleLocked == true || viewModel.isAnimating)
+                        }
+                    }
+                } else {
+                    Text("Loading styles...")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                }
+            }
+            
+            // Opponent status
+            HStack {
+                Circle()
+                    .fill(currentMatch.opponentStyleLocked == true ? myColor : KingdomTheme.Colors.inkLight)
+                    .frame(width: 8, height: 8)
+                Text(currentMatch.opponentStyleLocked == true ? "\(opponentDisplayName) locked in!" : "\(opponentDisplayName) choosing...")
+                    .font(FontStyles.labelTiny)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+        }
+        .padding(14)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+    }
+    
     // MARK: - Compact Header
+    
+    /// Computed status for the round header
+    private var roundStatus: (text: String, color: Color) {
+        let roundNum = currentMatch.roundNumber ?? 1
+        let hasSubmitted = currentMatch.hasSubmittedRound ?? false
+        let inStylePhase = currentMatch.inStylePhase ?? false
+        let myStyleLocked = currentMatch.myStyleLocked ?? false
+        
+        if inStylePhase && !myStyleLocked {
+            return ("ROUND \(roundNum) — PICK STYLE", KingdomTheme.Colors.imperialGold)
+        } else if inStylePhase && myStyleLocked {
+            return ("ROUND \(roundNum) — STYLE LOCKED", myColor)
+        } else if hasSubmitted {
+            return ("ROUND \(roundNum) — WAITING", enemyColor)
+        } else {
+            return ("ROUND \(roundNum) — SUBMIT", myColor)
+        }
+    }
     
     private var compactHeader: some View {
         HStack {
-            // Turn indicator
-            let isYourTurn = currentMatch.isYourTurn ?? false
+            // Round indicator (shows phase: style selection or swing submission)
             HStack(spacing: 6) {
                 Circle()
-                    .fill(isYourTurn ? myColor : enemyColor)
+                    .fill(roundStatus.color)
                     .frame(width: 10, height: 10)
                     .overlay(
                         Circle()
                             .stroke(Color.black, lineWidth: 1.5)
                     )
-                    .shadow(color: isYourTurn ? myColor.opacity(0.6) : .clear, radius: isYourTurn ? 4 : 0)
+                    .shadow(color: roundStatus.color.opacity(0.6), radius: 4)
                 
-                Text(isYourTurn ? "YOUR TURN" : "\(opponentDisplayName.uppercased())'S TURN")
+                Text(roundStatus.text)
                     .font(FontStyles.labelBold)
-                    .foregroundColor(isYourTurn ? myColor : enemyColor)
+                    .foregroundColor(roundStatus.color)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isYourTurn ? myColor.opacity(0.15) : enemyColor.opacity(0.15))
+                    .fill(roundStatus.color.opacity(0.15))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
             )
             
@@ -682,11 +787,15 @@ struct DuelCombatView: View {
             }
             return "ROLLING..."
         }
-        return (currentMatch.isYourTurn ?? false) ? "YOUR ATTACK ODDS" : "\(opponentDisplayName.uppercased())'S ODDS"
+        return "YOUR SWING ODDS"
     }
     
     private var displayBarColor: Color {
-        (currentMatch.isYourTurn ?? false) ? myColor : enemyColor
+        // Round system: marker color should reflect WHO is rolling, not "turn"
+        if let roll = viewModel.currentRoll, let attacker = roll.attackerName {
+            return attacker == currentMatch.myName ? myColor : enemyColor
+        }
+        return myColor
     }
     
     private func markerColor(_ value: Int) -> Color {
@@ -725,29 +834,64 @@ struct DuelCombatView: View {
         }
     }
     
-    // MARK: - Turn Swings Card (UNIFIED - no my/opponent split!)
+    // MARK: - Round Reveal Card
     
     private var turnSwingsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Title shows whose turn it is
-            let isYourTurn = currentMatch.isYourTurn ?? false
-            let title = isYourTurn ? "YOUR SWINGS" : "\(opponentDisplayName.uppercased())'S SWINGS"
-            Text(title).font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            let rolls = viewModel.displayedRolls
-            if rolls.isEmpty {
-                let emptyText = isYourTurn ? "Attack to see your rolls!" : "Waiting for \(opponentDisplayName)..."
-                Text(emptyText).font(FontStyles.labelTiny).foregroundColor(KingdomTheme.Colors.inkLight)
-                    .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(Array(rolls.enumerated()), id: \.offset) { index, roll in
-                            // Color based on whose turn (from server)
-                            let rollColor = isYourTurn ? myColor : enemyColor
-                            rollBadge(roll: roll, index: index + 1, color: rollColor)
-                        }
-                    }.padding(.horizontal, 4)
+            let roundNum = currentMatch.roundNumber ?? 1
+            Text("ROUND \(roundNum)")
+                .font(FontStyles.labelBadge)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+
+            // YOU
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("YOU").font(FontStyles.labelBold).foregroundColor(KingdomTheme.Colors.inkDark)
+                    Spacer()
+                    if currentMatch.hasSubmittedRound == true {
+                        Text("SUBMITTED").font(FontStyles.labelBadge).foregroundColor(myColor)
+                    }
+                }
+
+                if viewModel.myDisplayedRoundRolls.isEmpty {
+                    Text("Waiting for reveal…")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(viewModel.myDisplayedRoundRolls.enumerated()), id: \.offset) { index, roll in
+                                rollBadge(roll: roll, index: index + 1, color: myColor)
+                            }
+                        }.padding(.horizontal, 4)
+                    }
+                }
+            }
+
+            // OPPONENT
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(opponentDisplayName.uppercased())
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    Spacer()
+                    if currentMatch.opponentHasSubmittedRound == true {
+                        Text("SUBMITTED").font(FontStyles.labelBadge).foregroundColor(enemyColor)
+                    }
+                }
+
+                if viewModel.opponentDisplayedRoundRolls.isEmpty {
+                    Text("Waiting for reveal…")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(viewModel.opponentDisplayedRoundRolls.enumerated()), id: \.offset) { index, roll in
+                                rollBadge(roll: roll, index: index + 1, color: enemyColor)
+                            }
+                        }.padding(.horizontal, 4)
+                    }
                 }
             }
         }
@@ -846,12 +990,12 @@ struct DuelCombatView: View {
                         HStack { Image(systemName: "figure.fencing"); Text("Start Duel") }.frame(maxWidth: .infinity)
                     }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
                 } else if currentMatch.isFighting {
-                    // Use server-provided values ONLY - no fallback calculations
-                    let canAttack = currentMatch.canAttack ?? false
-                    let isYourTurn = currentMatch.isYourTurn ?? false
-                    let swingsRemaining = currentMatch.yourSwingsRemaining ?? 0
-                    
-                    let buttonText = isYourTurn ? "Swing! (\(swingsRemaining) left)" : "Waiting..."
+                    // Round system: use server-provided values ONLY
+                    let canSubmitRound = currentMatch.canSubmitRound ?? (currentMatch.canAttack ?? false)
+                    let hasSubmittedRound = currentMatch.hasSubmittedRound ?? false
+                    let rollsThisRound = currentMatch.yourRoundRollsCount ?? (currentMatch.yourSwingsRemaining ?? 0)
+
+                    let buttonText = hasSubmittedRound ? "Submitted… Waiting" : "Swing! (\(rollsThisRound) rolls)"
                     // Use server-provided can_claim_timeout ONLY
                     let canClaimTimeout = (currentMatch.canClaimTimeout ?? false) && !viewModel.isAnimating
                     
@@ -866,11 +1010,11 @@ struct DuelCombatView: View {
                         .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
                     } else {
                         HStack(spacing: KingdomTheme.Spacing.medium) {
-                            Button { Task { await viewModel.attack() } } label: {
+                            Button { Task { await viewModel.submitRoundSwing() } } label: {
                                 HStack { Image(systemName: "figure.fencing"); Text(buttonText) }.frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.brutalist(backgroundColor: (canAttack && !viewModel.isAnimating) ? myColor : KingdomTheme.Colors.disabled, foregroundColor: .white, fullWidth: true))
-                            .disabled(!(canAttack && !viewModel.isAnimating))
+                            .buttonStyle(.brutalist(backgroundColor: (canSubmitRound && !hasSubmittedRound && !viewModel.isAnimating) ? myColor : KingdomTheme.Colors.disabled, foregroundColor: .white, fullWidth: true))
+                            .disabled(!(canSubmitRound && !hasSubmittedRound && !viewModel.isAnimating))
                             
                             Button { showForfeitConfirmation = true } label: {
                                 HStack { Image(systemName: "flag.fill"); Text("Forfeit") }.frame(maxWidth: .infinity)
@@ -1170,6 +1314,111 @@ struct DuelCombatView: View {
         }
     }
     
+    // MARK: - Style Reveal Overlay
+    
+    private func styleRevealOverlay(data: StyleRevealData) -> some View {
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Text("STYLE REVEAL")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundColor(.white.opacity(0.7))
+                
+                HStack(spacing: 30) {
+                    // Your style
+                    VStack(spacing: 8) {
+                        Text("YOU")
+                            .font(FontStyles.labelBadge)
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        styleIconView(styleName: data.myStyle, color: myColor)
+                        
+                        Text(data.myStyleName)
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Text("VS")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundColor(.white.opacity(0.5))
+                    
+                    // Opponent style
+                    VStack(spacing: 8) {
+                        Text(opponentDisplayName.uppercased())
+                            .font(FontStyles.labelBadge)
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        styleIconView(styleName: data.opponentStyle, color: enemyColor)
+                        
+                        Text(data.opponentStyleName)
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(.white)
+                    }
+                }
+                
+                // Feint winner indicator
+                if let feint = data.feintWinner {
+                    let feintWinnerName = feint == "challenger" ? 
+                        (currentMatch.challenger.id == playerId ? "YOU" : opponentDisplayName) :
+                        (currentMatch.opponent?.id == playerId ? "YOU" : opponentDisplayName)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundColor(.yellow)
+                        Text("\(feintWinnerName) WINS TIE WITH FEINT!")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(.yellow)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.yellow.opacity(0.2))
+                    )
+                }
+            }
+            .padding(30)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.black)
+                        .offset(x: 4, y: 4)
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(KingdomTheme.Colors.inkDark.opacity(0.95))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                        )
+                }
+            )
+        }
+    }
+    
+    /// Get icon for a style (from server config or fallback)
+    private func styleIconView(styleName: String, color: Color) -> some View {
+        // Get icon from server config if available
+        let icon = gameConfig?.attackStyles?.first(where: { $0.id == styleName })?.icon ?? "equal.circle.fill"
+        
+        return Image(systemName: icon)
+            .font(.system(size: 40))
+            .foregroundColor(.white)
+            .frame(width: 70, height: 70)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.black)
+                        .offset(x: 2, y: 2)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(color)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                }
+            )
+    }
+    
     // MARK: - Push Popup Overlay
     
     private func pushPopupOverlay(data: PushPopupData) -> some View {
@@ -1184,10 +1433,10 @@ struct DuelCombatView: View {
         let amountText: String
         
         if isBlocked {
-            // BLOCKED - gray, shield icon
+            // PARRIED - gray, shield icon
             popupColor = Color(white: 0.4)
             popupIcon = "shield.fill"
-            title = "BLOCKED!"
+            title = "PARRIED!"
             subtitle = "No ground gained"
             amountText = "0%"
         } else if isGoodPush {
@@ -1267,6 +1516,15 @@ struct PushPopupData {
     let outcome: String     // hit, critical, miss
 }
 
+// MARK: - Style Reveal Data
+struct StyleRevealData {
+    let myStyle: String
+    let opponentStyle: String
+    let myStyleName: String
+    let opponentStyleName: String
+    let feintWinner: String?  // If feint broke a tie
+}
+
 // MARK: - Critical Hit Data
 struct CritPopupData {
     let attackerName: String
@@ -1309,7 +1567,8 @@ class DuelCombatViewModel: ObservableObject {
     // Animation state
     @Published var currentRoll: Roll?
     @Published var isAnimating: Bool = false
-    @Published var displayedRolls: [Roll] = []
+    @Published var myDisplayedRoundRolls: [Roll] = []
+    @Published var opponentDisplayedRoundRolls: [Roll] = []
     
     // Turn banner (controlled by event queue)
     @Published var showTurnBanner: Bool = false
@@ -1318,6 +1577,10 @@ class DuelCombatViewModel: ObservableObject {
     // Push popup (controlled by event queue)
     @Published var showPushPopup: Bool = false
     @Published var pushPopupData: PushPopupData? = nil
+    
+    // Style reveal popup (shows both styles after round resolution)
+    @Published var showStyleReveal: Bool = false
+    @Published var styleRevealData: StyleRevealData? = nil
     
     // Odds from server
     @Published var odds = Odds()
@@ -1357,30 +1620,98 @@ class DuelCombatViewModel: ObservableObject {
     // === QUEUE MANAGEMENT ===
     
     private func enqueueWebSocketEvent(_ event: DuelEvent) {
-        var roll: Roll? = nil
+        // Legacy swing events
         if event.eventType == .swing,
            let rollData = event.data["roll"] as? [String: Any],
            let attackerName = event.data["attacker_name"] as? String,
            let value = rollData["value"] as? Double {
             let outcome = rollData["outcome"] as? String ?? "miss"
             let swingNumber = event.data["swing_number"] as? Int ?? 1
-            roll = Roll(value: Int(value), outcome: outcome, attackerName: attackerName, swingNumber: swingNumber)
+            let roll = Roll(value: Int(value), outcome: outcome, attackerName: attackerName, swingNumber: swingNumber)
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: roll, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil))
+            processQueue()
+            return
         }
         
-        eventQueue.append(DuelQueuedEvent(
-            match: event.match,
-            roll: roll,
-            isFirstSwingOfTurn: (event.data["swing_number"] as? Int ?? 1) == 1
-        ))
+        // Style locked - just update match state (opponent locked their style)
+        if event.eventType == .styleLocked {
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil))
+            processQueue()
+            return
+        }
+
+        // New round system events
+        if event.eventType == .roundResolved || event.eventType == .ended {
+            let challengerName = event.data["challenger_name"] as? String
+            let opponentName = event.data["opponent_name"] as? String
+
+            let challengerRolls = event.data["challenger_rolls"] as? [[String: Any]] ?? []
+            let opponentRolls = event.data["opponent_rolls"] as? [[String: Any]] ?? []
+            
+            // Style reveal data
+            let challengerStyle = event.data["challenger_style"] as? String
+            let opponentStyleData = event.data["opponent_style"] as? String
+            let resultDict = event.data["result"] as? [String: Any]
+            let feintWinner = resultDict?["feint_winner"] as? String
+
+            func decodeRolls(_ rs: [[String: Any]], attacker: String?) -> [Roll] {
+                rs.compactMap { d in
+                    guard let value = d["value"] as? Double else { return nil }
+                    let outcome = d["outcome"] as? String ?? "miss"
+                    let n = d["roll_number"] as? Int ?? 1
+                    return Roll(value: Int(value), outcome: outcome, attackerName: attacker, swingNumber: n)
+                }
+            }
+
+            let ch = decodeRolls(challengerRolls, attacker: challengerName)
+            let op = decodeRolls(opponentRolls, attacker: opponentName)
+
+            // Interleave reveal: best UX for “compare” feeling
+            var reveal: [Roll] = []
+            let maxLen = max(ch.count, op.count)
+            for i in 0..<maxLen {
+                if i < ch.count { reveal.append(ch[i]) }
+                if i < op.count { reveal.append(op[i]) }
+            }
+
+            let parried = (resultDict?["parried"] as? Bool) ?? false
+            let popupOutcome = parried ? "parried" : ((resultDict?["decisive_outcome"] as? String) ?? "hit")
+            
+            // Build style reveal if we have style data
+            var styleReveal: StyleRevealData? = nil
+            if let chStyle = challengerStyle, let opStyle = opponentStyleData {
+                let isChallenger = match?.challenger.id == playerId
+                let myStyle = isChallenger == true ? chStyle : opStyle
+                let oppStyle = isChallenger == true ? opStyle : chStyle
+                styleReveal = StyleRevealData(
+                    myStyle: myStyle,
+                    opponentStyle: oppStyle,
+                    myStyleName: myStyle.replacingOccurrences(of: "_", with: " ").capitalized,
+                    opponentStyleName: oppStyle.replacingOccurrences(of: "_", with: " ").capitalized,
+                    feintWinner: feintWinner
+                )
+            }
+
+            eventQueue.append(DuelQueuedEvent(
+                match: event.match,
+                roll: nil,
+                rolls: reveal,
+                clearRoundRolls: true,
+                showRoundPopup: true,
+                popupOutcome: popupOutcome,
+                styleReveal: styleReveal
+            ))
+            processQueue()
+            return
+        }
+
+        // Round submitted just updates state (so UI can show opponent submitted)
+        eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil))
         processQueue()
     }
     
-    private func enqueueAPIResponse(match: DuelMatch?, roll: Roll?, clearRolls: Bool = false) {
-        eventQueue.append(DuelQueuedEvent(
-            match: match,
-            roll: roll,
-            isFirstSwingOfTurn: clearRolls
-        ))
+    private func enqueueAPIResponse(match: DuelMatch?) {
+        eventQueue.append(DuelQueuedEvent(match: match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil))
         processQueue()
     }
     
@@ -1400,25 +1731,31 @@ class DuelCombatViewModel: ObservableObject {
     }
     
     private func processEvent(_ event: DuelQueuedEvent) async {
-        // Remember old turn state and bar position to detect changes
-        let wasMyTurn = match?.isYourTurn ?? false
+        // Remember old bar position to detect changes
         let oldBarPosition = match?.yourBarPosition ?? 50.0
+
+        if event.clearRoundRolls {
+            myDisplayedRoundRolls = []
+            opponentDisplayedRoundRolls = []
+        }
         
-        // STEP 1: If there's a roll, animate it
-        if let roll = event.roll {
-            currentRoll = roll
+        // STEP 1: Animate roll(s) if present
+        let rollsToAnimate: [Roll] = {
+            if let rs = event.rolls { return rs }
+            if let r = event.roll { return [r] }
+            return []
+        }()
+
+        for r in rollsToAnimate {
+            currentRoll = r
             isAnimating = true
-            
-            // Wait for animation to complete (view will call finishCurrentRoll)
             await withCheckedContinuation { continuation in
                 animationContinuation = continuation
             }
-            
-            // STEP 2: Pause to see the roll result
             try? await Task.sleep(nanoseconds: 800_000_000)  // 0.8 seconds to see result
         }
         
-        // STEP 3: Update match state (this changes turn, bar position, etc)
+        // STEP 2: Update match state
         if let m = event.match {
             match = m
             if let matchOdds = m.currentOdds {
@@ -1426,56 +1763,48 @@ class DuelCombatViewModel: ObservableObject {
             }
         }
         
-        // STEP 4: If turn changed, show PUSH POPUP first, THEN turn banner
-        let isNowMyTurn = match?.isYourTurn ?? false
+        // STEP 3: Show style reveal if we have style data (before push popup)
+        if let styleData = event.styleReveal {
+            self.styleRevealData = styleData
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                self.showStyleReveal = true
+            }
+            // Show for style reveal duration from config, or default 1.5s
+            let revealDuration = match?.config?.styleRevealDurationMs ?? 1500
+            try? await Task.sleep(nanoseconds: UInt64(revealDuration) * 1_000_000)
+            withAnimation(.easeOut(duration: 0.2)) {
+                self.showStyleReveal = false
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
+        
+        // STEP 4: Show round result popup (push/parry) when requested
         let newBarPosition = match?.yourBarPosition ?? 50.0
         let pushAmount = newBarPosition - oldBarPosition
         
-        if wasMyTurn != isNowMyTurn && match?.isFighting == true {
-            // Clear displayed rolls when turn changes
-            displayedRolls = []
-            
-            // STEP 4a: Show PUSH or BLOCKED popup - ONLY when server says turn is complete
-            let turnComplete = event.roll?.turnComplete ?? false
-            if turnComplete {
-                let outcome = event.roll?.outcome ?? "miss"
-                self.pushPopupData = PushPopupData(pushAmount: pushAmount, outcome: outcome)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    self.showPushPopup = true
-                }
-                
-                // Let the bar animation play while popup is showing
-                try? await Task.sleep(nanoseconds: 1_800_000_000)  // 1.8 seconds
-                
-                // Hide push popup
-                withAnimation(.easeOut(duration: 0.2)) {
-                    self.showPushPopup = false
-                }
-                
-                try? await Task.sleep(nanoseconds: 300_000_000)  // 0.3 second gap
+        if event.showRoundPopup && match?.isFighting == true {
+            let outcome = event.popupOutcome ?? "hit"
+            self.pushPopupData = PushPopupData(pushAmount: pushAmount, outcome: outcome)
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                self.showPushPopup = true
             }
-            
-            // STEP 4b: Show turn banner
-            self.showTurnBanner = true
-            self.turnBannerScale = 0.8
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                self.turnBannerScale = 1.0
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            withAnimation(.easeOut(duration: 0.2)) {
+                self.showPushPopup = false
             }
-            
-            // Keep banner visible for a moment
-            try? await Task.sleep(nanoseconds: 1_200_000_000)  // 1.2 seconds
-            
-            // Hide banner
-            withAnimation(.easeOut(duration: 0.3)) {
-                self.showTurnBanner = false
-            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
         }
     }
     
     /// Called by view when roll animation completes
     func finishCurrentRoll() {
         if let roll = currentRoll {
-            displayedRolls.append(roll)
+            let isMe = (roll.attackerName ?? "") == (match?.myName ?? "")
+            if isMe {
+                myDisplayedRoundRolls.append(roll)
+            } else {
+                opponentDisplayedRoundRolls.append(roll)
+            }
         }
         currentRoll = nil
         isAnimating = false
@@ -1487,27 +1816,33 @@ class DuelCombatViewModel: ObservableObject {
     
     // === API CALLS ===
     
-    func attack() async {
+    func lockStyle(_ style: String) async {
         guard let matchId = matchId else { return }
-        guard match?.canAttack == true && !isAnimating && !isProcessingQueue else { return }
+        guard match?.canLockStyle == true && !isAnimating else { return }
         
         do {
-            let r = try await api.attack(matchId: matchId)
-            if r.success, let roll = r.roll {
-                // Update odds immediately (for probability bar)
-                if let miss = r.missChance, let hit = r.hitChancePct, let crit = r.critChance {
-                    odds = Odds(miss: miss, hit: hit, crit: crit)
+            let r = try await api.lockStyle(matchId: matchId, style: style)
+            if let m = r.match { 
+                match = m 
+                if let matchOdds = m.currentOdds {
+                    odds = Odds(miss: matchOdds.miss, hit: matchOdds.hit, crit: matchOdds.crit)
                 }
-                
-                let myName = match?.myName ?? "You"
-                let swingNumber = r.swingNumber ?? 1
-                let queuedRoll = Roll(value: Int(roll.value), outcome: roll.outcome, attackerName: myName, swingNumber: swingNumber)
-                
-                // Queue the roll animation, then match update
-                enqueueAPIResponse(match: r.match, roll: queuedRoll, clearRolls: swingNumber == 1)
-            } else {
-                errorMessage = r.message
             }
+            if !r.success { errorMessage = r.message }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func submitRoundSwing() async {
+        guard let matchId = matchId else { return }
+        guard match?.canSubmitRound == true && match?.hasSubmittedRound != true && !isAnimating && !isProcessingQueue else { return }
+        
+        do {
+            let r = try await api.submitRoundSwing(matchId: matchId)
+            // Sync match state immediately; reveal happens via WebSocket when both submitted
+            if let m = r.match { enqueueAPIResponse(match: m) }
+            if !r.success { errorMessage = r.message }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1549,7 +1884,11 @@ class DuelCombatViewModel: ObservableObject {
 struct DuelQueuedEvent {
     let match: DuelMatch?
     let roll: Roll?
-    let isFirstSwingOfTurn: Bool
+    let rolls: [Roll]?
+    let clearRoundRolls: Bool
+    let showRoundPopup: Bool
+    let popupOutcome: String?
+    let styleReveal: StyleRevealData?
 }
 
 // MARK: - Duel Control Bar
@@ -1657,5 +1996,132 @@ struct DuelBarStripes: View {
             }
         }
         .clipped()
+    }
+}
+
+// MARK: - Style Button
+
+/// A button for selecting an attack style - renders from server config
+struct StyleButton: View {
+    let style: AttackStyleConfig
+    let isSelected: Bool
+    let myColor: Color
+    let action: () -> Void
+    
+    @State private var showingDetails = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: style.icon)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(isSelected ? .white : KingdomTheme.Colors.inkDark)
+                
+                Text(style.name)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(isSelected ? .white : KingdomTheme.Colors.inkDark)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black)
+                        .offset(x: 2, y: 2)
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isSelected ? myColor : KingdomTheme.Colors.parchment)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? myColor : Color.black, lineWidth: 2)
+                        )
+                }
+            )
+        }
+        .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.3) {
+            showingDetails = true
+        }
+        .popover(isPresented: $showingDetails) {
+            styleDetailsPopover
+        }
+    }
+    
+    private var styleDetailsPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: style.icon)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(myColor)
+                Text(style.name)
+                    .font(FontStyles.headingSmall)
+            }
+            
+            Text(style.description)
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(style.effectsSummary, id: \.self) { effect in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(myColor)
+                            .frame(width: 6, height: 6)
+                        Text(effect)
+                            .font(FontStyles.labelTiny)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(minWidth: 200)
+        .background(KingdomTheme.Colors.parchment)
+    }
+}
+
+// MARK: - Style Phase Timer
+
+/// Timer for the style selection phase
+struct StylePhaseTimer: View {
+    let expiresAt: String
+    
+    @State private var secondsRemaining: Int = 10
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "clock")
+                .font(.system(size: 10, weight: .bold))
+            Text("\(secondsRemaining)s")
+                .font(.system(size: 12, weight: .black, design: .monospaced))
+        }
+        .foregroundColor(secondsRemaining <= 3 ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkMedium)
+        .onAppear {
+            updateTimer()
+        }
+        .onReceive(timer) { _ in
+            if secondsRemaining > 0 {
+                secondsRemaining -= 1
+            }
+        }
+    }
+    
+    private func updateTimer() {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        var expiry = formatter.date(from: expiresAt)
+        if expiry == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            expiry = formatter.date(from: expiresAt)
+        }
+        
+        if let exp = expiry {
+            let remaining = exp.timeIntervalSinceNow
+            secondsRemaining = max(0, Int(remaining))
+        }
     }
 }

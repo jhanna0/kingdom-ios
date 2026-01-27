@@ -95,6 +95,27 @@ class DuelMatch(Base):
     turn_best_outcome = Column(String(20), nullable=True)  # Best outcome so far: 'miss', 'hit', 'critical'
     turn_best_push = Column(Float, default=0.0)    # Push amount from best outcome
     turn_rolls = Column(JSONB, nullable=True)      # All rolls this turn for display
+
+    # ============================================================
+    # Simultaneous round system (no turns; both submit each round)
+    # ============================================================
+    round_number = Column(Integer, nullable=False, default=1)  # Current round (starts at 1)
+    round_expires_at = Column(DateTime, nullable=True)  # Shared timer for round submission
+
+    # Pending submissions for the current round (persist across reconnects)
+    pending_challenger_round_rolls = Column(JSONB, nullable=True)
+    pending_opponent_round_rolls = Column(JSONB, nullable=True)
+    pending_challenger_round_submitted_at = Column(DateTime, nullable=True)
+    pending_opponent_round_submitted_at = Column(DateTime, nullable=True)
+    
+    # ============================================================
+    # Attack Style System (locked before rolls each round)
+    # ============================================================
+    style_lock_expires_at = Column(DateTime, nullable=True)  # When style selection phase ends
+    challenger_style = Column(String(20), nullable=True)  # balanced, aggressive, precise, power, guard, feint
+    opponent_style = Column(String(20), nullable=True)
+    challenger_style_locked_at = Column(DateTime, nullable=True)
+    opponent_style_locked_at = Column(DateTime, nullable=True)
     
     # Stats snapshots (frozen at match start for fairness)
     challenger_stats = Column(JSONB, nullable=True)
@@ -189,6 +210,42 @@ class DuelMatch(Base):
             self.current_turn = "opponent"
         else:
             self.current_turn = "challenger"
+    
+    # === Style Helpers ===
+    
+    def get_player_style(self, player_id: int) -> Optional[str]:
+        """Get the attack style a player has locked in."""
+        if player_id == self.challenger_id:
+            return self.challenger_style
+        elif player_id == self.opponent_id:
+            return self.opponent_style
+        return None
+    
+    def has_player_locked_style(self, player_id: int) -> bool:
+        """Check if a player has locked in their style for this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_style is not None
+        elif player_id == self.opponent_id:
+            return self.opponent_style is not None
+        return False
+    
+    def both_styles_locked(self) -> bool:
+        """Check if both players have locked in their styles."""
+        return self.challenger_style is not None and self.opponent_style is not None
+    
+    def style_phase_expired(self) -> bool:
+        """Check if the style selection phase has expired."""
+        if self.style_lock_expires_at is None:
+            return True
+        return datetime.utcnow() > self.style_lock_expires_at
+    
+    def clear_styles_for_new_round(self) -> None:
+        """Clear styles for a new round."""
+        self.challenger_style = None
+        self.opponent_style = None
+        self.challenger_style_locked_at = None
+        self.opponent_style_locked_at = None
+        self.style_lock_expires_at = None
     
     # === Combat ===
     
@@ -303,7 +360,12 @@ class DuelMatch(Base):
             include_actions: Whether to include action history
             odds: Optional dict with miss/hit/crit percentages for current attacker
         """
-        from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS, calculate_duel_roll_chances, get_duel_game_config
+        from systems.duel.config import (
+            DUEL_TURN_TIMEOUT_SECONDS,
+            calculate_duel_roll_chances,
+            calculate_duel_round_rolls,
+            get_duel_game_config,
+        )
         
         # Determine perspective
         my_side = self.get_player_side(player_id)
@@ -335,6 +397,60 @@ class DuelMatch(Base):
         # Turn state - pre-calculated booleans
         is_your_turn = self.is_players_turn(player_id)
         can_attack = is_your_turn and self.is_fighting
+
+        # ============================================================
+        # Round system state (simultaneous; no turns)
+        # ============================================================
+        if is_challenger:
+            my_pending_round = self.pending_challenger_round_rolls
+            opp_pending_round = self.pending_opponent_round_rolls
+        else:
+            my_pending_round = self.pending_opponent_round_rolls
+            opp_pending_round = self.pending_challenger_round_rolls
+
+        has_submitted_round = bool(my_pending_round)
+        opponent_has_submitted_round = bool(opp_pending_round)
+        can_submit_round = self.is_fighting and (not has_submitted_round)
+
+        # Round timeout claim: you submitted, opponent didn't, and the round expired
+        can_claim_round_timeout = (
+            self.is_fighting
+            and self.round_expires_at is not None
+            and datetime.utcnow() > self.round_expires_at
+            and has_submitted_round
+            and (not opponent_has_submitted_round)
+        )
+        
+        # === STYLE PHASE STATE ===
+        if is_challenger:
+            my_style = self.challenger_style
+            opponent_style_locked = self.opponent_style is not None
+            my_style_locked = self.challenger_style is not None
+        else:
+            my_style = self.opponent_style
+            opponent_style_locked = self.challenger_style is not None
+            my_style_locked = self.opponent_style is not None
+        
+        # Style phase is active if: fighting, no pending rolls, and style_lock_expires_at not passed
+        both_styles_locked = self.both_styles_locked()
+        style_phase_expired = self.style_phase_expired()
+        in_style_phase = (
+            self.is_fighting 
+            and not has_submitted_round 
+            and not both_styles_locked 
+            and not style_phase_expired
+        )
+        can_lock_style = in_style_phase and not my_style_locked
+        
+        # After round resolution, show both styles for the reveal
+        # (only reveal opponent's style after both are locked or phase expired)
+        show_opponent_style = both_styles_locked or style_phase_expired
+        opponent_style_for_display = None
+        if show_opponent_style:
+            if is_challenger:
+                opponent_style_for_display = self.opponent_style
+            else:
+                opponent_style_for_display = self.challenger_style
         
         # Timeout claim - can claim if it's NOT your turn and the turn has expired
         can_claim_timeout = (
@@ -342,7 +458,7 @@ class DuelMatch(Base):
             self.is_fighting and 
             self.turn_expires_at is not None and 
             datetime.utcnow() > self.turn_expires_at
-        )
+        ) or can_claim_round_timeout
         
         # Swings - only relevant when it's your turn
         if is_your_turn:
@@ -359,7 +475,7 @@ class DuelMatch(Base):
             your_max_swings = 1 + my_stats.get("attack", 0)
             your_swings_remaining = your_max_swings
         
-        # Current attacker's odds (for probability bar display)
+        # Current odds (for probability bar display)
         if odds:
             current_odds = {
                 "miss": odds.get("miss", 50),
@@ -367,14 +483,9 @@ class DuelMatch(Base):
                 "crit": odds.get("crit", 10),
             }
         elif self.is_fighting:
-            # Calculate odds for whoever's turn it is
-            current_turn_player_id = self.get_current_turn_player_id()
-            if current_turn_player_id == self.challenger_id:
-                atk = (self.challenger_stats or {}).get("attack", 0)
-                defense = (self.opponent_stats or {}).get("defense", 0)
-            else:
-                atk = (self.opponent_stats or {}).get("attack", 0)
-                defense = (self.challenger_stats or {}).get("defense", 0)
+            # Round system: each player always sees THEIR odds
+            atk = my_stats.get("attack", 0)
+            defense = opponent_stats.get("defense", 0)
             miss_pct, hit_pct, crit_pct = calculate_duel_roll_chances(atk, defense)
             current_odds = {"miss": miss_pct, "hit": hit_pct, "crit": crit_pct}
         else:
@@ -419,6 +530,24 @@ class DuelMatch(Base):
             "can_attack": can_attack,
             "can_claim_timeout": can_claim_timeout,
             "your_bar_position": round(your_bar_position, 2),
+
+            # === ROUND SYSTEM (new) ===
+            "round_number": self.round_number or 1,
+            "round_expires_at": _format_datetime_iso(self.round_expires_at),
+            "can_submit_round": can_submit_round,
+            "has_submitted_round": has_submitted_round,
+            "opponent_has_submitted_round": opponent_has_submitted_round,
+            "your_round_rolls_count": calculate_duel_round_rolls(my_stats.get("attack", 0)),
+            
+            # === ATTACK STYLE SYSTEM ===
+            "in_style_phase": in_style_phase,
+            "can_lock_style": can_lock_style,
+            "my_style": my_style,  # Your locked style (or None)
+            "my_style_locked": my_style_locked,
+            "opponent_style_locked": opponent_style_locked,
+            "opponent_style": opponent_style_for_display,  # Only shown after both locked
+            "style_lock_expires_at": _format_datetime_iso(self.style_lock_expires_at),
+            "both_styles_locked": both_styles_locked,
             
             "your_swings_used": your_swings_used,
             "your_swings_remaining": your_swings_remaining,

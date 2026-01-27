@@ -141,10 +141,72 @@ struct DuelOdds: Codable {
     let crit: Int
 }
 
+/// Attack style definition from server - frontend renders what server sends
+struct AttackStyleConfig: Codable, Identifiable {
+    let id: String  // balanced, aggressive, precise, power, guard, feint
+    let name: String
+    let description: String
+    let icon: String  // SF Symbol name
+    
+    // Modifiers (for display to user)
+    let rollBonus: Int
+    let hitChanceMod: Int  // As percentage (e.g., -5, +8)
+    let critRateMod: Int   // As percentage change (e.g., -25)
+    let pushMultWin: Double
+    let pushMultLose: Double
+    let opponentHitMod: Int
+    let winsTies: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, icon
+        case rollBonus = "roll_bonus"
+        case hitChanceMod = "hit_chance_mod"
+        case critRateMod = "crit_rate_mod"
+        case pushMultWin = "push_mult_win"
+        case pushMultLose = "push_mult_lose"
+        case opponentHitMod = "opponent_hit_mod"
+        case winsTies = "wins_ties"
+    }
+    
+    /// Human-readable summary of the style's effects
+    var effectsSummary: [String] {
+        var effects: [String] = []
+        if rollBonus != 0 {
+            effects.append(rollBonus > 0 ? "+\(rollBonus) roll" : "\(rollBonus) roll")
+        }
+        if hitChanceMod != 0 {
+            effects.append(hitChanceMod > 0 ? "+\(hitChanceMod)% hit" : "\(hitChanceMod)% hit")
+        }
+        if critRateMod != 0 {
+            effects.append("\(critRateMod)% crit rate")
+        }
+        if opponentHitMod != 0 {
+            effects.append("Enemy \(opponentHitMod)% hit")
+        }
+        if pushMultWin != 1.0 {
+            let pct = Int((pushMultWin - 1.0) * 100)
+            effects.append("+\(pct)% push if win")
+        }
+        if pushMultLose != 1.0 {
+            let pct = Int((pushMultLose - 1.0) * 100)
+            effects.append("Enemy +\(pct)% if lose")
+        }
+        if winsTies {
+            effects.append("Win ties")
+        }
+        return effects
+    }
+}
+
 /// Game config from server - frontend has ZERO hardcoded values
 struct DuelGameConfig: Codable {
+    // Mode
+    let duelMode: String?
+
     // Timing
     let turnTimeoutSeconds: Int
+    let roundTimeoutSeconds: Int?
+    let styleLockTimeoutSeconds: Int?  // Time for style selection phase
     let invitationTimeoutMinutes: Int
     
     // Combat multipliers (for display)
@@ -167,9 +229,20 @@ struct DuelGameConfig: Codable {
     let rollPauseBetweenMs: Int  // Pause between consecutive rolls
     let critPopupDurationMs: Int
     let rollSweepStepMs: Int
+    let styleRevealDurationMs: Int?  // How long to show style reveal
+
+    // Round pacing
+    let maxRollsPerRoundCap: Int?
+    
+    // Attack styles - ALL definitions from server
+    let attackStyles: [AttackStyleConfig]?
+    let defaultStyle: String?
     
     enum CodingKeys: String, CodingKey {
+        case duelMode = "duel_mode"
         case turnTimeoutSeconds = "turn_timeout_seconds"
+        case roundTimeoutSeconds = "round_timeout_seconds"
+        case styleLockTimeoutSeconds = "style_lock_timeout_seconds"
         case invitationTimeoutMinutes = "invitation_timeout_minutes"
         case criticalMultiplier = "critical_multiplier"
         case pushBasePercent = "push_base_percent"
@@ -182,6 +255,10 @@ struct DuelGameConfig: Codable {
         case rollPauseBetweenMs = "roll_pause_between_ms"
         case critPopupDurationMs = "crit_popup_duration_ms"
         case rollSweepStepMs = "roll_sweep_step_ms"
+        case styleRevealDurationMs = "style_reveal_duration_ms"
+        case maxRollsPerRoundCap = "max_rolls_per_round_cap"
+        case attackStyles = "attack_styles"
+        case defaultStyle = "default_style"
     }
     
     /// Formatted critical multiplier string (e.g., "1.5x")
@@ -237,6 +314,24 @@ struct DuelMatch: Codable, Identifiable {
     
     /// Bar position from YOUR perspective (0-100, higher = winning)
     let yourBarPosition: Double?
+
+    // === ROUND SYSTEM (simultaneous; no turns) ===
+    let roundNumber: Int?
+    let roundExpiresAt: String?
+    let canSubmitRound: Bool?
+    let hasSubmittedRound: Bool?
+    let opponentHasSubmittedRound: Bool?
+    let yourRoundRollsCount: Int?
+    
+    // === ATTACK STYLE SYSTEM ===
+    let inStylePhase: Bool?        // Are we in the style selection phase?
+    let canLockStyle: Bool?        // Can the player lock a style right now?
+    let myStyle: String?           // Your locked style (or nil)
+    let myStyleLocked: Bool?       // Have you locked your style?
+    let opponentStyleLocked: Bool? // Has opponent locked their style?
+    let opponentStyle: String?     // Opponent's style (only revealed after both locked)
+    let styleLockExpiresAt: String?
+    let bothStylesLocked: Bool?
     
     /// Your swings used this turn
     let yourSwingsUsed: Int?
@@ -303,6 +398,25 @@ struct DuelMatch: Codable, Identifiable {
         case canAttack = "can_attack"
         case canClaimTimeout = "can_claim_timeout"
         case yourBarPosition = "your_bar_position"
+
+        // Round system
+        case roundNumber = "round_number"
+        case roundExpiresAt = "round_expires_at"
+        case canSubmitRound = "can_submit_round"
+        case hasSubmittedRound = "has_submitted_round"
+        case opponentHasSubmittedRound = "opponent_has_submitted_round"
+        case yourRoundRollsCount = "your_round_rolls_count"
+        
+        // Attack style system
+        case inStylePhase = "in_style_phase"
+        case canLockStyle = "can_lock_style"
+        case myStyle = "my_style"
+        case myStyleLocked = "my_style_locked"
+        case opponentStyleLocked = "opponent_style_locked"
+        case opponentStyle = "opponent_style"
+        case styleLockExpiresAt = "style_lock_expires_at"
+        case bothStylesLocked = "both_styles_locked"
+
         case yourSwingsUsed = "your_swings_used"
         case yourSwingsRemaining = "your_swings_remaining"
         case yourMaxSwings = "your_max_swings"
@@ -517,6 +631,60 @@ struct DuelAttackResponse: Codable {
         case critChance = "crit_chance"
     }
 }
+
+// MARK: - Round System Response Models
+
+struct DuelRoundSwingResponse: Codable {
+    let success: Bool
+    let status: String?
+    let message: String
+
+    let roundNumber: Int?
+    let roundExpiresAt: String?
+
+    let yourRolls: [DuelRoll]?
+    let opponentRolls: [DuelRoll]?
+
+    let result: [String: AnyCodable]?
+    let push: [String: AnyCodable]?
+    let styles: [String: AnyCodable]?  // Style reveal after resolution
+
+    let match: DuelMatch?
+    let winner: DuelWinner?
+    let gameOver: Bool?
+
+    let missChance: Int?
+    let hitChancePct: Int?
+    let critChance: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case success, status, message, match, winner, result, push, styles
+        case roundNumber = "round_number"
+        case roundExpiresAt = "round_expires_at"
+        case yourRolls = "your_rolls"
+        case opponentRolls = "opponent_rolls"
+        case gameOver = "game_over"
+        case missChance = "miss_chance"
+        case hitChancePct = "hit_chance_pct"
+        case critChance = "crit_chance"
+    }
+}
+
+/// Response from locking an attack style
+struct DuelLockStyleResponse: Codable {
+    let success: Bool
+    let message: String
+    let style: String?
+    let bothStylesLocked: Bool?
+    let match: DuelMatch?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, style, match
+        case bothStylesLocked = "both_styles_locked"
+    }
+}
+
+// Note: AnyCodable is defined in PlayerModels.swift - do not duplicate here
 
 struct DuelNextTurn: Codable {
     let playerId: Int?

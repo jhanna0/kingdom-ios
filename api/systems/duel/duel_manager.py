@@ -35,9 +35,15 @@ from .config import (
     DUEL_TURN_TIMEOUT_SECONDS,
     DUEL_INVITATION_TIMEOUT_MINUTES,
     DUEL_MAX_WAGER,
+    DUEL_STYLE_LOCK_TIMEOUT_SECONDS,
     calculate_duel_hit_chance,
     calculate_roll_outcome,
     generate_match_code,
+    AttackStyle,
+    get_style_modifiers,
+    DUEL_MIN_HIT_CHANCE,
+    DUEL_MAX_HIT_CHANCE,
+    DUEL_CRITICAL_MULTIPLIER,
 )
 
 
@@ -453,6 +459,178 @@ class DuelManager:
         
         return match
     
+    # ===== Attack Style System =====
+    
+    def lock_style(
+        self,
+        db: Session,
+        match_id: int,
+        player_id: int,
+        style: str
+    ) -> Dict[str, Any]:
+        """
+        Lock in an attack style for the current round.
+        
+        Must be called during the style selection phase (first 10s of round).
+        Once both players lock in (or time expires), rolls can be submitted.
+        
+        Args:
+            db: Database session
+            match_id: The duel match ID
+            player_id: ID of the player locking their style
+            style: The attack style to lock (balanced, aggressive, precise, power, guard, feint)
+        
+        Returns:
+            Dict with success status and updated match state
+        """
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        if not match:
+            raise ValueError("Match not found")
+        
+        if not match.is_fighting:
+            raise ValueError(f"Match is {match.status}, not fighting")
+        
+        if player_id not in [match.challenger_id, match.opponent_id]:
+            raise ValueError("You are not in this match")
+        
+        # Validate style
+        if style not in AttackStyle.ALL_STYLES:
+            raise ValueError(f"Invalid style: {style}. Must be one of: {AttackStyle.ALL_STYLES}")
+        
+        side = match.get_player_side(player_id)
+        
+        # Check if already locked
+        if match.has_player_locked_style(player_id):
+            current_style = match.get_player_style(player_id)
+            raise ValueError(f"You already locked in {current_style} for this round")
+        
+        # Check if already submitted rolls (can't change style after submitting)
+        if side == "challenger" and match.pending_challenger_round_rolls:
+            raise ValueError("Cannot change style after submitting rolls")
+        if side == "opponent" and match.pending_opponent_round_rolls:
+            raise ValueError("Cannot change style after submitting rolls")
+        
+        # Lock the style
+        now = datetime.utcnow()
+        if side == "challenger":
+            match.challenger_style = style
+            match.challenger_style_locked_at = now
+        else:
+            match.opponent_style = style
+            match.opponent_style_locked_at = now
+        
+        both_locked = match.both_styles_locked()
+        
+        db.commit()
+        db.refresh(match)
+        
+        return {
+            "success": True,
+            "style": style,
+            "both_styles_locked": both_locked,
+            "match": match,
+        }
+    
+    def _start_style_phase(self, match: DuelMatch) -> None:
+        """Start the style selection phase for a new round."""
+        match.clear_styles_for_new_round()
+        match.style_lock_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_STYLE_LOCK_TIMEOUT_SECONDS)
+    
+    def _apply_style_modifiers_to_hit_chance(
+        self,
+        base_hit_chance: float,
+        attacker_style: str,
+        defender_style: str
+    ) -> float:
+        """
+        Apply style modifiers to hit chance.
+        
+        Attacker's hit_chance_mod is additive.
+        Defender's opponent_hit_mod is also additive (usually negative).
+        """
+        attacker_mods = get_style_modifiers(attacker_style or AttackStyle.BALANCED)
+        defender_mods = get_style_modifiers(defender_style or AttackStyle.BALANCED)
+        
+        modified = base_hit_chance + attacker_mods["hit_chance_mod"] + defender_mods["opponent_hit_mod"]
+        return max(DUEL_MIN_HIT_CHANCE, min(DUEL_MAX_HIT_CHANCE, modified))
+    
+    def _apply_style_modifiers_to_crit_rate(
+        self,
+        style: str
+    ) -> float:
+        """Get modified crit rate multiplier based on style."""
+        mods = get_style_modifiers(style or AttackStyle.BALANCED)
+        return DUEL_CRITICAL_MULTIPLIER * mods["crit_rate_mult"]
+    
+    def _get_style_roll_bonus(self, style: str) -> int:
+        """Get roll bonus/penalty from style."""
+        mods = get_style_modifiers(style or AttackStyle.BALANCED)
+        return mods["roll_bonus"]
+    
+    def _get_style_push_multipliers(self, winner_style: str, loser_style: str) -> tuple:
+        """
+        Get push multipliers based on styles.
+        
+        Returns (winner_mult, loser_penalty_mult) where:
+        - winner_mult is applied to the winner's push
+        - loser_penalty_mult is an additional multiplier if loser used POWER
+        """
+        winner_mods = get_style_modifiers(winner_style or AttackStyle.BALANCED)
+        loser_mods = get_style_modifiers(loser_style or AttackStyle.BALANCED)
+        
+        # Winner gets their push_mult_win
+        # Loser's push_mult_lose is an additional multiplier for the winner
+        return (winner_mods["push_mult_win"], loser_mods["push_mult_lose"])
+    
+    def _check_feint_tiebreaker(self, challenger_style: str, opponent_style: str) -> Optional[str]:
+        """
+        Check if feint style wins a tie.
+        
+        Returns the side that wins the tie, or None if no feint advantage.
+        """
+        ch_mods = get_style_modifiers(challenger_style or AttackStyle.BALANCED)
+        op_mods = get_style_modifiers(opponent_style or AttackStyle.BALANCED)
+        
+        ch_has_feint = ch_mods["tie_advantage"]
+        op_has_feint = op_mods["tie_advantage"]
+        
+        # If both have feint, cancel out
+        if ch_has_feint and op_has_feint:
+            return None
+        if ch_has_feint:
+            return "challenger"
+        if op_has_feint:
+            return "opponent"
+        return None
+    
+    def _calculate_roll_outcome_with_style(
+        self,
+        roll_value: float,
+        hit_chance: float,
+        crit_multiplier: float
+    ) -> str:
+        """
+        Determine outcome of a roll with style-modified crit rate.
+        
+        Args:
+            roll_value: Random value 0-1
+            hit_chance: Modified hit chance (already includes style mods)
+            crit_multiplier: Modified crit multiplier (from style)
+        
+        Returns:
+            "miss", "hit", or "critical"
+        """
+        if roll_value > hit_chance:
+            return "miss"
+        
+        # It's a hit - check if critical (crit threshold uses style-modified multiplier)
+        critical_threshold = hit_chance * crit_multiplier
+        
+        if roll_value < critical_threshold:
+            return "critical"
+        else:
+            return "hit"
+    
     # ===== Turn Management =====
     
     def _switch_turn(self, match: DuelMatch) -> None:
@@ -524,6 +702,292 @@ class DuelManager:
         return match
     
     # ===== Combat =====
+
+    def submit_round_swing(
+        self,
+        db: Session,
+        match_id: int,
+        player_id: int
+    ) -> Dict[str, Any]:
+        """
+        Submit a FULL ROUND of swings (simultaneous round system).
+
+        Rules:
+        - No turns. Both players submit once per round.
+        - Submission generates N rolls where N = min(1 + attack, cap) + style bonus.
+        - When both players have submitted, backend resolves the round:
+          - Sort each player's outcomes (critical > hit > miss)
+          - Compare sorted lists pairwise; first difference wins
+          - If tied all the way: check feint advantage, else no push ("parried")
+          - Only the round winner pushes once (with style multipliers)
+        
+        Attack styles affect:
+        - Number of rolls (aggressive +1, guard -1)
+        - Hit chance (aggressive -5%, precise +8%, guard makes opponent -8%)
+        - Crit rate (precise -25%)
+        - Push multiplier (power +25% win / +10% lose penalty)
+        - Tiebreakers (feint wins ties)
+        """
+        from .config import (
+            DUEL_ROUND_TIMEOUT_SECONDS,
+            calculate_duel_round_rolls,
+            calculate_duel_roll_chances,
+            calculate_duel_push,
+            DUEL_MAX_ROLLS_PER_ROUND_CAP,
+        )
+
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        if not match:
+            raise ValueError("Match not found")
+        if not match.is_fighting:
+            raise ValueError(f"Match is {match.status}, not fighting")
+        if player_id not in [match.challenger_id, match.opponent_id]:
+            raise ValueError("You are not in this match")
+
+        side = match.get_player_side(player_id)
+        attacker_stats = match.challenger_stats if side == "challenger" else match.opponent_stats
+        defender_stats = match.opponent_stats if side == "challenger" else match.challenger_stats
+
+        attack = (attacker_stats or {}).get("attack", 0)
+        defense = (defender_stats or {}).get("defense", 0)
+        leadership = (attacker_stats or {}).get("leadership", 0)
+
+        # Initialize round timer if needed (or if expired, reset the round)
+        now = datetime.utcnow()
+        if match.round_number is None:
+            match.round_number = 1
+
+        if match.round_expires_at is None or (match.round_expires_at and now > match.round_expires_at):
+            # If a previous round expired without resolution, start a fresh round window
+            match.round_expires_at = now + timedelta(seconds=DUEL_ROUND_TIMEOUT_SECONDS)
+            # Also start the style phase for this new round
+            self._start_style_phase(match)
+
+        # Prevent double-submission
+        if side == "challenger" and match.pending_challenger_round_rolls:
+            raise ValueError("You already submitted this round")
+        if side == "opponent" and match.pending_opponent_round_rolls:
+            raise ValueError("You already submitted this round")
+        
+        # === ATTACK STYLE HANDLING ===
+        # If player hasn't locked a style, default to balanced
+        if not match.has_player_locked_style(player_id):
+            if side == "challenger":
+                match.challenger_style = AttackStyle.DEFAULT
+                match.challenger_style_locked_at = now
+            else:
+                match.opponent_style = AttackStyle.DEFAULT
+                match.opponent_style_locked_at = now
+        
+        # Get styles for this player and opponent
+        my_style = match.get_player_style(player_id)
+        opp_style = match.challenger_style if side == "opponent" else match.opponent_style
+        
+        # Apply style modifiers to hit chance
+        base_hit_chance = calculate_duel_hit_chance(attack, defense)
+        hit_chance = self._apply_style_modifiers_to_hit_chance(base_hit_chance, my_style, opp_style)
+        
+        # Apply style modifier to crit rate
+        modified_crit_mult = self._apply_style_modifiers_to_crit_rate(my_style)
+        
+        # Calculate display odds (with style modifiers applied)
+        miss_pct = int(round((1.0 - hit_chance) * 100))
+        crit_pct = int(round(hit_chance * modified_crit_mult * 100))
+        hit_pct = 100 - miss_pct - crit_pct
+        
+        # Apply style roll bonus/penalty
+        base_rolls = calculate_duel_round_rolls(attack)
+        roll_bonus = self._get_style_roll_bonus(my_style)
+        n_rolls = max(1, min(DUEL_MAX_ROLLS_PER_ROUND_CAP, base_rolls + roll_bonus))
+
+        rolls: List[Dict[str, Any]] = []
+        for i in range(n_rolls):
+            rv = self.rng.random()
+            # Use modified crit rate for outcome calculation
+            outcome = self._calculate_roll_outcome_with_style(rv, hit_chance, modified_crit_mult)
+            rolls.append({
+                "roll_number": i + 1,
+                "value": round(rv * 100, 1),
+                "outcome": outcome,
+            })
+
+        if side == "challenger":
+            match.pending_challenger_round_rolls = rolls
+            match.pending_challenger_round_submitted_at = now
+        else:
+            match.pending_opponent_round_rolls = rolls
+            match.pending_opponent_round_submitted_at = now
+
+        # If opponent hasn't submitted yet, return waiting response
+        opp_rolls = match.pending_opponent_round_rolls if side == "challenger" else match.pending_challenger_round_rolls
+        if not opp_rolls:
+            db.commit()
+            db.refresh(match)
+            return {
+                "success": True,
+                "status": "waiting_for_opponent",
+                "message": "Submitted. Waiting for opponent...",
+                "round_number": match.round_number or 1,
+                "round_expires_at": match.round_expires_at,
+                "your_rolls": rolls,
+                "opponent_rolls": None,
+                "result": None,
+                "push": None,
+                "styles": {
+                    "your_style": my_style,
+                    # Don't reveal opponent's style yet
+                },
+                "match": match,
+                "miss_chance": miss_pct,
+                "hit_chance_pct": hit_pct,
+                "crit_chance": crit_pct,
+            }
+
+        # === RESOLVE ROUND ===
+        challenger_rolls = match.pending_challenger_round_rolls or []
+        opponent_rolls = match.pending_opponent_round_rolls or []
+        
+        # Capture styles for the result (before clearing)
+        challenger_style_used = match.challenger_style or AttackStyle.BALANCED
+        opponent_style_used = match.opponent_style or AttackStyle.BALANCED
+
+        rank = {"miss": 0, "hit": 1, "critical": 2}
+
+        def sorted_outcomes(rs: List[Dict[str, Any]]) -> List[int]:
+            return sorted([rank.get(r.get("outcome", "miss"), 0) for r in rs], reverse=True)
+
+        ch_list = sorted_outcomes(challenger_rolls)
+        op_list = sorted_outcomes(opponent_rolls)
+        max_len = max(len(ch_list), len(op_list))
+        ch_list += [0] * (max_len - len(ch_list))  # pad with misses
+        op_list += [0] * (max_len - len(op_list))
+
+        winner_side: Optional[str] = None
+        decisive_rank: Optional[int] = None
+        is_tie = True
+        
+        for i in range(max_len):
+            if ch_list[i] > op_list[i]:
+                winner_side = "challenger"
+                decisive_rank = ch_list[i]
+                is_tie = False
+                break
+            if op_list[i] > ch_list[i]:
+                winner_side = "opponent"
+                decisive_rank = op_list[i]
+                is_tie = False
+                break
+        
+        # === FEINT TIEBREAKER ===
+        feint_winner = None
+        if is_tie:
+            # Check if feint style wins the tie
+            feint_winner = self._check_feint_tiebreaker(challenger_style_used, opponent_style_used)
+            if feint_winner:
+                winner_side = feint_winner
+                # For feint wins, use the best outcome as decisive
+                decisive_rank = max(ch_list[0] if ch_list else 0, op_list[0] if op_list else 0)
+                is_tie = False
+
+        bar_before = match.control_bar
+        push_amount = 0.0
+        decisive_outcome = "miss"
+
+        if winner_side and decisive_rank:
+            decisive_outcome = {2: "critical", 1: "hit", 0: "miss"}.get(decisive_rank, "miss")
+            winner_stats = match.challenger_stats if winner_side == "challenger" else match.opponent_stats
+            winner_leadership = (winner_stats or {}).get("leadership", 0)
+            if decisive_outcome == "critical":
+                base_push = calculate_duel_push(winner_leadership, is_critical=True)
+            elif decisive_outcome == "hit":
+                base_push = calculate_duel_push(winner_leadership, is_critical=False)
+            else:
+                base_push = 0.0
+            
+            # === APPLY STYLE PUSH MULTIPLIERS ===
+            if base_push > 0:
+                winner_style = challenger_style_used if winner_side == "challenger" else opponent_style_used
+                loser_style = opponent_style_used if winner_side == "challenger" else challenger_style_used
+                
+                win_mult, lose_penalty = self._get_style_push_multipliers(winner_style, loser_style)
+                push_amount = base_push * win_mult * lose_penalty
+
+        # Apply push once (winner only). If tie/no push => "parried"
+        match_winner_side: Optional[str] = None
+        if winner_side and push_amount > 0:
+            match_winner_side = match.apply_push(winner_side, push_amount)
+
+            # Record action (single action for the round winner)
+            action = DuelAction(
+                match_id=match_id,
+                player_id=(match.challenger_id if winner_side == "challenger" else match.opponent_id),
+                side=winner_side,
+                roll_value=0.0,  # Round compare is outcome-based; raw value isn't used
+                outcome=decisive_outcome,
+                push_amount=push_amount,
+                bar_before=bar_before,
+                bar_after=match.control_bar,
+            )
+            db.add(action)
+
+        # Clear pending for next round
+        match.pending_challenger_round_rolls = None
+        match.pending_opponent_round_rolls = None
+        match.pending_challenger_round_submitted_at = None
+        match.pending_opponent_round_submitted_at = None
+
+        # Advance round & reset timer, and start new style phase
+        match.round_number = (match.round_number or 1) + 1
+        match.round_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_ROUND_TIMEOUT_SECONDS)
+        self._start_style_phase(match)  # Clear styles and start new selection phase
+
+        # Resolve match winner if bar reached end
+        winner_payload = None
+        game_over = False
+        if match_winner_side:
+            self._resolve_match(db, match, match_winner_side)
+            winner_payload = {
+                "side": match_winner_side,
+                "player_id": match.winner_id,
+                "gold_earned": match.winner_gold_earned,
+            }
+            game_over = True
+
+        db.commit()
+        db.refresh(match)
+
+        return {
+            "success": True,
+            "status": "resolved",
+            "message": "Round resolved",
+            "round_number": (match.round_number or 2) - 1,  # the resolved round number
+            "your_rolls": rolls,
+            "opponent_rolls": opp_rolls,
+            "result": {
+                "winner_side": winner_side,
+                "decisive_outcome": decisive_outcome,
+                "parried": (winner_side is None) or (push_amount <= 0.0),
+                "feint_winner": feint_winner,  # Set if feint broke the tie
+            },
+            "push": {
+                "push_amount": round(push_amount, 2),
+                "bar_before": round(bar_before, 2),
+                "bar_after": round(match.control_bar, 2),
+            },
+            # Style reveal - both styles shown after resolution
+            "styles": {
+                "challenger": challenger_style_used,
+                "opponent": opponent_style_used,
+                "your_style": my_style,
+            },
+            "winner": winner_payload,
+            "game_over": game_over,
+            "match": match,
+            "miss_chance": miss_pct,
+            "hit_chance_pct": hit_pct,
+            "crit_chance": crit_pct,
+            "round_expires_at": match.round_expires_at,
+        }
     
     def execute_attack(
         self,
