@@ -3,7 +3,11 @@ UNIFIED TIER SYSTEM - Single Source of Truth for ALL game tier descriptions
 Handles: Properties, Skills, Buildings, Crafting, Training, Actions
 NO MORE HARDCODING DESCRIPTIONS IN FRONTEND!
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from db import get_db, User
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/tiers", tags=["tiers"])
 
@@ -52,15 +56,18 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
 # Gold formula: BASE + (target_tier × PER_TIER)
 # Actions formula: BASE + (current_tier × PER_TIER) + (total_points × PER_POINT)
 
-TRAINING_GOLD_BASE = 5           # Base gold per action
-TRAINING_GOLD_PER_TIER = 5       # Additional gold per target tier
-TRAINING_GOLD_PER_POINT = 2      # Additional gold per total skill point owned
+TRAINING_GOLD_BASE = 25          # Base gold per action
+TRAINING_GOLD_PER_TIER = 25      # Additional gold per target tier
+TRAINING_GOLD_PER_POINT = 6      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
-TRAINING_ACTIONS_PER_TIER = 5    # Extra actions per current tier level
-TRAINING_ACTIONS_PER_POINT = 8   # Extra actions per total skill point owned
-TRAINING_MIN_ACTIONS = 5         # Floor (never fewer than this)
+TRAINING_ACTIONS_PER_TIER = 10   # Extra actions per current tier level (specializing is hard)
+TRAINING_ACTIONS_PER_POINT = 2   # Extra actions per total skill point owned (diversifying is easy)
+TRAINING_MIN_ACTIONS = 10         # Floor (never fewer than this)
 TRAINING_MAX_ACTIONS = 500       # Cap (never more than this)
 
+
+# gold = 25 + (target_tier × 25) + (total_skill_points × 6)
+# actions = 10 + (current_tier × 10) + (total_skill_points × 2
 
 def calculate_training_gold_per_action(target_tier: int, total_skill_points: int = 0) -> float:
     """Gold cost per training action.
@@ -71,12 +78,12 @@ def calculate_training_gold_per_action(target_tier: int, total_skill_points: int
     Formula: BASE + (target_tier × PER_TIER) + (total_points × PER_POINT)
     
     Examples (with 0 skill points):
-    - Tier 1 (0→1): 5 + 5 + 0 = 10g per action
-    - Tier 2 (1→2): 5 + 10 + 0 = 15g per action
+    - Tier 1 (0→1): 10 + 10 + 0 = 20g per action
+    - Tier 2 (1→2): 10 + 20 + 0 = 30g per action
     
-    Examples (with 5 skill points, training 6th skill):
-    - Tier 1 (0→1): 5 + 5 + 5 = 15g per action
-    - Tier 2 (1→2): 5 + 10 + 5 = 20g per action
+    Examples (with 6 skill points, training 7th skill):
+    - Tier 1 (0→1): 10 + 10 + 24 = 44g per action
+    - Tier 2 (1→2): 10 + 20 + 24 = 54g per action
     """
     return TRAINING_GOLD_BASE + (target_tier * TRAINING_GOLD_PER_TIER) + (total_skill_points * TRAINING_GOLD_PER_POINT)
 
@@ -85,15 +92,15 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
     """Number of actions to complete training.
     
     Scales with:
-    - Current tier of the skill (higher tiers need more work)
-    - Total skill points owned across ALL skills (experienced players need more work)
+    - Current tier of the skill (higher tiers need more work) - PRIMARY factor
+    - Total skill points owned across ALL skills - MINOR factor
     
     Formula: BASE + (current_tier × PER_TIER) + (total_points × PER_POINT)
     
     Examples:
     - 0→1, 1st skill (tier=0, points=0): 10 + 0 + 0 = 10 actions
-    - 0→1, 10th skill (tier=0, points=9): 10 + 0 + 90 = 100 actions
-    - 4→5, 12th skill (tier=4, points=15): 10 + 20 + 150 = 180 actions
+    - 0→1, 7th skill (tier=0, points=6): 10 + 0 + 12 = 22 actions
+    - 4→5, with 9 total points: 10 + 40 + 18 = 68 actions
     """
     actions = (
         TRAINING_BASE_ACTIONS 
@@ -110,8 +117,8 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
 # Gold formula: BASE + (tier × PER_TIER)
 # Actions formula: BASE + (tier × PER_TIER)
 
-PROPERTY_GOLD_BASE = 15          # Higher than training (permanent investment)
-PROPERTY_GOLD_PER_TIER = 10      # Scales faster than training
+PROPERTY_GOLD_BASE = 40          # Higher than training (permanent investment)
+PROPERTY_GOLD_PER_TIER = 35      # Scales faster than training
 PROPERTY_BASE_ACTIONS = 10       # Base actions for tier 1
 PROPERTY_ACTIONS_PER_TIER = 10   # Extra actions per tier
 
@@ -144,28 +151,28 @@ PROPERTY_TIERS = {
         "icon": "house.fill",
         "description": "A comfy home with garden",
         "benefits": ["All Land benefits", "A comfy home with garden"],
-        "per_action_costs": [{"resource": "wood", "amount": 35}],  # Matches gold per action
+        "resource_ratios": [{"resource": "wood", "ratio": 1.0}],  # 100% wood
     },
     3: {
         "name": "Workshop",
         "icon": "hammer.fill",
         "description": "Crafting workshop",
         "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
-        "per_action_costs": [{"resource": "wood", "amount": 45}, {"resource": "iron", "amount": 22}],
+        "resource_ratios": [{"resource": "wood", "ratio": 0.6}, {"resource": "iron", "ratio": 0.4}],
     },
     4: {
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
-        "per_action_costs": [{"resource": "wood", "amount": 55}, {"resource": "iron", "amount": 27}],
+        "resource_ratios": [{"resource": "wood", "ratio": 0.55}, {"resource": "iron", "ratio": 0.45}],
     },
     5: {
         "name": "Defensive Walls",
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
-        "per_action_costs": [{"resource": "wood", "amount": 65}, {"resource": "iron", "amount": 32}],
+        "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
     }
 }
 
@@ -185,9 +192,23 @@ def get_property_gold_cost(to_tier: int) -> int:
 
 
 def get_property_per_action_costs(to_tier: int) -> list:
-    """Get per-action resource costs required during each work action"""
+    """Get per-action resource costs required during each work action.
+    
+    Resource amounts are calculated from gold cost × ratio.
+    This ensures resources always match gold cost.
+    """
     tier_data = PROPERTY_TIERS.get(to_tier, {})
-    return tier_data.get("per_action_costs", [])
+    ratios = tier_data.get("resource_ratios", [])
+    
+    if not ratios:
+        return []
+    
+    gold_per_action = calculate_property_gold_per_action(to_tier)
+    
+    return [
+        {"resource": r["resource"], "amount": int(gold_per_action * r["ratio"])}
+        for r in ratios
+    ]
 
 
 def get_property_base_actions(to_tier: int) -> int:
@@ -896,25 +917,46 @@ def get_skills_data_for_player(state, training_costs: dict = None) -> list:
 
 # ===== HELPER FUNCTIONS =====
 
-def _get_training_actions_dict() -> dict:
-    """Get training actions required for each tier (with 0 total skill points as baseline)"""
+def _get_training_actions_dict(total_skill_points: int) -> dict:
+    """Get training actions required for each tier based on player's total skill points"""
     # Uses centralized calculate_training_actions from this file
     return {
-        str(level): calculate_training_actions(level, total_skill_points=0)
+        str(level): calculate_training_actions(level, total_skill_points=total_skill_points)
         for level in range(10)
+    }
+
+
+def _get_training_gold_dict(total_skill_points: int) -> dict:
+    """Get gold cost per action for each target tier based on player's total skill points"""
+    # Uses centralized calculate_training_gold_per_action from this file
+    return {
+        str(target_tier): calculate_training_gold_per_action(target_tier, total_skill_points=total_skill_points)
+        for target_tier in range(1, 11)  # Target tiers 1-10
     }
 
 
 # ===== API ENDPOINTS =====
 
 @router.get("")
-def get_all_tiers():
+def get_all_tiers(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Get ALL tier information for the entire game
     Single source of truth - NO MORE HARDCODING IN FRONTEND!
     """
     from .actions.action_config import ACTION_TYPES
     from .resources import RESOURCES
+    
+    # Get player's total skill points for training actions calculation
+    state = current_user.player_state
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player state not found"
+        )
+    total_skill_points = get_total_skill_points(state)
     
     return {
         "resources": {
@@ -942,7 +984,8 @@ def get_all_tiers():
         "training": {
             "max_tier": 10,
             "tier_names": SKILL_TIER_NAMES,
-            "actions_required": _get_training_actions_dict()
+            "actions_required": _get_training_actions_dict(total_skill_points),
+            "gold_per_action": _get_training_gold_dict(total_skill_points)
         },
         "reputation": {
             "max_tier": 6,
@@ -974,7 +1017,7 @@ def get_property_tiers():
             "gold_per_action": gold_per_action,
             "base_actions_required": base_actions,
             "total_gold_cost": total_gold,
-            "per_action_costs": info.get("per_action_costs", []),
+            "per_action_costs": get_property_per_action_costs(tier),
         }
     
     return {

@@ -206,7 +206,7 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
       - total_costs: Total resources needed over all actions (for display)
     """
     from routers.tiers import (
-        PROPERTY_TIERS, get_property_max_tier, 
+        get_property_max_tier, get_property_per_action_costs,
         calculate_property_gold_per_action, calculate_property_actions
     )
     from routers.resources import RESOURCES
@@ -214,10 +214,8 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
     next_tier = current_tier + 1
     if current_tier >= get_property_max_tier():
         return {"gold_cost": 0, "gold_per_action": 0, "per_action_costs": [], "total_costs": []}
-    
-    tier_data = PROPERTY_TIERS.get(next_tier, {})
     gold_per_action = calculate_property_gold_per_action(next_tier)
-    base_per_action = tier_data.get("per_action_costs", [])
+    base_per_action = get_property_per_action_costs(next_tier)
     base_actions = calculate_property_actions(next_tier)
     
     # Use provided actions_required or default to base
@@ -560,9 +558,8 @@ def get_property_status(
     properties_upgrade_status = []
     for prop in properties:
         if prop.tier < max_tier:
-            # Get dynamic resource costs
+            # Get dynamic resource costs (total for display)
             resource_costs = get_upgrade_resource_costs(prop.tier)
-            affordability = check_player_can_afford(state, resource_costs)
             actions_required = calculate_upgrade_actions_required(prop.tier, state.building_skill)
             
             # Find active contract for this property
@@ -577,10 +574,10 @@ def get_property_status(
                 "current_tier": prop.tier,
                 "max_tier": max_tier,
                 "can_upgrade": prop.tier < max_tier,
-                "resource_costs": resource_costs,  # Dynamic list!
+                "resource_costs": resource_costs,  # Dynamic list (for display)
                 "actions_required": actions_required,
-                "can_afford": affordability["can_afford"],
-                "missing_resources": affordability["missing"],
+                "can_afford": True,  # No upfront payment - cost checked at action time
+                "missing_resources": [],
                 "active_contract": active_contract
             })
     
@@ -957,28 +954,21 @@ def get_property_upgrade_status(
         gold_cost = all_costs["gold_cost"]
         per_action_costs = all_costs["per_action_costs"]
         total_costs = all_costs["total_costs"]
-        
-        # Check if player can afford gold upfront
-        can_afford_gold = state.gold >= gold_cost
     else:
         gold_cost = 0
         per_action_costs = []
         total_costs = []
-        can_afford_gold = False
     
     return {
         "property_id": property_id,
         "current_tier": property.tier,
         "max_tier": max_tier,
         "can_upgrade": property.tier < max_tier,
-        # Gold paid upfront to start
         "gold_cost": gold_cost,
-        # Resources required per action
         "per_action_costs": per_action_costs,
-        # Total resources needed (for display)
         "total_costs": total_costs,
         "actions_required": actions_required,
-        "can_afford": can_afford_gold,  # Can afford gold to START
+        "can_afford": True,  # No upfront payment - cost checked at action time
         "player_gold": int(state.gold),
         "active_contract": active_contract_data,
         "player_building_skill": state.building_skill

@@ -192,7 +192,7 @@ def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
 
 def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
     """Get property contracts from unified_contracts table for status endpoint"""
-    from routers.tiers import PROPERTY_TIERS
+    from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
     
     # Rulers don't pay tax
@@ -214,9 +214,8 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         target_parts = contract.target_id.split("|") if contract.target_id else []
         property_id = target_parts[0] if target_parts else contract.target_id
         
-        # Get per-action costs from tier config
-        tier_data = PROPERTY_TIERS.get(contract.tier or 1, {})
-        raw_per_action = tier_data.get("per_action_costs", [])
+        # Get per-action costs from tier config (dynamically calculated)
+        raw_per_action = get_property_per_action_costs(contract.tier or 1)
         
         # Enrich with display info and check affordability
         per_action_costs = []

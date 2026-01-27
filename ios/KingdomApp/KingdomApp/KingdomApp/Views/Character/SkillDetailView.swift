@@ -54,72 +54,73 @@ struct SkillDetailView: View {
                             .fill(skillColor.opacity(0.3))
                             .frame(height: 2)
                         
-                        // Requirements - ALWAYS SHOW
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader(icon: "hourglass", title: "Requirements")
+                        // Training Cost Table
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionHeader(icon: "dollarsign.circle.fill", title: "Training Cost")
+                            let actionsRequired = tierManager.trainingActionsFor(currentLevel: tier - 1)
+                            let goldPerActionForTier = tierManager.trainingGoldFor(targetTier: tier)
+                            let goldPerActionWithTaxForTier = goldPerActionForTier + (goldPerActionForTier * Double(currentTaxRate) / 100.0)
+                            let totalGoldForTier = Int(Double(actionsRequired) * goldPerActionWithTaxForTier)
                             
-                                HStack {
-                                    Image(systemName: "figure.walk")
-                                        .font(FontStyles.iconSmall)
-                                        .foregroundColor(skillColor.opacity(0.5))
-                                        .frame(width: 20)
-                                    // tier-1 because we're showing requirements TO REACH this tier
-                                    // e.g. tier 5 requires actions from level 4 -> 5
-                                    Text("\(tierManager.trainingActionsFor(currentLevel: tier - 1)) actions")
-                                        .font(FontStyles.bodySmall)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Spacer()
-                                    Text("2 hr cooldown")
-                                        .font(FontStyles.labelSmall)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                        }
-                        
-                        Rectangle()
-                            .fill(skillColor.opacity(0.3))
-                            .frame(height: 2)
-                        
-                        // Cost Per Action - Show only for next tier
-                        if tier == currentTier + 1 && currentTier < 5 {
-                            VStack(alignment: .leading, spacing: 12) {
-                                sectionHeader(icon: "dollarsign.circle.fill", title: "Cost Per Action")
-                                
-                                // Use ActionCostRowWithTax for consistent styling
-                                // Note: Food cost is shown in the action card, not here at purchase time
-                                ActionCostRowWithTax(
-                                    costs: [],
-                                    goldCost: buildGoldCost()
-                                )
-                                
-                                // Show total estimate
-                                let actionsRequired = tierManager.trainingActionsFor(currentLevel: currentTier)
-                                let totalGold = Int(goldPerAction * Double(actionsRequired))
-                                let totalWithTax = Int(goldPerActionWithTax * Double(actionsRequired))
-                                
-                                HStack(spacing: 4) {
-                                    Text("Total for \(actionsRequired) actions:")
-                                        .font(FontStyles.labelTiny)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            VStack(spacing: 0) {
+                                // Table header
+                                HStack(spacing: 12) {
+                                    Text("Tier")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .layoutPriority(2)
                                     
-                                    if currentTaxRate > 0 {
-                                        Text("\(totalWithTax)g")
-                                            .font(FontStyles.labelBold)
-                                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                                        Text("(+\(Int(taxAmount * Double(actionsRequired)))g tax)")
-                                            .font(FontStyles.labelTiny)
-                                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    } else {
-                                        Text("\(totalGold)g")
-                                            .font(FontStyles.labelBold)
-                                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                                    }
+                                    Text("Skill Pts")
+                                        .frame(width: 72, alignment: .center)
+                                    
+                                    Text("Actions")
+                                        .frame(width: 72, alignment: .center)
+                                    
+                                    Text("Gold/Act")
+                                        .frame(width: 88, alignment: .trailing)
                                 }
-                                .padding(.top, 4)
+                                .font(FontStyles.labelBold)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                
+                                Divider()
+                                    .overlay(Color.black.opacity(0.1))
+                                
+                                // Table row
+                                HStack(spacing: 12) {
+                                    Text("\(tier - 1) → \(tier)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .layoutPriority(2)
+                                    
+                                    Text("\(totalSkillPoints)")
+                                        .frame(width: 72, alignment: .center)
+                                    
+                                    Text("\(actionsRequired)")
+                                        .frame(width: 72, alignment: .center)
+                                    
+                                    Text("\(Int(goldPerActionForTier))g")
+                                        .frame(width: 88, alignment: .trailing)
+                                }
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
                             }
+                            .background(Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                            .padding(.vertical, 2)
+                            .padding(.top, 4)
                             
-                            Rectangle()
-                                .fill(skillColor.opacity(0.3))
-                                .frame(height: 2)
+                            Text("Total cost is \(totalGoldForTier)g.\nSkills cost dramatically more over time. Choose your build wisely!")
+                                .font(FontStyles.bodySmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 6)
+                                .padding(.horizontal, 2)
                         }
                         
                         // Action button or status - EXACT MapHUD style
@@ -320,9 +321,15 @@ struct SkillDetailView: View {
         }
     }
     
-    /// Gold cost per action (direct from backend - no upfront payment!)
+    /// Total skill points across all skills
+    private var totalSkillPoints: Int {
+        return player.attackPower + player.defensePower + player.leadership + 
+               player.buildingSkill + player.intelligence + player.science + player.faith
+    }
+    
+    /// Gold cost per action based on this skill's target tier
     private var goldPerAction: Double {
-        return Double(player.trainingCost)
+        return tierManager.trainingGoldFor(targetTier: currentTier + 1)
     }
     
     /// Tax amount per action
