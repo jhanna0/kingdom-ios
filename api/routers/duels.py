@@ -376,8 +376,6 @@ def start_match(
     try:
         match = manager.start_match(db, match_id, user.id)
         
-        from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS
-        
         # Notify challenger with THEIR perspective
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_STARTED,
@@ -401,7 +399,13 @@ def start_match(
             match=match.to_dict_for_player(user.id)
         )
     except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
+        # Even on error, return current match state so client can sync
+        match = manager.get_match(db, match_id)
+        return DuelResponse(
+            success=False, 
+            message=str(e),
+            match=match.to_dict_for_player(user.id) if match else None
+        )
 
 
 @router.post("/{match_id}/attack", response_model=AttackResponse)
@@ -464,11 +468,27 @@ def execute_attack(
                 data=swing_data
             )
             
-            # === On LAST swing, also send turn complete with final results ===
+            # === On LAST swing, send turn complete ONLY to the OPPONENT (not the attacker) ===
+            # The attacker already has everything from their API response.
+            # Only the opponent needs the WebSocket event to see the turn change.
             if is_last_swing:
                 event_type = DuelEvents.DUEL_TURN_COMPLETE if not result.get("winner") else DuelEvents.DUEL_ENDED
                 
-                # Common event data
+                # Calculate odds for the NEXT attacker (so they see their chances before attacking)
+                next_odds = odds  # Default to current odds
+                if not result.get("winner"):
+                    from systems.duel.config import calculate_duel_roll_chances
+                    
+                    if db_match.current_turn == "challenger":
+                        new_attack = db_match.challenger_stats.get("attack", 0)
+                        new_defense = db_match.opponent_stats.get("defense", 0)
+                    else:
+                        new_attack = db_match.opponent_stats.get("attack", 0)
+                        new_defense = db_match.challenger_stats.get("defense", 0)
+                    
+                    new_miss, new_hit, new_crit = calculate_duel_roll_chances(new_attack, new_defense)
+                    next_odds = {"miss": new_miss, "hit": new_hit, "crit": new_crit}
+                
                 event_data = {
                     "attacker_id": user.id,
                     "attacker_name": attacker_name,
@@ -477,19 +497,11 @@ def execute_attack(
                     "game_over": result.get("game_over", False),
                 }
                 
-                # Broadcast to challenger with their perspective
+                # ONLY send to the OPPONENT - the attacker already has their API response
                 broadcast_duel_event(
                     event_type=event_type,
-                    match=db_match.to_dict_for_player(db_match.challenger_id, odds=odds),
-                    target_user_ids=_get_apple_user_ids(db, [db_match.challenger_id]),
-                    data=event_data
-                )
-                
-                # Broadcast to opponent with their perspective
-                broadcast_duel_event(
-                    event_type=event_type,
-                    match=db_match.to_dict_for_player(db_match.opponent_id, odds=odds),
-                    target_user_ids=_get_apple_user_ids(db, [db_match.opponent_id]),
+                    match=db_match.to_dict_for_player(opponent_id, odds=next_odds),
+                    target_user_ids=_get_apple_user_ids(db, [opponent_id]),
                     data=event_data
                 )
         
@@ -516,8 +528,23 @@ def execute_attack(
             else:
                 message = f"Miss! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
         
-        # Return attacker's perspective
-        match_dict = db_match.to_dict_for_player(user.id, odds=odds) if db_match else result.get("match", {})
+        # For the match response, use the CURRENT attacker's odds (which is the opponent if turn switched)
+        # This ensures the probability bar shows correct odds for whoever's turn it is now
+        response_odds = odds  # Default to attacker's odds (for mid-turn swings)
+        if is_last_swing and not result.get("winner") and db_match:
+            # Turn has switched - calculate odds for the NEW current attacker
+            from systems.duel.config import calculate_duel_roll_chances
+            if db_match.current_turn == "challenger":
+                new_attack = db_match.challenger_stats.get("attack", 0)
+                new_defense = db_match.opponent_stats.get("defense", 0)
+            else:
+                new_attack = db_match.opponent_stats.get("attack", 0)
+                new_defense = db_match.challenger_stats.get("defense", 0)
+            new_miss, new_hit, new_crit = calculate_duel_roll_chances(new_attack, new_defense)
+            response_odds = {"miss": new_miss, "hit": new_hit, "crit": new_crit}
+        
+        # Return attacker's perspective with correct current odds
+        match_dict = db_match.to_dict_for_player(user.id, odds=response_odds) if db_match else result.get("match", {})
         
         return AttackResponse(
             success=True,
@@ -628,7 +655,13 @@ def claim_timeout(
             match=match.to_dict_for_player(user.id)
         )
     except ValueError as e:
-        return DuelResponse(success=False, message=str(e))
+        # Even on error, return current match state so client can sync
+        match = manager.get_match(db, match_id)
+        return DuelResponse(
+            success=False, 
+            message=str(e),
+            match=match.to_dict_for_player(user.id) if match else None
+        )
 
 
 @router.post("/{match_id}/cancel", response_model=DuelResponse)

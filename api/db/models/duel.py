@@ -336,10 +336,22 @@ class DuelMatch(Base):
         is_your_turn = self.is_players_turn(player_id)
         can_attack = is_your_turn and self.is_fighting
         
+        # Timeout claim - can claim if it's NOT your turn and the turn has expired
+        can_claim_timeout = (
+            not is_your_turn and 
+            self.is_fighting and 
+            self.turn_expires_at is not None and 
+            datetime.utcnow() > self.turn_expires_at
+        )
+        
         # Swings - only relevant when it's your turn
         if is_your_turn:
             your_swings_used = self.turn_swings_used or 0
-            your_max_swings = self.turn_max_swings or 1
+            # If no swings yet, calculate from your attack (turn_max_swings might be stale from opponent's turn)
+            if your_swings_used == 0:
+                your_max_swings = 1 + my_stats.get("attack", 0)
+            else:
+                your_max_swings = self.turn_max_swings or (1 + my_stats.get("attack", 0))
             your_swings_remaining = your_max_swings - your_swings_used
         else:
             # When not your turn, show your potential swings (1 + attack)
@@ -405,6 +417,7 @@ class DuelMatch(Base):
             # === PLAYER PERSPECTIVE (the good stuff) ===
             "is_your_turn": is_your_turn,
             "can_attack": can_attack,
+            "can_claim_timeout": can_claim_timeout,
             "your_bar_position": round(your_bar_position, 2),
             
             "your_swings_used": your_swings_used,

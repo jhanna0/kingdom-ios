@@ -407,11 +407,11 @@ class DuelManager:
         if not match:
             raise ValueError("Match not found")
         
-        if match.status != DuelStatus.READY.value:
-            raise ValueError(f"Match is {match.status}, cannot start")
-        
         if player_id not in [match.challenger_id, match.opponent_id]:
             raise ValueError("You are not in this match")
+        
+        if match.status != DuelStatus.READY.value:
+            raise ValueError(f"Match is {match.status}, cannot start")
         
         # Deduct wagers
         if match.wager_gold > 0:
@@ -589,6 +589,9 @@ class DuelManager:
             raise ValueError("No swings remaining this turn")
         
         # === DO ONE SWING ===
+        # Reset turn timer on each swing (player is active, clears timeout state)
+        match.turn_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_TURN_TIMEOUT_SECONDS)
+        
         roll_value = self.rng.random()
         outcome, push_amount = calculate_roll_outcome(roll_value, hit_chance, leadership)
         

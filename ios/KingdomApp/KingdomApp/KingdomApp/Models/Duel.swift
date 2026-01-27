@@ -82,7 +82,7 @@ struct DuelWinner: Codable {
     }
 }
 
-/// A duel attack action
+/// A duel attack action (full version from database/action history)
 struct DuelAction: Codable, Identifiable {
     let id: Int
     let matchId: Int
@@ -232,6 +232,9 @@ struct DuelMatch: Codable, Identifiable {
     /// Can you attack right now? (server-computed: is_your_turn && is_fighting)
     let canAttack: Bool?
     
+    /// Can you claim timeout victory? (server-computed: !is_your_turn && turn_expired)
+    let canClaimTimeout: Bool?
+    
     /// Bar position from YOUR perspective (0-100, higher = winning)
     let yourBarPosition: Double?
     
@@ -298,6 +301,7 @@ struct DuelMatch: Codable, Identifiable {
         // Player perspective (new format from to_dict_for_player)
         case isYourTurn = "is_your_turn"
         case canAttack = "can_attack"
+        case canClaimTimeout = "can_claim_timeout"
         case yourBarPosition = "your_bar_position"
         case yourSwingsUsed = "your_swings_used"
         case yourSwingsRemaining = "your_swings_remaining"
@@ -542,8 +546,6 @@ struct DuelRoll: Codable {
 struct DuelActionResult: Codable {
     let playerId: Int
     let side: String
-    let rollValue: Double
-    let hitChance: Double
     let outcome: String
     let pushAmount: Double
     let barBefore: Double
@@ -552,8 +554,6 @@ struct DuelActionResult: Codable {
     enum CodingKeys: String, CodingKey {
         case playerId = "player_id"
         case side
-        case rollValue = "roll_value"
-        case hitChance = "hit_chance"
         case outcome
         case pushAmount = "push_amount"
         case barBefore = "bar_before"

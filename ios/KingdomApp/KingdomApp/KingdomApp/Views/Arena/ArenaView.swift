@@ -533,18 +533,21 @@ struct ChallengeFriendView: View {
     @State private var friends: [Friend] = []
     @State private var selectedFriend: Friend?
     @State private var wagerGold = 0
+    @State private var wagerGoldText = ""
     @State private var isLoading = true
     @State private var isSending = false
     @State private var errorMessage: String?
+    @FocusState private var isWagerFieldFocused: Bool
     
     private let friendsService = FriendsService()
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: KingdomTheme.Spacing.large) {
-                Spacer().frame(height: 20)
-                
-                Image(systemName: "figure.fencing")
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.large) {
+                    Spacer().frame(height: 20)
+                    
+                    Image(systemName: "figure.fencing")
                     .font(.system(size: 48))
                     .foregroundColor(.white)
                     .frame(width: 80, height: 80)
@@ -618,22 +621,39 @@ struct ChallengeFriendView: View {
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     HStack {
-                        TextField("0", value: $wagerGold, format: .number)
+                        TextField("0", text: $wagerGoldText)
                             .keyboardType(.numberPad)
+                            .focused($isWagerFieldFocused)
                             .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                             .padding(12)
                             .background(KingdomTheme.Colors.parchmentLight)
                             .cornerRadius(8)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(KingdomTheme.Colors.border, lineWidth: 1.5))
+                            .onChange(of: wagerGoldText) { _, newValue in
+                                // Only allow digits
+                                let filtered = newValue.filter { $0.isNumber }
+                                if filtered != newValue {
+                                    wagerGoldText = filtered
+                                }
+                                wagerGold = Int(filtered) ?? 0
+                            }
                         
-                        Image(systemName: "bitcoinsign.circle.fill")
+                        Image(systemName: "g.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(KingdomTheme.Colors.gold)
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
                     }
                 }
+                .id("wagerField")
                 .padding()
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                .onChange(of: isWagerFieldFocused) { _, focused in
+                    if focused {
+                        withAnimation {
+                            scrollProxy.scrollTo("wagerField", anchor: .center)
+                        }
+                    }
+                }
                 
                 // Error message
                 if let error = errorMessage {
@@ -681,10 +701,22 @@ struct ChallengeFriendView: View {
         .task {
             await loadFriends()
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    isWagerFieldFocused = false
+                }
+                .font(FontStyles.bodySmallBold)
+                .foregroundColor(KingdomTheme.Colors.royalBlue)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        } // ScrollViewReader
     }
     
     private func selectedFriendCard(friend: Friend) -> some View {
-        VStack(spacing: KingdomTheme.Spacing.small) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
@@ -704,7 +736,7 @@ struct ChallengeFriendView: View {
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }

@@ -538,10 +538,72 @@ def _extract_boundary_from_members(members: List[Dict]) -> List[Tuple[float, flo
     return _join_segments(segments)
 
 
+def _find_connected_components(segments: List[List[Tuple[float, float]]], max_gap: float = 0.0001) -> List[List[int]]:
+    """
+    Find connected components among segments using Union-Find.
+    Two segments are connected if any of their endpoints are within max_gap of each other.
+    Returns list of components, each component is a list of segment indices.
+    """
+    n = len(segments)
+    if n == 0:
+        return []
+    
+    # Union-Find data structure
+    parent = list(range(n))
+    rank = [0] * n
+    
+    def find(x):
+        if parent[x] != x:
+            parent[x] = find(parent[x])  # Path compression
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px == py:
+            return
+        # Union by rank
+        if rank[px] < rank[py]:
+            px, py = py, px
+        parent[py] = px
+        if rank[px] == rank[py]:
+            rank[px] += 1
+    
+    # Check all pairs of segments for connectivity
+    for i in range(n):
+        if not segments[i]:
+            continue
+        seg_i_start = segments[i][0]
+        seg_i_end = segments[i][-1]
+        
+        for j in range(i + 1, n):
+            if not segments[j]:
+                continue
+            seg_j_start = segments[j][0]
+            seg_j_end = segments[j][-1]
+            
+            # Check all 4 endpoint combinations
+            if (_coord_distance(seg_i_end, seg_j_start) <= max_gap or
+                _coord_distance(seg_i_end, seg_j_end) <= max_gap or
+                _coord_distance(seg_i_start, seg_j_start) <= max_gap or
+                _coord_distance(seg_i_start, seg_j_end) <= max_gap):
+                union(i, j)
+    
+    # Group segments by their root
+    components: dict[int, List[int]] = {}
+    for i in range(n):
+        root = find(i)
+        if root not in components:
+            components[root] = []
+        components[root].append(i)
+    
+    return list(components.values())
+
+
 def _join_segments(segments: List[List[Tuple[float, float]]]) -> List[Tuple[float, float]]:
     """
     Join disconnected way segments into a complete boundary.
     Uses nearest-neighbor chaining: always pick the BEST connection, not just any.
+    IMPROVED: Starts with the largest connected component to avoid orphaning the main boundary.
     """
     if not segments:
         return []
@@ -554,10 +616,25 @@ def _join_segments(segments: List[List[Tuple[float, float]]]) -> List[Tuple[floa
     # Debug: show endpoint connectivity
     _debug_segment_connectivity(segments)
     
+    # Find connected components and start with the largest one
+    components = _find_connected_components(segments)
+    
+    if len(components) > 1:
+        # Sort by total point count (largest first)
+        components.sort(key=lambda comp: sum(len(segments[i]) for i in comp), reverse=True)
+        largest_component = components[0]
+        total_points_in_largest = sum(len(segments[i]) for i in largest_component)
+        print(f"       📊 Found {len(components)} disconnected components, using largest with {len(largest_component)} segments ({total_points_in_largest} points)")
+        
+        # Start with the first segment of the largest component
+        start_idx = largest_component[0]
+    else:
+        start_idx = 0
+    
     # Build chain using nearest-neighbor algorithm
     # Each entry: (segment_index, is_reversed)
-    chain: List[Tuple[int, bool]] = [(0, False)]  # Start with first segment
-    used = {0}
+    chain: List[Tuple[int, bool]] = [(start_idx, False)]  # Start with chosen segment
+    used = {start_idx}
     
     # Grow chain from both ends until all segments connected
     max_gap = 0.001  # ~100m max gap (tight tolerance)
