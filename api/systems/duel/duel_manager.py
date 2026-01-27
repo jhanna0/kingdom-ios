@@ -532,17 +532,14 @@ class DuelManager:
         player_id: int
     ) -> Dict[str, Any]:
         """
-        Execute an attack in the duel.
+        Execute a SINGLE SWING in the duel.
         
-        BACKEND IS AUTHORITATIVE:
-        - Validates it's actually this player's turn
-        - Validates the match is in FIGHTING status
-        - Processes the attack server-side
-        - Updates bar position
-        - Switches turn (or resolves winner)
-        - Returns complete state for broadcast
-        
-        Like battles: you get multiple rolls (1 + attack), best outcome is used.
+        Multi-swing system:
+        - Each API call = one swing
+        - Player can have multiple swings per turn (1 + attack stat)
+        - Best outcome is tracked across all swings
+        - Turn only switches after all swings are used
+        - Bar is pushed after final swing using best outcome
         
         Args:
             db: Database session
@@ -550,8 +547,7 @@ class DuelManager:
             player_id: ID of the attacking player
         
         Returns:
-            Attack result with all rolls, best outcome, push, bar state, 
-            next turn info, and winner (if any). Ready for broadcast.
+            Single swing result with roll, current best, swings remaining.
         """
         from .config import calculate_duel_max_rolls, calculate_duel_roll_chances
         
@@ -562,7 +558,7 @@ class DuelManager:
         if not match.is_fighting:
             raise ValueError(f"Match is {match.status}, not fighting")
         
-        # STRICT TURN ENFORCEMENT - prevent cheating
+        # STRICT TURN ENFORCEMENT
         if not match.is_players_turn(player_id):
             current_turn_player = match.get_current_turn_player_id()
             raise ValueError(f"Not your turn. Current turn: player {current_turn_player}")
@@ -574,116 +570,136 @@ class DuelManager:
         
         attack = attacker_stats.get("attack", 0)
         defense = defender_stats.get("defense", 0)
-        leadership = attacker_stats.get("leadership", 0)  # Leadership affects push!
+        leadership = attacker_stats.get("leadership", 0)
         
-        # Calculate max rolls based on attack (like battles)
-        max_rolls = calculate_duel_max_rolls(attack)
         hit_chance = calculate_duel_hit_chance(attack, defense)
         miss_pct, hit_pct, crit_pct = calculate_duel_roll_chances(attack, defense)
         
-        # Do all rolls, track best outcome
-        rolls = []
-        best_outcome = "miss"
-        best_push = 0.0
-        best_roll_value = 0.0
+        # Initialize turn swing tracking if this is first swing of turn
+        if match.turn_swings_used == 0 or match.turn_swings_used is None:
+            max_swings = calculate_duel_max_rolls(attack)
+            match.turn_max_swings = max_swings
+            match.turn_swings_used = 0
+            match.turn_best_outcome = "miss"
+            match.turn_best_push = 0.0
+            match.turn_rolls = []
         
-        outcome_rank = {"miss": 0, "hit": 1, "critical": 2}
+        # Check if player still has swings
+        if match.turn_swings_used >= match.turn_max_swings:
+            raise ValueError("No swings remaining this turn")
         
-        for i in range(max_rolls):
-            roll_value = self.rng.random()
-            outcome, push_amount = calculate_roll_outcome(roll_value, hit_chance, leadership)
-            
-            rolls.append({
-                "roll_number": i + 1,
-                "value": round(roll_value * 100, 1),  # 0-100 for display
-                "outcome": outcome,
-            })
-            
-            # Track best outcome
-            if outcome_rank[outcome] > outcome_rank[best_outcome]:
-                best_outcome = outcome
-                best_push = push_amount
-                best_roll_value = roll_value
-            elif outcome_rank[outcome] == outcome_rank[best_outcome] and push_amount > best_push:
-                best_push = push_amount
-                best_roll_value = roll_value
+        # === DO ONE SWING ===
+        roll_value = self.rng.random()
+        outcome, push_amount = calculate_roll_outcome(roll_value, hit_chance, leadership)
         
-        # Record bar state before push
-        bar_before = match.control_bar
-        
-        # Apply push using best outcome
-        winner_side = match.apply_push(side, best_push)
-        
-        print(f"🎯 ATTACK: player={player_id}, side={side}, outcome={best_outcome}, push={best_push:.2f}")
-        print(f"🎯 BAR: before={bar_before:.2f}, after={match.control_bar:.2f}")
-        
-        # Record action (best outcome)
-        action = DuelAction(
-            match_id=match_id,
-            player_id=player_id,
-            side=side,
-            roll_value=best_roll_value,
-            outcome=best_outcome,
-            push_amount=best_push,
-            bar_before=bar_before,
-            bar_after=match.control_bar,
-        )
-        db.add(action)
-        
-        # Build the action result
-        action_result = {
-            "player_id": player_id,
-            "side": side,
-            "roll_value": round(best_roll_value, 4),
-            "hit_chance": round(hit_chance, 3),
-            "outcome": best_outcome,
-            "push_amount": round(best_push, 2),
-            "bar_before": round(bar_before, 2),
-            "bar_after": round(match.control_bar, 2),
+        swing_number = match.turn_swings_used + 1
+        roll_data = {
+            "roll_number": swing_number,
+            "value": round(roll_value * 100, 1),
+            "outcome": outcome,
         }
         
+        # Add to turn rolls
+        turn_rolls = match.turn_rolls or []
+        turn_rolls.append(roll_data)
+        match.turn_rolls = turn_rolls
+        
+        # Track best outcome
+        outcome_rank = {"miss": 0, "hit": 1, "critical": 2}
+        current_best = match.turn_best_outcome or "miss"
+        if outcome_rank[outcome] > outcome_rank[current_best]:
+            match.turn_best_outcome = outcome
+            match.turn_best_push = push_amount
+        elif outcome_rank[outcome] == outcome_rank[current_best] and push_amount > (match.turn_best_push or 0):
+            match.turn_best_push = push_amount
+        
+        match.turn_swings_used = swing_number
+        swings_remaining = match.turn_max_swings - swing_number
+        is_last_swing = swings_remaining == 0
+        
+        print(f"🎯 SWING {swing_number}/{match.turn_max_swings}: player={player_id}, outcome={outcome}, best={match.turn_best_outcome}")
+        
+        # Build result for this swing
         result = {
             "success": True,
-            "action": action_result,
-            "rolls": rolls,
-            "max_rolls": max_rolls,
+            "roll": roll_data,
+            "swing_number": swing_number,
+            "swings_remaining": swings_remaining,
+            "max_swings": match.turn_max_swings,
+            "current_best_outcome": match.turn_best_outcome,
+            "current_best_push": round(match.turn_best_push or 0, 2),
+            "all_rolls": turn_rolls,
             "miss_chance": miss_pct,
             "hit_chance_pct": hit_pct,
             "crit_chance": crit_pct,
-            "match": None,  # Will be filled in
+            "is_last_swing": is_last_swing,
+            "turn_complete": is_last_swing,
+            "match": None,
+            "action": None,
             "winner": None,
-            "turn_complete": True,  # Signal that turn is complete
-            "next_turn": None,  # Will be filled if game continues
+            "game_over": False,
         }
         
-        # Check for winner
-        if winner_side:
-            self._resolve_match(db, match, winner_side)
-            result["winner"] = {
-                "side": winner_side,
-                "player_id": match.winner_id,
-                "gold_earned": match.winner_gold_earned,
+        # If last swing, apply the best outcome and switch turns
+        if is_last_swing:
+            bar_before = match.control_bar
+            best_push = match.turn_best_push or 0
+            best_outcome = match.turn_best_outcome or "miss"
+            
+            winner_side = match.apply_push(side, best_push)
+            
+            print(f"🎯 TURN COMPLETE: best={best_outcome}, push={best_push:.2f}, bar={bar_before:.2f}->{match.control_bar:.2f}")
+            
+            # Record action
+            action = DuelAction(
+                match_id=match_id,
+                player_id=player_id,
+                side=side,
+                roll_value=roll_value,  # Last roll value
+                outcome=best_outcome,
+                push_amount=best_push,
+                bar_before=bar_before,
+                bar_after=match.control_bar,
+            )
+            db.add(action)
+            
+            result["action"] = {
+                "player_id": player_id,
+                "side": side,
+                "outcome": best_outcome,
+                "push_amount": round(best_push, 2),
+                "bar_before": round(bar_before, 2),
+                "bar_after": round(match.control_bar, 2),
             }
-            result["game_over"] = True
-        else:
-            # Switch turns using internal method
-            self._switch_turn(match)
-            result["game_over"] = False
-            result["next_turn"] = {
-                "player_id": match.get_current_turn_player_id(),
-                "side": match.current_turn,
-                "expires_at": match.turn_expires_at.isoformat() + "Z" if match.turn_expires_at else None,
-                "timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
-            }
+            
+            # Check for winner
+            if winner_side:
+                self._resolve_match(db, match, winner_side)
+                result["winner"] = {
+                    "side": winner_side,
+                    "player_id": match.winner_id,
+                    "gold_earned": match.winner_gold_earned,
+                }
+                result["game_over"] = True
+            else:
+                # Switch turns and reset swing tracking
+                self._switch_turn(match)
+                match.turn_swings_used = 0
+                match.turn_best_outcome = None
+                match.turn_best_push = 0.0
+                match.turn_rolls = []
+                
+                result["next_turn"] = {
+                    "player_id": match.get_current_turn_player_id(),
+                    "side": match.current_turn,
+                    "expires_at": match.turn_expires_at.isoformat() + "Z" if match.turn_expires_at else None,
+                    "timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+                }
         
         db.commit()
         db.refresh(match)
         
-        print(f"🎯 AFTER REFRESH: control_bar={match.control_bar:.2f}")
-        
         result["match"] = match.to_dict(include_actions=True)
-        
-        print(f"🎯 SERIALIZED: control_bar={result['match'].get('control_bar')}")
         
         return result
     

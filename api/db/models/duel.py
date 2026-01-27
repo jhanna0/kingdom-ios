@@ -89,6 +89,13 @@ class DuelMatch(Base):
     turn_expires_at = Column(DateTime, nullable=True)
     first_turn_player_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who went first (for history)
     
+    # Multi-swing tracking (within a single turn)
+    turn_swings_used = Column(Integer, default=0)  # How many swings used this turn
+    turn_max_swings = Column(Integer, default=1)   # Max swings for this turn (1 + attack)
+    turn_best_outcome = Column(String(20), nullable=True)  # Best outcome so far: 'miss', 'hit', 'critical'
+    turn_best_push = Column(Float, default=0.0)    # Push amount from best outcome
+    turn_rolls = Column(JSONB, nullable=True)      # All rolls this turn for display
+    
     # Stats snapshots (frozen at match start for fairness)
     challenger_stats = Column(JSONB, nullable=True)
     opponent_stats = Column(JSONB, nullable=True)
@@ -255,6 +262,12 @@ class DuelMatch(Base):
             "turn_expires_at": _format_datetime_iso(self.turn_expires_at),
             "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
             "first_turn_player_id": self.first_turn_player_id,
+            
+            # Multi-swing tracking
+            "turn_swings_used": self.turn_swings_used or 0,
+            "turn_max_swings": self.turn_max_swings or 1,
+            "turn_swings_remaining": (self.turn_max_swings or 1) - (self.turn_swings_used or 0),
+            "turn_rolls": self.turn_rolls or [],
             
             "wager_gold": self.wager_gold,
             

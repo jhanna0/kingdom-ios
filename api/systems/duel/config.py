@@ -144,8 +144,8 @@ def calculate_roll_outcome(
     if roll_value > hit_chance:
         return ("miss", DUEL_MISS_PUSH)
     
-    # It's a hit - check if critical
-    critical_threshold = hit_chance * (1 - DUEL_CRITICAL_MULTIPLIER)
+    # It's a hit - check if critical (only top 15% of hits are crits)
+    critical_threshold = hit_chance * DUEL_CRITICAL_MULTIPLIER
     
     if roll_value < critical_threshold:
         return ("critical", calculate_duel_push(leadership, is_critical=True))

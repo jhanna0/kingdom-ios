@@ -142,6 +142,12 @@ struct DuelMatch: Codable, Identifiable {
     let turnTimeoutSeconds: Int?  // How long each turn lasts
     let firstTurnPlayerId: Int?   // Who went first (for history tracking)
     
+    // Multi-swing tracking
+    let turnSwingsUsed: Int?
+    let turnMaxSwings: Int?
+    let turnSwingsRemaining: Int?
+    let turnRolls: [DuelRoll]?
+    
     let wagerGold: Int
     
     let winner: DuelWinner?
@@ -167,6 +173,10 @@ struct DuelMatch: Codable, Identifiable {
         case turnExpiresAt = "turn_expires_at"
         case turnTimeoutSeconds = "turn_timeout_seconds"
         case firstTurnPlayerId = "first_turn_player_id"
+        case turnSwingsUsed = "turn_swings_used"
+        case turnMaxSwings = "turn_max_swings"
+        case turnSwingsRemaining = "turn_swings_remaining"
+        case turnRolls = "turn_rolls"
         case wagerGold = "wager_gold"
         case winner
         case createdAt = "created_at"
@@ -351,21 +361,59 @@ struct DuelResponse: Codable {
 struct DuelAttackResponse: Codable {
     let success: Bool
     let message: String
+    
+    // Single swing data
+    let roll: DuelRoll?
+    let swingNumber: Int?
+    let swingsRemaining: Int?
+    let maxSwings: Int?
+    let currentBestOutcome: String?
+    let currentBestPush: Double?
+    let allRolls: [DuelRoll]?
+    let isLastSwing: Bool?
+    let turnComplete: Bool?
+    
+    // Final action (only on last swing)
     let action: DuelActionResult?
-    let rolls: [DuelRoll]?
-    let maxRolls: Int?
+    let match: DuelMatch?
+    let winner: DuelWinner?
+    let nextTurn: DuelNextTurn?
+    let gameOver: Bool?
+    
+    // Odds
     let missChance: Int?
     let hitChancePct: Int?
     let critChance: Int?
-    let match: DuelMatch?
-    let winner: DuelWinner?
     
     enum CodingKeys: String, CodingKey {
-        case success, message, action, rolls, match, winner
-        case maxRolls = "max_rolls"
+        case success, message, roll, action, match, winner
+        case swingNumber = "swing_number"
+        case swingsRemaining = "swings_remaining"
+        case maxSwings = "max_swings"
+        case currentBestOutcome = "current_best_outcome"
+        case currentBestPush = "current_best_push"
+        case allRolls = "all_rolls"
+        case isLastSwing = "is_last_swing"
+        case turnComplete = "turn_complete"
+        case nextTurn = "next_turn"
+        case gameOver = "game_over"
         case missChance = "miss_chance"
         case hitChancePct = "hit_chance_pct"
         case critChance = "crit_chance"
+    }
+}
+
+struct DuelNextTurn: Codable {
+    let playerId: Int?
+    let side: String?
+    let expiresAt: String?
+    let timeoutSeconds: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case side
+        case expiresAt = "expires_at"
+        case timeoutSeconds = "timeout_seconds"
     }
 }
 

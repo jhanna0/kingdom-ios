@@ -79,10 +79,23 @@ class DuelResponse(BaseModel):
 class AttackResponse(BaseModel):
     success: bool
     message: str
+    # Single swing data
+    roll: Optional[dict] = None
+    swing_number: Optional[int] = None
+    swings_remaining: Optional[int] = None
+    max_swings: Optional[int] = None
+    current_best_outcome: Optional[str] = None
+    current_best_push: Optional[float] = None
+    all_rolls: Optional[List[dict]] = None
+    is_last_swing: Optional[bool] = None
+    turn_complete: Optional[bool] = None
+    # Final action (only on last swing)
     action: Optional[dict] = None
     match: Optional[dict] = None
     winner: Optional[dict] = None
-    rolls: Optional[List[dict]] = None
+    next_turn: Optional[dict] = None
+    game_over: Optional[bool] = None
+    # Odds
     miss_chance: Optional[int] = None
     hit_chance_pct: Optional[int] = None
     crit_chance: Optional[int] = None
@@ -397,67 +410,89 @@ def execute_attack(
     manager: DuelManager = Depends(get_duel_manager),
 ):
     """
-    Execute an attack during your turn.
+    Execute a SINGLE SWING during your turn.
     
-    BACKEND IS AUTHORITATIVE:
-    - Validates it's actually your turn (prevents cheating)
-    - Processes the attack completely server-side
-    - Broadcasts result to BOTH players
-    - Switches turn to opponent (or declares winner)
+    Multi-swing system:
+    - Each call = one swing (not all swings at once)
+    - Player gets (1 + attack) swings per turn
+    - Best outcome across all swings is used
+    - Turn only switches after all swings are used
     
-    Frontend should just render the result and wait for next event.
+    Frontend calls this once per swing, animates each one.
     """
     try:
         result = manager.execute_attack(db, match_id, user.id)
         
         match = result.get("match", {})
-        action = result.get("action", {})
+        roll = result.get("roll", {})
+        is_last_swing = result.get("is_last_swing", False)
         
-        # Get both player IDs for broadcast
-        challenger_id = match.get("challenger", {}).get("id")
-        opponent_id = match.get("opponent", {}).get("id")
-        player_ids = [p for p in [challenger_id, opponent_id] if p]
-        
-        # Build comprehensive turn complete event for both players
-        event_data = {
-            "attacker_id": user.id,
-            "action": action,
-            "rolls": result.get("rolls"),
-            "max_rolls": result.get("max_rolls"),
-            "miss_chance": result.get("miss_chance"),
-            "hit_chance_pct": result.get("hit_chance_pct"),
-            "crit_chance": result.get("crit_chance"),
-            "game_over": result.get("game_over", False),
-            "winner": result.get("winner"),
-            "next_turn": result.get("next_turn"),
-        }
-        
-        # Broadcast TURN_COMPLETE to both players - this is all they need
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_TURN_COMPLETE if not result.get("winner") else DuelEvents.DUEL_ENDED,
-            match=match,
-            target_user_ids=_get_apple_user_ids(db, player_ids),
-            data=event_data
-        )
+        # Only broadcast to opponent on LAST swing (when turn actually changes)
+        if is_last_swing:
+            challenger_id = match.get("challenger", {}).get("id")
+            opponent_id = match.get("opponent", {}).get("id")
+            player_ids = [p for p in [challenger_id, opponent_id] if p]
+            
+            event_data = {
+                "attacker_id": user.id,
+                "action": result.get("action"),
+                "all_rolls": result.get("all_rolls"),
+                "max_swings": result.get("max_swings"),
+                "miss_chance": result.get("miss_chance"),
+                "hit_chance_pct": result.get("hit_chance_pct"),
+                "crit_chance": result.get("crit_chance"),
+                "game_over": result.get("game_over", False),
+                "winner": result.get("winner"),
+                "next_turn": result.get("next_turn"),
+            }
+            
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_TURN_COMPLETE if not result.get("winner") else DuelEvents.DUEL_ENDED,
+                match=match,
+                target_user_ids=_get_apple_user_ids(db, player_ids),
+                data=event_data
+            )
         
         # Build response message
-        outcome = action.get("outcome", "miss")
+        outcome = roll.get("outcome", "miss")
+        swings_remaining = result.get("swings_remaining", 0)
+        
         if result.get("winner"):
-            message = "VICTORY! You win the duel!" if result["winner"]["player_id"] == user.id else "Defeat... Better luck next time."
-        elif outcome == "critical":
-            message = f"CRITICAL HIT! Bar pushed {action.get('push_amount', 0):.1f}"
-        elif outcome == "hit":
-            message = f"Hit! Bar pushed {action.get('push_amount', 0):.1f}"
+            message = "VICTORY! You win the duel!" if result["winner"]["player_id"] == user.id else "Defeat..."
+        elif is_last_swing:
+            best = result.get("current_best_outcome", "miss")
+            push = result.get("action", {}).get("push_amount", 0)
+            if best == "critical":
+                message = f"CRITICAL HIT! Pushed {push:.1f}%"
+            elif best == "hit":
+                message = f"Hit! Pushed {push:.1f}%"
+            else:
+                message = "All misses! No push."
         else:
-            message = "Miss! No push."
+            if outcome == "critical":
+                message = f"CRIT! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
+            elif outcome == "hit":
+                message = f"Hit! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
+            else:
+                message = f"Miss! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
         
         return AttackResponse(
             success=True,
             message=message,
+            roll=roll,
+            swing_number=result.get("swing_number"),
+            swings_remaining=result.get("swings_remaining"),
+            max_swings=result.get("max_swings"),
+            current_best_outcome=result.get("current_best_outcome"),
+            current_best_push=result.get("current_best_push"),
+            all_rolls=result.get("all_rolls"),
+            is_last_swing=is_last_swing,
+            turn_complete=result.get("turn_complete"),
             action=result.get("action"),
             match=match,
             winner=result.get("winner"),
-            rolls=result.get("rolls"),
+            next_turn=result.get("next_turn"),
+            game_over=result.get("game_over"),
             miss_chance=result.get("miss_chance"),
             hit_chance_pct=result.get("hit_chance_pct"),
             crit_chance=result.get("crit_chance"),

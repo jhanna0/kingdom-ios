@@ -26,6 +26,11 @@ struct DuelCombatView: View {
     @State private var showCritPopup: Bool = false
     @State private var critPopupData: CritPopupData? = nil
     
+    // Turn timer
+    @State private var secondsRemaining: Int = 30
+    @State private var timerActive: Bool = false
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
     @Environment(\.dismiss) private var dismiss
 
     private var currentMatch: DuelMatch { viewModel.match ?? match }
@@ -96,6 +101,18 @@ struct DuelCombatView: View {
                 opponentAnimationStarted = false
             }
         }
+        // Turn timer - reset when turn changes
+        .onChange(of: viewModel.isMyTurn) { _, isMyTurn in
+            secondsRemaining = 30
+            timerActive = currentMatch.isFighting
+        }
+        // Countdown timer
+        .onReceive(timer) { _ in
+            guard currentMatch.isFighting && !viewModel.isAnimating else { return }
+            if secondsRemaining > 0 {
+                secondsRemaining -= 1
+            }
+        }
     }
     
     // MARK: - YOUR Attack Animation
@@ -103,58 +120,42 @@ struct DuelCombatView: View {
     @MainActor
     private func runYourAttackAnimation() async {
         let rolls = viewModel.pendingRolls
-        print("🎲 runYourAttackAnimation called with \(rolls.count) rolls")
         
         guard !rolls.isEmpty else {
-            print("⚠️ No rolls to animate!")
             viewModel.finishYourAttackAnimation()
             return
         }
         
         showRollMarker = true
-        currentRollIndex = -1
         
-        // Animate each roll one by one
-        for (index, roll) in rolls.enumerated() {
-            print("🎲 Animating roll \(index + 1): value=\(roll.value), outcome=\(roll.outcome)")
-            
-            // Sweep animation for this roll
+        // Quick sweep to the roll value
+        if let roll = rolls.first {
             await sweepMarker(to: Int(roll.value))
-            
-            // Show this roll badge
-            currentRollIndex = index
-            
-            // Pause between rolls
-            if index < rolls.count - 1 {
-                try? await Task.sleep(nanoseconds: 300_000_000)
+            currentRollIndex = 0
+        }
+        
+        // Brief hold
+        try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms
+        
+        // Animate bar if it changed (last swing)
+        let newBarValue = viewModel.pendingBarValue
+        let oldBarValue = animatedBarValue
+        if abs(newBarValue - oldBarValue) > 0.1 {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                animatedBarValue = newBarValue
+            }
+            try? await Task.sleep(nanoseconds: 350_000_000)  // 350ms
+        }
+        
+        // Check for crit popup
+        if let roll = rolls.first, roll.outcome == "critical" {
+            let pushAmount = abs(newBarValue - oldBarValue)
+            if pushAmount > 0.1 {
+                showCriticalHit(attackerId: playerId, pushAmount: pushAmount)
+                try? await Task.sleep(nanoseconds: 1_200_000_000)  // 1.2s for popup
             }
         }
         
-        // Hold final result
-        try? await Task.sleep(nanoseconds: 400_000_000)
-        
-        // NOW animate the bar
-        let newBarValue = viewModel.pendingBarValue
-        print("📊 Animating bar to \(newBarValue)")
-        withAnimation(.easeInOut(duration: 0.6)) {
-            animatedBarValue = newBarValue
-        }
-        
-        try? await Task.sleep(nanoseconds: 700_000_000)
-        
-        // Check if this was a critical hit - show popup!
-        if let roll = rolls.first, roll.outcome == "critical" {
-            // Calculate push amount from bar change
-            let oldBar = viewModel.match?.barForPlayer(playerId: playerId) ?? 50
-            let pushAmount = abs(newBarValue - oldBar)
-            showCriticalHit(attackerId: playerId, pushAmount: pushAmount)
-            
-            // Wait for popup to show before finishing
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
-        }
-        
-        // Done
-        print("✅ Animation complete")
         viewModel.finishYourAttackAnimation()
         showRollMarker = false
     }
@@ -163,22 +164,22 @@ struct DuelCombatView: View {
     private func sweepMarker(to target: Int) async {
         let clamped = max(1, min(100, target))
         
-        // Sweep up (slower - 25ms per step)
-        for pos in stride(from: 1, through: 100, by: 3) {
+        // Fast sweep up (10ms per step, bigger jumps)
+        for pos in stride(from: 1, through: 100, by: 8) {
             rollDisplayValue = pos
-            try? await Task.sleep(nanoseconds: 25_000_000)
+            try? await Task.sleep(nanoseconds: 10_000_000)
         }
         
-        // Sweep back down to target (slower)
+        // Fast sweep down to target
         if clamped < 100 {
-            for pos in stride(from: 97, through: clamped, by: -3) {
+            for pos in stride(from: 92, through: clamped, by: -8) {
                 rollDisplayValue = pos
-                try? await Task.sleep(nanoseconds: 25_000_000)
+                try? await Task.sleep(nanoseconds: 10_000_000)
             }
         }
         
         rollDisplayValue = clamped
-        try? await Task.sleep(nanoseconds: 300_000_000)  // Hold on result longer
+        try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms hold
     }
     
     // MARK: - OPPONENT Attack Animation
@@ -293,17 +294,21 @@ struct DuelCombatView: View {
         HStack(spacing: KingdomTheme.Spacing.small) {
             chip(label: "ATTACK", value: "\(myStats?.attack ?? 0)", icon: "burst.fill", tint: myColor)
             
-            let maxRolls = 1 + (myStats?.attack ?? 0)
-            let usedSwings = viewModel.allRolls.isEmpty ? 0 : (maxRolls - viewModel.swingsRemaining)
+            // Only show YOUR swings when it's your turn
+            let myMaxSwings = 1 + (myStats?.attack ?? 0)
+            let isMyTurnNow = viewModel.isMyTurn
+            // If it's my turn, show backend state; otherwise show my max swings (not used yet)
+            let swingsUsed = isMyTurnNow ? (currentMatch.turnSwingsUsed ?? 0) : 0
+            let swingsToShow = isMyTurnNow ? (currentMatch.turnMaxSwings ?? myMaxSwings) : myMaxSwings
             HStack(spacing: 8) {
                 Image(systemName: "dice.fill").font(FontStyles.iconTiny).foregroundColor(.white)
                     .frame(width: 28, height: 28).background(KingdomTheme.Colors.inkDark).clipShape(RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SWINGS").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
                     HStack(spacing: 3) {
-                        ForEach(0..<max(1, maxRolls), id: \.self) { i in
+                        ForEach(0..<max(1, swingsToShow), id: \.self) { i in
                             Circle()
-                                .fill(i < usedSwings ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.buttonSuccess)
+                                .fill(i < swingsUsed ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.buttonSuccess)
                                 .frame(width: 8, height: 8)
                         }
                     }
@@ -313,10 +318,26 @@ struct DuelCombatView: View {
             .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
             
             let canAct = viewModel.canAttack
-            let hasSwingsLeft = viewModel.swingsRemaining > 0
+            let hasSwingsLeft = isMyTurnNow && swingsUsed > 0  // Show SWING! only when mid-attack
+            let isUrgent = secondsRemaining <= 10
             HStack(spacing: 8) {
-                Image(systemName: canAct ? "bolt.fill" : "hourglass").font(FontStyles.iconTiny).foregroundColor(.white)
-                    .frame(width: 28, height: 28).background(canAct ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium).clipShape(RoundedRectangle(cornerRadius: 8))
+                // Timer circle with countdown
+                ZStack {
+                    Circle()
+                        .stroke(Color.black.opacity(0.2), lineWidth: 3)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(secondsRemaining) / 30.0)
+                        .stroke(
+                            canAct ? KingdomTheme.Colors.buttonSuccess : (isUrgent ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkMedium),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                    Text("\(secondsRemaining)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(canAct ? KingdomTheme.Colors.buttonSuccess : (isUrgent ? KingdomTheme.Colors.buttonDanger : KingdomTheme.Colors.inkDark))
+                }
+                .frame(width: 28, height: 28)
+                
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TURN").font(FontStyles.labelBadge).foregroundColor(KingdomTheme.Colors.inkMedium)
                     Text(canAct ? (hasSwingsLeft ? "SWING!" : "YOUR") : "WAIT").font(FontStyles.labelBold).foregroundColor(KingdomTheme.Colors.inkDark)
@@ -483,37 +504,29 @@ struct DuelCombatView: View {
     private var barTitle: String {
         if viewModel.opponentAnimationPhase == .rolling { return "\(opponentDisplayName.uppercased()) ROLLING..." }
         if viewModel.animationPhase == .rolling { return "YOUR ROLL" }
-        if viewModel.isMyTurn || viewModel.swingsRemaining > 0 { return "YOUR ATTACK ODDS" }
+        if showingMyOdds { return "YOUR ATTACK ODDS" }
         return "\(opponentDisplayName.uppercased())'S ODDS"
     }
     
     // Show different odds based on whose turn it is
+    private var showingMyOdds: Bool {
+        viewModel.isMyTurn || viewModel.animationPhase == .rolling
+    }
+    
     private var displayMissChance: Int {
-        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
-            return missChance
-        }
-        return viewModel.opponentMissChance
+        showingMyOdds ? missChance : viewModel.opponentMissChance
     }
     
     private var displayHitChance: Int {
-        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
-            return hitChance
-        }
-        return viewModel.opponentHitChance
+        showingMyOdds ? hitChance : viewModel.opponentHitChance
     }
     
     private var displayCritChance: Int {
-        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
-            return critChance
-        }
-        return viewModel.opponentCritChance
+        showingMyOdds ? critChance : viewModel.opponentCritChance
     }
     
     private var displayBarColor: Color {
-        if viewModel.isMyTurn || viewModel.animationPhase == .rolling {
-            return myColor
-        }
-        return enemyColor
+        showingMyOdds ? myColor : enemyColor
     }
     
     private func markerColor(_ value: Int) -> Color {
@@ -651,18 +664,50 @@ struct DuelCombatView: View {
                         HStack { Image(systemName: "figure.fencing"); Text("Start Duel") }.frame(maxWidth: .infinity)
                     }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
                 } else if currentMatch.isFighting {
-                    let swingsLeft = viewModel.swingsRemaining
-                    let buttonText = swingsLeft > 0 ? "Swing! (\(swingsLeft) left)" : "Attack!"
-                    HStack(spacing: KingdomTheme.Spacing.medium) {
-                        Button { Task { await viewModel.attack() } } label: {
-                            HStack { Image(systemName: "figure.fencing"); Text(buttonText) }.frame(maxWidth: .infinity)
+                    let canClaimTimeout = !viewModel.isMyTurn && secondsRemaining <= 0 && !viewModel.isAnimating
+                    
+                    if canClaimTimeout {
+                        // Opponent timed out - show claim button
+                        Button { Task { await viewModel.claimTimeout() } } label: {
+                            HStack { 
+                                Image(systemName: "clock.badge.exclamationmark")
+                                Text("\(opponentDisplayName) timed out! Claim Victory")
+                            }.frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.brutalist(backgroundColor: viewModel.canAttack ? myColor : KingdomTheme.Colors.disabled, foregroundColor: .white, fullWidth: true))
-                        .disabled(!viewModel.canAttack)
+                        .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, foregroundColor: .white, fullWidth: true))
+                    } else if viewModel.isMyTurn {
+                        // My turn - show attack button
+                        let mySwingsLeft = currentMatch.turnSwingsRemaining ?? (1 + (myStats?.attack ?? 0))
+                        let mySwingsUsed = currentMatch.turnSwingsUsed ?? 0
+                        let buttonText = mySwingsUsed > 0 ? "Swing! (\(mySwingsLeft) left)" : "Attack!"
                         
-                        Button { Task { await viewModel.forfeit() } } label: {
-                            HStack { Image(systemName: "flag.fill"); Text("Forfeit") }.frame(maxWidth: .infinity)
-                        }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonDanger.opacity(0.8), foregroundColor: .white, fullWidth: true))
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
+                            Button { Task { await viewModel.attack() } } label: {
+                                HStack { Image(systemName: "figure.fencing"); Text(buttonText) }.frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.brutalist(backgroundColor: viewModel.canAttack ? myColor : KingdomTheme.Colors.disabled, foregroundColor: .white, fullWidth: true))
+                            .disabled(!viewModel.canAttack)
+                            
+                            Button { Task { await viewModel.forfeit() } } label: {
+                                HStack { Image(systemName: "flag.fill"); Text("Forfeit") }.frame(maxWidth: .infinity)
+                            }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonDanger.opacity(0.8), foregroundColor: .white, fullWidth: true))
+                        }
+                    } else {
+                        // Opponent's turn - show waiting state
+                        HStack(spacing: KingdomTheme.Spacing.medium) {
+                            HStack { 
+                                Image(systemName: "hourglass")
+                                Text("Waiting for \(opponentDisplayName)...")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(KingdomTheme.Colors.disabled.opacity(0.3))
+                            .cornerRadius(8)
+                            
+                            Button { Task { await viewModel.forfeit() } } label: {
+                                HStack { Image(systemName: "flag.fill"); Text("Forfeit") }.frame(maxWidth: .infinity)
+                            }.buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonDanger.opacity(0.8), foregroundColor: .white, fullWidth: true))
+                        }
                     }
                 } else {
                     Button { onComplete(); dismiss() } label: {
@@ -850,8 +895,8 @@ class DuelCombatViewModel: ObservableObject {
     
     var isAnimating: Bool { animationPhase != .none || opponentAnimationPhase != .none }
     
-    /// Can I attack? Either it's my turn OR I have swings remaining (and not animating)
-    var canAttack: Bool { (isMyTurn || swingsRemaining > 0) && !isAnimating }
+    /// Can I attack? It's my turn AND not animating (backend tracks swings)
+    var canAttack: Bool { isMyTurn && !isAnimating }
     
     func pendingBarValueForOpponent(playerId: Int) -> Double {
         pendingMatch?.barForPlayer(playerId: playerId) ?? 50
@@ -999,7 +1044,16 @@ class DuelCombatViewModel: ObservableObject {
         ))
         
         opponentAnimationPhase = .none
-        if let m = pendingMatch { match = m; pendingMatch = nil }
+        if let m = pendingMatch { 
+            match = m
+            pendingMatch = nil
+        }
+        
+        // Reset our swing state for new turn
+        swingsRemaining = 0
+        allRolls = []
+        currentSwingIndex = 0
+        lastRolls = []
     }
     
     private func refresh() async {
@@ -1018,37 +1072,46 @@ class DuelCombatViewModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
     
-    /// Send attack command to backend OR animate next swing
+    /// Execute a single swing - one API call per swing
     func attack() async {
         guard let matchId = matchId, canAttack else { return }
         
-        // If we have swings remaining, animate the next one (no API call)
-        if swingsRemaining > 0 {
-            animateNextSwing()
-            return
-        }
-        
-        // First click - fetch all rolls from backend
         do {
             let r = try await api.attack(matchId: matchId)
             if r.success {
-                // Clear previous rolls for new attack sequence
-                lastRolls = []
-                
-                // Store everything for multi-swing
-                allRolls = r.rolls ?? []
-                turnAction = r.action
-                turnPendingMatch = r.match
+                // Update odds
                 missChance = r.missChance ?? 50
                 hitChance = r.hitChancePct ?? 40
                 critChance = r.critChance ?? 10
                 
-                // Setup multi-swing state
-                currentSwingIndex = 0
-                swingsRemaining = allRolls.count
+                // Store swing data for animation
+                if let roll = r.roll {
+                    pendingRolls = [roll]
+                    lastRolls.append(roll)
+                }
                 
-                // Animate just the first swing
-                animateNextSwing()
+                // Track swings from backend
+                swingsRemaining = r.swingsRemaining ?? 0
+                currentSwingIndex = r.swingNumber ?? 1
+                allRolls = r.allRolls ?? []
+                
+                // Store match for after animation
+                turnPendingMatch = r.match
+                
+                // If last swing, store the final action
+                if r.isLastSwing == true {
+                    turnAction = r.action
+                    // Calculate bar push from action
+                    if let action = r.action {
+                        pendingBarValue = action.barAfter
+                    }
+                } else {
+                    // Not last swing - bar doesn't move yet
+                    pendingBarValue = match?.barForPlayer(playerId: playerId ?? 0) ?? 50
+                }
+                
+                // Start animation
+                animationPhase = .rolling
             } else {
                 errorMessage = r.message
             }
@@ -1057,47 +1120,25 @@ class DuelCombatViewModel: ObservableObject {
         }
     }
     
-    /// Animate a single swing
-    private func animateNextSwing() {
-        guard currentSwingIndex < allRolls.count else { return }
-        
-        // Get just this one roll to animate
-        let roll = allRolls[currentSwingIndex]
-        pendingRolls = [roll]
-        
-        // Add to displayed rolls
-        lastRolls.append(roll)
-        
-        // Calculate intermediate bar value (proportional progress toward final)
-        if let finalMatch = turnPendingMatch, let pid = playerId {
-            let startBar = match?.barForPlayer(playerId: pid) ?? 50
-            let endBar = finalMatch.barForPlayer(playerId: pid)
-            let progress = Double(currentSwingIndex + 1) / Double(allRolls.count)
-            pendingBarValue = startBar + (endBar - startBar) * progress
-        }
-        
-        currentSwingIndex += 1
-        swingsRemaining -= 1
-        
-        animationPhase = .rolling
-    }
-    
     func finishYourAttackAnimation() {
         animationPhase = .none
         
-        // If all swings are done, apply final result
+        // Always update match state after animation
+        if let m = turnPendingMatch {
+            match = m
+            turnPendingMatch = nil
+        }
+        
+        // If turn is complete (all swings done), apply final action
         if swingsRemaining == 0 {
             lastAction = turnAction
-            if let m = turnPendingMatch { 
-                match = m 
-                turnPendingMatch = nil
-            }
-            // Reset for next turn
+            turnAction = nil
+            // Clear rolls for next turn
+            lastRolls = []
             allRolls = []
             currentSwingIndex = 0
-            turnAction = nil
         }
-        // Otherwise, wait for next click to animate next swing
+        // Otherwise, player can click again for next swing
     }
     
     func cancel() async {
