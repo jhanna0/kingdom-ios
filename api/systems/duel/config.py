@@ -162,3 +162,41 @@ def generate_match_code() -> str:
     chars = chars.replace('O', '').replace('0', '').replace('I', '').replace('1', '').replace('L', '')
     
     return ''.join(random.choice(chars) for _ in range(DUEL_CODE_LENGTH))
+
+
+def get_duel_game_config() -> dict:
+    """
+    Return ALL game config that the frontend needs.
+    
+    DUMB RENDERER PRINCIPLE:
+    - Frontend displays what server tells it
+    - NO hardcoded values on frontend
+    - Change config here = changes everywhere instantly
+    - No app redeployment needed
+    """
+    return {
+        # Timing
+        "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
+        "invitation_timeout_minutes": DUEL_INVITATION_TIMEOUT_MINUTES,
+        
+        # Combat multipliers (for display)
+        "critical_multiplier": DUEL_CRITICAL_PUSH_BONUS,  # 1.5
+        "push_base_percent": DUEL_PUSH_BASE,  # 4.0
+        "leadership_bonus_percent": DUEL_LEADERSHIP_BONUS * 100,  # 20
+        
+        # Hit chance bounds
+        "min_hit_chance_percent": int(DUEL_MIN_HIT_CHANCE * 100),  # 10
+        "max_hit_chance_percent": int(DUEL_MAX_HIT_CHANCE * 100),  # 90
+        
+        # Crit rate (what % of hits become crits)
+        "crit_rate_percent": int(DUEL_CRITICAL_MULTIPLIER * 100),  # 15
+        
+        # Wager limits
+        "max_wager_gold": DUEL_MAX_WAGER,
+        
+        # Animation timing (milliseconds) - frontend can adjust but server controls defaults
+        "roll_animation_ms": 300,
+        "roll_pause_between_ms": 400,  # Pause between consecutive rolls
+        "crit_popup_duration_ms": 1500,
+        "roll_sweep_step_ms": 15,
+    }

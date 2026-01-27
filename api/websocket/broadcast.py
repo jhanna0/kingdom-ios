@@ -271,20 +271,17 @@ class DuelEvents:
     """
     Events for PvP Arena duels.
     
-    The main event is DUEL_TURN_COMPLETE which contains everything:
-    - Who attacked
-    - The rolls and result
-    - New bar position
-    - Whose turn is next (or winner if game over)
+    Real-time swing events:
+    - DUEL_SWING: Broadcast for EVERY swing so opponent sees them in real-time
+    - DUEL_TURN_COMPLETE: Final turn summary (bar push, next turn info)
     
-    Frontend should just render what this event says.
+    Frontend should animate each DUEL_SWING as it arrives.
     """
     DUEL_INVITATION = "duel_invitation"
     DUEL_OPPONENT_JOINED = "duel_opponent_joined"
     DUEL_STARTED = "duel_started"
-    DUEL_ATTACK = "duel_attack"  # Legacy - use TURN_COMPLETE instead
-    DUEL_TURN_CHANGED = "duel_turn_changed"  # Legacy
-    DUEL_TURN_COMPLETE = "duel_turn_complete"  # NEW: Complete turn info for frontend
+    DUEL_SWING = "duel_swing"  # NEW: Real-time swing broadcast to opponent
+    DUEL_TURN_COMPLETE = "duel_turn_complete"  # Turn finished, bar pushed
     DUEL_ENDED = "duel_ended"
     DUEL_CANCELLED = "duel_cancelled"
     DUEL_TIMEOUT = "duel_timeout"  # Player timed out

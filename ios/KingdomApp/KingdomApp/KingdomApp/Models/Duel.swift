@@ -125,68 +125,210 @@ struct DuelAction: Codable, Identifiable {
     }
 }
 
-/// A duel match
+/// Simple player info for the "you" and "opponent" fields in player-perspective response
+struct DuelPlayerInfo: Codable {
+    let id: Int?
+    let name: String?
+    let attack: Int?
+    let defense: Int?
+    let leadership: Int?
+}
+
+/// Odds for probability bar display
+struct DuelOdds: Codable {
+    let miss: Int
+    let hit: Int
+    let crit: Int
+}
+
+/// Game config from server - frontend has ZERO hardcoded values
+struct DuelGameConfig: Codable {
+    // Timing
+    let turnTimeoutSeconds: Int
+    let invitationTimeoutMinutes: Int
+    
+    // Combat multipliers (for display)
+    let criticalMultiplier: Double  // e.g., 1.5
+    let pushBasePercent: Double     // e.g., 4.0
+    let leadershipBonusPercent: Double  // e.g., 20
+    
+    // Hit chance bounds
+    let minHitChancePercent: Int
+    let maxHitChancePercent: Int
+    
+    // Crit rate
+    let critRatePercent: Int
+    
+    // Wager limits
+    let maxWagerGold: Int
+    
+    // Animation timing (ms)
+    let rollAnimationMs: Int
+    let rollPauseBetweenMs: Int  // Pause between consecutive rolls
+    let critPopupDurationMs: Int
+    let rollSweepStepMs: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case turnTimeoutSeconds = "turn_timeout_seconds"
+        case invitationTimeoutMinutes = "invitation_timeout_minutes"
+        case criticalMultiplier = "critical_multiplier"
+        case pushBasePercent = "push_base_percent"
+        case leadershipBonusPercent = "leadership_bonus_percent"
+        case minHitChancePercent = "min_hit_chance_percent"
+        case maxHitChancePercent = "max_hit_chance_percent"
+        case critRatePercent = "crit_rate_percent"
+        case maxWagerGold = "max_wager_gold"
+        case rollAnimationMs = "roll_animation_ms"
+        case rollPauseBetweenMs = "roll_pause_between_ms"
+        case critPopupDurationMs = "crit_popup_duration_ms"
+        case rollSweepStepMs = "roll_sweep_step_ms"
+    }
+    
+    /// Formatted critical multiplier string (e.g., "1.5x")
+    var criticalMultiplierText: String {
+        return "\(criticalMultiplier)x"
+    }
+}
+
+/// Roll with attacker info (no isMe flag needed - server tells us who attacked)
+struct DuelTurnRoll: Codable {
+    let rollNumber: Int
+    let value: Double
+    let outcome: String
+    let attackerName: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case rollNumber = "roll_number"
+        case value, outcome
+        case attackerName = "attacker_name"
+    }
+}
+
+/// Winner from player's perspective
+struct DuelWinnerPerspective: Codable {
+    let id: Int?
+    let didIWin: Bool?
+    let goldEarned: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case didIWin = "did_i_win"
+        case goldEarned = "gold_earned"
+    }
+}
+
+/// A duel match - now with player-perspective fields from server
 struct DuelMatch: Codable, Identifiable {
     let id: Int
     let matchCode: String
     let kingdomId: String
     let status: String
     
-    let challenger: DuelPlayer
-    let opponent: DuelPlayer?
+    // === PLAYER PERSPECTIVE (server-computed, no client logic needed) ===
     
-    let controlBar: Double
-    let currentTurn: String?
-    let currentTurnPlayerId: Int?  // Direct player ID for convenience
-    let turnExpiresAt: String?
-    let turnTimeoutSeconds: Int?  // How long each turn lasts
-    let firstTurnPlayerId: Int?   // Who went first (for history tracking)
+    /// Is it your turn? (server-computed)
+    let isYourTurn: Bool?
     
-    // Multi-swing tracking
-    let turnSwingsUsed: Int?
-    let turnMaxSwings: Int?
-    let turnSwingsRemaining: Int?
-    let turnRolls: [DuelRoll]?
+    /// Can you attack right now? (server-computed: is_your_turn && is_fighting)
+    let canAttack: Bool?
     
+    /// Bar position from YOUR perspective (0-100, higher = winning)
+    let yourBarPosition: Double?
+    
+    /// Your swings used this turn
+    let yourSwingsUsed: Int?
+    
+    /// Your swings remaining this turn
+    let yourSwingsRemaining: Int?
+    
+    /// Your max swings this turn
+    let yourMaxSwings: Int?
+    
+    /// Your info (from your perspective)
+    let you: DuelPlayerInfo?
+    
+    /// Opponent info (from your perspective)
+    let opponentInfo: DuelPlayerInfo?
+    
+    /// Current attacker's odds (for probability bar)
+    let currentOdds: DuelOdds?
+    
+    /// Rolls this turn with attacker name
+    let turnRolls: [DuelTurnRoll]?
+    
+    /// Winner from your perspective
+    let winnerPerspective: DuelWinnerPerspective?
+    
+    // === METADATA ===
     let wagerGold: Int
-    
-    let winner: DuelWinner?
-    
+    let turnExpiresAt: String?
     let createdAt: String?
     let startedAt: String?
     let completedAt: String?
-    let expiresAt: String?
     
-    // Optional actions (included when fetching full match)
+    // === GAME CONFIG (from server - NO hardcoded frontend values!) ===
+    let config: DuelGameConfig?
+    
+    // === LEGACY (for backwards compatibility during transition) ===
+    let challenger: DuelPlayer  // Always present (non-optional)
+    let opponent: DuelPlayer?   // Legacy format from "opponent_legacy" key
+    let controlBar: Double?
+    let currentTurn: String?
+    
+    // Old swing tracking (legacy)
+    let turnSwingsUsed: Int?
+    let turnMaxSwings: Int?
+    let turnSwingsRemaining: Int?
+    
+    // Optional actions
     let actions: [DuelAction]?
+    
+    /// Legacy winner accessor (converts from perspective format)
+    var winner: DuelWinner? {
+        guard let wp = winnerPerspective else { return nil }
+        return DuelWinner(id: wp.id, side: nil, goldEarned: wp.goldEarned)
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
         case matchCode = "match_code"
         case kingdomId = "kingdom_id"
         case status
-        case challenger
-        case opponent
-        case controlBar = "control_bar"
-        case currentTurn = "current_turn"
-        case currentTurnPlayerId = "current_turn_player_id"
-        case turnExpiresAt = "turn_expires_at"
-        case turnTimeoutSeconds = "turn_timeout_seconds"
-        case firstTurnPlayerId = "first_turn_player_id"
-        case turnSwingsUsed = "turn_swings_used"
-        case turnMaxSwings = "turn_max_swings"
-        case turnSwingsRemaining = "turn_swings_remaining"
+        
+        // Player perspective (new format from to_dict_for_player)
+        case isYourTurn = "is_your_turn"
+        case canAttack = "can_attack"
+        case yourBarPosition = "your_bar_position"
+        case yourSwingsUsed = "your_swings_used"
+        case yourSwingsRemaining = "your_swings_remaining"
+        case yourMaxSwings = "your_max_swings"
+        case you
+        case opponentInfo = "opponent"  // New format: simple {id, name, attack, defense}
+        case currentOdds = "current_odds"
         case turnRolls = "turn_rolls"
+        case winnerPerspective = "winner"
+        
+        // Metadata
         case wagerGold = "wager_gold"
-        case winner
+        case turnExpiresAt = "turn_expires_at"
         case createdAt = "created_at"
         case startedAt = "started_at"
         case completedAt = "completed_at"
-        case expiresAt = "expires_at"
+        case config
+        
+        // Legacy (from to_dict - kept for backwards compatibility)
+        case challenger
+        case opponent = "opponent_legacy"  // Backend sends this as "opponent_legacy" in player-perspective view
+        case controlBar = "control_bar"
+        case currentTurn = "current_turn"
+        // Note: winner is now a computed property that uses winnerPerspective
+        case turnSwingsUsed = "turn_swings_used"
+        case turnMaxSwings = "turn_max_swings"
+        case turnSwingsRemaining = "turn_swings_remaining"
         case actions
     }
     
-    // MARK: - Computed Properties
+    // MARK: - Status Helpers
     
     var isWaiting: Bool { status == "waiting" }
     var isPendingAcceptance: Bool { status == "pending_acceptance" }
@@ -199,16 +341,6 @@ struct DuelMatch: Codable, Identifiable {
     
     var isActive: Bool {
         isWaiting || isPendingAcceptance || isReady || isFighting
-    }
-    
-    /// Can an opponent join this match?
-    var canJoin: Bool {
-        isWaiting && opponent == nil
-    }
-    
-    /// Does challenger need to confirm/decline the opponent?
-    var needsChallengerConfirmation: Bool {
-        isPendingAcceptance
     }
     
     var statusText: String {
@@ -225,46 +357,25 @@ struct DuelMatch: Codable, Identifiable {
         }
     }
     
-    var statusColor: String {
-        switch status {
-        case "waiting": return "orange"
-        case "ready": return "blue"
-        case "fighting": return "red"
-        case "complete": return "green"
-        case "cancelled", "expired": return "gray"
-        default: return "gray"
-        }
-    }
+    // MARK: - Convenience Accessors (use server values, fallback to legacy)
     
-    /// Check if it's a specific player's turn
-    func isPlayersTurn(playerId: Int) -> Bool {
-        guard isFighting else { return false }
-        if currentTurn == "challenger" {
-            return challenger.id == playerId
-        } else if currentTurn == "opponent" {
-            return opponent?.id == playerId
-        }
-        return false
-    }
+    /// Your name (from server perspective)
+    var myName: String { you?.name ?? "You" }
     
-    /// Get which side a player is on
-    func playerSide(playerId: Int) -> String? {
-        if challenger.id == playerId { return "challenger" }
-        if opponent?.id == playerId { return "opponent" }
-        return nil
-    }
+    /// Opponent's name (from server perspective)
+    var opponentName: String { opponentInfo?.name ?? opponent?.name ?? "Opponent" }
     
-    /// Bar position from a player's perspective (0-100, where 100 = winning)
-    func barForPlayer(playerId: Int) -> Double {
-        let side = playerSide(playerId: playerId)
-        if side == "challenger" {
-            // Challenger wins at bar = 0, so invert
-            return 100 - controlBar
-        } else {
-            // Opponent wins at bar = 100
-            return controlBar
-        }
-    }
+    /// Your attack stat
+    var myAttack: Int { you?.attack ?? 0 }
+    
+    /// Your defense stat
+    var myDefense: Int { you?.defense ?? 0 }
+    
+    /// Opponent's attack stat
+    var opponentAttack: Int { opponentInfo?.attack ?? opponent?.stats?.attack ?? 0 }
+    
+    /// Opponent's defense stat
+    var opponentDefense: Int { opponentInfo?.defense ?? opponent?.stats?.defense ?? 0 }
 }
 
 /// Duel challenge from another player

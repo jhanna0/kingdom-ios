@@ -236,7 +236,7 @@ class DuelMatch(Base):
     # === Serialization ===
     
     def to_dict(self, include_actions: bool = False) -> Dict[str, Any]:
-        """Convert to dictionary for API response"""
+        """Convert to dictionary for API response (generic, no player perspective)"""
         from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS
         
         result = {
@@ -281,6 +281,186 @@ class DuelMatch(Base):
             "started_at": _format_datetime_iso(self.started_at),
             "completed_at": _format_datetime_iso(self.completed_at),
             "expires_at": _format_datetime_iso(self.expires_at),
+        }
+        
+        if include_actions:
+            result["actions"] = [a.to_dict() for a in self.actions.order_by(DuelAction.performed_at)]
+        
+        return result
+    
+    def to_dict_for_player(self, player_id: int, include_actions: bool = False, odds: Dict = None) -> Dict[str, Any]:
+        """
+        Convert to dictionary with player-specific perspective.
+        
+        SERVER-DRIVEN ARCHITECTURE:
+        - Frontend is a dumb renderer
+        - All values pre-calculated for this player's perspective
+        - No client-side flipping/computing needed
+        - ALL config included so frontend has zero hardcoded values
+        
+        Args:
+            player_id: The player requesting the view
+            include_actions: Whether to include action history
+            odds: Optional dict with miss/hit/crit percentages for current attacker
+        """
+        from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS, calculate_duel_roll_chances, get_duel_game_config
+        
+        # Determine perspective
+        my_side = self.get_player_side(player_id)
+        is_challenger = my_side == "challenger"
+        
+        # Get stats for each side from this player's perspective
+        if is_challenger:
+            my_stats = self.challenger_stats or {}
+            opponent_stats = self.opponent_stats or {}
+            my_name = self.challenger_name
+            opponent_name = self.opponent_name
+            opponent_id = self.opponent_id
+        else:
+            my_stats = self.opponent_stats or {}
+            opponent_stats = self.challenger_stats or {}
+            my_name = self.opponent_name
+            opponent_name = self.challenger_name
+            opponent_id = self.challenger_id
+        
+        # Pre-calculate bar position for this player's perspective
+        # Higher = better for YOU (100 = you win, 0 = you lose)
+        if is_challenger:
+            # Challenger wins at bar=0, so invert
+            your_bar_position = 100.0 - self.control_bar
+        else:
+            # Opponent wins at bar=100
+            your_bar_position = self.control_bar
+        
+        # Turn state - pre-calculated booleans
+        is_your_turn = self.is_players_turn(player_id)
+        can_attack = is_your_turn and self.is_fighting
+        
+        # Swings - only relevant when it's your turn
+        if is_your_turn:
+            your_swings_used = self.turn_swings_used or 0
+            your_max_swings = self.turn_max_swings or 1
+            your_swings_remaining = your_max_swings - your_swings_used
+        else:
+            # When not your turn, show your potential swings (1 + attack)
+            your_swings_used = 0
+            your_max_swings = 1 + my_stats.get("attack", 0)
+            your_swings_remaining = your_max_swings
+        
+        # Current attacker's odds (for probability bar display)
+        if odds:
+            current_odds = {
+                "miss": odds.get("miss", 50),
+                "hit": odds.get("hit", 40),
+                "crit": odds.get("crit", 10),
+            }
+        elif self.is_fighting:
+            # Calculate odds for whoever's turn it is
+            current_turn_player_id = self.get_current_turn_player_id()
+            if current_turn_player_id == self.challenger_id:
+                atk = (self.challenger_stats or {}).get("attack", 0)
+                defense = (self.opponent_stats or {}).get("defense", 0)
+            else:
+                atk = (self.opponent_stats or {}).get("attack", 0)
+                defense = (self.challenger_stats or {}).get("defense", 0)
+            miss_pct, hit_pct, crit_pct = calculate_duel_roll_chances(atk, defense)
+            current_odds = {"miss": miss_pct, "hit": hit_pct, "crit": crit_pct}
+        else:
+            current_odds = {"miss": 50, "hit": 40, "crit": 10}
+        
+        # Turn rolls with attacker name (no isMe flag needed)
+        turn_rolls_display = []
+        current_attacker_name = None
+        if self.is_fighting:
+            current_attacker_id = self.get_current_turn_player_id()
+            if current_attacker_id == self.challenger_id:
+                current_attacker_name = self.challenger_name
+            else:
+                current_attacker_name = self.opponent_name
+        
+        for roll in (self.turn_rolls or []):
+            turn_rolls_display.append({
+                "roll_number": roll.get("roll_number", 1),
+                "value": roll.get("value", 50),
+                "outcome": roll.get("outcome", "miss"),
+                "attacker_name": current_attacker_name or "Unknown",
+            })
+        
+        # Winner from this player's perspective
+        winner_data = None
+        if self.winner_id:
+            did_i_win = self.winner_id == player_id
+            winner_data = {
+                "id": self.winner_id,
+                "did_i_win": did_i_win,
+                "gold_earned": self.winner_gold_earned if did_i_win else 0,
+            }
+        
+        result = {
+            "id": self.id,
+            "match_code": self.match_code,
+            "kingdom_id": self.kingdom_id,
+            "status": self.status,
+            
+            # === PLAYER PERSPECTIVE (the good stuff) ===
+            "is_your_turn": is_your_turn,
+            "can_attack": can_attack,
+            "your_bar_position": round(your_bar_position, 2),
+            
+            "your_swings_used": your_swings_used,
+            "your_swings_remaining": your_swings_remaining,
+            "your_max_swings": your_max_swings,
+            
+            # Your info
+            "you": {
+                "id": player_id,
+                "name": my_name,
+                "attack": my_stats.get("attack", 0),
+                "defense": my_stats.get("defense", 0),
+                "leadership": my_stats.get("leadership", 0),
+            },
+            
+            # Opponent info
+            "opponent": {
+                "id": opponent_id,
+                "name": opponent_name,
+                "attack": opponent_stats.get("attack", 0),
+                "defense": opponent_stats.get("defense", 0),
+            } if opponent_id else None,
+            
+            # Current attacker's odds (for probability bar)
+            "current_odds": current_odds,
+            
+            # Rolls this turn (generic - no isMe needed)
+            "turn_rolls": turn_rolls_display,
+            
+            # Winner
+            "winner": winner_data,
+            
+            # === METADATA ===
+            "wager_gold": self.wager_gold,
+            "turn_expires_at": _format_datetime_iso(self.turn_expires_at),
+            
+            "created_at": _format_datetime_iso(self.created_at),
+            "started_at": _format_datetime_iso(self.started_at),
+            "completed_at": _format_datetime_iso(self.completed_at),
+            
+            # === GAME CONFIG (frontend has ZERO hardcoded values) ===
+            "config": get_duel_game_config(),
+            
+            # === LEGACY (for backwards compat during transition) ===
+            "challenger": {
+                "id": self.challenger_id,
+                "name": self.challenger_name,
+                "stats": self.challenger_stats,
+            },
+            "opponent_legacy": {
+                "id": self.opponent_id,
+                "name": self.opponent_name,
+                "stats": self.opponent_stats,
+            } if self.opponent_id else None,
+            "control_bar": round(self.control_bar, 2),
+            "current_turn": self.current_turn,
         }
         
         if include_actions:

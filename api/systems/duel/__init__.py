@@ -11,6 +11,7 @@ from .config import (
     calculate_duel_push,
     calculate_duel_max_rolls,
     calculate_duel_roll_chances,
+    get_duel_game_config,
 )
 from .duel_manager import DuelManager
 
@@ -25,4 +26,5 @@ __all__ = [
     "calculate_duel_push",
     "calculate_duel_max_rolls",
     "calculate_duel_roll_chances",
+    "get_duel_game_config",
 ]

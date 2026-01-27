@@ -67,7 +67,7 @@ class ArenaViewModel: ObservableObject {
                 }
             }
             
-        case .started, .attack, .turnChanged, .turnComplete:
+        case .started, .swing, .turnComplete:
             // Combat events - update active match if it's ours
             if event.matchId == activeMatch?.id, let match = event.match {
                 activeMatch = match

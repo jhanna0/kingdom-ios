@@ -3,14 +3,13 @@ import Combine
 import UIKit
 
 /// Event types for duels (matches API's DuelEvents)
-/// The main event is TURN_COMPLETE which contains everything frontend needs
+/// Real-time swing events allow opponent to see each swing as it happens
 enum DuelEventType: String {
     case invitation = "duel_invitation"
     case opponentJoined = "duel_opponent_joined"
     case started = "duel_started"
-    case attack = "duel_attack"  // Legacy
-    case turnChanged = "duel_turn_changed"  // Legacy
-    case turnComplete = "duel_turn_complete"  // NEW: Complete turn info
+    case swing = "duel_swing"  // Real-time: each swing broadcast immediately
+    case turnComplete = "duel_turn_complete"  // Turn finished, bar pushed
     case ended = "duel_ended"
     case cancelled = "duel_cancelled"
     case timeout = "duel_timeout"  // Player timed out
