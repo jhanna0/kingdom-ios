@@ -919,7 +919,7 @@ class HuntManager:
         if state.phase == HuntPhase.TRACK:
             result.update(self._resolve_track_phase(session, state))
         elif state.phase == HuntPhase.STRIKE:
-            result.update(self._resolve_strike_phase(session, state))
+            result.update(self._resolve_strike_phase(db, session, state))
         elif state.phase == HuntPhase.BLESSING:
             result.update(self._resolve_blessing_phase(db, session, state))
         
@@ -1048,12 +1048,14 @@ class HuntManager:
             },
         }
     
-    def _resolve_strike_phase(self, session: HuntSession, state: PhaseState) -> dict:
+    def _resolve_strike_phase(self, db, session: HuntSession, state: PhaseState) -> dict:
         """
         Resolve strike phase using DROP TABLE!
         
         Three sections: SCARE / MISS / HIT
         Only HIT kills. Scare and Miss both = animal escapes.
+        
+        STREAK BONUS: Check on kill - this is when the popup should show!
         """
         # MASTER ROLL - returns (outcome, roll_value)
         outcome, master_roll = self._roll_on_drop_table(state.drop_table_slots)
@@ -1068,6 +1070,22 @@ class HuntManager:
         
         if outcome == "hit":
             # VICTORY! Animal slain
+            # Check streak NOW - this is the kill screen!
+            streak_active = self._check_hunt_streak(db, session.created_by)
+            if streak_active:
+                session.streak_active = True
+                session.show_streak_popup = True  # Show on kill screen!
+                session.streak_info = {
+                    "title": "HOT STREAK!",
+                    "subtitle": "2x Meat",
+                    "description": f"{HUNT_STREAK_THRESHOLD} hunts in a row!",
+                    "multiplier": HUNT_STREAK_MEAT_MULTIPLIER,
+                    "threshold": HUNT_STREAK_THRESHOLD,
+                    "icon": "flame.fill",
+                    "color": "buttonDanger",
+                    "dismiss_button": "Claim",
+                }
+            
             return {
                 "message": f"{session.animal_data['name']} slain!",
                 "effects": {
@@ -1076,6 +1094,7 @@ class HuntManager:
                     "hit_chance": round(hit_chance, 3),
                     "master_roll": master_roll,
                     "drop_table_slots": state.drop_table_slots.copy(),
+                    "streak_active": streak_active,
                 },
             }
         else:
@@ -1122,10 +1141,8 @@ class HuntManager:
         rare_slots = state.drop_table_slots.get("rare", 0)
         rare_chance = rare_slots / total_slots if total_slots > 0 else 0
         
-        # Apply loot based on tier
-        streak_active = False
+        # Apply loot based on tier (streak was already set in strike phase)
         if not session.animal_escaped and session.animal_data:
-            streak_active = self._check_hunt_streak(db, session.created_by)
             self._calculate_loot(db, session, loot_tier)
         
         # Build message based on outcome
@@ -1140,8 +1157,8 @@ class HuntManager:
         else:
             message = f"Common loot. ({int(rare_chance * 100)}% chance was rare)"
         
-        # Add streak bonus message
-        if streak_active:
+        # Add streak bonus message if active
+        if session.streak_active:
             message += f" 🔥 {HUNT_STREAK_THRESHOLD}x STREAK BONUS!"
         
         return {
@@ -1155,9 +1172,9 @@ class HuntManager:
                 "bonus_meat": session.bonus_meat,
                 "master_roll": master_roll,
                 "drop_table_slots": state.drop_table_slots.copy(),
-                "streak_active": streak_active,
+                "streak_active": session.streak_active,
                 "streak_threshold": HUNT_STREAK_THRESHOLD,
-                "streak_multiplier": HUNT_STREAK_MEAT_MULTIPLIER if streak_active else 1,
+                "streak_multiplier": HUNT_STREAK_MEAT_MULTIPLIER if session.streak_active else 1,
             },
         }
     
@@ -1470,23 +1487,9 @@ class HuntManager:
         # Apply bonus from config
         session.total_meat = max(1, int(base_meat * meat_bonus))
         
-        # Check hunt streak - query last N-1 hunts to see if they were successful
-        # If this hunt succeeds and last N-1 were successful, that's N in a row
-        streak_active = self._check_hunt_streak(db, session.created_by)
-        if streak_active:
+        # Apply streak multiplier if active (streak was set in strike phase on kill)
+        if session.streak_active:
             session.total_meat *= HUNT_STREAK_MEAT_MULTIPLIER
-            session.streak_active = True
-            session.show_streak_popup = True  # Backend tells frontend when to show
-            session.streak_info = {
-                "title": "HOT STREAK!",
-                "subtitle": "2x Meat",
-                "description": f"{HUNT_STREAK_THRESHOLD} hunts in a row!",
-                "multiplier": HUNT_STREAK_MEAT_MULTIPLIER,
-                "threshold": HUNT_STREAK_THRESHOLD,
-                "icon": "flame.fill",
-                "color": "buttonDanger",
-                "dismiss_button": "Claim",
-            }
         session.bonus_meat = session.total_meat - base_meat if session.total_meat > base_meat else 0
         
         # Drop items based on loot tier

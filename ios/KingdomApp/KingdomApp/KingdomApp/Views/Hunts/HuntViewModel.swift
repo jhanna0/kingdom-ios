@@ -228,7 +228,6 @@ class HuntViewModel: ObservableObject {
     }
     
     /// User taps "Continue" after master roll animation completes
-    /// Goes directly to next phase or results - NO intermediate screens
     func userTappedNextAfterMasterRoll() async {
         guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
         
@@ -247,7 +246,13 @@ class HuntViewModel: ObservableObject {
             return
         }
         
-        // Go straight to next phase - animal info shows in arena card
+        // After track phase, show creature reveal before advancing
+        if currentPhase == .track && hunt?.animal != nil {
+            uiState = .creatureReveal
+            return
+        }
+        
+        // Otherwise go to next phase
         currentPhaseResult = nil
         roundResults = []
         lastRollResult = nil

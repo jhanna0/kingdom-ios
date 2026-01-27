@@ -280,7 +280,7 @@ ANIMAL_WEIGHTS_BY_TIER = {
 # What drops for each loot tier (applied after blessing resolution)
 # Items come from animal's rare_items config (only on "rare" rolls)
 LOOT_TIERS = {
-    "nothing": {"meat_bonus": 0.5},   # 50% meat
+    "nothing": {"meat_bonus": 0.75},   # 50% meat
     "common": {"meat_bonus": 1.0},    # 100% meat
     "uncommon": {"meat_bonus": 1.15}, # 115% meat
     "rare": {"meat_bonus": 1.25},     # 125% meat + animal's rare_items
