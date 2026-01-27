@@ -751,7 +751,7 @@ def purchase_land(
         "actions_required": actions_required,
         "cost_paid": 0,  # OLD: backwards compat (no upfront payment in new system)
         "total_cost": land_price,  # Total if paid upfront (for display)
-        "gold_per_action": round(gold_per_action, 1),  # NEW: Cost per action before tax
+        "gold_per_action": int(gold_per_action),  # NEW: Cost per action before tax
         "current_tax_rate": current_tax_rate  # NEW: Current rate (may change)
     }
 
@@ -862,8 +862,8 @@ def start_property_upgrade(
         "property_id": property_id,
         "from_tier": property.tier,
         "to_tier": next_tier,
-        "total_gold_cost": gold_cost,  # Total if paid upfront (for display)
-        "gold_per_action": round(gold_per_action, 1),  # Cost per action before tax
+        "gold_cost": gold_cost,  # Total if paid upfront (for display)
+        "gold_per_action": int(gold_per_action),  # Cost per action before tax
         "current_tax_rate": current_tax_rate,  # Current rate (may change)
         "per_action_costs": per_action_costs,  # What each action will cost (resources)
         "total_costs": all_costs["total_costs"],  # Total resources over all actions

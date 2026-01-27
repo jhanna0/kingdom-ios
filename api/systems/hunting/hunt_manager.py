@@ -478,7 +478,7 @@ class HuntSession:
                 "meat": self.total_meat,
                 "bonus_meat": self.bonus_meat,
                 "total_meat": self.total_meat + self.bonus_meat,
-                "meat_market_value": (self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE,
+                "meat_market_value": int((self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE),
                 "items": self.items_dropped,
                 "item_details": self._get_item_details(),
             },
