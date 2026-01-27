@@ -25,7 +25,7 @@ from db.models import User, PlayerState, PlayerInventory, Kingdom
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
 from systems.hunting import HuntManager, HuntConfig, HuntPhase
-from systems.hunting.config import HUNTING_PERMIT_COST, HUNTING_PERMIT_DURATION_MINUTES
+from systems.hunting.config import HUNTING_PERMIT_COST, HUNTING_PERMIT_DURATION_MINUTES, MEAT_MARKET_VALUE
 from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
 from websocket.broadcast import notify_hunt_participants, PartyEvents
 
@@ -99,7 +99,7 @@ def add_to_inventory(db: Session, user_id: int, item_id: str, quantity: int) -> 
 def apply_hunt_rewards(db: Session, hunt: dict) -> None:
     """Apply hunt rewards to participants.
     
-    Hunts award MEAT + GOLD (equal amounts) and sinew (rare) for bow crafting.
+    Hunts award MEAT + GOLD (meat * 0.5) and sinew (rare) for bow crafting.
     Gold is taxed by the kingdom where the hunt takes place.
     Uses proper inventory table, not columns per item type!
     
@@ -116,17 +116,19 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
         if meat_earned > 0:
             add_to_inventory(db, player_id, "meat", meat_earned)
         
-        # Add gold equal to meat earned (with tax)
+        # Add gold based on meat earned (with tax)
         if meat_earned > 0:
             player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
             if player_state:
+                gold_value = float(meat_earned) * MEAT_MARKET_VALUE
                 net_gold, tax_amount, tax_rate = apply_kingdom_tax(
-                    db, kingdom_id, player_state, float(meat_earned)
+                    db, kingdom_id, player_state, gold_value
                 )
-                player_state.gold += net_gold
+                gold_earned = int(net_gold) if net_gold >= 1 else 1
+                player_state.gold += gold_earned
                 # Store gold earned in participant data for response
-                participant["gold_earned"] = net_gold
-                participant["gold_tax"] = tax_amount
+                participant["gold_earned"] = gold_earned
+                participant["gold_tax"] = int(tax_amount)
         
         # Add rare drops (sinew, etc)
         for item_id in items_earned:
@@ -176,8 +178,9 @@ def calculate_hunting_stats(db: Session, player_id: int) -> dict:
         meat = participant.get("meat_earned", 0)
         total_meat += meat
         
-        # Gold = meat
-        total_gold += meat
+        # Gold = meat * market value
+        gold = int(meat * MEAT_MARKET_VALUE) if meat * MEAT_MARKET_VALUE >= 1 else 1
+        total_gold += gold
         
         # Items are stored at top level as items_dropped, NOT in rewards
         items = data.get("items_dropped", [])

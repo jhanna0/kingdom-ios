@@ -478,7 +478,7 @@ class HuntSession:
                 "meat": self.total_meat,
                 "bonus_meat": self.bonus_meat,
                 "total_meat": self.total_meat + self.bonus_meat,
-                "meat_market_value": int((self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE),
+                "meat_market_value": max(1, int((self.total_meat + self.bonus_meat) * MEAT_MARKET_VALUE)),
                 "items": self.items_dropped,
                 "item_details": self._get_item_details(),
             },
@@ -1448,7 +1448,7 @@ class HuntManager:
         """Calculate and assign loot based on hunt results - ALL FROM CONFIG.
 
         Loot tiers and their requirements come from LOOT_TIERS config.
-        Gold drops equal to meat earned (taxed by kingdom).
+        Gold = meat * MEAT_MARKET_VALUE (taxed by kingdom).
         
         STREAK BONUS: 3 successful hunts in a row = double meat!
         """
@@ -1462,10 +1462,9 @@ class HuntManager:
         animal = session.animal_data
         animal_tier = animal.get("tier", 0)
 
-        # Meat reward: min = half of max, max = config meat value
-        animal_level = animal_tier + 1
-        max_meat = animal.get("meat", animal_level * 2)
-        min_meat = max(animal_level, max_meat // 2)
+        # Meat reward: min = 75% of max, max = config meat value
+        max_meat = animal.get("meat", (animal_tier + 1) * 2)
+        min_meat = max(1, int(max_meat * 0.75))
         base_meat = random.randint(min_meat, max_meat)
         
         # Apply bonus from config

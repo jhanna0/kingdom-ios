@@ -54,7 +54,7 @@ ANIMALS = {
         "track_threshold": 0,     # Always findable
         "hp": 1,
         "danger": 0,
-        "meat": 3,                # Level 1: drops 1-3 meat
+        "meat": 1,                # Drops 1 meat
         "description": "A quick little critter. Easy prey.",
     },
     "rabbit": {
@@ -64,7 +64,7 @@ ANIMALS = {
         "track_threshold": 0.5,
         "hp": 1,
         "danger": 0,
-        "meat": 3,                # Level 2: drops 2-3 meat
+        "meat": 2,                # Drops 1 meat
         "description": "Fast but fragile. Common in meadows.",
         "rare_items": ["lucky_rabbits_foot"],
     },
@@ -75,7 +75,7 @@ ANIMALS = {
         "track_threshold": 1.5,
         "hp": 2,
         "danger": 1,
-        "meat": 8,                # Boosted: 3-7 meat
+        "meat": 6,                # Drops 1-2 meat
         "description": "Graceful and alert. A worthy hunt.",
         "rare_items": ["fur"],    # Deer drops fur on RARE only
     },
@@ -86,7 +86,7 @@ ANIMALS = {
         "track_threshold": 2.5,
         "hp": 3,
         "danger": 3,
-        "meat": 12,               # Boosted: 4-12 meat
+        "meat": 8,                # Drops 2-3 meat
         "description": "Aggressive when cornered. Dangerous tusks.",
         "rare_items": ["fur"],    # Boar drops fur on RARE only
     },
@@ -97,7 +97,7 @@ ANIMALS = {
         "track_threshold": 3.5,
         "hp": 5,
         "danger": 5,
-        "meat": 16,               # Boosted: 5-16 meat
+        "meat": 12,                # Drops 2-4 meat
         "description": "The king of the forest. Approach with caution.",
         "rare_items": ["sinew"],  # Bear drops sinew
     },
@@ -108,7 +108,7 @@ ANIMALS = {
         "track_threshold": 4.5,
         "hp": 6,
         "danger": 4,
-        "meat": 22,               # Boosted: 6-20 meat
+        "meat": 20,                # Drops 3-5 meat
         "description": "Massive and unpredictable. Legendary game.",
         "rare_items": ["sinew"],  # Moose drops sinew
     },
@@ -275,7 +275,7 @@ ANIMAL_WEIGHTS_BY_TIER = {
 #
 # The blessing phase shifts odds from common to rare.
 # Sinew is used to craft hunting bow (10 wood + 3 sinew)
-# Gold drops equal to meat earned (gold is taxed by kingdom).
+# Gold = meat * MEAT_MARKET_VALUE (gold is taxed by kingdom).
 
 # What drops for each loot tier (applied after blessing resolution)
 # Items come from animal's rare_items config (only on "rare" rolls)
@@ -458,7 +458,7 @@ HUNT_STREAK_MEAT_MULTIPLIER = 2  # Meat multiplier when streak is active
 # ============================================================
 # MEAT VALUE (for market selling)
 # ============================================================
-MEAT_MARKET_VALUE = 1  # 1 meat = 1 gold (gold is awarded directly from hunts now)
+MEAT_MARKET_VALUE = 0.6  # 1 meat = 0.5 gold
 
 
 # ============================================================
