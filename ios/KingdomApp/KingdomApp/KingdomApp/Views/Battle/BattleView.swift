@@ -217,7 +217,6 @@ class BattleViewModel: ObservableObject {
     @Published var error: String?
     
     private var battleId: Int?
-    private var refreshTimer: Timer?
     
     func loadBattle(id: Int) {
         self.battleId = id
@@ -233,11 +232,6 @@ class BattleViewModel: ObservableObject {
                 let response: BattleEventResponse = try await APIClient.shared.execute(request)
                 self.battle = response
                 self.isLoading = false
-                
-                // Start auto-refresh during battle phase
-                if response.isBattlePhase {
-                    startAutoRefresh()
-                }
                 
                 // Schedule phase notifications if user has pledged
                 if response.userSide != nil {
@@ -342,25 +336,6 @@ class BattleViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Auto Refresh
-    
-    private func startAutoRefresh() {
-        stopAutoRefresh()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.refresh()
-            }
-        }
-    }
-    
-    private func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-    }
-    
-    deinit {
-        refreshTimer?.invalidate()
-    }
 }
 
 // Backwards compatible alias

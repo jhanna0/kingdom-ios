@@ -110,23 +110,25 @@ struct PropertyTiersView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Cost section
-            if let cost = tierManager.propertyTierCost(tier), let actions = tierManager.propertyTierActions(tier) {
+            // Cost section - show per-action cost
+            if let totalCost = tierManager.propertyTierCost(tier), let actions = tierManager.propertyTierActions(tier), actions > 0 {
+                let goldPerAction = totalCost / actions  // Calculate per-action cost
+                
                 VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                    sectionHeader(icon: "dollarsign.circle.fill", title: "Base Cost")
+                    sectionHeader(icon: "dollarsign.circle.fill", title: "Cost Per Action")
                     
                     HStack(spacing: 12) {
-                        // Gold cost
+                        // Gold per action
                         HStack(spacing: 6) {
                             Image(systemName: "g.circle.fill")
                                 .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(cost)g")
+                                .foregroundColor(KingdomTheme.Colors.goldLight)
+                            Text("\(goldPerAction)g")
                                 .font(FontStyles.bodyMediumBold)
                                 .foregroundColor(KingdomTheme.Colors.inkDark)
                         }
                         
-                        Text("•")
+                        Text("×")
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         
                         // Actions required

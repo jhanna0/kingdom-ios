@@ -482,7 +482,7 @@ BEGIN
     RAISE NOTICE 'Updated % player_state rows with hometown_kingdom_id from current_kingdom_id', rows_updated;
 END $$;
 
--- Verify all player_states have hometown_kingdom_id set
+-- Verify all player_state have hometown_kingdom_id set
 DO $$
 DECLARE
     states_with_hometown INTEGER;
@@ -495,11 +495,11 @@ BEGIN
     WHERE hometown_kingdom_id IS NOT NULL;
     
     IF states_with_hometown != total_states THEN
-        RAISE EXCEPTION 'DATA LOSS RISK: Only % of % player_states have hometown_kingdom_id set. Aborting!', 
+        RAISE EXCEPTION 'DATA LOSS RISK: Only % of % player_state have hometown_kingdom_id set. Aborting!', 
             states_with_hometown, total_states;
     END IF;
     
-    RAISE NOTICE 'SAFETY CHECK PASSED: All % player_states have hometown_kingdom_id set', states_with_hometown;
+    RAISE NOTICE 'SAFETY CHECK PASSED: All % player_state have hometown_kingdom_id set', states_with_hometown;
 END $$;
 
 -- Drop the unique constraint that uses hometown_kingdom_id

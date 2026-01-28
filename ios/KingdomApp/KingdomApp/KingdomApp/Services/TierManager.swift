@@ -14,6 +14,7 @@ class TierManager {
     var skillTierNames: [Int: String] = [:]
     var skillBenefits: [String: SkillBenefitsData] = [:]
     var trainingActionsRequired: [Int: Int] = [:]  // current_level -> actions to train to next level
+    var trainingGoldPerAction: [Int: Double] = [:]  // target_tier -> gold cost per action
     var buildings: [String: BuildingTypeData] = [:]
     var buildingTypes: [String: BuildingTypeInfo] = [:]  // Full building type info
     var reputation: ReputationTiersData?
@@ -150,6 +151,24 @@ class TierManager {
                 print("   - Loaded training actions: \(actionsDict)")
             }
             
+            // Training gold per action from backend
+            if let trainingData = response.training {
+                if let goldPerAction = trainingData.gold_per_action {
+                    var goldDict: [Int: Double] = [:]
+                    for (key, value) in goldPerAction {
+                        if let tier = Int(key) {
+                            goldDict[tier] = value
+                        }
+                    }
+                    self.trainingGoldPerAction = goldDict
+                    print("   - Loaded training gold per action: \(goldDict)")
+                } else {
+                    print("   ⚠️ WARNING: gold_per_action is nil in response!")
+                }
+            } else {
+                print("   ⚠️ WARNING: training data is nil in response!")
+            }
+            
             // Buildings - parse full building type info
             if let buildingData = response.buildings {
                 var buildingTypesDict: [String: BuildingTypeInfo] = [:]
@@ -282,6 +301,12 @@ class TierManager {
         return trainingActionsRequired[currentLevel] ?? 100  // Default fallback
     }
     
+    /// Get gold cost per action to train to a target tier
+    /// targetTier 1 = training from 0 to 1, targetTier 5 = training from 4 to 5
+    func trainingGoldFor(targetTier: Int) -> Double {
+        return trainingGoldPerAction[targetTier] ?? 100.0  // Default fallback
+    }
+    
     // MARK: - Reputation Accessors
     
     func reputationTierName(_ tier: Int) -> String {
@@ -398,6 +423,7 @@ struct TrainingTiersResponseData: Codable {
     let max_tier: Int
     let tier_names: [String: String]?
     let actions_required: [String: Int]?
+    let gold_per_action: [String: Double]?
 }
 
 struct PropertyTiersResponseData: Codable {

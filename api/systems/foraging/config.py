@@ -108,8 +108,8 @@ ROUND1_WIN_CONFIG = {
     # Skill: leadership
     "skill": "leadership",
     # Base rates (T0) - berry teases dominate!
-    "berry_win_base": 0.15,
-    "seed_trail_win_base": 0.05,
+    "berry_win_base": 0.20,
+    "seed_trail_win_base": 0.10,
     "berry_tease_base": 0.65,       # 65% - almost won berries!
     "seed_trail_tease_base": 0.10,  # 10% - rare bonus round tease
     # Nothing: only 5% at T0
@@ -189,7 +189,7 @@ ROUND2_WIN_CONFIG = {
     # Skill: merchant
     "skill": "merchant",
     # Base rates (T0) - teasers dominate!
-    "seed_win_base": 0.15,
+    "seed_win_base": 0.22,
     "rare_egg_base": 0.001,
     "rare_egg_tease_base": 0.02,  # 2% - glimpse of rare egg!
     "seed_tease_base": 0.68,  # 68% - so close to seeds!

@@ -41,9 +41,6 @@ class HuntViewModel: ObservableObject {
     @Published var permitStatus: HuntingPermitStatusResponse?
     @Published var isBuyingPermit = false
     
-    @Published var error: String?
-    @Published var showError = false
-    
     // Roll reveal tracking (legacy)
     @Published var rollsRevealed: Set<Int> = []
     
@@ -77,6 +74,7 @@ class HuntViewModel: ObservableObject {
     // MARK: - Computed Properties
     
     var currentUserId: Int?
+    var currentKingdomId: String?
     
     var isLeader: Bool {
         guard let hunt = hunt, let userId = currentUserId else { return false }
@@ -101,6 +99,11 @@ class HuntViewModel: ObservableObject {
     /// Can resolve/finalize current phase
     var canResolve: Bool {
         hunt?.phase_state?.can_resolve ?? false
+    }
+    
+    /// Backend tells us when to show streak popup
+    var shouldShowStreakPopup: Bool {
+        hunt?.shouldShowStreakPopup ?? false
     }
     
     /// Rolls completed in current phase
@@ -136,8 +139,12 @@ class HuntViewModel: ObservableObject {
         switch hunt.status {
         case .lobby:
             uiState = .lobby
-        case .completed, .failed:
+        case .completed:
             uiState = .results
+        case .failed:
+            // Failed hunt = auto-restart so user can immediately try again (like fishing)
+            Task { await autoRestartHunt() }
+            return
         case .cancelled:
             uiState = .noHunt
         case .inProgress:
@@ -221,12 +228,17 @@ class HuntViewModel: ObservableObject {
     }
     
     /// User taps "Continue" after master roll animation completes
-    /// Goes directly to next phase or results - NO intermediate screens
     func userTappedNextAfterMasterRoll() async {
         guard let currentPhase = hunt?.phase_state?.huntPhase else { return }
         
-        // If hunt is already completed (blessing auto-finalizes), go straight to results
-        if hunt?.isComplete == true {
+        // If hunt failed, auto-restart so user can immediately try again (like fishing)
+        if hunt?.status == .failed {
+            await autoRestartHunt()
+            return
+        }
+        
+        // If hunt completed successfully, show results
+        if hunt?.status == .completed {
             currentPhaseResult = nil
             roundResults = []
             lastRollResult = nil
@@ -234,19 +246,17 @@ class HuntViewModel: ObservableObject {
             return
         }
         
-        // Check if we should show creature reveal (Track phase found animal)
-        if currentPhase == .track,
-           let result = currentPhaseResult,
-           let effects = result.effects,
-           effects["animal_found"]?.boolValue == true {
+        // After track phase, show creature reveal before advancing
+        if currentPhase == .track && hunt?.animal != nil {
             uiState = .creatureReveal
-        } else {
-            // Skip PhaseCompleteOverlay - go directly to next phase or results
-            currentPhaseResult = nil
-            roundResults = []
-            lastRollResult = nil
-            await advanceToNextPhase()
+            return
         }
+        
+        // Otherwise go to next phase
+        currentPhaseResult = nil
+        roundResults = []
+        lastRollResult = nil
+        await advanceToNextPhase()
     }
     
     /// User taps "Continue" after seeing phase result
@@ -316,16 +326,11 @@ class HuntViewModel: ObservableObject {
                 uiState = .phaseActive(currentPhase)
                 
             } else {
-                // Silently ignore "cannot roll" - it's just timing, not a real error
-                if !response.message.contains("Cannot roll") {
-                    error = response.message
-                    showError = true
-                }
+                // Silently ignore gameplay errors - just sync state and continue
                 syncUIState()
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors - just sync state and continue
             syncUIState()
         }
     }
@@ -351,13 +356,11 @@ class HuntViewModel: ObservableObject {
                 // Animation done - stay on this screen!
                 // User must tap "Next" to proceed (no auto-transition BS)
             } else {
-                error = response.message
-                showError = true
+                // Silently handle - just sync state and continue
                 syncUIState()
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors - just sync state and continue
             syncUIState()
         }
     }
@@ -383,12 +386,12 @@ class HuntViewModel: ObservableObject {
                     uiState = .results
                 }
             } else {
-                error = response.message
-                showError = true
+                // Silently handle - go to results on failure
+                uiState = .results
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors - go to results
+            uiState = .results
         }
     }
     
@@ -402,18 +405,25 @@ class HuntViewModel: ObservableObject {
     
     /// Called by HuntPhaseView when master roll animation completes
     func finishMasterRollAnimation() {
-        shouldAnimateMasterRoll = false  // Animation is done
+        shouldAnimateMasterRoll = false
         
-        // Get the phase from current state - works for both resolving and masterRollAnimation
-        let phase: HuntPhase
-        switch uiState {
-        case .masterRollAnimation(let p), .resolving(let p):
-            phase = p
-        default:
-            // Fallback to current hunt phase
-            phase = hunt?.phase_state?.huntPhase ?? .track
+        // If hunt failed, auto-restart immediately - no Continue button
+        if hunt?.status == .failed {
+            Task { await autoRestartHunt() }
+            return
         }
         
+        // If hunt completed successfully, go straight to results
+        if hunt?.status == .completed {
+            currentPhaseResult = nil
+            roundResults = []
+            lastRollResult = nil
+            uiState = .results
+            return
+        }
+        
+        // Otherwise show Continue button for next phase
+        let phase = hunt?.phase_state?.huntPhase ?? .track
         uiState = .masterRollComplete(phase)
     }
     
@@ -477,8 +487,8 @@ class HuntViewModel: ObservableObject {
         do {
             config = try await KingdomAPIService.shared.hunts.getHuntConfig()
         } catch {
-            self.error = "Failed to load hunt config: \(error.localizedDescription)"
-            showError = true
+            // Silently handle - config is optional for display
+            print("Failed to load hunt config: \(error.localizedDescription)")
         }
     }
     
@@ -486,12 +496,13 @@ class HuntViewModel: ObservableObject {
         do {
             preview = try await KingdomAPIService.shared.hunts.getHuntPreview()
         } catch {
-            self.error = "Failed to load preview: \(error.localizedDescription)"
-            showError = true
+            // Silently handle - preview is optional for display
+            print("Failed to load preview: \(error.localizedDescription)")
         }
     }
     
     func checkForActiveHunt(kingdomId: String) async {
+        currentKingdomId = kingdomId
         uiState = .loading
         do {
             // Check permit status and active hunt in parallel
@@ -528,40 +539,33 @@ class HuntViewModel: ObservableObject {
                 await loadPermitStatus(kingdomId: kingdomId)
                 return true
             } else {
-                error = response.message
-                showError = true
+                // Silently handle - button will just not work
                 return false
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors
             return false
         }
     }
     
-    func createHunt(kingdomId: String) async {
+    func createHunt(kingdomId: String, skipIntro: Bool = false) async {
+        currentKingdomId = kingdomId
         uiState = .loading
         
         do {
             let response = try await KingdomAPIService.shared.hunts.createHunt(kingdomId: kingdomId)
             if response.success {
                 hunt = response.hunt
-                // Creator is auto-ready, just start immediately
-                await startHunt()
+                await startHunt(skipIntro: skipIntro)
             } else {
-                // If API returns existing hunt, use it so user can abandon/resume
                 if let existingHunt = response.hunt {
                     hunt = existingHunt
                     syncUIState()
                 } else {
-                    error = response.message
-                    showError = true
                     uiState = .noHunt
                 }
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
             uiState = .noHunt
         }
     }
@@ -574,13 +578,10 @@ class HuntViewModel: ObservableObject {
             if response.success {
                 hunt = response.hunt
                 syncUIState()
-            } else {
-                error = response.message
-                showError = true
             }
+            // Silently handle failures - just stay on current screen
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors
         }
     }
     
@@ -598,8 +599,7 @@ class HuntViewModel: ObservableObject {
                 syncUIState()
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors
         }
     }
     
@@ -612,12 +612,11 @@ class HuntViewModel: ObservableObject {
                 hunt = response.hunt
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
+            // Silently handle network errors
         }
     }
     
-    func startHunt() async {
+    func startHunt(skipIntro: Bool = false) async {
         guard let huntId = hunt?.hunt_id else {
             uiState = .noHunt
             return
@@ -629,19 +628,22 @@ class HuntViewModel: ObservableObject {
                 hunt = response.hunt
                 currentTrackScore = 0
                 currentDamageDealt = 0
-                // Transition to first phase intro
                 if let firstPhase = phaseOrder.first {
-                    uiState = .phaseIntro(firstPhase)
+                    if skipIntro {
+                        // Auto-restart: skip intro, go straight to active
+                        dropTableSlots = hunt?.phase_state?.drop_table_slots ?? [:]
+                        dropTableOdds = hunt?.phase_state?.dropTableOdds ?? [:]
+                        uiState = .phaseActive(firstPhase)
+                    } else {
+                        // Fresh hunt: show intro
+                        uiState = .phaseIntro(firstPhase)
+                    }
                 }
             } else {
-                error = response.message
-                showError = true
-                syncUIState()  // Reset to correct state on failure
+                syncUIState()
             }
         } catch {
-            self.error = error.localizedDescription
-            showError = true
-            syncUIState()  // Reset to correct state on failure
+            syncUIState()
         }
     }
     
@@ -662,6 +664,34 @@ class HuntViewModel: ObservableObject {
         shouldAnimateMasterRoll = false
         selectedCreatureId = nil
         uiState = .noHunt
+    }
+    
+    /// Auto-restart hunt after failure - like fishing, no intermediate screens
+    func autoRestartHunt() async {
+        guard let kingdomId = currentKingdomId else {
+            uiState = .noHunt
+            return
+        }
+        
+        // Clear state but don't go to noHunt - go straight to new hunt
+        hunt = nil
+        currentPhaseResult = nil
+        rollsRevealed = []
+        roundResults = []
+        lastRollResult = nil
+        lastPhaseUpdate = nil
+        currentTrackScore = 0
+        currentDamageDealt = 0
+        currentAnimalHP = 1
+        currentEscapeRisk = 0
+        currentBlessingBonus = 0
+        creatureProbabilities = [:]
+        masterRollFinalValue = 0
+        shouldAnimateMasterRoll = false
+        selectedCreatureId = nil
+        
+        // Immediately create and start a new hunt (skip intro on restart)
+        await createHunt(kingdomId: kingdomId, skipIntro: true)
     }
 }
 

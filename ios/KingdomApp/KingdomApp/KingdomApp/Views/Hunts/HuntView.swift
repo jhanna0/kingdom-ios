@@ -11,6 +11,7 @@ struct HuntView: View {
     @StateObject private var viewModel = HuntViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showAbandonConfirmation = false
+    @State private var showStreakPopup: Bool = false
     
     var body: some View {
         ZStack {
@@ -25,6 +26,21 @@ struct HuntView: View {
             
             // Content based on UI state machine
             contentForState
+            
+            // Streak bonus popup - shown when backend tells us
+            if showStreakPopup, let streakInfo = viewModel.hunt?.streak_info {
+                StreakBonusPopup(
+                    title: streakInfo.title,
+                    subtitle: streakInfo.subtitle,
+                    description: streakInfo.description,
+                    multiplier: streakInfo.multiplier,
+                    icon: streakInfo.icon,
+                    color: streakInfo.color,
+                    dismissButton: streakInfo.dismiss_button
+                ) {
+                    showStreakPopup = false
+                }
+            }
         }
         .navigationTitle("Hunt")
         .navigationBarTitleDisplayMode(.inline)
@@ -61,10 +77,10 @@ struct HuntView: View {
             await viewModel.loadPreview()
             await viewModel.checkForActiveHunt(kingdomId: kingdomId)
         }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(viewModel.error ?? "Unknown error")
+        .onChange(of: viewModel.shouldShowStreakPopup) { _, shouldShow in
+            if shouldShow {
+                showStreakPopup = true
+            }
         }
     }
     
@@ -106,14 +122,11 @@ struct HuntView: View {
             )
             
         case .creatureReveal:
-            CreatureRevealOverlay(
-                viewModel: viewModel,
-                onContinue: {
-                    Task {
-                        await viewModel.userTappedContinueAfterCreatureReveal()
-                    }
+            CreatureRevealOverlay(viewModel: viewModel) {
+                Task {
+                    await viewModel.userTappedContinueAfterCreatureReveal()
                 }
-            )
+            }
             
         case .results:
             HuntResultsView(viewModel: viewModel)

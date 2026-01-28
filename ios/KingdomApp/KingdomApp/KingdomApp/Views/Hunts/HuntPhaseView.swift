@@ -181,9 +181,16 @@ struct HuntPhaseView: View {
     
     // MARK: - Arena Card
     
+    /// Only show animal after track phase is done (strike/blessing phase, or after master roll complete)
+    private var shouldShowAnimal: Bool {
+        guard viewModel.hunt?.animal != nil else { return false }
+        // Show animal in strike or blessing phase, or after master roll in track
+        return phase == .strike || phase == .blessing || 
+               (phase == .track && viewModel.uiState == .masterRollComplete(.track))
+    }
+    
     private var arenaCard: some View {
         ZStack {
-            // Background gradient
             LinearGradient(
                 colors: [KingdomTheme.Colors.parchmentRich, KingdomTheme.Colors.parchmentDark],
                 startPoint: .topLeading,
@@ -191,7 +198,6 @@ struct HuntPhaseView: View {
             )
             
             VStack {
-                // Nameplates at top
                 HStack {
                     nameplate(title: "YOU", subtitle: nil)
                     Spacer()
@@ -201,32 +207,65 @@ struct HuntPhaseView: View {
                 
                 Spacer()
                 
-                // Sprites at bottom
                 HStack {
-                    // Player
                     Image(systemName: "person.fill")
                         .font(.system(size: 50, weight: .black))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
                     Spacer()
                     
-                    // Enemy
-                    if phase == .strike, let icon = viewModel.hunt?.animal?.icon, !icon.isEmpty {
-                        Text(icon).font(.system(size: 70))
+                    // Animal (only after track resolves) or phase icon
+                    if shouldShowAnimal, let animal = viewModel.hunt?.animal, let icon = animal.icon, !icon.isEmpty {
+                        VStack(spacing: 6) {
+                            Text(icon).font(.system(size: 55))
+                            // Potential drops with names
+                            if let drops = animal.potential_drops, !drops.isEmpty {
+                                VStack(spacing: 2) {
+                                    ForEach(drops.prefix(2)) { drop in
+                                        HStack(spacing: 3) {
+                                            Image(systemName: drop.item_icon)
+                                                .font(.system(size: 9))
+                                            Text(drop.item_name)
+                                                .font(.system(size: 9, weight: .medium))
+                                        }
+                                        .foregroundColor(dropColor(drop.item_color))
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        Image(systemName: displayConfig?.phase_icon ?? phase.icon)
-                            .font(.system(size: 50, weight: .black))
-                            .foregroundColor(phaseColor)
-                            .opacity(0.4)
+                        // Bush for track phase, SF Symbol for others
+                        if phase == .track {
+                            BrutalistBush()
+                                .opacity(0.7)
+                        } else {
+                            Image(systemName: displayConfig?.phase_icon ?? phase.icon)
+                                .font(.system(size: 50, weight: .black))
+                                .foregroundColor(phaseColor)
+                                .opacity(0.4)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
             }
         }
         .frame(height: 200)
         .clipShape(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium))
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: KingdomTheme.Brutalist.cornerRadiusMedium)
+    }
+    
+    private func dropColor(_ colorName: String?) -> Color {
+        guard let name = colorName?.lowercased() else { return .gray }
+        switch name {
+        case "orange": return .orange
+        case "brown": return .brown
+        case "purple": return KingdomTheme.Colors.regalPurple
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        default: return .gray
+        }
     }
     
     private func nameplate(title: String, subtitle: String?) -> some View {
@@ -251,8 +290,11 @@ struct HuntPhaseView: View {
     }
     
     private var enemyTitle: String {
+        // Only show animal name after animation completes
+        if shouldShowAnimal, let name = viewModel.hunt?.animal?.name {
+            return name
+        }
         switch phase {
-        case .strike: return viewModel.hunt?.animal?.name ?? "PREY"
         case .track: return "WILDERNESS"
         case .blessing: return "ALTAR"
         default: return "ENCOUNTER"
@@ -260,12 +302,15 @@ struct HuntPhaseView: View {
     }
     
     private var enemySubtitle: String? {
-        switch phase {
-        case .strike:
-            if let hp = viewModel.hunt?.animal?.hp {
+        // Only show animal stats after animation completes
+        if shouldShowAnimal, let animal = viewModel.hunt?.animal {
+            if phase == .strike, let hp = animal.hp {
                 return "HP \(viewModel.currentAnimalHP)/\(hp)"
+            } else if let hp = animal.hp, let meat = animal.meat {
+                return "\(hp) HP · \(meat) Meat"
             }
-            return nil
+        }
+        switch phase {
         case .track: return "Find prey"
         case .blessing: return "Seek fortune"
         default: return nil
@@ -677,6 +722,50 @@ struct HuntPhaseView: View {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: style).impactOccurred()
         #endif
+    }
+}
+
+// MARK: - Brutalist Bush
+
+private struct BrutalistBush: View {
+    var body: some View {
+        ZStack {
+            // Shadow layer
+            bushShape
+                .fill(Color.black)
+                .offset(x: 3, y: 3)
+            
+            // Main bush
+            bushShape
+                .fill(KingdomTheme.Colors.buttonSuccess.opacity(0.6))
+                .overlay(
+                    bushShape
+                        .stroke(Color.black, lineWidth: 2.5)
+                )
+        }
+        .frame(width: 70, height: 55)
+    }
+    
+    private var bushShape: some Shape {
+        BushPath()
+    }
+}
+
+private struct BushPath: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        
+        // Three overlapping bumps to form a bush
+        // Left bump
+        path.addEllipse(in: CGRect(x: 0, y: h * 0.2, width: w * 0.5, height: h * 0.8))
+        // Right bump
+        path.addEllipse(in: CGRect(x: w * 0.5, y: h * 0.2, width: w * 0.5, height: h * 0.8))
+        // Top center bump
+        path.addEllipse(in: CGRect(x: w * 0.2, y: 0, width: w * 0.6, height: h * 0.7))
+        
+        return path
     }
 }
 

@@ -51,7 +51,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let targetTierName: String
     let actionsRequired: Int
     let actionsCompleted: Int
-    let cost: Int
+    let cost: Int  // OLD: upfront payment (backwards compat)
     let status: String
     let startedAt: String
     let endpoint: String?  // Dynamic endpoint from backend
@@ -59,6 +59,11 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let canAfford: Bool?  // Can player afford the per-action costs?
     let foodCost: Int?  // Food cost per action (0.5 per minute of cooldown)
     let canAffordFood: Bool?  // Can player afford the food cost?
+    
+    // NEW: Pay-per-action gold system
+    let goldPerAction: Double?  // Gold cost per action (before tax)
+    let currentTaxRate: Int?    // Kingdom tax rate (for display)
+    let canAffordGold: Bool?    // Can player afford the gold cost?
     
     var id: String { contractId }
     
@@ -78,6 +83,9 @@ struct PropertyUpgradeContract: Codable, Identifiable {
         case canAfford = "can_afford"
         case foodCost = "food_cost"
         case canAffordFood = "can_afford_food"
+        case goldPerAction = "gold_per_action"
+        case currentTaxRate = "current_tax_rate"
+        case canAffordGold = "can_afford_gold"
     }
     
     var progress: Double {
@@ -88,6 +96,25 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     var perActionCostDescription: String? {
         guard let costs = perActionCosts, !costs.isEmpty else { return nil }
         return costs.map { "\($0.amount) \($0.displayName.lowercased())" }.joined(separator: ", ")
+    }
+    
+    /// Check if this is a new pay-per-action contract
+    var isPayPerAction: Bool {
+        return (goldPerAction ?? 0) > 0
+    }
+    
+    /// Calculate gold cost with tax for display
+    var goldCostWithTax: Double {
+        let base = goldPerAction ?? 0
+        let taxRate = Double(currentTaxRate ?? 0) / 100.0
+        return base * (1 + taxRate)
+    }
+    
+    /// Tax amount per action
+    var taxAmount: Double {
+        let base = goldPerAction ?? 0
+        let taxRate = Double(currentTaxRate ?? 0) / 100.0
+        return base * taxRate
     }
 }
 

@@ -11,7 +11,7 @@ from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from config import DEV_MODE
-from routers.actions.training import calculate_training_cost
+from routers.tiers import calculate_training_gold_per_action, calculate_training_actions
 from routers.actions.utils import get_equipped_items, get_inventory, log_activity, format_datetime_iso
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -242,14 +242,17 @@ def get_or_create_player_state(db: Session, user: User) -> DBPlayerState:
 
 def player_state_to_response(user: User, state: DBPlayerState, db: Session, travel_event=None) -> PlayerState:
     """Convert PlayerState model to PlayerState schema"""
-    # Calculate training costs based on TOTAL SKILL POINTS across ALL skills
+    # Calculate training costs - each skill has different cost based on tier
     # Import here to avoid circular dependency
-    from routers.tiers import get_total_skill_points, SKILL_TYPES, get_skills_data_for_player
+    from routers.tiers import get_total_skill_points, SKILL_TYPES, get_skills_data_for_player, get_all_skill_values
     from routers.resources import RESOURCES
     
-    # All skills have the SAME cost - only total matters
     total_skill_points = get_total_skill_points(state)
-    unified_cost = calculate_training_cost(total_skill_points)
+    current_stats = get_all_skill_values(state)
+    
+    # Calculate per-skill training costs using centralized function
+    from routers.tiers import get_training_costs_for_player
+    training_costs = get_training_costs_for_player(state)
     
     # Build DYNAMIC resources data - frontend renders without hardcoding!
     # Maps resource keys to player state columns (gold is in state.gold, iron in state.iron, etc.)
@@ -293,11 +296,8 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     # Sort by display order
     resources_data.sort(key=lambda x: x["display_order"])
     
-    # Generate training costs dynamically for all skills
-    training_costs = {skill_type: unified_cost for skill_type in SKILL_TYPES}
-    
     # Generate complete skills data for dynamic frontend rendering
-    skills_data = get_skills_data_for_player(state, unified_cost)
+    skills_data = get_skills_data_for_player(state, training_costs)
     
     # Calculate active perks
     active_perks = calculate_player_perks(user, state, db)

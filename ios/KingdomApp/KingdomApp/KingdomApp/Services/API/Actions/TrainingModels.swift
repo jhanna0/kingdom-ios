@@ -7,9 +7,13 @@ struct TrainingContract: Codable, Identifiable {
     let type: String
     let actionsRequired: Int
     let actionsCompleted: Int
-    let costPaid: Int
+    let costPaid: Int  // OLD: upfront payment (backwards compat)
     let createdAt: String
     let status: String
+    
+    // NEW: Pay-per-action system
+    let goldPerAction: Double?  // Gold cost per action (before tax)
+    let currentTaxRate: Int?    // Kingdom tax rate (for display)
     
     enum CodingKeys: String, CodingKey {
         case id, type, status
@@ -17,10 +21,31 @@ struct TrainingContract: Codable, Identifiable {
         case actionsCompleted = "actions_completed"
         case costPaid = "cost_paid"
         case createdAt = "created_at"
+        case goldPerAction = "gold_per_action"
+        case currentTaxRate = "current_tax_rate"
     }
     
     var progress: Double {
         return Double(actionsCompleted) / Double(actionsRequired)
+    }
+    
+    /// Check if this is a new pay-per-action contract
+    var isPayPerAction: Bool {
+        return (goldPerAction ?? 0) > 0
+    }
+    
+    /// Calculate gold cost with tax for display
+    var goldCostWithTax: Double {
+        let base = goldPerAction ?? 0
+        let taxRate = Double(currentTaxRate ?? 0) / 100.0
+        return base * (1 + taxRate)
+    }
+    
+    /// Tax amount per action
+    var taxAmount: Double {
+        let base = goldPerAction ?? 0
+        let taxRate = Double(currentTaxRate ?? 0) / 100.0
+        return base * taxRate
     }
 }
 

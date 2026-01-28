@@ -172,6 +172,21 @@ extension ActionsView {
         let isReady = cooldown?.ready ?? true
         let remainingSeconds = cooldown?.secondsRemaining ?? 0
         
+        // Property upgrade contracts (show first - player's own property takes priority)
+        if let propertyContracts = status.propertyUpgradeContracts {
+            ForEach(propertyContracts.filter { $0.status != "completed" }) { contract in
+                PropertyUpgradeContractCard(
+                    contract: contract,
+                    fetchedAt: statusFetchedAt ?? Date(),
+                    currentTime: currentTime,
+                    globalCooldownActive: !isReady,
+                    blockingAction: cooldown?.blockingAction,
+                    globalCooldownSecondsRemaining: remainingSeconds,
+                    onAction: { performPropertyUpgrade(contract: contract) }
+                )
+            }
+        }
+        
         // Kingdom building contracts
         ForEach(availableContractsInKingdom) { contract in
             WorkContractCard(
@@ -190,21 +205,6 @@ extension ActionsView {
                     }
                 }
             )
-        }
-        
-        // Property upgrade contracts
-        if let propertyContracts = status.propertyUpgradeContracts {
-            ForEach(propertyContracts.filter { $0.status != "completed" }) { contract in
-                PropertyUpgradeContractCard(
-                    contract: contract,
-                    fetchedAt: statusFetchedAt ?? Date(),
-                    currentTime: currentTime,
-                    globalCooldownActive: !isReady,
-                    blockingAction: cooldown?.blockingAction,
-                    globalCooldownSecondsRemaining: remainingSeconds,
-                    onAction: { performPropertyUpgrade(contract: contract) }
-                )
-            }
         }
     }
 }

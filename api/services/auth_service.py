@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException, status
 
-from db import User, UserKingdom, PlayerState
+from db import User, UserKingdom, PlayerState, PlayerInventory
 from models.auth_schemas import AppleSignIn
 from utils.validation import validate_username, sanitize_username
 
@@ -200,10 +200,16 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     )
     
     db.add(player_state)
+    
+    # Give new users 100 starting meat (stored in inventory table)
+    starting_meat = PlayerInventory(user_id=user.id, item_id="meat", quantity=100)
+    db.add(starting_meat)
+    
     db.commit()
     db.refresh(user)
     
     print(f"✅ [SIGNUP] PlayerState created: hometown_kingdom_id={player_state.hometown_kingdom_id} (should be None)")
+    print(f"✅ [SIGNUP] Starting resources: 100 gold, 100 meat")
     
     return user
 
@@ -259,11 +265,11 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
         print(f"✅ [UPDATE_PROFILE] Display name validated: {display_name}")
     
     # Fields that belong on player_state, not user
-    player_state_fields = {"hometown_kingdom_id", "current_kingdom_id"}
+    player_states_fields = {"hometown_kingdom_id", "current_kingdom_id"}
     
     # Update user fields
     for key, value in updates.items():
-        if key in player_state_fields:
+        if key in player_states_fields:
             continue  # Handle separately
         if value is not None and hasattr(user, key):
             print(f"   - Setting user.{key} = {value}")
@@ -284,7 +290,7 @@ def update_user_profile(db: Session, user_id: int, updates: dict) -> User:
     hometown_value = None
     
     for key, value in updates.items():
-        if key in player_state_fields and value is not None:
+        if key in player_states_fields and value is not None:
             print(f"   - Setting player_state.{key} = {value}")
             setattr(player_state, key, value)
             
