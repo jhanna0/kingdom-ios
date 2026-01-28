@@ -130,11 +130,23 @@ struct DuelCombatView: View {
                     .zIndex(45)
             }
             
-            // Push popup overlay (shows bar push dramatically)
-            if viewModel.showPushPopup, let data = viewModel.pushPopupData {
-                pushPopupOverlay(data: data)
-                    .transition(.scale.combined(with: .opacity))
-                    .zIndex(60)
+            // Round result popup (shows head-to-head comparison)
+            if viewModel.showRoundResult, let data = viewModel.roundResultData {
+                RoundResultPopup(
+                    data: data,
+                    myColor: myColor,
+                    enemyColor: enemyColor,
+                    myName: currentMatch.myName,
+                    opponentName: opponentDisplayName,
+                    gameConfig: gameConfig,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            viewModel.showRoundResult = false
+                        }
+                    }
+                )
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(60)
             }
             
             // Forfeit confirmation overlay
@@ -152,10 +164,18 @@ struct DuelCombatView: View {
             await viewModel.load(match: match, playerId: playerId)
             // Use server-provided bar position
             animatedBarValue = currentMatch.yourBarPosition ?? 50
-            // Initialize animated odds from server
-            animatedMiss = CGFloat(currentMatch.currentOdds?.miss ?? 50)
-            animatedHit = CGFloat(currentMatch.currentOdds?.hit ?? 40)
-            animatedCrit = CGFloat(currentMatch.currentOdds?.crit ?? 10)
+            // Initialize animated odds - use BASE if styles not locked yet, else CURRENT
+            if currentMatch.bothStylesLocked == true {
+                // Styles already locked, show final values
+                animatedMiss = CGFloat(currentMatch.currentOdds?.miss ?? 50)
+                animatedHit = CGFloat(currentMatch.currentOdds?.hit ?? 40)
+                animatedCrit = CGFloat(currentMatch.currentOdds?.crit ?? 10)
+            } else {
+                // Styles not locked yet, show base values (animation will play when they lock)
+                animatedMiss = CGFloat(currentMatch.baseOdds?.miss ?? currentMatch.currentOdds?.miss ?? 50)
+                animatedHit = CGFloat(currentMatch.baseOdds?.hit ?? currentMatch.currentOdds?.hit ?? 40)
+                animatedCrit = CGFloat(currentMatch.baseOdds?.crit ?? currentMatch.currentOdds?.crit ?? 10)
+            }
             // Initialize turn timer from SERVER's turn_expires_at (not hardcoded 30s)
             updateTimerFromServer()
         }
@@ -182,43 +202,57 @@ struct DuelCombatView: View {
                 }
             }
         }
-        // Animate probability bar when odds change (style effects!)
+        // Animate probability bar when styles lock (style effects!)
         // Uses baseOdds and currentOdds from server - NO CLIENT CALCULATIONS
-        .onChange(of: currentMatch.currentOdds?.hit) { oldHit, newHit in
-            guard let newHit = newHit else { return }
-            let baseHit = currentMatch.baseOdds?.hit ?? newHit
-            let hitDelta = newHit - baseHit
+        .onChange(of: currentMatch.bothStylesLocked) { oldLocked, newLocked in
+            guard newLocked == true else { return }
             
-            // Only animate if there's a style effect
+            // Server sends base_odds and current_odds
+            // Animate from base → current to show style effects
+            let baseHit = currentMatch.baseOdds?.hit ?? 50
+            let finalHit = currentMatch.currentOdds?.hit ?? baseHit
+            let hitDelta = finalHit - baseHit
+            
+            // Only animate if there's a style effect (delta != 0)
             if hitDelta != 0 {
-                // Show change indicator from SERVER values
-                oddsChangeText = hitDelta > 0 ? "HIT +\(hitDelta)%" : "HIT \(hitDelta)%"
-                withAnimation(.easeOut(duration: 0.2)) {
-                    showOddsChange = true
-                }
-                
-                // Animate from base to final (values from server)
+                // Start at base values
                 animatedMiss = CGFloat(currentMatch.baseOdds?.miss ?? 50)
                 animatedHit = CGFloat(baseHit)
                 animatedCrit = CGFloat(currentMatch.baseOdds?.crit ?? 10)
                 
+                // Show change indicator from SERVER values
+                oddsChangeText = hitDelta > 0 ? "HIT +\(hitDelta)%" : "HIT \(hitDelta)%"
+                
                 // Delay then animate to final values
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showOddsChange = true
+                    }
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                         animatedMiss = CGFloat(currentMatch.currentOdds?.miss ?? 50)
-                        animatedHit = CGFloat(newHit)
+                        animatedHit = CGFloat(finalHit)
                         animatedCrit = CGFloat(currentMatch.currentOdds?.crit ?? 10)
                     }
                 }
                 
                 // Hide change indicator after delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation(.easeOut(duration: 0.3)) {
                         showOddsChange = false
                     }
                 }
             } else {
-                // No style effect, just update directly
+                // No style effect, just set directly
+                animatedMiss = CGFloat(currentMatch.currentOdds?.miss ?? 50)
+                animatedHit = CGFloat(finalHit)
+                animatedCrit = CGFloat(currentMatch.currentOdds?.crit ?? 10)
+            }
+        }
+        // Also update if odds change mid-round (shouldn't happen but safety)
+        .onChange(of: currentMatch.currentOdds?.hit) { _, newHit in
+            guard let newHit = newHit else { return }
+            // Only direct update if styles already locked (animation already played)
+            if currentMatch.bothStylesLocked == true && !showOddsChange {
                 animatedMiss = CGFloat(currentMatch.currentOdds?.miss ?? 50)
                 animatedHit = CGFloat(newHit)
                 animatedCrit = CGFloat(currentMatch.currentOdds?.crit ?? 10)
@@ -385,6 +419,7 @@ struct DuelCombatView: View {
                     // Style chips (shown after both styles locked)
                     if currentMatch.bothStylesLocked == true {
                         activeStyleChips
+                            .id("styleChips-\(currentMatch.myStyle ?? "")-\(currentMatch.opponentStyle ?? "")")
                     }
                     
                     probabilityBar
@@ -1640,82 +1675,19 @@ struct DuelCombatView: View {
     // MARK: - Style Reveal Overlay
     
     private func styleRevealOverlay(data: StyleRevealData) -> some View {
-        ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                Text("STYLE REVEAL")
-                    .font(.system(size: 16, weight: .black))
-                    .foregroundColor(.white.opacity(0.7))
-                
-                HStack(spacing: 30) {
-                    // Your style
-                    VStack(spacing: 8) {
-                        Text("YOU")
-                            .font(FontStyles.labelBadge)
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        styleIconView(styleName: data.myStyle, color: myColor)
-                        
-                        Text(data.myStyleName)
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(.white)
-                    }
-                    
-                    Text("VS")
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundColor(.white.opacity(0.5))
-                    
-                    // Opponent style
-                    VStack(spacing: 8) {
-                        Text(opponentDisplayName.uppercased())
-                            .font(FontStyles.labelBadge)
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        styleIconView(styleName: data.opponentStyle, color: enemyColor)
-                        
-                        Text(data.opponentStyleName)
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(.white)
-                    }
-                }
-                
-                // Feint winner indicator
-                if let feint = data.feintWinner {
-                    let feintWinnerName = feint == "challenger" ? 
-                        (currentMatch.challenger.id == playerId ? "YOU" : opponentDisplayName) :
-                        (currentMatch.opponent?.id == playerId ? "YOU" : opponentDisplayName)
-                    
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .foregroundColor(.yellow)
-                        Text("\(feintWinnerName) WINS TIE WITH FEINT!")
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(.yellow)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.yellow.opacity(0.2))
-                    )
+        StyleRevealPopup(
+            data: data,
+            myColor: myColor,
+            enemyColor: enemyColor,
+            opponentName: opponentDisplayName,
+            isChallenger: currentMatch.challenger.id == playerId,
+            gameConfig: gameConfig,
+            onDismiss: {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    viewModel.showStyleReveal = false
                 }
             }
-            .padding(30)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.black)
-                        .offset(x: 4, y: 4)
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(KingdomTheme.Colors.inkDark.opacity(0.95))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                        )
-                }
-            )
-        }
+        )
     }
     
     /// Get icon for a style (from server config or fallback)
@@ -1741,102 +1713,317 @@ struct DuelCombatView: View {
                 }
             )
     }
+}
+
+// MARK: - Style Reveal Popup with Animations
+struct StyleRevealPopup: View {
+    let data: StyleRevealData
+    let myColor: Color
+    let enemyColor: Color
+    let opponentName: String
+    let isChallenger: Bool
+    let gameConfig: DuelGameConfig?
+    let onDismiss: () -> Void
     
-    // MARK: - Push Popup Overlay
+    // Animation state - entrance happens ONCE
+    @State private var hasAppeared = false
+    // These loop for the swings/odds animation
+    @State private var myDisplayedSwings: Int = 0
+    @State private var oppDisplayedSwings: Int = 0
+    @State private var showSwingDeltas = false
+    @State private var animatedMiss: CGFloat = 50
+    @State private var animatedHit: CGFloat = 40
+    @State private var animatedCrit: CGFloat = 10
+    @State private var showOddsChange = false
     
-    private func pushPopupOverlay(data: PushPopupData) -> some View {
-        let isBlocked = abs(data.pushAmount) < 0.1  // No push = blocked
-        let isGoodPush = data.pushAmount > 0
-        
-        // Colors and content based on outcome
-        let popupColor: Color
-        let popupIcon: String
-        let title: String
-        let subtitle: String
-        let amountText: String
-        
-        if isBlocked {
-            // PARRIED - gray, shield icon
-            popupColor = Color(white: 0.4)
-            popupIcon = "shield.fill"
-            title = "PARRIED!"
-            subtitle = "No ground gained"
-            amountText = "0%"
-        } else if isGoodPush {
-            // YOU PUSHED - your color
-            popupColor = myColor
-            popupIcon = "arrow.right.circle.fill"
-            title = "PUSHED!"
-            subtitle = "You gain ground!"
-            amountText = "+\(String(format: "%.1f", abs(data.pushAmount)))%"
-        } else {
-            // PUSHED BACK - enemy color
-            popupColor = enemyColor
-            popupIcon = "arrow.left.circle.fill"
-            title = "PUSHED BACK!"
-            subtitle = "\(opponentDisplayName) gains ground!"
-            amountText = "-\(String(format: "%.1f", abs(data.pushAmount)))%"
-        }
-        
-        return ZStack {
-            // Semi-transparent backdrop
-            Color.black.opacity(0.5).ignoresSafeArea()
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
             
             VStack(spacing: 16) {
-                // Icon
-                Image(systemName: popupIcon)
-                    .font(.system(size: 60))
-                    .foregroundColor(.white)
-                    .shadow(color: popupColor, radius: 15)
+                Text("STYLES REVEALED!")
+                    .font(.system(size: 18, weight: .black, design: .serif))
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                // Title
-                Text(title)
-                    .font(.system(size: 28, weight: .black, design: .serif))
-                    .foregroundColor(.white)
-                
-                // Subtitle
-                Text(subtitle)
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(.white.opacity(0.9))
-                
-                // Push amount
-                Text(amountText)
-                    .font(.system(size: 36, weight: .black, design: .monospaced))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black.opacity(0.3))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            )
+                // Styles row - FIXED LAYOUT, no animation on structure
+                HStack(alignment: .top, spacing: 24) {
+                    // Your style
+                    playerStyleCard(
+                        name: "YOU",
+                        styleName: data.myStyleName,
+                        styleId: data.myStyle,
+                        color: myColor,
+                        swings: myDisplayedSwings,
+                        baseSwings: data.myBaseSwings,
+                        finalSwings: data.myFinalSwings,
+                        delta: data.mySwingDelta
                     )
-            }
-            .padding(30)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.black)
-                        .offset(x: 4, y: 4)
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(popupColor)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.black, lineWidth: 3)
+                    
+                    Text("VS")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                        .padding(.top, 40)
+                    
+                    // Opponent style
+                    playerStyleCard(
+                        name: opponentName.prefix(10).uppercased(),
+                        styleName: data.opponentStyleName,
+                        styleId: data.opponentStyle,
+                        color: enemyColor,
+                        swings: oppDisplayedSwings,
+                        baseSwings: data.oppBaseSwings,
+                        finalSwings: data.oppFinalSwings,
+                        delta: data.oppSwingDelta
+                    )
+                }
+                
+                // Probability bar section
+                VStack(spacing: 6) {
+                    Text("YOUR HIT CHANCE")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                    
+                    // The bar - fixed height, animates widths
+                    GeometryReader { geo in
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .fill(KingdomTheme.Colors.disabled)
+                                .frame(width: max(0, animatedMiss / 100.0 * geo.size.width))
+                            Rectangle()
+                                .fill(KingdomTheme.Colors.buttonSuccess)
+                                .frame(width: max(0, animatedHit / 100.0 * geo.size.width))
+                            Rectangle()
+                                .fill(KingdomTheme.Colors.imperialGold)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
+                    }
+                    .frame(height: 24)
+                    
+                    // Labels - fixed positions
+                    HStack {
+                        Text("MISS \(Int(animatedMiss))%")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.disabled)
+                            .frame(width: 70, alignment: .leading)
+                        
+                        Spacer()
+                        
+                        // Hit with delta indicator
+                        HStack(spacing: 4) {
+                            Text("HIT \(Int(animatedHit))%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            if showOddsChange && data.finalHit != data.baseHit {
+                                let delta = data.finalHit - data.baseHit
+                                Text(delta > 0 ? "(+\(delta))" : "(\(delta))")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundColor(delta > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonWarning)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Text("CRIT \(Int(animatedCrit))%")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            .frame(width: 70, alignment: .trailing)
+                    }
+                }
+                .padding(.horizontal, 16)
+                
+                // Feint winner (if applicable)
+                if let feint = data.feintWinner {
+                    let feintWinnerName = feint == "challenger" ? 
+                        (isChallenger ? "YOU" : String(opponentName.prefix(10))) :
+                        (!isChallenger ? "YOU" : String(opponentName.prefix(10)))
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        Text("\(feintWinnerName) WINS TIES!")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(KingdomTheme.Colors.imperialGold.opacity(0.2))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(KingdomTheme.Colors.imperialGold, lineWidth: 1))
+                    )
+                }
+                
+                // FIGHT button
+                Button(action: onDismiss) {
+                    Text("FIGHT!")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundColor(KingdomTheme.Colors.parchment)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black)
+                                    .offset(x: 3, y: 3)
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(KingdomTheme.Colors.buttonDanger)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black, lineWidth: 2))
+                            }
                         )
                 }
+                .padding(.horizontal, 16)
+            }
+            .padding(20)
+            .frame(width: 320)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.black)
+                        .offset(x: 4, y: 4)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black, lineWidth: 3))
+                }
             )
-            .scaleEffect(viewModel.showPushPopup ? 1.0 : 0.8)
+        }
+        .onAppear {
+            if !hasAppeared {
+                hasAppeared = true
+                startAnimation()
+            }
+        }
+    }
+    
+    private func playerStyleCard(name: String, styleName: String, styleId: String, color: Color, swings: Int, baseSwings: Int, finalSwings: Int, delta: Int) -> some View {
+        let icon = gameConfig?.attackStyles?.first(where: { $0.id == styleId })?.icon ?? "equal.circle.fill"
+        
+        return VStack(spacing: 8) {
+            // Name - ALWAYS on top, fixed height
+            Text(String(name))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+                .lineLimit(1)
+                .frame(height: 14)
+            
+            // Icon
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundColor(KingdomTheme.Colors.parchment)
+                .frame(width: 52, height: 52)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black)
+                            .offset(x: 2, y: 2)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(color)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black, lineWidth: 2))
+                    }
+                )
+            
+            // Style name
+            Text(styleName.uppercased())
+                .font(.system(size: 11, weight: .black))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .frame(height: 14)
+            
+            // Swings - fixed layout
+            HStack(spacing: 3) {
+                ForEach(0..<max(baseSwings, finalSwings), id: \.self) { i in
+                    Image(systemName: "figure.fencing")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(i < swings ? color : KingdomTheme.Colors.disabled.opacity(0.3))
+                        .scaleEffect(i < swings ? 1.0 : 0.7)
+                }
+                
+                if showSwingDeltas && delta != 0 {
+                    Text(delta > 0 ? "+\(delta)" : "\(delta)")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundColor(delta > 0 ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonWarning)
+                }
+            }
+            .frame(height: 20)
+        }
+        .frame(width: 110)
+    }
+    
+    private func startAnimation() {
+        // Set to base values first
+        myDisplayedSwings = data.myBaseSwings
+        oppDisplayedSwings = data.oppBaseSwings
+        animatedMiss = CGFloat(data.baseMiss)
+        animatedHit = CGFloat(data.baseHit)
+        animatedCrit = CGFloat(data.baseCrit)
+        showSwingDeltas = false
+        showOddsChange = false
+        
+        // Animate to final values after short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                myDisplayedSwings = data.myFinalSwings
+                oppDisplayedSwings = data.oppFinalSwings
+                showSwingDeltas = true
+            }
+        }
+        
+        // Animate probability bar
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            showOddsChange = true
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                animatedMiss = CGFloat(data.finalMiss)
+                animatedHit = CGFloat(data.finalHit)
+                animatedCrit = CGFloat(data.finalCrit)
+            }
+        }
+        
+        // Loop ONLY the numbers animation (not the whole layout)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            loopNumbersAnimation()
+        }
+    }
+    
+    private func loopNumbersAnimation() {
+        // Reset to base (no layout change, just values)
+        withAnimation(.easeOut(duration: 0.3)) {
+            myDisplayedSwings = data.myBaseSwings
+            oppDisplayedSwings = data.oppBaseSwings
+            animatedMiss = CGFloat(data.baseMiss)
+            animatedHit = CGFloat(data.baseHit)
+            animatedCrit = CGFloat(data.baseCrit)
+            showSwingDeltas = false
+            showOddsChange = false
+        }
+        
+        // Animate back to final
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                myDisplayedSwings = data.myFinalSwings
+                oppDisplayedSwings = data.oppFinalSwings
+                showSwingDeltas = true
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            showOddsChange = true
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                animatedMiss = CGFloat(data.finalMiss)
+                animatedHit = CGFloat(data.finalHit)
+                animatedCrit = CGFloat(data.finalCrit)
+            }
+        }
+        
+        // Loop again
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            loopNumbersAnimation()
         }
     }
 }
 
-// MARK: - Push Popup Data
-struct PushPopupData {
-    let pushAmount: Double  // Positive = you pushed, negative = opponent pushed
-    let outcome: String     // hit, critical, miss
+// Continue DuelCombatView extension
+extension DuelCombatView {
+    
 }
 
 // MARK: - Style Reveal Data
@@ -1846,6 +2033,20 @@ struct StyleRevealData {
     let myStyleName: String
     let opponentStyleName: String
     let feintWinner: String?  // If feint broke a tie
+    
+    // Animation data from server - NO CLIENT CALCS
+    let myBaseSwings: Int
+    let myFinalSwings: Int
+    let mySwingDelta: Int
+    let oppBaseSwings: Int
+    let oppFinalSwings: Int
+    let oppSwingDelta: Int
+    let baseMiss: Int
+    let baseHit: Int
+    let baseCrit: Int
+    let finalMiss: Int
+    let finalHit: Int
+    let finalCrit: Int
 }
 
 // MARK: - Critical Hit Data
@@ -1897,9 +2098,9 @@ class DuelCombatViewModel: ObservableObject {
     @Published var showTurnBanner: Bool = false
     @Published var turnBannerScale: CGFloat = 1.0
     
-    // Push popup (controlled by event queue)
-    @Published var showPushPopup: Bool = false
-    @Published var pushPopupData: PushPopupData? = nil
+    // Round result popup (controlled by event queue)
+    @Published var showRoundResult: Bool = false
+    @Published var roundResultData: RoundResultData? = nil
     
     // Style reveal popup (shows both styles after round resolution)
     @Published var showStyleReveal: Bool = false
@@ -1954,21 +2155,21 @@ class DuelCombatViewModel: ObservableObject {
             let outcome = rollData["outcome"] as? String ?? "miss"
             let swingNumber = event.data["swing_number"] as? Int ?? 1
             let roll = Roll(value: Int(value), outcome: outcome, attackerName: attackerName, swingNumber: swingNumber)
-            eventQueue.append(DuelQueuedEvent(match: event.match, roll: roll, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil))
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: roll, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
             processQueue()
             return
         }
         
         // Style locked - just update match state (opponent locked their style)
         if event.eventType == .styleLocked {
-            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil))
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
             processQueue()
             return
         }
         
         // Styles revealed - both players locked, transition to swing phase
         if event.eventType == .stylesRevealed {
-            // Build style reveal data for animation
+            // Build style reveal data for animation - ALL VALUES FROM SERVER
             let challengerStyle = event.data["challenger_style"] as? String
             let opponentStyle = event.data["opponent_style"] as? String
             
@@ -1977,30 +2178,44 @@ class DuelCombatViewModel: ObservableObject {
                 let isChallenger = m.challenger.id == playerId
                 let myStyle = isChallenger ? chStyle : opStyle
                 let oppStyle = isChallenger ? opStyle : chStyle
+                
+                // All animation values from server
                 styleReveal = StyleRevealData(
                     myStyle: myStyle,
                     opponentStyle: oppStyle,
                     myStyleName: myStyle.replacingOccurrences(of: "_", with: " ").capitalized,
                     opponentStyleName: oppStyle.replacingOccurrences(of: "_", with: " ").capitalized,
-                    feintWinner: nil
+                    feintWinner: nil,
+                    myBaseSwings: m.baseMaxSwings ?? 1,
+                    myFinalSwings: m.maxSwings ?? 1,
+                    mySwingDelta: m.swingDelta ?? 0,
+                    oppBaseSwings: m.opponentBaseSwings ?? 1,
+                    oppFinalSwings: m.opponentMaxSwings ?? 1,
+                    oppSwingDelta: m.opponentSwingDelta ?? 0,
+                    baseMiss: m.baseOdds?.miss ?? 50,
+                    baseHit: m.baseOdds?.hit ?? 40,
+                    baseCrit: m.baseOdds?.crit ?? 10,
+                    finalMiss: m.currentOdds?.miss ?? 50,
+                    finalHit: m.currentOdds?.hit ?? 40,
+                    finalCrit: m.currentOdds?.crit ?? 10
                 )
             }
             
             // Update match state with style reveal animation
-            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: styleReveal, resolutionPushAmount: nil))
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: styleReveal, resolutionPushAmount: nil, roundResultData: nil))
             processQueue()
             return
         }
         
         // Player submitted - opponent finished swinging
         if event.eventType == .playerSubmitted {
-            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil))
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
             processQueue()
             return
         }
 
-        // New round system events
-        if event.eventType == .roundResolved || event.eventType == .ended {
+        // Round resolved - show results popup (NOT for ended/forfeit)
+        if event.eventType == .roundResolved {
             let challengerName = event.data["challenger_name"] as? String
             let opponentName = event.data["opponent_name"] as? String
 
@@ -2075,6 +2290,19 @@ class DuelCombatViewModel: ObservableObject {
             // NOTE: styleReveal is nil - styles were already revealed at round START
             // Don't show style reveal animation again after round resolution
             // yourPushAmount comes from backend with correct sign (positive=won, negative=lost)
+            
+            // Build round result data for the popup
+            let roundResult = RoundResultData(
+                pushAmount: yourPushAmount,
+                outcome: popupOutcome,
+                myBestOutcome: myBest,
+                oppBestOutcome: oppBest,
+                myStyle: myStyle,
+                oppStyle: oppStyle,
+                roundNumber: roundNumber,
+                parried: parried
+            )
+            
             eventQueue.append(DuelQueuedEvent(
                 match: event.match,
                 roll: nil,
@@ -2083,19 +2311,27 @@ class DuelCombatViewModel: ObservableObject {
                 showRoundPopup: true,
                 popupOutcome: popupOutcome,
                 styleReveal: nil,
-                resolutionPushAmount: yourPushAmount
+                resolutionPushAmount: yourPushAmount,
+                roundResultData: roundResult
             ))
+            processQueue()
+            return
+        }
+        
+        // Match ended (forfeit, timeout win, final win) - just update state, no popup
+        if event.eventType == .ended {
+            eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: true, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
             processQueue()
             return
         }
 
         // Round submitted just updates state (so UI can show opponent submitted)
-        eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil))
+        eventQueue.append(DuelQueuedEvent(match: event.match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
         processQueue()
     }
     
     private func enqueueAPIResponse(match: DuelMatch?) {
-        eventQueue.append(DuelQueuedEvent(match: match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil))
+        eventQueue.append(DuelQueuedEvent(match: match, roll: nil, rolls: nil, clearRoundRolls: false, showRoundPopup: false, popupOutcome: nil, styleReveal: nil, resolutionPushAmount: nil, roundResultData: nil))
         processQueue()
     }
     
@@ -2146,35 +2382,32 @@ class DuelCombatViewModel: ObservableObject {
         
         // STEP 3: Show style reveal if we have style data (before push popup)
         // NOTE: This should ONLY happen for stylesRevealed event, NOT for roundResolved
+        // User dismisses manually with FIGHT button - no auto-dismiss
         if let styleData = event.styleReveal {
             self.styleRevealData = styleData
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 self.showStyleReveal = true
             }
-            // Show for style reveal duration from config, or default 1.5s
-            let revealDuration = match?.config?.styleRevealDurationMs ?? 1500
-            try? await Task.sleep(nanoseconds: UInt64(revealDuration) * 1_000_000)
-            withAnimation(.easeOut(duration: 0.2)) {
-                self.showStyleReveal = false
+            // Wait for user to dismiss - but don't block the queue forever
+            // Poll until dismissed (user taps FIGHT button)
+            while self.showStyleReveal {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             }
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 200_000_000) // Brief pause after dismiss
         }
         
-        // STEP 4: Show round result popup (push/parry) when requested
-        // Use resolutionPushAmount from the event - this has the correct sign for the player's perspective
-        // and comes directly from the resolution, avoiding race condition issues with bar position calculations
-        if event.showRoundPopup && match?.isFighting == true {
-            let outcome = event.popupOutcome ?? "hit"
-            let pushAmount = event.resolutionPushAmount ?? 0
-            self.pushPopupData = PushPopupData(pushAmount: pushAmount, outcome: outcome)
+        // STEP 4: Show round result popup (head-to-head comparison) when requested
+        // User dismisses manually, then bar animates
+        if event.showRoundPopup, let resultData = event.roundResultData {
+            self.roundResultData = resultData
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                self.showPushPopup = true
+                self.showRoundResult = true
             }
-            try? await Task.sleep(nanoseconds: 1_800_000_000)
-            withAnimation(.easeOut(duration: 0.2)) {
-                self.showPushPopup = false
+            // Wait for user to dismiss
+            while self.showRoundResult {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             }
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 200_000_000) // Brief pause after dismiss
         }
     }
     
@@ -2219,18 +2452,25 @@ class DuelCombatViewModel: ObservableObject {
                         opponentStyle: oppStyle,
                         myStyleName: m.myName,
                         opponentStyleName: m.opponentName,
-                        feintWinner: nil
+                        feintWinner: nil,
+                        myBaseSwings: m.baseMaxSwings ?? 1,
+                        myFinalSwings: m.maxSwings ?? 1,
+                        mySwingDelta: m.swingDelta ?? 0,
+                        oppBaseSwings: m.opponentBaseSwings ?? 1,
+                        oppFinalSwings: m.opponentMaxSwings ?? 1,
+                        oppSwingDelta: m.opponentSwingDelta ?? 0,
+                        baseMiss: m.baseOdds?.miss ?? 50,
+                        baseHit: m.baseOdds?.hit ?? 40,
+                        baseCrit: m.baseOdds?.crit ?? 10,
+                        finalMiss: m.currentOdds?.miss ?? 50,
+                        finalHit: m.currentOdds?.hit ?? 40,
+                        finalCrit: m.currentOdds?.crit ?? 10
                     )
                     self.styleRevealData = revealData
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         self.showStyleReveal = true
                     }
-                    // Show for style reveal duration from config, or default 2s
-                    let revealDuration = m.config?.styleRevealDurationMs ?? 2000
-                    try? await Task.sleep(nanoseconds: UInt64(revealDuration) * 1_000_000)
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        self.showStyleReveal = false
-                    }
+                    // User dismisses manually with FIGHT button - no auto-dismiss
                 }
             }
             if !r.success { errorMessage = r.message }
@@ -2274,7 +2514,8 @@ class DuelCombatViewModel: ObservableObject {
                     showRoundPopup: false,  // WebSocket handles popup
                     popupOutcome: nil,
                     styleReveal: nil,
-                    resolutionPushAmount: nil
+                    resolutionPushAmount: nil,
+                    roundResultData: nil
                 ))
                 processQueue()
             } else if let m = r.match {
@@ -2403,6 +2644,8 @@ struct DuelQueuedEvent {
     let styleReveal: StyleRevealData?
     // Push amount from resolution - positive = you won, negative = you lost, nil = calculate from bar
     let resolutionPushAmount: Double?
+    // Round result data for the popup
+    let roundResultData: RoundResultData?
 }
 
 // MARK: - Duel Control Bar

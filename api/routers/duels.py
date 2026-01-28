@@ -628,7 +628,8 @@ def stop_swinging(
                 push = resolution.get("push_amount", 0)
                 message = f"Round resolved! Push: {push:.1f}%"
         else:
-            message = f"Submitted! Best: {result.get('best_outcome', 'miss').upper()}. Waiting for opponent..."
+            best = result.get('best_outcome') or 'miss'
+            message = f"Submitted! Best: {best.upper()}. Waiting for opponent..."
         
         return StopResponse(
             success=True,
