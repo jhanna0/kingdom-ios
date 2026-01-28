@@ -76,7 +76,36 @@ class DuelsAPI {
         return try await client.execute(request)
     }
     
-    /// Execute an attack during your turn
+    /// Lock in an attack style for the current round
+    func lockStyle(matchId: Int, style: String) async throws -> DuelLockStyleResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let body = LockStyleRequest(style: style)
+        let request = try client.request(endpoint: "/duels/\(matchId)/lock-style", method: "POST", body: body)
+        return try await client.execute(request)
+    }
+    
+    // MARK: - Swing-by-Swing Combat (Core Mechanic)
+    
+    /// Execute ONE swing. Returns the result, then player decides to swing again or stop.
+    func swing(matchId: Int) async throws -> DuelSwingResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let request = client.request(endpoint: "/duels/\(matchId)/swing", method: "POST")
+        return try await client.execute(request)
+    }
+    
+    /// Stop swinging and lock in current best roll.
+    func stop(matchId: Int) async throws -> DuelStopResponse {
+        guard client.isAuthenticated else { throw APIError.unauthorized }
+        
+        let request = client.request(endpoint: "/duels/\(matchId)/stop", method: "POST")
+        return try await client.execute(request)
+    }
+    
+    // MARK: - Legacy (for backwards compat)
+    
+    /// Legacy: Execute an attack (maps to swing)
     func attack(matchId: Int) async throws -> DuelAttackResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
@@ -84,21 +113,11 @@ class DuelsAPI {
         return try await client.execute(request)
     }
 
-    /// Submit a FULL round of swings (simultaneous rounds; no turns)
+    /// Legacy: Submit round
     func submitRoundSwing(matchId: Int) async throws -> DuelRoundSwingResponse {
         guard client.isAuthenticated else { throw APIError.unauthorized }
         
         let request = client.request(endpoint: "/duels/\(matchId)/round-swing", method: "POST")
-        return try await client.execute(request)
-    }
-    
-    /// Lock in an attack style for the current round
-    /// Must be called during style selection phase (first 10s of round)
-    func lockStyle(matchId: Int, style: String) async throws -> DuelLockStyleResponse {
-        guard client.isAuthenticated else { throw APIError.unauthorized }
-        
-        let body = LockStyleRequest(style: style)
-        let request = try client.request(endpoint: "/duels/\(matchId)/lock-style", method: "POST", body: body)
         return try await client.execute(request)
     }
     

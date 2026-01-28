@@ -206,13 +206,16 @@ struct DuelGameConfig: Codable {
     // Timing
     let turnTimeoutSeconds: Int
     let roundTimeoutSeconds: Int?
-    let styleLockTimeoutSeconds: Int?  // Time for style selection phase
+    let styleLockTimeoutSeconds: Int?
+    let swingTimeoutSeconds: Int?
+    let styleRevealDurationSeconds: Int?
     let invitationTimeoutMinutes: Int
     
-    // Combat multipliers (for display)
-    let criticalMultiplier: Double  // e.g., 1.5
-    let pushBasePercent: Double     // e.g., 4.0
-    let leadershipBonusPercent: Double  // e.g., 20
+    // Combat multipliers
+    let criticalMultiplier: Double
+    let criticalMultiplierText: String?
+    let pushBasePercent: Double
+    let leadershipBonusPercent: Double
     
     // Hit chance bounds
     let minHitChancePercent: Int
@@ -226,15 +229,15 @@ struct DuelGameConfig: Codable {
     
     // Animation timing (ms)
     let rollAnimationMs: Int
-    let rollPauseBetweenMs: Int  // Pause between consecutive rolls
+    let rollPauseBetweenMs: Int
     let critPopupDurationMs: Int
     let rollSweepStepMs: Int
-    let styleRevealDurationMs: Int?  // How long to show style reveal
+    let styleRevealDurationMs: Int?
 
     // Round pacing
     let maxRollsPerRoundCap: Int?
     
-    // Attack styles - ALL definitions from server
+    // Attack styles
     let attackStyles: [AttackStyleConfig]?
     let defaultStyle: String?
     
@@ -243,8 +246,11 @@ struct DuelGameConfig: Codable {
         case turnTimeoutSeconds = "turn_timeout_seconds"
         case roundTimeoutSeconds = "round_timeout_seconds"
         case styleLockTimeoutSeconds = "style_lock_timeout_seconds"
+        case swingTimeoutSeconds = "swing_timeout_seconds"
+        case styleRevealDurationSeconds = "style_reveal_duration_seconds"
         case invitationTimeoutMinutes = "invitation_timeout_minutes"
         case criticalMultiplier = "critical_multiplier"
+        case criticalMultiplierText = "critical_multiplier_text"
         case pushBasePercent = "push_base_percent"
         case leadershipBonusPercent = "leadership_bonus_percent"
         case minHitChancePercent = "min_hit_chance_percent"
@@ -259,11 +265,6 @@ struct DuelGameConfig: Codable {
         case maxRollsPerRoundCap = "max_rolls_per_round_cap"
         case attackStyles = "attack_styles"
         case defaultStyle = "default_style"
-    }
-    
-    /// Formatted critical multiplier string (e.g., "1.5x")
-    var criticalMultiplierText: String {
-        return "\(criticalMultiplier)x"
     }
 }
 
@@ -294,94 +295,97 @@ struct DuelWinnerPerspective: Codable {
     }
 }
 
-/// A duel match - now with player-perspective fields from server
+/// A duel match - swing-by-swing system with player perspective
 struct DuelMatch: Codable, Identifiable {
     let id: Int
     let matchCode: String
     let kingdomId: String
     let status: String
     
-    // === PLAYER PERSPECTIVE (server-computed, no client logic needed) ===
+    // === ROUND STATE ===
+    let roundNumber: Int?
+    let roundPhase: String?  // style_selection, style_reveal, swinging, resolving
+    let roundExpiresAt: String?
     
-    /// Is it your turn? (server-computed)
-    let isYourTurn: Bool?
+    // === STYLE PHASE ===
+    let inStylePhase: Bool?
+    let inStyleReveal: Bool?
+    let canLockStyle: Bool?
+    let myStyle: String?
+    let myStyleLocked: Bool?
+    let opponentStyle: String?
+    let opponentStyleLocked: Bool?
+    let bothStylesLocked: Bool?
+    let styleLockExpiresAt: String?
     
-    /// Can you attack right now? (server-computed: is_your_turn && is_fighting)
-    let canAttack: Bool?
+    // === SWING PHASE (the core mechanic) ===
+    let inSwingPhase: Bool?
+    let canSwing: Bool?
+    let canStop: Bool?
+    let swingsUsed: Int?
+    let swingsRemaining: Int?
+    let maxSwings: Int?
+    let baseMaxSwings: Int?  // Before style modifier
+    let swingDelta: Int?  // Style effect on swings
+    let opponentMaxSwings: Int?
+    let opponentBaseSwings: Int?
+    let opponentSwingDelta: Int?
+    let bestOutcome: String?
+    let myRolls: [[String: AnyCodable]]?  // All your rolls this round
+    let submitted: Bool?
+    let opponentSubmitted: Bool?
+    let swingPhaseExpiresAt: String?
     
-    /// Can you claim timeout victory? (server-computed: !is_your_turn && turn_expired)
+    // === BAR POSITION ===
+    let yourBarPosition: Double?
+    let controlBar: Double?
+    
+    // === ODDS ===
+    let currentOdds: DuelOdds?
+    let baseOdds: DuelOdds?  // Before style modifiers (for animation)
+    
+    // === TIMEOUT ===
     let canClaimTimeout: Bool?
     
-    /// Bar position from YOUR perspective (0-100, higher = winning)
-    let yourBarPosition: Double?
-
-    // === ROUND SYSTEM (simultaneous; no turns) ===
-    let roundNumber: Int?
-    let roundExpiresAt: String?
-    let canSubmitRound: Bool?
-    let hasSubmittedRound: Bool?
-    let opponentHasSubmittedRound: Bool?
-    let yourRoundRollsCount: Int?
-    
-    // === ATTACK STYLE SYSTEM ===
-    let inStylePhase: Bool?        // Are we in the style selection phase?
-    let canLockStyle: Bool?        // Can the player lock a style right now?
-    let myStyle: String?           // Your locked style (or nil)
-    let myStyleLocked: Bool?       // Have you locked your style?
-    let opponentStyleLocked: Bool? // Has opponent locked their style?
-    let opponentStyle: String?     // Opponent's style (only revealed after both locked)
-    let styleLockExpiresAt: String?
-    let bothStylesLocked: Bool?
-    
-    /// Your swings used this turn
-    let yourSwingsUsed: Int?
-    
-    /// Your swings remaining this turn
-    let yourSwingsRemaining: Int?
-    
-    /// Your max swings this turn
-    let yourMaxSwings: Int?
-    
-    /// Your info (from your perspective)
+    // === YOUR INFO ===
     let you: DuelPlayerInfo?
     
-    /// Opponent info (from your perspective)
+    // === OPPONENT INFO ===
     let opponentInfo: DuelPlayerInfo?
     
-    /// Current attacker's odds (for probability bar)
-    let currentOdds: DuelOdds?
-    
-    /// Rolls this turn with attacker name
-    let turnRolls: [DuelTurnRoll]?
-    
-    /// Winner from your perspective
+    // === WINNER ===
     let winnerPerspective: DuelWinnerPerspective?
     
     // === METADATA ===
     let wagerGold: Int
-    let turnExpiresAt: String?
     let createdAt: String?
     let startedAt: String?
     let completedAt: String?
+    let turnExpiresAt: String?
     
-    // === GAME CONFIG (from server - NO hardcoded frontend values!) ===
+    // === GAME CONFIG ===
     let config: DuelGameConfig?
     
-    // === LEGACY (for backwards compatibility during transition) ===
-    let challenger: DuelPlayer  // Always present (non-optional)
-    let opponent: DuelPlayer?   // Legacy format from "opponent_legacy" key
-    let controlBar: Double?
+    // === LEGACY ===
+    let challenger: DuelPlayer
+    let opponent: DuelPlayer?
     let currentTurn: String?
-    
-    // Old swing tracking (legacy)
+    let isYourTurn: Bool?
+    let canAttack: Bool?
+    let hasSubmittedRound: Bool?
+    let opponentHasSubmittedRound: Bool?
+    let canSubmitRound: Bool?
+    let yourRoundRollsCount: Int?
+    let yourSwingsUsed: Int?
+    let yourSwingsRemaining: Int?
+    let yourMaxSwings: Int?
+    let turnRolls: [DuelTurnRoll]?
     let turnSwingsUsed: Int?
     let turnMaxSwings: Int?
     let turnSwingsRemaining: Int?
-    
-    // Optional actions
     let actions: [DuelAction]?
     
-    /// Legacy winner accessor (converts from perspective format)
+    /// Legacy winner accessor
     var winner: DuelWinner? {
         guard let wp = winnerPerspective else { return nil }
         return DuelWinner(id: wp.id, side: nil, goldEarned: wp.goldEarned)
@@ -393,53 +397,80 @@ struct DuelMatch: Codable, Identifiable {
         case kingdomId = "kingdom_id"
         case status
         
-        // Player perspective (new format from to_dict_for_player)
-        case isYourTurn = "is_your_turn"
-        case canAttack = "can_attack"
-        case canClaimTimeout = "can_claim_timeout"
-        case yourBarPosition = "your_bar_position"
-
-        // Round system
+        // Round state
         case roundNumber = "round_number"
+        case roundPhase = "round_phase"
         case roundExpiresAt = "round_expires_at"
-        case canSubmitRound = "can_submit_round"
-        case hasSubmittedRound = "has_submitted_round"
-        case opponentHasSubmittedRound = "opponent_has_submitted_round"
-        case yourRoundRollsCount = "your_round_rolls_count"
         
-        // Attack style system
+        // Style phase
         case inStylePhase = "in_style_phase"
+        case inStyleReveal = "in_style_reveal"
         case canLockStyle = "can_lock_style"
         case myStyle = "my_style"
         case myStyleLocked = "my_style_locked"
-        case opponentStyleLocked = "opponent_style_locked"
         case opponentStyle = "opponent_style"
-        case styleLockExpiresAt = "style_lock_expires_at"
+        case opponentStyleLocked = "opponent_style_locked"
         case bothStylesLocked = "both_styles_locked"
-
-        case yourSwingsUsed = "your_swings_used"
-        case yourSwingsRemaining = "your_swings_remaining"
-        case yourMaxSwings = "your_max_swings"
-        case you
-        case opponentInfo = "opponent"  // New format: simple {id, name, attack, defense}
+        case styleLockExpiresAt = "style_lock_expires_at"
+        
+        // Swing phase
+        case inSwingPhase = "in_swing_phase"
+        case canSwing = "can_swing"
+        case canStop = "can_stop"
+        case swingsUsed = "swings_used"
+        case swingsRemaining = "swings_remaining"
+        case maxSwings = "max_swings"
+        case baseMaxSwings = "base_max_swings"
+        case swingDelta = "swing_delta"
+        case opponentMaxSwings = "opponent_max_swings"
+        case opponentBaseSwings = "opponent_base_swings"
+        case opponentSwingDelta = "opponent_swing_delta"
+        case bestOutcome = "best_outcome"
+        case myRolls = "my_rolls"
+        case submitted
+        case opponentSubmitted = "opponent_submitted"
+        case swingPhaseExpiresAt = "swing_phase_expires_at"
+        
+        // Bar position
+        case yourBarPosition = "your_bar_position"
+        case controlBar = "control_bar"
+        
+        // Odds
         case currentOdds = "current_odds"
-        case turnRolls = "turn_rolls"
+        case baseOdds = "base_odds"
+        
+        // Timeout
+        case canClaimTimeout = "can_claim_timeout"
+        
+        // Player info
+        case you
+        case opponentInfo = "opponent"
+        
+        // Winner
         case winnerPerspective = "winner"
         
         // Metadata
         case wagerGold = "wager_gold"
-        case turnExpiresAt = "turn_expires_at"
         case createdAt = "created_at"
         case startedAt = "started_at"
         case completedAt = "completed_at"
+        case turnExpiresAt = "turn_expires_at"
         case config
         
-        // Legacy (from to_dict - kept for backwards compatibility)
+        // Legacy
         case challenger
-        case opponent = "opponent_legacy"  // Backend sends this as "opponent_legacy" in player-perspective view
-        case controlBar = "control_bar"
+        case opponent = "opponent_legacy"
         case currentTurn = "current_turn"
-        // Note: winner is now a computed property that uses winnerPerspective
+        case isYourTurn = "is_your_turn"
+        case canAttack = "can_attack"
+        case hasSubmittedRound = "has_submitted_round"
+        case opponentHasSubmittedRound = "opponent_has_submitted_round"
+        case canSubmitRound = "can_submit_round"
+        case yourRoundRollsCount = "your_round_rolls_count"
+        case yourSwingsUsed = "your_swings_used"
+        case yourSwingsRemaining = "your_swings_remaining"
+        case yourMaxSwings = "your_max_swings"
+        case turnRolls = "turn_rolls"
         case turnSwingsUsed = "turn_swings_used"
         case turnMaxSwings = "turn_max_swings"
         case turnSwingsRemaining = "turn_swings_remaining"
@@ -632,7 +663,104 @@ struct DuelAttackResponse: Codable {
     }
 }
 
-// MARK: - Round System Response Models
+// MARK: - Swing-by-Swing Response Models
+
+/// Response from executing ONE swing
+struct DuelSwingResponse: Codable {
+    let success: Bool
+    let message: String
+    let roll: DuelRoll?
+    let outcome: String?
+    let swingNumber: Int?
+    let swingsRemaining: Int?
+    let maxSwings: Int?
+    let bestOutcome: String?
+    let canSwing: Bool?
+    let canStop: Bool?
+    let autoSubmitted: Bool?
+    let roundResolved: Bool?
+    let resolution: DuelRoundResolution?
+    let match: DuelMatch?
+    let missChance: Int?
+    let hitChancePct: Int?
+    let critChance: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, roll, outcome, match, resolution
+        case swingNumber = "swing_number"
+        case swingsRemaining = "swings_remaining"
+        case maxSwings = "max_swings"
+        case bestOutcome = "best_outcome"
+        case canSwing = "can_swing"
+        case canStop = "can_stop"
+        case autoSubmitted = "auto_submitted"
+        case roundResolved = "round_resolved"
+        case missChance = "miss_chance"
+        case hitChancePct = "hit_chance_pct"
+        case critChance = "crit_chance"
+    }
+}
+
+/// Response from stopping (locking in best roll)
+struct DuelStopResponse: Codable {
+    let success: Bool
+    let message: String
+    let submitted: Bool?
+    let bestOutcome: String?
+    let waitingForOpponent: Bool?
+    let roundResolved: Bool?
+    let resolution: DuelRoundResolution?
+    let match: DuelMatch?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message, match, resolution
+        case submitted
+        case bestOutcome = "best_outcome"
+        case waitingForOpponent = "waiting_for_opponent"
+        case roundResolved = "round_resolved"
+    }
+}
+
+/// Round resolution data
+struct DuelRoundResolution: Codable {
+    let roundNumber: Int?
+    let challengerBest: String?
+    let opponentBest: String?
+    let challengerRolls: [[String: AnyCodable]]?
+    let opponentRolls: [[String: AnyCodable]]?
+    let challengerStyle: String?
+    let opponentStyle: String?
+    let winnerSide: String?
+    let decisiveOutcome: String?
+    let feintWinner: String?
+    let parried: Bool?
+    let pushAmount: Double?
+    let barBefore: Double?
+    let barAfter: Double?
+    let matchWinner: String?
+    let gameOver: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case roundNumber = "round_number"
+        case challengerBest = "challenger_best"
+        case opponentBest = "opponent_best"
+        case challengerRolls = "challenger_rolls"
+        case opponentRolls = "opponent_rolls"
+        case challengerStyle = "challenger_style"
+        case opponentStyle = "opponent_style"
+        case winnerSide = "winner_side"
+        case decisiveOutcome = "decisive_outcome"
+        case feintWinner = "feint_winner"
+        case parried
+        case pushAmount = "push_amount"
+        case barBefore = "bar_before"
+        case barAfter = "bar_after"
+        case matchWinner = "match_winner"
+        case gameOver = "game_over"
+    }
+}
+
+// MARK: - Legacy Round System Response
 
 struct DuelRoundSwingResponse: Codable {
     let success: Bool
@@ -647,7 +775,7 @@ struct DuelRoundSwingResponse: Codable {
 
     let result: [String: AnyCodable]?
     let push: [String: AnyCodable]?
-    let styles: [String: AnyCodable]?  // Style reveal after resolution
+    let styles: [String: AnyCodable]?
 
     let match: DuelMatch?
     let winner: DuelWinner?

@@ -269,28 +269,39 @@ class PartyEvents:
 
 class DuelEvents:
     """
-    Events for PvP Arena duels.
+    Events for PvP Arena duels - Swing-by-Swing System.
     
-    Real-time swing events:
-    - DUEL_SWING: Broadcast for EVERY swing so opponent sees them in real-time
-    - DUEL_TURN_COMPLETE: Final turn summary (bar push, next turn info)
-    
-    Style system events:
-    - DUEL_STYLE_LOCKED: Player locked in their attack style (doesn't reveal WHICH style)
-    
-    Frontend should animate each DUEL_SWING as it arrives.
+    FLOW:
+    1. DUEL_STARTED - Match begins, style selection phase
+    2. DUEL_STYLE_LOCKED - Player locked style (not revealed yet)
+    3. DUEL_STYLES_REVEALED - Both styles shown, swing phase begins
+    4. DUEL_SWING - Each swing broadcast in real-time
+    5. DUEL_PLAYER_SUBMITTED - Player stopped swinging
+    6. DUEL_ROUND_RESOLVED - Both submitted, round result
+    7. Repeat from step 1 OR DUEL_ENDED
     """
+    # Match lifecycle
     DUEL_INVITATION = "duel_invitation"
     DUEL_OPPONENT_JOINED = "duel_opponent_joined"
     DUEL_STARTED = "duel_started"
-    DUEL_SWING = "duel_swing"  # NEW: Real-time swing broadcast to opponent
-    DUEL_TURN_COMPLETE = "duel_turn_complete"  # Turn finished, bar pushed
-    DUEL_STYLE_LOCKED = "duel_style_locked"  # Player locked their style (not revealed yet)
-    DUEL_ROUND_SUBMITTED = "duel_round_submitted"  # One player submitted their round
-    DUEL_ROUND_RESOLVED = "duel_round_resolved"  # Both submitted; reveal + push applied
     DUEL_ENDED = "duel_ended"
     DUEL_CANCELLED = "duel_cancelled"
-    DUEL_TIMEOUT = "duel_timeout"  # Player timed out
+    DUEL_TIMEOUT = "duel_timeout"
+    
+    # Style phase
+    DUEL_STYLE_LOCKED = "duel_style_locked"      # One player locked (hidden)
+    DUEL_STYLES_REVEALED = "duel_styles_revealed"  # Both revealed + effects applied
+    
+    # Swing phase
+    DUEL_SWING = "duel_swing"                    # Real-time swing result
+    DUEL_PLAYER_SUBMITTED = "duel_player_submitted"  # Player stopped swinging
+    
+    # Round resolution
+    DUEL_ROUND_RESOLVED = "duel_round_resolved"  # Compare + push
+    
+    # Legacy
+    DUEL_TURN_COMPLETE = "duel_turn_complete"
+    DUEL_ROUND_SUBMITTED = "duel_round_submitted"
 
 
 def notify_hunt_participants(

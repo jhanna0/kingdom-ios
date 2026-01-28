@@ -83,6 +83,12 @@ DUEL_MAX_ROLLS_PER_ROUND_CAP = 4
 # Style selection phase timeout (first 10s of the round)
 DUEL_STYLE_LOCK_TIMEOUT_SECONDS = 10
 
+# Swing phase timeout (after styles revealed, players have this long to swing)
+DUEL_SWING_TIMEOUT_SECONDS = 30
+
+# Style reveal duration (brief pause to show both styles before swinging)
+DUEL_STYLE_REVEAL_DURATION_SECONDS = 2
+
 # ============================================================
 # ATTACK STYLES
 # ============================================================
@@ -116,7 +122,7 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.0,     # Opponent push multiplier if you lose
         "opponent_hit_mod": 0.0,   # +/- to opponent's hit chance
         "tie_advantage": False,    # Win ties if True
-        "description": "No modifiers. The safe choice.",
+        "description": "No modifiers",
         "icon": "equal.circle.fill",
     },
     
@@ -129,7 +135,7 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.0,
         "opponent_hit_mod": 0.0,
         "tie_advantage": False,
-        "description": "More chances to spike, slightly less accurate.",
+        "description": "+1 roll, -5% hit chance",
         "icon": "flame.fill",
     },
     
@@ -142,7 +148,7 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.0,
         "opponent_hit_mod": 0.0,
         "tie_advantage": False,
-        "description": "Fewer all-miss rounds, fewer crits.",
+        "description": "+8% hit chance, -25% crit rate",
         "icon": "scope",
     },
     
@@ -155,20 +161,21 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.10,    # Opponent gets +10% if you lose
         "opponent_hit_mod": 0.0,
         "tie_advantage": False,
-        "description": "Higher drama. Win big or lose bigger.",
+        "description": "Win: 1.25x push. Lose: enemy 1.1x push",
         "icon": "bolt.fill",
     },
     
     # Guard - defensive, reduces opponent's chances
+    # Note: If -1 roll would drop you to 0, you get 1 but opponent gets +1 bonus
     AttackStyle.GUARD: {
-        "roll_bonus": -1,          # -1 roll (min 1)
+        "roll_bonus": -1,          # -1 roll (risky if you have 1 base roll)
         "hit_chance_mod": 0.0,
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.0,
         "push_mult_lose": 1.0,
         "opponent_hit_mod": -0.08, # Opponent gets -8% hit chance
         "tie_advantage": False,
-        "description": "Reduces opponent spike potential. Trade offense for defense.",
+        "description": "-1 roll, opponent -8% hit chance",
         "icon": "shield.fill",
     },
     
@@ -181,7 +188,7 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.0,
         "opponent_hit_mod": 0.0,
         "tie_advantage": True,     # Wins outcome ties
-        "description": "Win tiebreakers. Predict your opponent.",
+        "description": "Wins ties (hit vs hit, crit vs crit)",
         "icon": "arrow.triangle.branch",
     },
 }
@@ -324,16 +331,19 @@ def get_duel_game_config() -> dict:
     """
     return {
         # Mode
-        "duel_mode": "rounds",
+        "duel_mode": "swing_by_swing",
 
         # Timing
         "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
         "round_timeout_seconds": DUEL_ROUND_TIMEOUT_SECONDS,
         "style_lock_timeout_seconds": DUEL_STYLE_LOCK_TIMEOUT_SECONDS,
+        "swing_timeout_seconds": DUEL_SWING_TIMEOUT_SECONDS,
+        "style_reveal_duration_seconds": DUEL_STYLE_REVEAL_DURATION_SECONDS,
         "invitation_timeout_minutes": DUEL_INVITATION_TIMEOUT_MINUTES,
         
         # Combat multipliers (for display)
         "critical_multiplier": DUEL_CRITICAL_PUSH_BONUS,  # 1.5
+        "critical_multiplier_text": f"{DUEL_CRITICAL_PUSH_BONUS}x",
         "push_base_percent": DUEL_PUSH_BASE,  # 4.0
         "leadership_bonus_percent": DUEL_LEADERSHIP_BONUS * 100,  # 20
         
@@ -347,18 +357,17 @@ def get_duel_game_config() -> dict:
         # Wager limits
         "max_wager_gold": DUEL_MAX_WAGER,
         
-        # Animation timing (milliseconds) - frontend can adjust but server controls defaults
-        "roll_animation_ms": 300,
-        "roll_pause_between_ms": 400,  # Pause between consecutive rolls
+        # Animation timing (milliseconds)
+        "roll_animation_ms": 400,
+        "roll_pause_between_ms": 300,
         "crit_popup_duration_ms": 1500,
         "roll_sweep_step_ms": 15,
-        "style_reveal_duration_ms": 1500,  # How long to show style reveal
+        "style_reveal_duration_ms": DUEL_STYLE_REVEAL_DURATION_SECONDS * 1000,
 
         # Round pacing
         "max_rolls_per_round_cap": DUEL_MAX_ROLLS_PER_ROUND_CAP,
         
         # Attack styles - ALL style definitions come from server
-        # Frontend just renders this list, no hardcoded styles
         "attack_styles": get_all_styles_config(),
         "default_style": AttackStyle.DEFAULT,
     }

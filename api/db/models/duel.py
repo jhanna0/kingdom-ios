@@ -1,20 +1,22 @@
 """
 Duel Model - 1v1 PvP Arena Combat
 
-Simple duel system for the Town Hall arena:
-- Challenger creates a match, invites friends or gets a code
-- Opponent accepts, stats are snapshotted
-- Turn-based combat with tug-of-war bar
-- Winner is whoever pushes bar to their side first
-
-Combat uses same formulas as battles:
-  hit_chance = attack / (enemy_defense * 2)
+SWING-BY-SWING ROUND SYSTEM:
+1. Both players pick attack styles (10s)
+2. Styles revealed, effects applied to probability bar
+3. Each player controls their swings independently:
+   - Click SWING → get one result
+   - Click SWING again or STOP
+   - Best outcome is tracked
+4. Both players stop → round resolves
+5. Compare best outcomes → winner pushes bar
+6. Repeat until bar hits 0 or 100
 """
 from sqlalchemy import Column, String, Integer, BigInteger, Boolean, DateTime, ForeignKey, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from enum import Enum
 
 from ..base import Base
@@ -35,34 +37,56 @@ def _format_datetime_iso(dt: datetime) -> Optional[str]:
 
 class DuelStatus(str, Enum):
     """Duel match status"""
-    WAITING = "waiting"                    # Waiting for opponent
-    PENDING_ACCEPTANCE = "pending_acceptance"  # Opponent joined, challenger must confirm
-    READY = "ready"                        # Both players confirmed, about to start
-    FIGHTING = "fighting"                  # Match in progress
-    COMPLETE = "complete"                  # Match finished
-    CANCELLED = "cancelled"                # Cancelled by challenger
-    EXPIRED = "expired"                    # Invitation expired
-    DECLINED = "declined"                  # Challenger declined the opponent
+    WAITING = "waiting"
+    PENDING_ACCEPTANCE = "pending_acceptance"
+    READY = "ready"
+    FIGHTING = "fighting"
+    COMPLETE = "complete"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    DECLINED = "declined"
+
+
+class DuelPhase(str, Enum):
+    """Round phase within a fighting match"""
+    STYLE_SELECTION = "style_selection"  # Players picking styles
+    STYLE_REVEAL = "style_reveal"        # Showing both styles before swinging
+    SWINGING = "swinging"                # Players controlling their swings
+    RESOLVING = "resolving"              # Computing round winner
 
 
 class DuelOutcome(str, Enum):
-    """Possible outcomes for a duel attack"""
+    """Possible outcomes for a duel swing"""
     MISS = "miss"
     HIT = "hit"
     CRITICAL = "critical"
+
+
+# Outcome ranking for comparisons
+OUTCOME_RANK = {
+    DuelOutcome.MISS.value: 0,
+    DuelOutcome.HIT.value: 1,
+    DuelOutcome.CRITICAL.value: 2,
+    "miss": 0,
+    "hit": 1,
+    "critical": 2,
+}
 
 
 class DuelMatch(Base):
     """
     A 1v1 duel between two players.
     
-    Flow:
-    1. Challenger creates match → status='waiting', gets match_code
-    2. Challenger invites friends OR shares code
-    3. Opponent joins via invite/code → status='ready'
-    4. Both confirm ready → status='fighting', turn assigned
-    5. Players take turns attacking until bar hits 0 or 100
-    6. Winner determined → status='complete'
+    SWING-BY-SWING FLOW:
+    1. Match created → WAITING
+    2. Opponent accepts → READY
+    3. Either player starts → FIGHTING (round 1, style_selection phase)
+    4. Both lock styles OR timer expires → style_reveal phase
+    5. Brief reveal → swinging phase
+    6. Each player swings independently until they stop
+    7. Both stopped → resolving phase → round resolved
+    8. Winner pushes bar, next round starts
+    9. Bar hits 0 or 100 → COMPLETE
     """
     __tablename__ = "duel_matches"
     
@@ -84,40 +108,64 @@ class DuelMatch(Base):
     # Combat bar: 0 = challenger wins, 100 = opponent wins
     control_bar = Column(Float, nullable=False, default=50.0)
     
-    # Turn tracking
-    current_turn = Column(String(20), nullable=True)  # 'challenger' or 'opponent'
-    turn_expires_at = Column(DateTime, nullable=True)
-    first_turn_player_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who went first (for history)
+    # ============================================================
+    # ROUND SYSTEM
+    # ============================================================
+    round_number = Column(Integer, nullable=False, default=1)
+    round_phase = Column(String(20), nullable=False, default=DuelPhase.STYLE_SELECTION.value)
+    round_expires_at = Column(DateTime, nullable=True)  # Overall round timeout
     
-    # Multi-swing tracking (within a single turn)
-    turn_swings_used = Column(Integer, default=0)  # How many swings used this turn
-    turn_max_swings = Column(Integer, default=1)   # Max swings for this turn (1 + attack)
-    turn_best_outcome = Column(String(20), nullable=True)  # Best outcome so far: 'miss', 'hit', 'critical'
-    turn_best_push = Column(Float, default=0.0)    # Push amount from best outcome
-    turn_rolls = Column(JSONB, nullable=True)      # All rolls this turn for display
-
     # ============================================================
-    # Simultaneous round system (no turns; both submit each round)
+    # STYLE SELECTION PHASE
     # ============================================================
-    round_number = Column(Integer, nullable=False, default=1)  # Current round (starts at 1)
-    round_expires_at = Column(DateTime, nullable=True)  # Shared timer for round submission
-
-    # Pending submissions for the current round (persist across reconnects)
+    style_lock_expires_at = Column(DateTime, nullable=True)
+    challenger_style = Column(String(20), nullable=True)
+    opponent_style = Column(String(20), nullable=True)
+    challenger_style_locked_at = Column(DateTime, nullable=True)
+    opponent_style_locked_at = Column(DateTime, nullable=True)
+    
+    # ============================================================
+    # SWING PHASE - CHALLENGER STATE
+    # ============================================================
+    challenger_swings_used = Column(Integer, default=0)
+    challenger_max_swings = Column(Integer, default=1)
+    challenger_best_outcome = Column(String(20), nullable=True)
+    challenger_best_push = Column(Float, default=0.0)
+    challenger_round_rolls = Column(JSONB, nullable=True)  # List of roll results
+    challenger_submitted = Column(Boolean, default=False)
+    challenger_submitted_at = Column(DateTime, nullable=True)
+    
+    # ============================================================
+    # SWING PHASE - OPPONENT STATE
+    # ============================================================
+    opponent_swings_used = Column(Integer, default=0)
+    opponent_max_swings = Column(Integer, default=1)
+    opponent_best_outcome = Column(String(20), nullable=True)
+    opponent_best_push = Column(Float, default=0.0)
+    opponent_round_rolls = Column(JSONB, nullable=True)
+    opponent_submitted = Column(Boolean, default=False)
+    opponent_submitted_at = Column(DateTime, nullable=True)
+    
+    # Swing phase timeout
+    swing_phase_expires_at = Column(DateTime, nullable=True)
+    
+    # ============================================================
+    # LEGACY FIELDS (for backwards compat during transition)
+    # ============================================================
+    current_turn = Column(String(20), nullable=True)  # No longer used in round system
+    turn_expires_at = Column(DateTime, nullable=True)
+    first_turn_player_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    turn_swings_used = Column(Integer, default=0)
+    turn_max_swings = Column(Integer, default=1)
+    turn_best_outcome = Column(String(20), nullable=True)
+    turn_best_push = Column(Float, default=0.0)
+    turn_rolls = Column(JSONB, nullable=True)
     pending_challenger_round_rolls = Column(JSONB, nullable=True)
     pending_opponent_round_rolls = Column(JSONB, nullable=True)
     pending_challenger_round_submitted_at = Column(DateTime, nullable=True)
     pending_opponent_round_submitted_at = Column(DateTime, nullable=True)
     
-    # ============================================================
-    # Attack Style System (locked before rolls each round)
-    # ============================================================
-    style_lock_expires_at = Column(DateTime, nullable=True)  # When style selection phase ends
-    challenger_style = Column(String(20), nullable=True)  # balanced, aggressive, precise, power, guard, feint
-    opponent_style = Column(String(20), nullable=True)
-    challenger_style_locked_at = Column(DateTime, nullable=True)
-    opponent_style_locked_at = Column(DateTime, nullable=True)
-    
-    # Stats snapshots (frozen at match start for fairness)
+    # Stats snapshots (frozen at match start)
     challenger_stats = Column(JSONB, nullable=True)
     opponent_stats = Column(JSONB, nullable=True)
     
@@ -140,9 +188,11 @@ class DuelMatch(Base):
     actions = relationship("DuelAction", backref="match", lazy="dynamic", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<DuelMatch(id={self.id}, code='{self.match_code}', status='{self.status}')>"
+        return f"<DuelMatch(id={self.id}, code='{self.match_code}', status='{self.status}', phase='{self.round_phase}')>"
     
-    # === Status Helpers ===
+    # ============================================================
+    # STATUS HELPERS
+    # ============================================================
     
     @property
     def is_waiting(self) -> bool:
@@ -162,39 +212,43 @@ class DuelMatch(Base):
     
     @property
     def is_active(self) -> bool:
-        """Match is joinable or in progress"""
         return self.status in [DuelStatus.WAITING.value, DuelStatus.READY.value, DuelStatus.FIGHTING.value]
     
     @property
     def can_join(self) -> bool:
-        """Can someone join as opponent?"""
         return self.status == DuelStatus.WAITING.value and self.opponent_id is None
 
     @property
     def is_pending_acceptance(self) -> bool:
-        """Is this match waiting for challenger to confirm opponent?"""
         return self.status == DuelStatus.PENDING_ACCEPTANCE.value
 
     @property
     def is_expired(self) -> bool:
-        """Has the invitation expired?"""
-        if self.expires_at and datetime.utcnow() > self.expires_at:
-            return True
+        if self.expires_at:
+            now = datetime.utcnow()
+            exp = self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else self.expires_at
+            return now > exp
         return False
     
-    # === Turn Helpers ===
+    # ============================================================
+    # PHASE HELPERS
+    # ============================================================
     
-    def get_current_turn_player_id(self) -> Optional[int]:
-        """Get the player ID whose turn it is"""
-        if self.current_turn == "challenger":
-            return self.challenger_id
-        elif self.current_turn == "opponent":
-            return self.opponent_id
-        return None
+    @property
+    def in_style_selection(self) -> bool:
+        return self.round_phase == DuelPhase.STYLE_SELECTION.value
     
-    def is_players_turn(self, player_id: int) -> bool:
-        """Check if it's a specific player's turn"""
-        return self.get_current_turn_player_id() == player_id
+    @property
+    def in_style_reveal(self) -> bool:
+        return self.round_phase == DuelPhase.STYLE_REVEAL.value
+    
+    @property
+    def in_swinging(self) -> bool:
+        return self.round_phase == DuelPhase.SWINGING.value
+    
+    @property
+    def in_resolving(self) -> bool:
+        return self.round_phase == DuelPhase.RESOLVING.value
     
     def get_player_side(self, player_id: int) -> Optional[str]:
         """Get which side a player is on"""
@@ -204,14 +258,9 @@ class DuelMatch(Base):
             return "opponent"
         return None
     
-    def switch_turn(self) -> None:
-        """Switch to the other player's turn"""
-        if self.current_turn == "challenger":
-            self.current_turn = "opponent"
-        else:
-            self.current_turn = "challenger"
-    
-    # === Style Helpers ===
+    # ============================================================
+    # STYLE HELPERS
+    # ============================================================
     
     def get_player_style(self, player_id: int) -> Optional[str]:
         """Get the attack style a player has locked in."""
@@ -222,7 +271,7 @@ class DuelMatch(Base):
         return None
     
     def has_player_locked_style(self, player_id: int) -> bool:
-        """Check if a player has locked in their style for this round."""
+        """Check if a player has locked in their style."""
         if player_id == self.challenger_id:
             return self.challenger_style is not None
         elif player_id == self.opponent_id:
@@ -230,28 +279,192 @@ class DuelMatch(Base):
         return False
     
     def both_styles_locked(self) -> bool:
-        """Check if both players have locked in their styles."""
+        """Check if both players have locked styles."""
         return self.challenger_style is not None and self.opponent_style is not None
     
     def style_phase_expired(self) -> bool:
-        """Check if the style selection phase has expired."""
+        """Check if style selection has timed out."""
         if self.style_lock_expires_at is None:
             return True
-        return datetime.utcnow() > self.style_lock_expires_at
+        now = datetime.utcnow()
+        expires = self.style_lock_expires_at
+        if expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        return now > expires
     
-    def clear_styles_for_new_round(self) -> None:
-        """Clear styles for a new round."""
+    # ============================================================
+    # SWING HELPERS
+    # ============================================================
+    
+    def get_player_swings_used(self, player_id: int) -> int:
+        """Get swings used by a player this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_swings_used or 0
+        elif player_id == self.opponent_id:
+            return self.opponent_swings_used or 0
+        return 0
+    
+    def get_player_max_swings(self, player_id: int) -> int:
+        """Get max swings for a player this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_max_swings or 1
+        elif player_id == self.opponent_id:
+            return self.opponent_max_swings or 1
+        return 1
+    
+    def get_player_swings_remaining(self, player_id: int) -> int:
+        """Get remaining swings for a player."""
+        return self.get_player_max_swings(player_id) - self.get_player_swings_used(player_id)
+    
+    def get_player_best_outcome(self, player_id: int) -> Optional[str]:
+        """Get best outcome for a player this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_best_outcome
+        elif player_id == self.opponent_id:
+            return self.opponent_best_outcome
+        return None
+    
+    def get_player_rolls(self, player_id: int) -> List[Dict]:
+        """Get all rolls for a player this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_round_rolls or []
+        elif player_id == self.opponent_id:
+            return self.opponent_round_rolls or []
+        return []
+    
+    def has_player_submitted(self, player_id: int) -> bool:
+        """Check if a player has stopped/submitted this round."""
+        if player_id == self.challenger_id:
+            return self.challenger_submitted or False
+        elif player_id == self.opponent_id:
+            return self.opponent_submitted or False
+        return False
+    
+    def both_submitted(self) -> bool:
+        """Check if both players have submitted."""
+        return (self.challenger_submitted or False) and (self.opponent_submitted or False)
+    
+    def can_player_swing(self, player_id: int) -> bool:
+        """Check if a player can still swing."""
+        if not self.in_swinging:
+            return False
+        if self.has_player_submitted(player_id):
+            return False
+        return self.get_player_swings_remaining(player_id) > 0
+    
+    def can_player_stop(self, player_id: int) -> bool:
+        """Check if a player can stop (must have at least 1 swing)."""
+        if not self.in_swinging:
+            return False
+        if self.has_player_submitted(player_id):
+            return False
+        return self.get_player_swings_used(player_id) >= 1
+    
+    # ============================================================
+    # STATE MUTATIONS
+    # ============================================================
+    
+    def start_style_phase(self, style_timeout_seconds: int = 10) -> None:
+        """Start the style selection phase for a new round."""
+        self.round_phase = DuelPhase.STYLE_SELECTION.value
+        self.style_lock_expires_at = datetime.utcnow() + timedelta(seconds=style_timeout_seconds)
+        # Clear previous round state
         self.challenger_style = None
         self.opponent_style = None
         self.challenger_style_locked_at = None
         self.opponent_style_locked_at = None
-        self.style_lock_expires_at = None
+        self._reset_swing_state()
     
-    # === Combat ===
+    def start_swing_phase(self, swing_timeout_seconds: int = 30) -> None:
+        """Transition to swing phase (after styles revealed)."""
+        self.round_phase = DuelPhase.SWINGING.value
+        self.swing_phase_expires_at = datetime.utcnow() + timedelta(seconds=swing_timeout_seconds)
+    
+    def _reset_swing_state(self) -> None:
+        """Reset swing state for a new round."""
+        self.challenger_swings_used = 0
+        self.challenger_best_outcome = None
+        self.challenger_best_push = 0.0
+        self.challenger_round_rolls = None
+        self.challenger_submitted = False
+        self.challenger_submitted_at = None
+        
+        self.opponent_swings_used = 0
+        self.opponent_best_outcome = None
+        self.opponent_best_push = 0.0
+        self.opponent_round_rolls = None
+        self.opponent_submitted = False
+        self.opponent_submitted_at = None
+    
+    def record_swing(
+        self,
+        player_id: int,
+        roll_value: float,
+        outcome: str,
+        push_amount: float
+    ) -> Dict[str, Any]:
+        """
+        Record a single swing for a player.
+        Returns the roll data.
+        """
+        side = self.get_player_side(player_id)
+        if not side:
+            raise ValueError("Player not in this match")
+        
+        # Build roll data
+        if side == "challenger":
+            swing_number = (self.challenger_swings_used or 0) + 1
+            rolls = self.challenger_round_rolls or []
+        else:
+            swing_number = (self.opponent_swings_used or 0) + 1
+            rolls = self.opponent_round_rolls or []
+        
+        roll_data = {
+            "roll_number": swing_number,
+            "value": round(roll_value * 100, 1),
+            "outcome": outcome,
+        }
+        rolls.append(roll_data)
+        
+        # Update state
+        if side == "challenger":
+            self.challenger_swings_used = swing_number
+            self.challenger_round_rolls = rolls
+            
+            # Track best outcome
+            current_best = self.challenger_best_outcome or "miss"
+            if OUTCOME_RANK.get(outcome, 0) > OUTCOME_RANK.get(current_best, 0):
+                self.challenger_best_outcome = outcome
+                self.challenger_best_push = push_amount
+            elif outcome == current_best and push_amount > (self.challenger_best_push or 0):
+                self.challenger_best_push = push_amount
+        else:
+            self.opponent_swings_used = swing_number
+            self.opponent_round_rolls = rolls
+            
+            current_best = self.opponent_best_outcome or "miss"
+            if OUTCOME_RANK.get(outcome, 0) > OUTCOME_RANK.get(current_best, 0):
+                self.opponent_best_outcome = outcome
+                self.opponent_best_push = push_amount
+            elif outcome == current_best and push_amount > (self.opponent_best_push or 0):
+                self.opponent_best_push = push_amount
+        
+        return roll_data
+    
+    def submit_player(self, player_id: int) -> None:
+        """Mark a player as submitted (stopped swinging)."""
+        now = datetime.utcnow()
+        side = self.get_player_side(player_id)
+        if side == "challenger":
+            self.challenger_submitted = True
+            self.challenger_submitted_at = now
+        elif side == "opponent":
+            self.opponent_submitted = True
+            self.opponent_submitted_at = now
     
     def apply_push(self, side: str, push_amount: float) -> Optional[str]:
         """
-        Apply push to the bar. Returns winner side if match ends, None otherwise.
+        Apply push to the bar. Returns winner side if match ends.
         
         Challenger pushes toward 0 (wants bar at 0 to win)
         Opponent pushes toward 100 (wants bar at 100 to win)
@@ -261,39 +474,72 @@ class DuelMatch(Base):
         else:
             self.control_bar = min(100.0, self.control_bar + push_amount)
         
-        # Check for winner
         if self.control_bar <= 0:
             self.control_bar = 0.0
             return "challenger"
         elif self.control_bar >= 100:
             self.control_bar = 100.0
             return "opponent"
-        
         return None
     
+    def advance_round(self, style_timeout_seconds: int = 10) -> None:
+        """Advance to next round."""
+        self.round_number = (self.round_number or 1) + 1
+        self.start_style_phase(style_timeout_seconds)
+    
     def resolve(self, winner_side: str) -> None:
-        """Mark the match as complete with a winner"""
+        """Mark match as complete with a winner."""
         self.status = DuelStatus.COMPLETE.value
         self.winner_side = winner_side
         self.winner_id = self.challenger_id if winner_side == "challenger" else self.opponent_id
         self.completed_at = datetime.utcnow()
         
-        # Handle wager
         if self.wager_gold > 0:
-            self.winner_gold_earned = self.wager_gold * 2  # Winner gets both wagers
+            self.winner_gold_earned = self.wager_gold * 2
     
     def cancel(self) -> None:
-        """Cancel the match (only valid if waiting)"""
         self.status = DuelStatus.CANCELLED.value
     
     def expire(self) -> None:
-        """Mark as expired"""
         self.status = DuelStatus.EXPIRED.value
     
-    # === Serialization ===
+    # ============================================================
+    # LEGACY COMPATIBILITY
+    # ============================================================
+    
+    def get_current_turn_player_id(self) -> Optional[int]:
+        """Legacy: Get current turn player. In round system, not used."""
+        if self.current_turn == "challenger":
+            return self.challenger_id
+        elif self.current_turn == "opponent":
+            return self.opponent_id
+        return None
+    
+    def is_players_turn(self, player_id: int) -> bool:
+        """Legacy: In round system, both can act during swing phase."""
+        return self.get_current_turn_player_id() == player_id
+    
+    def switch_turn(self) -> None:
+        """Legacy: Switch turns."""
+        if self.current_turn == "challenger":
+            self.current_turn = "opponent"
+        else:
+            self.current_turn = "challenger"
+    
+    def clear_styles_for_new_round(self) -> None:
+        """Legacy helper."""
+        self.challenger_style = None
+        self.opponent_style = None
+        self.challenger_style_locked_at = None
+        self.opponent_style_locked_at = None
+        self.style_lock_expires_at = None
+    
+    # ============================================================
+    # SERIALIZATION
+    # ============================================================
     
     def to_dict(self, include_actions: bool = False) -> Dict[str, Any]:
-        """Convert to dictionary for API response (generic, no player perspective)"""
+        """Generic dict (no player perspective)"""
         from systems.duel.config import DUEL_TURN_TIMEOUT_SECONDS
         
         result = {
@@ -301,6 +547,8 @@ class DuelMatch(Base):
             "match_code": self.match_code,
             "kingdom_id": self.kingdom_id,
             "status": self.status,
+            "round_number": self.round_number,
+            "round_phase": self.round_phase,
             
             "challenger": {
                 "id": self.challenger_id,
@@ -314,18 +562,6 @@ class DuelMatch(Base):
             } if self.opponent_id else None,
             
             "control_bar": round(self.control_bar, 2),
-            "current_turn": self.current_turn,
-            "current_turn_player_id": self.get_current_turn_player_id(),
-            "turn_expires_at": _format_datetime_iso(self.turn_expires_at),
-            "turn_timeout_seconds": DUEL_TURN_TIMEOUT_SECONDS,
-            "first_turn_player_id": self.first_turn_player_id,
-            
-            # Multi-swing tracking
-            "turn_swings_used": self.turn_swings_used or 0,
-            "turn_max_swings": self.turn_max_swings or 1,
-            "turn_swings_remaining": (self.turn_max_swings or 1) - (self.turn_swings_used or 0),
-            "turn_rolls": self.turn_rolls or [],
-            
             "wager_gold": self.wager_gold,
             
             "winner": {
@@ -337,7 +573,6 @@ class DuelMatch(Base):
             "created_at": _format_datetime_iso(self.created_at),
             "started_at": _format_datetime_iso(self.started_at),
             "completed_at": _format_datetime_iso(self.completed_at),
-            "expires_at": _format_datetime_iso(self.expires_at),
         }
         
         if include_actions:
@@ -347,169 +582,172 @@ class DuelMatch(Base):
     
     def to_dict_for_player(self, player_id: int, include_actions: bool = False, odds: Dict = None) -> Dict[str, Any]:
         """
-        Convert to dictionary with player-specific perspective.
-        
-        SERVER-DRIVEN ARCHITECTURE:
-        - Frontend is a dumb renderer
-        - All values pre-calculated for this player's perspective
-        - No client-side flipping/computing needed
-        - ALL config included so frontend has zero hardcoded values
-        
-        Args:
-            player_id: The player requesting the view
-            include_actions: Whether to include action history
-            odds: Optional dict with miss/hit/crit percentages for current attacker
+        Player-perspective view. Frontend is a DUMB RENDERER.
+        All values pre-calculated, all config included.
         """
         from systems.duel.config import (
             DUEL_TURN_TIMEOUT_SECONDS,
+            DUEL_SWING_TIMEOUT_SECONDS,
             calculate_duel_roll_chances,
             calculate_duel_round_rolls,
             get_duel_game_config,
+            get_style_modifiers,
+            AttackStyle,
+            DUEL_MAX_ROLLS_PER_ROUND_CAP,
         )
         
         # Determine perspective
         my_side = self.get_player_side(player_id)
         is_challenger = my_side == "challenger"
         
-        # Get stats for each side from this player's perspective
+        # Stats for each side
         if is_challenger:
             my_stats = self.challenger_stats or {}
-            opponent_stats = self.opponent_stats or {}
+            opp_stats = self.opponent_stats or {}
             my_name = self.challenger_name
-            opponent_name = self.opponent_name
-            opponent_id = self.opponent_id
+            opp_name = self.opponent_name
+            opp_id = self.opponent_id
+            my_style = self.challenger_style
+            opp_style = self.opponent_style
+            my_swings_used = self.challenger_swings_used or 0
+            my_max_swings = self.challenger_max_swings or 1
+            my_best_outcome = self.challenger_best_outcome
+            my_rolls = self.challenger_round_rolls or []
+            my_submitted = self.challenger_submitted or False
+            opp_submitted = self.opponent_submitted or False
         else:
             my_stats = self.opponent_stats or {}
-            opponent_stats = self.challenger_stats or {}
+            opp_stats = self.challenger_stats or {}
             my_name = self.opponent_name
-            opponent_name = self.challenger_name
-            opponent_id = self.challenger_id
+            opp_name = self.challenger_name
+            opp_id = self.challenger_id
+            my_style = self.opponent_style
+            opp_style = self.challenger_style
+            my_swings_used = self.opponent_swings_used or 0
+            my_max_swings = self.opponent_max_swings or 1
+            my_best_outcome = self.opponent_best_outcome
+            my_rolls = self.opponent_round_rolls or []
+            my_submitted = self.opponent_submitted or False
+            opp_submitted = self.challenger_submitted or False
         
-        # Pre-calculate bar position for this player's perspective
-        # Higher = better for YOU (100 = you win, 0 = you lose)
+        # Bar position from player's perspective (100 = you winning)
         if is_challenger:
-            # Challenger wins at bar=0, so invert
             your_bar_position = 100.0 - self.control_bar
         else:
-            # Opponent wins at bar=100
             your_bar_position = self.control_bar
         
-        # Turn state - pre-calculated booleans
-        is_your_turn = self.is_players_turn(player_id)
-        can_attack = is_your_turn and self.is_fighting
-
         # ============================================================
-        # Round system state (simultaneous; no turns)
+        # PHASE STATE
         # ============================================================
-        if is_challenger:
-            my_pending_round = self.pending_challenger_round_rolls
-            opp_pending_round = self.pending_opponent_round_rolls
-        else:
-            my_pending_round = self.pending_opponent_round_rolls
-            opp_pending_round = self.pending_challenger_round_rolls
-
-        has_submitted_round = bool(my_pending_round)
-        opponent_has_submitted_round = bool(opp_pending_round)
-        can_submit_round = self.is_fighting and (not has_submitted_round)
-
-        # Round timeout claim: you submitted, opponent didn't, and the round expired
-        can_claim_round_timeout = (
-            self.is_fighting
-            and self.round_expires_at is not None
-            and datetime.utcnow() > self.round_expires_at
-            and has_submitted_round
-            and (not opponent_has_submitted_round)
-        )
         
-        # === STYLE PHASE STATE ===
-        if is_challenger:
-            my_style = self.challenger_style
-            opponent_style_locked = self.opponent_style is not None
-            my_style_locked = self.challenger_style is not None
-        else:
-            my_style = self.opponent_style
-            opponent_style_locked = self.challenger_style is not None
-            my_style_locked = self.opponent_style is not None
+        in_style_phase = self.in_style_selection and self.is_fighting
+        in_style_reveal = self.in_style_reveal and self.is_fighting
+        in_swing_phase = self.in_swinging and self.is_fighting
         
-        # Style phase is active if: fighting, no pending rolls, and style_lock_expires_at not passed
+        my_style_locked = my_style is not None
+        opp_style_locked = opp_style is not None
         both_styles_locked = self.both_styles_locked()
-        style_phase_expired = self.style_phase_expired()
-        in_style_phase = (
-            self.is_fighting 
-            and not has_submitted_round 
-            and not both_styles_locked 
-            and not style_phase_expired
-        )
+        
+        # Can lock style during style selection if not yet locked
         can_lock_style = in_style_phase and not my_style_locked
         
-        # After round resolution, show both styles for the reveal
-        # (only reveal opponent's style after both are locked or phase expired)
-        show_opponent_style = both_styles_locked or style_phase_expired
-        opponent_style_for_display = None
-        if show_opponent_style:
-            if is_challenger:
-                opponent_style_for_display = self.opponent_style
-            else:
-                opponent_style_for_display = self.challenger_style
+        # Show opponent's style only after both locked or in reveal/swing phase
+        show_opp_style = both_styles_locked or in_style_reveal or in_swing_phase or self.is_complete
+        opp_style_display = opp_style if show_opp_style else None
         
-        # Timeout claim - can claim if it's NOT your turn and the turn has expired
-        can_claim_timeout = (
-            not is_your_turn and 
-            self.is_fighting and 
-            self.turn_expires_at is not None and 
-            datetime.utcnow() > self.turn_expires_at
-        ) or can_claim_round_timeout
+        # ============================================================
+        # SWING STATE
+        # ============================================================
         
-        # Swings - only relevant when it's your turn
-        if is_your_turn:
-            your_swings_used = self.turn_swings_used or 0
-            # If no swings yet, calculate from your attack (turn_max_swings might be stale from opponent's turn)
-            if your_swings_used == 0:
-                your_max_swings = 1 + my_stats.get("attack", 0)
-            else:
-                your_max_swings = self.turn_max_swings or (1 + my_stats.get("attack", 0))
-            your_swings_remaining = your_max_swings - your_swings_used
+        # Calculate max swings based on attack + style modifier
+        base_max_swings = min(1 + my_stats.get("attack", 0), DUEL_MAX_ROLLS_PER_ROUND_CAP)
+        style_roll_bonus = get_style_modifiers(my_style or AttackStyle.BALANCED).get("roll_bonus", 0)
+        calculated_max_swings = max(1, min(DUEL_MAX_ROLLS_PER_ROUND_CAP, base_max_swings + style_roll_bonus))
+        
+        # Use stored max if in swing phase, else calculated
+        if in_swing_phase:
+            effective_max_swings = my_max_swings
         else:
-            # When not your turn, show your potential swings (1 + attack)
-            your_swings_used = 0
-            your_max_swings = 1 + my_stats.get("attack", 0)
-            your_swings_remaining = your_max_swings
+            effective_max_swings = calculated_max_swings
         
-        # Current odds (for probability bar display)
+        swings_remaining = max(0, effective_max_swings - my_swings_used)
+        
+        # Can swing if in swing phase OR style reveal (which auto-transitions), not submitted, has swings left
+        can_swing = (in_swing_phase or in_style_reveal) and not my_submitted and swings_remaining > 0
+        
+        # Can stop if in swing phase (not reveal), not submitted, has at least 1 swing done
+        can_stop = in_swing_phase and not my_submitted and my_swings_used >= 1
+        
+        # ============================================================
+        # ODDS CALCULATION (with style modifiers)
+        # ============================================================
+        
+        # Calculate BASE odds (before style modifiers) for animation
+        base_odds = {"miss": 50, "hit": 40, "crit": 10}
+        current_odds = {"miss": 50, "hit": 40, "crit": 10}
+        
         if odds:
-            current_odds = {
-                "miss": odds.get("miss", 50),
-                "hit": odds.get("hit", 40),
-                "crit": odds.get("crit", 10),
-            }
+            current_odds = {"miss": odds.get("miss", 50), "hit": odds.get("hit", 40), "crit": odds.get("crit", 10)}
+            base_odds = current_odds.copy()
         elif self.is_fighting:
-            # Round system: each player always sees THEIR odds
             atk = my_stats.get("attack", 0)
-            defense = opponent_stats.get("defense", 0)
-            miss_pct, hit_pct, crit_pct = calculate_duel_roll_chances(atk, defense)
+            defense = opp_stats.get("defense", 0)
+            
+            # Base odds (without style modifiers)
+            base_miss_pct, base_hit_pct, base_crit_pct = calculate_duel_roll_chances(atk, defense)
+            base_odds = {"miss": base_miss_pct, "hit": base_hit_pct, "crit": base_crit_pct}
+            
+            miss_pct, hit_pct, crit_pct = base_miss_pct, base_hit_pct, base_crit_pct
+            
+            # Apply style modifiers if styles are revealed
+            if show_opp_style and (my_style or opp_style):
+                my_mods = get_style_modifiers(my_style or AttackStyle.BALANCED)
+                opp_mods = get_style_modifiers(opp_style or AttackStyle.BALANCED)
+                
+                # Hit chance modification (my style + opponent's debuff on me)
+                hit_mod = my_mods.get("hit_chance_mod", 0) + opp_mods.get("opponent_hit_mod", 0)
+                hit_mod_pct = int(hit_mod * 100)
+                
+                # Crit rate modification
+                crit_mult = my_mods.get("crit_rate_mult", 1.0)
+                
+                # Recalculate
+                base_hit = (100 - miss_pct) / 100.0
+                modified_hit = max(0.10, min(0.90, base_hit + hit_mod))
+                miss_pct = int(round((1.0 - modified_hit) * 100))
+                crit_pct = int(round(modified_hit * 0.15 * crit_mult * 100))
+                hit_pct = 100 - miss_pct - crit_pct
+            
             current_odds = {"miss": miss_pct, "hit": hit_pct, "crit": crit_pct}
-        else:
-            current_odds = {"miss": 50, "hit": 40, "crit": 10}
         
-        # Turn rolls with attacker name (no isMe flag needed)
-        turn_rolls_display = []
-        current_attacker_name = None
-        if self.is_fighting:
-            current_attacker_id = self.get_current_turn_player_id()
-            if current_attacker_id == self.challenger_id:
-                current_attacker_name = self.challenger_name
-            else:
-                current_attacker_name = self.opponent_name
+        # Calculate opponent's base and final swings
+        opp_base_swings = min(1 + opp_stats.get("attack", 0), DUEL_MAX_ROLLS_PER_ROUND_CAP)
+        opp_style_roll_bonus = get_style_modifiers(opp_style or AttackStyle.BALANCED).get("roll_bonus", 0) if show_opp_style else 0
+        opp_final_swings = max(1, min(DUEL_MAX_ROLLS_PER_ROUND_CAP, opp_base_swings + opp_style_roll_bonus))
         
-        for roll in (self.turn_rolls or []):
-            turn_rolls_display.append({
-                "roll_number": roll.get("roll_number", 1),
-                "value": roll.get("value", 50),
-                "outcome": roll.get("outcome", "miss"),
-                "attacker_name": current_attacker_name or "Unknown",
-            })
+        # ============================================================
+        # TIMEOUT CLAIMS
+        # ============================================================
         
-        # Winner from this player's perspective
+        def _is_expired(dt):
+            if dt is None:
+                return False
+            now = datetime.utcnow()
+            exp = dt.replace(tzinfo=None) if dt.tzinfo else dt
+            return now > exp
+        
+        # Can claim timeout if opponent hasn't submitted and swing phase expired
+        can_claim_timeout = (
+            in_swing_phase
+            and my_submitted
+            and not opp_submitted
+            and _is_expired(self.swing_phase_expires_at)
+        )
+        
+        # ============================================================
+        # WINNER PERSPECTIVE
+        # ============================================================
+        
         winner_data = None
         if self.winner_id:
             did_i_win = self.winner_id == player_id
@@ -519,41 +757,62 @@ class DuelMatch(Base):
                 "gold_earned": self.winner_gold_earned if did_i_win else 0,
             }
         
+        # ============================================================
+        # BUILD RESPONSE
+        # ============================================================
+        
         result = {
             "id": self.id,
             "match_code": self.match_code,
             "kingdom_id": self.kingdom_id,
             "status": self.status,
             
-            # === PLAYER PERSPECTIVE (the good stuff) ===
-            "is_your_turn": is_your_turn,
-            "can_attack": can_attack,
-            "can_claim_timeout": can_claim_timeout,
-            "your_bar_position": round(your_bar_position, 2),
-
-            # === ROUND SYSTEM (new) ===
+            # === ROUND STATE ===
             "round_number": self.round_number or 1,
+            "round_phase": self.round_phase,
             "round_expires_at": _format_datetime_iso(self.round_expires_at),
-            "can_submit_round": can_submit_round,
-            "has_submitted_round": has_submitted_round,
-            "opponent_has_submitted_round": opponent_has_submitted_round,
-            "your_round_rolls_count": calculate_duel_round_rolls(my_stats.get("attack", 0)),
             
-            # === ATTACK STYLE SYSTEM ===
+            # === STYLE PHASE ===
             "in_style_phase": in_style_phase,
+            "in_style_reveal": in_style_reveal,
             "can_lock_style": can_lock_style,
-            "my_style": my_style,  # Your locked style (or None)
+            "my_style": my_style,
             "my_style_locked": my_style_locked,
-            "opponent_style_locked": opponent_style_locked,
-            "opponent_style": opponent_style_for_display,  # Only shown after both locked
-            "style_lock_expires_at": _format_datetime_iso(self.style_lock_expires_at),
+            "opponent_style": opp_style_display,
+            "opponent_style_locked": opp_style_locked,
             "both_styles_locked": both_styles_locked,
+            "style_lock_expires_at": _format_datetime_iso(self.style_lock_expires_at),
             
-            "your_swings_used": your_swings_used,
-            "your_swings_remaining": your_swings_remaining,
-            "your_max_swings": your_max_swings,
+            # === SWING PHASE ===
+            "in_swing_phase": in_swing_phase,
+            "can_swing": can_swing,
+            "can_stop": can_stop,
+            "swings_used": my_swings_used,
+            "swings_remaining": swings_remaining,
+            "max_swings": effective_max_swings,
+            "base_max_swings": base_max_swings,  # Before style modifier
+            "swing_delta": effective_max_swings - base_max_swings,  # Style effect
+            "opponent_max_swings": opp_final_swings if show_opp_style else opp_base_swings,
+            "opponent_base_swings": opp_base_swings,
+            "opponent_swing_delta": (opp_final_swings - opp_base_swings) if show_opp_style else 0,
+            "best_outcome": my_best_outcome,
+            "my_rolls": my_rolls,
+            "submitted": my_submitted,
+            "opponent_submitted": opp_submitted,
+            "swing_phase_expires_at": _format_datetime_iso(self.swing_phase_expires_at),
             
-            # Your info
+            # === BAR POSITION ===
+            "your_bar_position": round(your_bar_position, 2),
+            "control_bar": round(self.control_bar, 2),
+            
+            # === ODDS ===
+            "current_odds": current_odds,
+            "base_odds": base_odds,  # Before style modifiers (for animation)
+            
+            # === TIMEOUT ===
+            "can_claim_timeout": can_claim_timeout,
+            
+            # === YOUR INFO ===
             "you": {
                 "id": player_id,
                 "name": my_name,
@@ -562,47 +821,37 @@ class DuelMatch(Base):
                 "leadership": my_stats.get("leadership", 0),
             },
             
-            # Opponent info
+            # === OPPONENT INFO ===
             "opponent": {
-                "id": opponent_id,
-                "name": opponent_name,
-                "attack": opponent_stats.get("attack", 0),
-                "defense": opponent_stats.get("defense", 0),
-            } if opponent_id else None,
+                "id": opp_id,
+                "name": opp_name,
+                "attack": opp_stats.get("attack", 0),
+                "defense": opp_stats.get("defense", 0),
+            } if opp_id else None,
             
-            # Current attacker's odds (for probability bar)
-            "current_odds": current_odds,
-            
-            # Rolls this turn (generic - no isMe needed)
-            "turn_rolls": turn_rolls_display,
-            
-            # Winner
+            # === WINNER ===
             "winner": winner_data,
             
             # === METADATA ===
             "wager_gold": self.wager_gold,
-            "turn_expires_at": _format_datetime_iso(self.turn_expires_at),
-            
             "created_at": _format_datetime_iso(self.created_at),
             "started_at": _format_datetime_iso(self.started_at),
             "completed_at": _format_datetime_iso(self.completed_at),
             
-            # === GAME CONFIG (frontend has ZERO hardcoded values) ===
+            # === GAME CONFIG ===
             "config": get_duel_game_config(),
             
-            # === LEGACY (for backwards compat during transition) ===
+            # === LEGACY (for backwards compat) ===
             "challenger": {
                 "id": self.challenger_id,
                 "name": self.challenger_name,
                 "stats": self.challenger_stats,
             },
-            "opponent_legacy": {
-                "id": self.opponent_id,
-                "name": self.opponent_name,
-                "stats": self.opponent_stats,
-            } if self.opponent_id else None,
-            "control_bar": round(self.control_bar, 2),
-            "current_turn": self.current_turn,
+            "is_your_turn": can_swing,  # Legacy
+            "can_attack": can_swing,  # Legacy
+            "has_submitted_round": my_submitted,  # Legacy
+            "opponent_has_submitted_round": opp_submitted,  # Legacy
+            "can_submit_round": can_swing,  # Legacy
         }
         
         if include_actions:
@@ -620,7 +869,7 @@ class DuelInvitation(Base):
     inviter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     invitee_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     
-    status = Column(String(20), nullable=False, default="pending")  # pending, accepted, declined, expired
+    status = Column(String(20), nullable=False, default="pending")
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     responded_at = Column(DateTime, nullable=True)
@@ -649,7 +898,7 @@ class DuelInvitation(Base):
 
 
 class DuelAction(Base):
-    """Log of each attack during a duel"""
+    """Log of each round resolution during a duel"""
     __tablename__ = "duel_actions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -685,36 +934,19 @@ class DuelAction(Base):
 
 
 class DuelPairingHistory(Base):
-    """
-    Tracks which player went first in previous duels between the same pair.
-    Used to alternate who starts when the same two players duel again.
-    
-    player_a_id is always the smaller ID (for consistent lookups).
-    """
+    """Tracks which player went first in previous duels."""
     __tablename__ = "duel_pairing_history"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    
-    # Always store with player_a_id < player_b_id for consistent lookups
     player_a_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     player_b_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    # Who went first in the last match
     last_first_player_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    
-    # Reference to the match
     last_match_id = Column(Integer, ForeignKey("duel_matches.id", ondelete="SET NULL"), nullable=True)
-    
-    # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    def __repr__(self):
-        return f"<DuelPairingHistory(a={self.player_a_id}, b={self.player_b_id}, last_first={self.last_first_player_id})>"
-    
     @staticmethod
     def normalize_pair(player_1_id: int, player_2_id: int) -> tuple:
-        """Return (smaller_id, larger_id) for consistent lookups"""
         return (min(player_1_id, player_2_id), max(player_1_id, player_2_id))
 
 
@@ -737,9 +969,6 @@ class DuelStats(Base):
     
     last_duel_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
-    def __repr__(self):
-        return f"<DuelStats(user={self.user_id}, wins={self.wins}, losses={self.losses})>"
     
     @property
     def total_matches(self) -> int:

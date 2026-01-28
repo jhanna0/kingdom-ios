@@ -1,45 +1,38 @@
 """
-DUEL API ROUTER
-===============
-Endpoints for PvP Arena duels in the Town Hall.
-
-Simplified flow (like trades):
-1. Challenger picks a friend and creates duel -> friend gets notification
-2. Friend accepts/declines
-3. Both players start fighting
+DUEL API ROUTER - Swing-by-Swing PvP Combat
+=============================================
 
 Endpoints:
-- POST /duels/create - Challenge a friend to a duel
-- GET /duels/invitations - Get pending duel challenges
-- GET /duels/pending-count - Get count of pending challenges (for badge)
-- POST /duels/invitations/{invitation_id}/accept - Accept a challenge
-- POST /duels/invitations/{invitation_id}/decline - Decline a challenge
-- POST /duels/{match_id}/start - Start the match
-- POST /duels/{match_id}/attack - Execute an attack
-- POST /duels/{match_id}/forfeit - Forfeit the match
-- POST /duels/{match_id}/cancel - Cancel (only if pending)
-- GET /duels/{match_id} - Get match status
-- GET /duels/active - Get player's active match
-- GET /duels/stats - Get player's duel stats
-- GET /duels/leaderboard - Get top duelists
-- GET /duels/kingdom/{kingdom_id}/recent - Get recent matches
+- POST /duels/create - Challenge a friend
+- GET /duels/invitations - Get pending challenges
+- POST /duels/invitations/{id}/accept - Accept challenge
+- POST /duels/invitations/{id}/decline - Decline challenge
+- POST /duels/{id}/start - Start the match
+- POST /duels/{id}/lock-style - Lock attack style
+- POST /duels/{id}/swing - Execute ONE swing
+- POST /duels/{id}/stop - Stop swinging, lock in best
+- POST /duels/{id}/forfeit - Forfeit match
+- POST /duels/{id}/claim-timeout - Claim timeout victory
+- POST /duels/{id}/cancel - Cancel waiting match
+- GET /duels/{id} - Get match status
+- GET /duels/active - Get active match
+- GET /duels/stats - Get duel stats
+- GET /duels/leaderboard - Top duelists
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 
 from db import get_db
-from db.models import User, PlayerState, Friend, DuelMatch, DuelInvitation, DuelStatus
+from db.models import User, DuelMatch, DuelInvitation, DuelStatus, Friend
 from routers.auth import get_current_user
 from systems.duel import DuelManager
 from websocket.broadcast import broadcast_duel_event, DuelEvents
 from sqlalchemy import or_, and_
 
 router = APIRouter(prefix="/duels", tags=["duels"])
-
-# Global duel manager
 _duel_manager = DuelManager()
 
 
@@ -48,10 +41,7 @@ def get_duel_manager() -> DuelManager:
 
 
 def _get_apple_user_ids(db: Session, user_ids: List[int]) -> List[str]:
-    """Convert database user IDs to Apple user IDs for WebSocket broadcast."""
-    if not user_ids:
-        return []
-    # Filter out None values
+    """Convert DB user IDs to Apple user IDs for WebSocket."""
     valid_ids = [uid for uid in user_ids if uid is not None]
     if not valid_ids:
         return []
@@ -64,9 +54,8 @@ def _get_apple_user_ids(db: Session, user_ids: List[int]) -> List[str]:
 # ============================================================
 
 class CreateDuelRequest(BaseModel):
-    """Challenge a friend to a duel"""
     kingdom_id: str
-    opponent_id: int  # Required: friend to challenge
+    opponent_id: int
     wager_gold: int = 0
 
 
@@ -76,59 +65,41 @@ class DuelResponse(BaseModel):
     match: Optional[dict] = None
 
 
-class AttackResponse(BaseModel):
+class SwingResponse(BaseModel):
+    """Response for a single swing."""
     success: bool
     message: str
-    # Single swing data
     roll: Optional[dict] = None
+    outcome: Optional[str] = None
     swing_number: Optional[int] = None
     swings_remaining: Optional[int] = None
     max_swings: Optional[int] = None
-    current_best_outcome: Optional[str] = None
-    current_best_push: Optional[float] = None
-    all_rolls: Optional[List[dict]] = None
-    is_last_swing: Optional[bool] = None
-    turn_complete: Optional[bool] = None
-    # Final action (only on last swing)
-    action: Optional[dict] = None
+    best_outcome: Optional[str] = None
+    can_swing: Optional[bool] = None
+    can_stop: Optional[bool] = None
+    auto_submitted: Optional[bool] = None
+    round_resolved: Optional[bool] = None
+    resolution: Optional[dict] = None
     match: Optional[dict] = None
-    winner: Optional[dict] = None
-    next_turn: Optional[dict] = None
-    game_over: Optional[bool] = None
-    # Odds
     miss_chance: Optional[int] = None
     hit_chance_pct: Optional[int] = None
     crit_chance: Optional[int] = None
 
 
-class RoundSwingResponse(BaseModel):
+class StopResponse(BaseModel):
+    """Response for stopping (locking in best roll)."""
     success: bool
-    status: Optional[str] = None  # waiting_for_opponent | resolved
     message: str
-
-    round_number: Optional[int] = None
-    round_expires_at: Optional[str] = None
-
-    your_rolls: Optional[List[dict]] = None
-    opponent_rolls: Optional[List[dict]] = None
-
-    result: Optional[dict] = None
-    push: Optional[dict] = None
-    styles: Optional[dict] = None  # Style reveal after resolution
-
+    submitted: Optional[bool] = None
+    best_outcome: Optional[str] = None
+    waiting_for_opponent: Optional[bool] = None
+    round_resolved: Optional[bool] = None
+    resolution: Optional[dict] = None
     match: Optional[dict] = None
-    winner: Optional[dict] = None
-    game_over: Optional[bool] = None
-
-    # Odds (per-roll odds for the submitting player)
-    miss_chance: Optional[int] = None
-    hit_chance_pct: Optional[int] = None
-    crit_chance: Optional[int] = None
 
 
 class LockStyleRequest(BaseModel):
-    """Lock in an attack style for the current round"""
-    style: str  # balanced, aggressive, precise, power, guard, feint
+    style: str
 
 
 class LockStyleResponse(BaseModel):
@@ -155,7 +126,7 @@ class LeaderboardResponse(BaseModel):
 
 
 # ============================================================
-# STATIC ROUTES (before dynamic routes)
+# STATIC ROUTES
 # ============================================================
 
 @router.get("/invitations", response_model=InvitationsResponse)
@@ -164,7 +135,7 @@ def get_invitations(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get pending duel invitations for the current user"""
+    """Get pending duel invitations."""
     invitations = manager.get_pending_invitations(db, user.id)
     return InvitationsResponse(success=True, invitations=invitations)
 
@@ -175,7 +146,7 @@ def get_active_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get the player's current active match (if any) - returns player-perspective view"""
+    """Get player's active match."""
     match = manager.get_active_match_for_player(db, user.id)
     if match:
         return DuelResponse(
@@ -192,19 +163,13 @@ def get_my_stats(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get the current user's duel statistics"""
+    """Get duel statistics."""
     stats = manager.get_player_stats(db, user.id)
     if stats:
         return StatsResponse(success=True, stats=stats.to_dict())
     return StatsResponse(success=True, stats={
-        "user_id": user.id,
-        "wins": 0,
-        "losses": 0,
-        "draws": 0,
-        "total_matches": 0,
-        "win_rate": 0.0,
-        "win_streak": 0,
-        "best_win_streak": 0,
+        "user_id": user.id, "wins": 0, "losses": 0, "draws": 0,
+        "total_matches": 0, "win_rate": 0.0, "win_streak": 0, "best_win_streak": 0,
     })
 
 
@@ -214,7 +179,7 @@ def get_leaderboard(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get the duel leaderboard (top players by wins)"""
+    """Get top duelists."""
     leaderboard = manager.get_leaderboard(db, limit=min(limit, 50))
     return LeaderboardResponse(success=True, leaderboard=leaderboard)
 
@@ -226,7 +191,7 @@ def get_recent_matches(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get recent completed duels in a kingdom"""
+    """Get recent matches in a kingdom."""
     matches = manager.get_recent_matches(db, kingdom_id, limit=min(limit, 25))
     return {"success": True, "matches": matches}
 
@@ -236,21 +201,20 @@ def get_pending_duel_count(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get count of pending duel invitations (for badge display)"""
+    """Get count of pending invitations."""
     count = db.query(DuelInvitation).filter(
         DuelInvitation.invitee_id == user.id,
         DuelInvitation.status == "pending"
     ).count()
-    
     return {"count": count}
 
 
 # ============================================================
-# MATCH CREATION AND INVITATIONS
+# MATCH CREATION
 # ============================================================
 
 def are_friends(db: Session, user_id_1: int, user_id_2: int) -> bool:
-    """Check if two users are friends (accepted friendship)"""
+    """Check if two users are friends."""
     friendship = db.query(Friend).filter(
         or_(
             and_(Friend.user_id == user_id_1, Friend.friend_user_id == user_id_2),
@@ -268,44 +232,26 @@ def create_duel(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """
-    Challenge a friend to a duel.
-    
-    Like trades: picks a friend directly and sends them a challenge.
-    The friend will see the invitation and can accept/decline.
-    """
-    # Can't challenge yourself
+    """Challenge a friend to a duel."""
     if request.opponent_id == user.id:
-        return DuelResponse(success=False, message="You cannot challenge yourself")
+        return DuelResponse(success=False, message="Cannot challenge yourself")
     
-    # Check if player already has an active match
     existing = manager.get_active_match_for_player(db, user.id)
     if existing:
-        return DuelResponse(
-            success=False,
-            message="You already have an active duel",
-            match=existing.to_dict()
-        )
+        return DuelResponse(success=False, message="You already have an active duel", match=existing.to_dict())
     
-    # Check opponent exists
     opponent = db.query(User).filter(User.id == request.opponent_id).first()
     if not opponent:
         return DuelResponse(success=False, message="Opponent not found")
     
-    # Check they're friends
     if not are_friends(db, user.id, request.opponent_id):
-        return DuelResponse(success=False, message="You can only challenge friends to duels")
+        return DuelResponse(success=False, message="You can only challenge friends")
     
-    # Check opponent doesn't have an active match
     opponent_match = manager.get_active_match_for_player(db, request.opponent_id)
     if opponent_match:
-        return DuelResponse(
-            success=False,
-            message=f"{opponent.display_name} is already in a duel"
-        )
+        return DuelResponse(success=False, message=f"{opponent.display_name} is already in a duel")
     
     try:
-        # Create match with opponent already set (pending their acceptance)
         match, invitation = manager.create_challenge(
             db=db,
             challenger_id=user.id,
@@ -314,19 +260,13 @@ def create_duel(
             wager_gold=request.wager_gold
         )
         
-        # Notify the opponent via WebSocket (use generic dict for notification)
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_INVITATION,
-            match=match.to_dict() if match else None,
+            match=match.to_dict(),
             target_user_ids=_get_apple_user_ids(db, [request.opponent_id]),
-            data={
-                "inviter_name": user.display_name,
-                "invitation_id": invitation.id,
-                "wager_gold": request.wager_gold,
-            }
+            data={"inviter_name": user.display_name, "invitation_id": invitation.id, "wager_gold": request.wager_gold}
         )
         
-        # Return player-perspective view for the challenger
         return DuelResponse(
             success=True,
             message=f"Challenge sent to {opponent.display_name}!",
@@ -343,11 +283,10 @@ def accept_invitation(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Accept a duel invitation - returns player-perspective view"""
+    """Accept a duel invitation."""
     try:
         match = manager.join_by_invitation(db, invitation_id, user.id)
         
-        # Notify the challenger with their perspective
         broadcast_duel_event(
             event_type=DuelEvents.DUEL_OPPONENT_JOINED,
             match=match.to_dict_for_player(match.challenger_id),
@@ -355,12 +294,7 @@ def accept_invitation(
             data={"opponent_name": user.display_name}
         )
         
-        # Return accepter's perspective
-        return DuelResponse(
-            success=True,
-            message="Joined the duel!",
-            match=match.to_dict_for_player(user.id)
-        )
+        return DuelResponse(success=True, message="Joined the duel!", match=match.to_dict_for_player(user.id))
     except ValueError as e:
         return DuelResponse(success=False, message=str(e))
 
@@ -372,19 +306,16 @@ def decline_invitation(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Decline a duel challenge - cancels the associated match"""
+    """Decline a duel invitation."""
     try:
         match = manager.decline_invitation(db, invitation_id, user.id)
-        
-        # Notify the challenger that their challenge was declined
         if match:
             broadcast_duel_event(
                 event_type=DuelEvents.DUEL_CANCELLED,
-                match=match.to_dict() if match else None,
+                match=match.to_dict(),
                 target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
-                data={"message": f"{user.display_name} declined your duel challenge."}
+                data={"message": f"{user.display_name} declined your challenge."}
             )
-        
         return {"success": True, "message": "Challenge declined"}
     except ValueError as e:
         return {"success": False, "message": str(e)}
@@ -401,212 +332,23 @@ def start_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """
-    Start the duel (once opponent has joined).
-    
-    BACKEND DETERMINES WHO GOES FIRST:
-    - Checks pairing history between these two players
-    - If they've dueled before, the OTHER player goes first this time
-    - This ensures fairness across rematches
-    
-    Returns player-perspective view for each client.
-    """
+    """Start the duel."""
     try:
         match = manager.start_match(db, match_id, user.id)
         
-        # Notify challenger with THEIR perspective
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_STARTED,
-            match=match.to_dict_for_player(match.challenger_id),
-            target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
-            data={"message": "The duel begins!"}
-        )
-        
-        # Notify opponent with THEIR perspective
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_STARTED,
-            match=match.to_dict_for_player(match.opponent_id),
-            target_user_ids=_get_apple_user_ids(db, [match.opponent_id]),
-            data={"message": "The duel begins!"}
-        )
-        
-        # Return starter's perspective
-        return DuelResponse(
-            success=True,
-            message="The duel begins!",
-            match=match.to_dict_for_player(user.id)
-        )
-    except ValueError as e:
-        # Even on error, return current match state so client can sync
-        match = manager.get_match(db, match_id)
-        return DuelResponse(
-            success=False, 
-            message=str(e),
-            match=match.to_dict_for_player(user.id) if match else None
-        )
-
-
-@router.post("/{match_id}/attack", response_model=AttackResponse)
-def execute_attack(
-    match_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    manager: DuelManager = Depends(get_duel_manager),
-):
-    """
-    Execute a SINGLE SWING during your turn.
-    
-    Multi-swing system:
-    - Each call = one swing (not all swings at once)
-    - Player gets (1 + attack) swings per turn
-    - Best outcome across all swings is used
-    - Turn only switches after all swings are used
-    
-    REAL-TIME: Each swing is broadcast immediately so opponent sees it live.
-    """
-    try:
-        result = manager.execute_attack(db, match_id, user.id)
-        
-        # Get the actual match object for player-perspective serialization
-        db_match = manager.get_match(db, match_id)
-        
-        roll = result.get("roll", {})
-        is_last_swing = result.get("is_last_swing", False)
-        
-        # Odds for the response
-        odds = {
-            "miss": result.get("miss_chance", 50),
-            "hit": result.get("hit_chance_pct", 40),
-            "crit": result.get("crit_chance", 10),
-        }
-        
-        if db_match:
-            # Get attacker name for the roll display
-            attacker_name = db_match.challenger_name if db_match.challenger_id == user.id else db_match.opponent_name
-            
-            # Get opponent ID (the one NOT attacking)
-            opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
-            
-            # === REAL-TIME: Broadcast EVERY swing to opponent immediately ===
-            swing_data = {
-                "attacker_id": user.id,
-                "attacker_name": attacker_name,
-                "roll": roll,
-                "swing_number": result.get("swing_number"),
-                "swings_remaining": result.get("swings_remaining"),
-                "max_swings": result.get("max_swings"),
-                "is_last_swing": is_last_swing,
-            }
-            
-            # Broadcast swing to opponent so they see it in real-time
+        # Notify both with their perspective
+        for pid in [match.challenger_id, match.opponent_id]:
             broadcast_duel_event(
-                event_type=DuelEvents.DUEL_SWING,
-                match=db_match.to_dict_for_player(opponent_id, odds=odds),
-                target_user_ids=_get_apple_user_ids(db, [opponent_id]),
-                data=swing_data
+                event_type=DuelEvents.DUEL_STARTED,
+                match=match.to_dict_for_player(pid),
+                target_user_ids=_get_apple_user_ids(db, [pid]),
+                data={"message": "The duel begins!", "round_number": 1, "phase": "style_selection"}
             )
-            
-            # === On LAST swing, send turn complete ONLY to the OPPONENT (not the attacker) ===
-            # The attacker already has everything from their API response.
-            # Only the opponent needs the WebSocket event to see the turn change.
-            if is_last_swing:
-                event_type = DuelEvents.DUEL_TURN_COMPLETE if not result.get("winner") else DuelEvents.DUEL_ENDED
-                
-                # Calculate odds for the NEXT attacker (so they see their chances before attacking)
-                next_odds = odds  # Default to current odds
-                if not result.get("winner"):
-                    from systems.duel.config import calculate_duel_roll_chances
-                    
-                    if db_match.current_turn == "challenger":
-                        new_attack = db_match.challenger_stats.get("attack", 0)
-                        new_defense = db_match.opponent_stats.get("defense", 0)
-                    else:
-                        new_attack = db_match.opponent_stats.get("attack", 0)
-                        new_defense = db_match.challenger_stats.get("defense", 0)
-                    
-                    new_miss, new_hit, new_crit = calculate_duel_roll_chances(new_attack, new_defense)
-                    next_odds = {"miss": new_miss, "hit": new_hit, "crit": new_crit}
-                
-                event_data = {
-                    "attacker_id": user.id,
-                    "attacker_name": attacker_name,
-                    "all_rolls": result.get("all_rolls"),
-                    "action": result.get("action"),
-                    "game_over": result.get("game_over", False),
-                }
-                
-                # ONLY send to the OPPONENT - the attacker already has their API response
-                broadcast_duel_event(
-                    event_type=event_type,
-                    match=db_match.to_dict_for_player(opponent_id, odds=next_odds),
-                    target_user_ids=_get_apple_user_ids(db, [opponent_id]),
-                    data=event_data
-                )
         
-        # Build response message
-        outcome = roll.get("outcome", "miss")
-        swings_remaining = result.get("swings_remaining", 0)
-        
-        if result.get("winner"):
-            message = "VICTORY! You win the duel!" if result["winner"]["player_id"] == user.id else "Defeat..."
-        elif is_last_swing:
-            best = result.get("current_best_outcome", "miss")
-            push = result.get("action", {}).get("push_amount", 0)
-            if best == "critical":
-                message = f"CRITICAL HIT! Pushed {push:.1f}%"
-            elif best == "hit":
-                message = f"Hit! Pushed {push:.1f}%"
-            else:
-                message = "All misses! No push."
-        else:
-            if outcome == "critical":
-                message = f"CRIT! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
-            elif outcome == "hit":
-                message = f"Hit! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
-            else:
-                message = f"Miss! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
-        
-        # For the match response, use the CURRENT attacker's odds (which is the opponent if turn switched)
-        # This ensures the probability bar shows correct odds for whoever's turn it is now
-        response_odds = odds  # Default to attacker's odds (for mid-turn swings)
-        if is_last_swing and not result.get("winner") and db_match:
-            # Turn has switched - calculate odds for the NEW current attacker
-            from systems.duel.config import calculate_duel_roll_chances
-            if db_match.current_turn == "challenger":
-                new_attack = db_match.challenger_stats.get("attack", 0)
-                new_defense = db_match.opponent_stats.get("defense", 0)
-            else:
-                new_attack = db_match.opponent_stats.get("attack", 0)
-                new_defense = db_match.challenger_stats.get("defense", 0)
-            new_miss, new_hit, new_crit = calculate_duel_roll_chances(new_attack, new_defense)
-            response_odds = {"miss": new_miss, "hit": new_hit, "crit": new_crit}
-        
-        # Return attacker's perspective with correct current odds
-        match_dict = db_match.to_dict_for_player(user.id, odds=response_odds) if db_match else result.get("match", {})
-        
-        return AttackResponse(
-            success=True,
-            message=message,
-            roll=roll,
-            swing_number=result.get("swing_number"),
-            swings_remaining=result.get("swings_remaining"),
-            max_swings=result.get("max_swings"),
-            current_best_outcome=result.get("current_best_outcome"),
-            current_best_push=result.get("current_best_push"),
-            all_rolls=result.get("all_rolls"),
-            is_last_swing=is_last_swing,
-            turn_complete=result.get("turn_complete"),
-            action=result.get("action"),
-            match=match_dict,
-            winner=result.get("winner"),
-            next_turn=result.get("next_turn"),
-            game_over=result.get("game_over"),
-            miss_chance=result.get("miss_chance"),
-            hit_chance_pct=result.get("hit_chance_pct"),
-            crit_chance=result.get("crit_chance"),
-        )
+        return DuelResponse(success=True, message="The duel begins!", match=match.to_dict_for_player(user.id))
     except ValueError as e:
-        return AttackResponse(success=False, message=str(e))
+        match = manager.get_match(db, match_id)
+        return DuelResponse(success=False, message=str(e), match=match.to_dict_for_player(user.id) if match else None)
 
 
 @router.post("/{match_id}/lock-style", response_model=LockStyleResponse)
@@ -617,41 +359,43 @@ def lock_style(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """
-    Lock in an attack style for the current round.
-    
-    Must be called during the style selection phase (first 10s of round).
-    If you don't lock a style before submitting swings, defaults to 'balanced'.
-    
-    Styles:
-    - balanced: No modifiers (default)
-    - aggressive: +1 roll, -5% hit chance
-    - precise: +8% hit chance, -25% crit rate
-    - power: +25% push if win, opponent +10% push if lose
-    - guard: -1 roll, opponent -8% hit chance
-    - feint: Win ties
-    """
+    """Lock in an attack style."""
     try:
         result = manager.lock_style(db, match_id, user.id, request.style)
         db_match = manager.get_match(db, match_id)
         
-        # Notify opponent that we locked a style (but not WHICH style)
         if db_match:
             opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
-            broadcast_duel_event(
-                event_type=DuelEvents.DUEL_STYLE_LOCKED,
-                match=db_match.to_dict_for_player(opponent_id),
-                target_user_ids=_get_apple_user_ids(db, [opponent_id]),
-                data={
-                    "locker_id": user.id,
-                    "locker_name": user.display_name,
-                    "both_locked": result.get("both_styles_locked", False),
-                }
-            )
+            both_locked = result.get("both_styles_locked", False)
+            
+            if both_locked:
+                # ONLY broadcast when BOTH have locked - reveals styles to both simultaneously
+                for pid in [db_match.challenger_id, db_match.opponent_id]:
+                    broadcast_duel_event(
+                        event_type=DuelEvents.DUEL_STYLES_REVEALED,
+                        match=db_match.to_dict_for_player(pid),
+                        target_user_ids=_get_apple_user_ids(db, [pid]),
+                        data={
+                            "challenger_style": db_match.challenger_style,
+                            "opponent_style": db_match.opponent_style,
+                            "phase": "style_reveal",
+                        }
+                    )
+            else:
+                # Notify opponent that we locked (not WHICH style - just that they locked)
+                broadcast_duel_event(
+                    event_type=DuelEvents.DUEL_STYLE_LOCKED,
+                    match=db_match.to_dict_for_player(opponent_id),
+                    target_user_ids=_get_apple_user_ids(db, [opponent_id]),
+                    data={
+                        "locker_id": user.id,
+                        "locker_name": user.display_name,
+                    }
+                )
         
         return LockStyleResponse(
             success=True,
-            message=f"Locked in {request.style} style!",
+            message=f"Locked in {request.style}!",
             style=result.get("style"),
             both_styles_locked=result.get("both_styles_locked"),
             match=db_match.to_dict_for_player(user.id) if db_match else None,
@@ -660,106 +404,286 @@ def lock_style(
         return LockStyleResponse(success=False, message=str(e))
 
 
-@router.post("/{match_id}/round-swing", response_model=RoundSwingResponse)
-def submit_round_swing(
+# ============================================================
+# SWING PHASE - THE CORE MECHANIC
+# ============================================================
+
+@router.post("/{match_id}/swing", response_model=SwingResponse)
+def execute_swing(
     match_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
     """
-    Submit a FULL round of swings (simultaneous rounds; no turns).
-
-    - Each player submits once per round
-    - Server rolls N times (N = min(1 + attack, cap) + style bonus)
-    - Attack style modifiers are applied to hit chance, crit rate, and push
-    - When both have submitted, server resolves once and broadcasts a full reveal to BOTH players
+    Execute ONE swing.
+    
+    This is the core mechanic. Player clicks, gets one roll result,
+    then decides to swing again or stop.
     """
     try:
-        result = manager.submit_round_swing(db, match_id, user.id)
+        result = manager.swing(db, match_id, user.id)
         db_match = manager.get_match(db, match_id)
-        if not db_match:
-            return RoundSwingResponse(success=False, message="Match not found")
-
-        # Identify opponent
-        opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
-        attacker_name = db_match.challenger_name if db_match.challenger_id == user.id else db_match.opponent_name
-        attacker_side = db_match.get_player_side(user.id)
-
-        # Odds for the response/match rendering
-        odds = {
-            "miss": result.get("miss_chance", 50),
-            "hit": result.get("hit_chance_pct", 40),
-            "crit": result.get("crit_chance", 10),
-        }
-
-        # Broadcasts
-        if result.get("status") == "waiting_for_opponent":
-            # Notify opponent that a submission happened (so they can feel the pressure)
+        
+        if db_match:
+            my_name = db_match.challenger_name if db_match.challenger_id == user.id else db_match.opponent_name
+            opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
+            
+            # Broadcast swing to opponent (real-time feedback)
             broadcast_duel_event(
-                event_type=DuelEvents.DUEL_ROUND_SUBMITTED,
-                match=db_match.to_dict_for_player(opponent_id, odds=odds),
+                event_type=DuelEvents.DUEL_SWING,
+                match=db_match.to_dict_for_player(opponent_id),
                 target_user_ids=_get_apple_user_ids(db, [opponent_id]),
                 data={
-                    "round_number": result.get("round_number"),
-                    "submitter_id": user.id,
-                    "submitter_name": attacker_name,
-                },
+                    "swinger_id": user.id,
+                    "swinger_name": my_name,
+                    "roll": result.get("roll"),
+                    "outcome": result.get("outcome"),
+                    "swing_number": result.get("swing_number"),
+                    "swings_remaining": result.get("swings_remaining"),
+                    "best_outcome": result.get("best_outcome"),
+                }
             )
-        elif result.get("status") == "resolved":
-            # Build canonical reveal payload (always challenger/opponent)
-            challenger_rolls = result.get("your_rolls") if attacker_side == "challenger" else result.get("opponent_rolls")
-            opponent_rolls = result.get("opponent_rolls") if attacker_side == "challenger" else result.get("your_rolls")
             
-            # Get styles from result
-            styles = result.get("styles") or {}
-
-            reveal = {
-                "round_number": result.get("round_number"),
-                "challenger_name": db_match.challenger_name,
-                "opponent_name": db_match.opponent_name,
-                "challenger_rolls": challenger_rolls or [],
-                "opponent_rolls": opponent_rolls or [],
-                # Style reveal - both players see both styles after resolution
-                "challenger_style": styles.get("challenger"),
-                "opponent_style": styles.get("opponent"),
-                "result": result.get("result") or {},
-                "push": result.get("push") or {},
-                "game_over": result.get("game_over", False),
-            }
-
-            # Send to both players with their own perspective match dict
-            for pid in [db_match.challenger_id, db_match.opponent_id]:
+            # If auto-submitted (used all swings), notify opponent
+            if result.get("auto_submitted"):
                 broadcast_duel_event(
-                    event_type=DuelEvents.DUEL_ROUND_RESOLVED if not result.get("winner") else DuelEvents.DUEL_ENDED,
-                    match=db_match.to_dict_for_player(pid, odds=odds),
-                    target_user_ids=_get_apple_user_ids(db, [pid]),
-                    data=reveal,
+                    event_type=DuelEvents.DUEL_PLAYER_SUBMITTED,
+                    match=db_match.to_dict_for_player(opponent_id),
+                    target_user_ids=_get_apple_user_ids(db, [opponent_id]),
+                    data={
+                        "submitter_id": user.id,
+                        "submitter_name": my_name,
+                        "best_outcome": result.get("best_outcome"),
+                    }
                 )
-
-        # Return submitter's perspective
-        match_dict = db_match.to_dict_for_player(user.id, odds=odds)
-        return RoundSwingResponse(
+            
+            # If round resolved, broadcast to both
+            if result.get("round_resolved"):
+                resolution = result.get("resolution", {})
+                winner_side = resolution.get("winner_side")
+                raw_push = resolution.get("push_amount", 0)
+                parried = resolution.get("parried", False)
+                
+                for pid in [db_match.challenger_id, db_match.opponent_id]:
+                    # Calculate YOUR push amount with correct sign for this player's perspective
+                    # Positive = you won/pushed forward, Negative = you lost/got pushed back
+                    is_challenger = (pid == db_match.challenger_id)
+                    if parried:
+                        your_push_amount = 0.0
+                    elif winner_side == "challenger":
+                        your_push_amount = raw_push if is_challenger else -raw_push
+                    elif winner_side == "opponent":
+                        your_push_amount = -raw_push if is_challenger else raw_push
+                    else:
+                        your_push_amount = 0.0
+                    
+                    event_type = DuelEvents.DUEL_ENDED if resolution.get("game_over") else DuelEvents.DUEL_ROUND_RESOLVED
+                    broadcast_duel_event(
+                        event_type=event_type,
+                        match=db_match.to_dict_for_player(pid),
+                        target_user_ids=_get_apple_user_ids(db, [pid]),
+                        data={
+                            "resolution": resolution,
+                            "round_number": resolution.get("round_number"),
+                            "winner_side": resolution.get("winner_side"),
+                            "challenger_rolls": resolution.get("challenger_rolls"),
+                            "opponent_rolls": resolution.get("opponent_rolls"),
+                            "challenger_style": resolution.get("challenger_style"),
+                            "opponent_style": resolution.get("opponent_style"),
+                            "push_amount": resolution.get("push_amount"),  # Raw (always positive)
+                            "your_push_amount": your_push_amount,  # Signed for this player
+                            "bar_before": resolution.get("bar_before"),
+                            "bar_after": resolution.get("bar_after"),
+                            "parried": resolution.get("parried"),
+                            "feint_winner": resolution.get("feint_winner"),
+                            "game_over": resolution.get("game_over"),
+                        }
+                    )
+        
+        # Build message
+        outcome = result.get("outcome", "miss")
+        swings_remaining = result.get("swings_remaining", 0)
+        
+        if result.get("round_resolved"):
+            resolution = result.get("resolution", {})
+            if resolution.get("game_over"):
+                message = "Match complete!"
+            elif resolution.get("parried"):
+                message = "Parried! No push."
+            else:
+                push = resolution.get("push_amount", 0)
+                message = f"Round resolved! Push: {push:.1f}%"
+        elif result.get("auto_submitted"):
+            message = f"Final swing: {outcome.upper()}! Best: {result.get('best_outcome', 'miss').upper()}"
+        else:
+            message = f"{outcome.upper()}! {swings_remaining} swing{'s' if swings_remaining != 1 else ''} left"
+        
+        return SwingResponse(
             success=True,
-            status=result.get("status"),
-            message=result.get("message", "OK"),
-            round_number=result.get("round_number"),
-            round_expires_at=match_dict.get("round_expires_at"),
-            # Reveal happens via WebSocket when both submitted (simultaneous reveal)
-            your_rolls=None,
-            opponent_rolls=None,
-            result=result.get("result"),
-            push=result.get("push"),
-            styles=result.get("styles"),  # Style info
-            match=match_dict,
-            winner=result.get("winner"),
-            game_over=result.get("game_over"),
+            message=message,
+            roll=result.get("roll"),
+            outcome=result.get("outcome"),
+            swing_number=result.get("swing_number"),
+            swings_remaining=result.get("swings_remaining"),
+            max_swings=result.get("max_swings"),
+            best_outcome=result.get("best_outcome"),
+            can_swing=result.get("can_swing"),
+            can_stop=result.get("can_stop"),
+            auto_submitted=result.get("auto_submitted"),
+            round_resolved=result.get("round_resolved"),
+            resolution=result.get("resolution"),
+            match=db_match.to_dict_for_player(user.id) if db_match else None,
             miss_chance=result.get("miss_chance"),
             hit_chance_pct=result.get("hit_chance_pct"),
             crit_chance=result.get("crit_chance"),
         )
     except ValueError as e:
-        return RoundSwingResponse(success=False, message=str(e))
+        return SwingResponse(success=False, message=str(e))
+
+
+@router.post("/{match_id}/stop", response_model=StopResponse)
+def stop_swinging(
+    match_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """
+    Stop swinging and lock in current best roll.
+    
+    Player chooses to stop early after at least 1 swing.
+    """
+    try:
+        result = manager.stop(db, match_id, user.id)
+        db_match = manager.get_match(db, match_id)
+        
+        if db_match:
+            my_name = db_match.challenger_name if db_match.challenger_id == user.id else db_match.opponent_name
+            opponent_id = db_match.opponent_id if db_match.challenger_id == user.id else db_match.challenger_id
+            
+            # Notify opponent
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_PLAYER_SUBMITTED,
+                match=db_match.to_dict_for_player(opponent_id),
+                target_user_ids=_get_apple_user_ids(db, [opponent_id]),
+                data={
+                    "submitter_id": user.id,
+                    "submitter_name": my_name,
+                    "best_outcome": result.get("best_outcome"),
+                }
+            )
+            
+            # If round resolved, broadcast to both
+            if result.get("round_resolved"):
+                resolution = result.get("resolution", {})
+                winner_side = resolution.get("winner_side")
+                raw_push = resolution.get("push_amount", 0)
+                parried = resolution.get("parried", False)
+                
+                for pid in [db_match.challenger_id, db_match.opponent_id]:
+                    # Calculate YOUR push amount with correct sign for this player's perspective
+                    # Positive = you won/pushed forward, Negative = you lost/got pushed back
+                    is_challenger = (pid == db_match.challenger_id)
+                    if parried:
+                        your_push_amount = 0.0
+                    elif winner_side == "challenger":
+                        your_push_amount = raw_push if is_challenger else -raw_push
+                    elif winner_side == "opponent":
+                        your_push_amount = -raw_push if is_challenger else raw_push
+                    else:
+                        your_push_amount = 0.0
+                    
+                    event_type = DuelEvents.DUEL_ENDED if resolution.get("game_over") else DuelEvents.DUEL_ROUND_RESOLVED
+                    broadcast_duel_event(
+                        event_type=event_type,
+                        match=db_match.to_dict_for_player(pid),
+                        target_user_ids=_get_apple_user_ids(db, [pid]),
+                        data={
+                            "resolution": resolution,
+                            "round_number": resolution.get("round_number"),
+                            "winner_side": resolution.get("winner_side"),
+                            "challenger_rolls": resolution.get("challenger_rolls"),
+                            "opponent_rolls": resolution.get("opponent_rolls"),
+                            "challenger_style": resolution.get("challenger_style"),
+                            "opponent_style": resolution.get("opponent_style"),
+                            "push_amount": resolution.get("push_amount"),  # Raw (always positive)
+                            "your_push_amount": your_push_amount,  # Signed for this player
+                            "bar_before": resolution.get("bar_before"),
+                            "bar_after": resolution.get("bar_after"),
+                            "parried": resolution.get("parried"),
+                            "feint_winner": resolution.get("feint_winner"),
+                            "game_over": resolution.get("game_over"),
+                        }
+                    )
+        
+        # Build message
+        if result.get("round_resolved"):
+            resolution = result.get("resolution", {})
+            if resolution.get("game_over"):
+                message = "Match complete!"
+            elif resolution.get("parried"):
+                message = "Parried! No push."
+            else:
+                push = resolution.get("push_amount", 0)
+                message = f"Round resolved! Push: {push:.1f}%"
+        else:
+            message = f"Submitted! Best: {result.get('best_outcome', 'miss').upper()}. Waiting for opponent..."
+        
+        return StopResponse(
+            success=True,
+            message=message,
+            submitted=result.get("submitted"),
+            best_outcome=result.get("best_outcome"),
+            waiting_for_opponent=result.get("waiting_for_opponent"),
+            round_resolved=result.get("round_resolved"),
+            resolution=result.get("resolution"),
+            match=db_match.to_dict_for_player(user.id) if db_match else None,
+        )
+    except ValueError as e:
+        return StopResponse(success=False, message=str(e))
+
+
+# ============================================================
+# LEGACY ENDPOINTS (for backwards compat)
+# ============================================================
+
+@router.post("/{match_id}/attack")
+def execute_attack(
+    match_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """Legacy: Maps to /swing."""
+    return execute_swing(match_id, user, db, manager)
+
+
+@router.post("/{match_id}/round-swing")
+def submit_round_swing(
+    match_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    manager: DuelManager = Depends(get_duel_manager),
+):
+    """Legacy: Auto-swings all and stops."""
+    try:
+        result = manager.submit_round_swing(db, match_id, user.id)
+        db_match = manager.get_match(db, match_id)
+        return {
+            "success": True,
+            "status": "resolved" if result.get("round_resolved") else "waiting_for_opponent",
+            "message": "Submitted",
+            "match": db_match.to_dict_for_player(user.id) if db_match else None,
+            **result
+        }
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
+
+
+# ============================================================
+# FORFEIT / CANCEL / TIMEOUT
+# ============================================================
 
 @router.post("/{match_id}/forfeit", response_model=DuelResponse)
 def forfeit_match(
@@ -768,30 +692,27 @@ def forfeit_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Forfeit the match (opponent wins) - returns player-perspective view"""
+    """Forfeit the match."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         match = manager.forfeit_match(db, match_id, user.id)
         
-        # Notify each player with their perspective
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_ENDED,
-            match=match.to_dict_for_player(match.challenger_id),
-            target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
-            data={"forfeit_by": user.id}
-        )
+        # Broadcast to both players
+        for pid in [match.challenger_id, match.opponent_id]:
+            apple_ids = _get_apple_user_ids(db, [pid])
+            logger.info(f"[Forfeit] Broadcasting DUEL_ENDED to player {pid}, apple_ids: {apple_ids}")
+            
+            sent = broadcast_duel_event(
+                event_type=DuelEvents.DUEL_ENDED,
+                match=match.to_dict_for_player(pid),
+                target_user_ids=apple_ids,
+                data={"forfeit_by": user.id, "reason": "forfeit"}
+            )
+            logger.info(f"[Forfeit] Broadcast result for player {pid}: {sent} connections notified")
         
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_ENDED,
-            match=match.to_dict_for_player(match.opponent_id),
-            target_user_ids=_get_apple_user_ids(db, [match.opponent_id]),
-            data={"forfeit_by": user.id}
-        )
-        
-        return DuelResponse(
-            success=True,
-            message="You forfeited the match.",
-            match=match.to_dict_for_player(user.id)
-        )
+        return DuelResponse(success=True, message="You forfeited.", match=match.to_dict_for_player(user.id))
     except ValueError as e:
         return DuelResponse(success=False, message=str(e))
 
@@ -803,55 +724,22 @@ def claim_timeout(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """
-    Claim victory due to opponent timeout.
-    
-    If it's the opponent's turn and their turn has expired (30s),
-    the calling player wins by timeout.
-    
-    BACKEND ENFORCES:
-    - Must be opponent's turn (not yours)
-    - Turn must actually be expired
-    - Match must be in FIGHTING status
-    
-    Returns player-perspective view.
-    """
+    """Claim victory due to opponent timeout."""
     try:
-        # Get current turn player before resolving (for broadcast)
-        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
-        timed_out_player_id = match.get_current_turn_player_id() if match else None
+        match = manager.claim_swing_timeout(db, match_id, user.id)
         
-        # Use manager to validate and resolve timeout
-        match = manager.forfeit_by_timeout(db, match_id, user.id)
+        for pid in [match.challenger_id, match.opponent_id]:
+            broadcast_duel_event(
+                event_type=DuelEvents.DUEL_TIMEOUT,
+                match=match.to_dict_for_player(pid),
+                target_user_ids=_get_apple_user_ids(db, [pid]),
+                data={"reason": "timeout"}
+            )
         
-        # Notify each player with their perspective
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_TIMEOUT,
-            match=match.to_dict_for_player(match.challenger_id),
-            target_user_ids=_get_apple_user_ids(db, [match.challenger_id]),
-            data={"timed_out_player_id": timed_out_player_id, "reason": "timeout"}
-        )
-        
-        broadcast_duel_event(
-            event_type=DuelEvents.DUEL_TIMEOUT,
-            match=match.to_dict_for_player(match.opponent_id),
-            target_user_ids=_get_apple_user_ids(db, [match.opponent_id]),
-            data={"timed_out_player_id": timed_out_player_id, "reason": "timeout"}
-        )
-        
-        return DuelResponse(
-            success=True,
-            message="Victory! Opponent timed out.",
-            match=match.to_dict_for_player(user.id)
-        )
+        return DuelResponse(success=True, message="Victory! Opponent timed out.", match=match.to_dict_for_player(user.id))
     except ValueError as e:
-        # Even on error, return current match state so client can sync
         match = manager.get_match(db, match_id)
-        return DuelResponse(
-            success=False, 
-            message=str(e),
-            match=match.to_dict_for_player(user.id) if match else None
-        )
+        return DuelResponse(success=False, message=str(e), match=match.to_dict_for_player(user.id) if match else None)
 
 
 @router.post("/{match_id}/cancel", response_model=DuelResponse)
@@ -861,14 +749,10 @@ def cancel_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Cancel a waiting match (only challenger can do this) - returns player-perspective view"""
+    """Cancel a waiting match."""
     try:
         match = manager.cancel_match(db, match_id, user.id)
-        return DuelResponse(
-            success=True,
-            message="Match cancelled",
-            match=match.to_dict_for_player(user.id)
-        )
+        return DuelResponse(success=True, message="Match cancelled", match=match.to_dict_for_player(user.id))
     except ValueError as e:
         return DuelResponse(success=False, message=str(e))
 
@@ -884,7 +768,7 @@ def get_match(
     db: Session = Depends(get_db),
     manager: DuelManager = Depends(get_duel_manager),
 ):
-    """Get match status by ID - returns player-perspective view"""
+    """Get match status."""
     match = manager.get_match(db, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")

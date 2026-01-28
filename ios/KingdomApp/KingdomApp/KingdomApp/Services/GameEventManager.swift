@@ -11,6 +11,8 @@ enum DuelEventType: String {
     case swing = "duel_swing"  // Real-time: each swing broadcast immediately
     case turnComplete = "duel_turn_complete"  // Turn finished, bar pushed
     case styleLocked = "duel_style_locked"  // Opponent locked their style (not revealed yet)
+    case stylesRevealed = "duel_styles_revealed"  // Both styles revealed, swing phase begins
+    case playerSubmitted = "duel_player_submitted"  // Player stopped swinging
     case roundSubmitted = "duel_round_submitted"
     case roundResolved = "duel_round_resolved"
     case ended = "duel_ended"
