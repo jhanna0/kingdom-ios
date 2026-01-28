@@ -241,6 +241,9 @@ struct DuelGameConfig: Codable {
     let attackStyles: [AttackStyleConfig]?
     let defaultStyle: String?
     
+    // Outcome display config (labels, icons, colors for miss/hit/crit)
+    let outcomes: [String: OutcomeDisplayConfig]?
+    
     enum CodingKeys: String, CodingKey {
         case duelMode = "duel_mode"
         case turnTimeoutSeconds = "turn_timeout_seconds"
@@ -265,7 +268,15 @@ struct DuelGameConfig: Codable {
         case maxRollsPerRoundCap = "max_rolls_per_round_cap"
         case attackStyles = "attack_styles"
         case defaultStyle = "default_style"
+        case outcomes
     }
+}
+
+/// Outcome display configuration from server
+struct OutcomeDisplayConfig: Codable {
+    let label: String
+    let icon: String
+    let color: String
 }
 
 /// Roll with attacker info (no isMe flag needed - server tells us who attacked)
@@ -340,9 +351,13 @@ struct DuelMatch: Codable, Identifiable {
     let yourBarPosition: Double?
     let controlBar: Double?
     
-    // === ODDS ===
+    // === ODDS (your attack vs opponent) ===
     let currentOdds: DuelOdds?
     let baseOdds: DuelOdds?  // Before style modifiers (for animation)
+    
+    // === OPPONENT'S ODDS (opponent's attack vs you) ===
+    let opponentOdds: DuelOdds?
+    let opponentBaseOdds: DuelOdds?
     
     // === TIMEOUT ===
     let canClaimTimeout: Bool?
@@ -438,6 +453,8 @@ struct DuelMatch: Codable, Identifiable {
         // Odds
         case currentOdds = "current_odds"
         case baseOdds = "base_odds"
+        case opponentOdds = "opponent_odds"
+        case opponentBaseOdds = "opponent_base_odds"
         
         // Timeout
         case canClaimTimeout = "can_claim_timeout"

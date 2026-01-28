@@ -411,9 +411,12 @@ class DuelManager:
         match.opponent_max_swings = min(DUEL_MAX_ROLLS_PER_ROUND_CAP, op_raw + ch_bonus_to_opponent)
         
         # Set to STYLE REVEAL phase - frontend will show animation
-        # swing() will auto-transition to SWINGING when called
         match.round_phase = DuelPhase.STYLE_REVEAL.value
-        # DON'T call start_swing_phase() here - let swing() do it after reveal
+        
+        # START THE SWING TIMEOUT NOW - even if no one swings, timeout should work
+        # Frontend shows reveal animation, then players can swing
+        # If opponent never swings, you can still claim timeout
+        match.swing_phase_expires_at = datetime.utcnow() + timedelta(seconds=DUEL_SWING_TIMEOUT_SECONDS)
     
     # =========================================================================
     # SWING PHASE - THE CORE MECHANIC
@@ -742,11 +745,17 @@ class DuelManager:
         attacker_style: str,
         defender_style: str
     ) -> float:
-        """Apply style modifiers to hit chance."""
+        """
+        Apply style modifiers to hit chance.
+        
+        Uses MULTIPLICATIVE modifiers for fairness across all stat levels.
+        A 20% penalty costs the same relative amount whether you have 30% or 70% hit.
+        """
         atk_mods = get_style_modifiers(attacker_style or AttackStyle.BALANCED)
         def_mods = get_style_modifiers(defender_style or AttackStyle.BALANCED)
         
-        modified = base_hit_chance + atk_mods["hit_chance_mod"] + def_mods["opponent_hit_mod"]
+        # Multiplicative: base * attacker_mult * defender_mult
+        modified = base_hit_chance * atk_mods["hit_chance_mult"] * def_mods["opponent_hit_mult"]
         return max(DUEL_MIN_HIT_CHANCE, min(DUEL_MAX_HIT_CHANCE, modified))
     
     def _get_style_crit_multiplier(self, style: str) -> float:

@@ -431,23 +431,17 @@ class DuelMatch(Base):
             self.challenger_swings_used = swing_number
             self.challenger_round_rolls = rolls
             
-            # Track best outcome
-            current_best = self.challenger_best_outcome or "miss"
-            if OUTCOME_RANK.get(outcome, 0) > OUTCOME_RANK.get(current_best, 0):
-                self.challenger_best_outcome = outcome
-                self.challenger_best_push = push_amount
-            elif outcome == current_best and push_amount > (self.challenger_best_push or 0):
-                self.challenger_best_push = push_amount
+            # Track LAST outcome (not best!) - this creates the "press your luck" decision
+            # Swinging again REPLACES your current result, so you risk losing a good roll
+            self.challenger_best_outcome = outcome
+            self.challenger_best_push = push_amount
         else:
             self.opponent_swings_used = swing_number
             self.opponent_round_rolls = rolls
             
-            current_best = self.opponent_best_outcome or "miss"
-            if OUTCOME_RANK.get(outcome, 0) > OUTCOME_RANK.get(current_best, 0):
-                self.opponent_best_outcome = outcome
-                self.opponent_best_push = push_amount
-            elif outcome == current_best and push_amount > (self.opponent_best_push or 0):
-                self.opponent_best_push = push_amount
+            # Track LAST outcome (not best!) - this creates the "press your luck" decision
+            self.opponent_best_outcome = outcome
+            self.opponent_best_push = push_amount
         
         return roll_data
     
@@ -726,6 +720,43 @@ class DuelMatch(Base):
         opp_final_swings = max(1, min(DUEL_MAX_ROLLS_PER_ROUND_CAP, opp_base_swings + opp_style_roll_bonus))
         
         # ============================================================
+        # OPPONENT'S ODDS (when opponent attacks ME)
+        # ============================================================
+        # This is for the Style Reveal screen to show both probability bars
+        
+        opponent_base_odds = {"miss": 50, "hit": 40, "crit": 10}
+        opponent_current_odds = {"miss": 50, "hit": 40, "crit": 10}
+        
+        if self.is_fighting:
+            # Opponent attacking me: their attack vs my defense
+            opp_atk = opp_stats.get("attack", 0)
+            my_def = my_stats.get("defense", 0)
+            
+            # Base odds (without style modifiers)
+            opp_base_miss, opp_base_hit, opp_base_crit = calculate_duel_roll_chances(opp_atk, my_def)
+            opponent_base_odds = {"miss": opp_base_miss, "hit": opp_base_hit, "crit": opp_base_crit}
+            
+            opp_miss, opp_hit, opp_crit = opp_base_miss, opp_base_hit, opp_base_crit
+            
+            # Apply style modifiers if styles are revealed
+            if show_opp_style and (my_style or opp_style):
+                # Opponent's hit chance modification (their style + my debuff on them)
+                opp_mods = get_style_modifiers(opp_style or AttackStyle.BALANCED)
+                my_mods = get_style_modifiers(my_style or AttackStyle.BALANCED)
+                
+                opp_hit_mod = opp_mods.get("hit_chance_mod", 0) + my_mods.get("opponent_hit_mod", 0)
+                opp_crit_mult = opp_mods.get("crit_rate_mult", 1.0)
+                
+                # Recalculate opponent's odds
+                opp_base_hit_rate = (100 - opp_miss) / 100.0
+                opp_modified_hit = max(0.10, min(0.90, opp_base_hit_rate + opp_hit_mod))
+                opp_miss = int(round((1.0 - opp_modified_hit) * 100))
+                opp_crit = int(round(opp_modified_hit * 0.15 * opp_crit_mult * 100))
+                opp_hit = 100 - opp_miss - opp_crit
+            
+            opponent_current_odds = {"miss": opp_miss, "hit": opp_hit, "crit": opp_crit}
+        
+        # ============================================================
         # TIMEOUT CLAIMS
         # ============================================================
         
@@ -805,9 +836,13 @@ class DuelMatch(Base):
             "your_bar_position": round(your_bar_position, 2),
             "control_bar": round(self.control_bar, 2),
             
-            # === ODDS ===
+            # === ODDS (your attack vs opponent) ===
             "current_odds": current_odds,
             "base_odds": base_odds,  # Before style modifiers (for animation)
+            
+            # === OPPONENT'S ODDS (opponent's attack vs you) ===
+            "opponent_odds": opponent_current_odds,
+            "opponent_base_odds": opponent_base_odds,
             
             # === TIMEOUT ===
             "can_claim_timeout": can_claim_timeout,

@@ -111,16 +111,18 @@ class AttackStyle:
     # Default style if not selected
     DEFAULT = BALANCED
 
-# Style modifier constants (intentionally small)
+# Style modifier constants
+# MULTIPLIERS (not additive) - fair across all stat levels
+# hit_chance_mult: 1.0 = no change, 0.80 = 20% reduction, 1.20 = 20% bonus
 STYLE_MODIFIERS = {
     # Balanced - no modifiers, the default
     AttackStyle.BALANCED: {
         "roll_bonus": 0,           # +/- to number of rolls
-        "hit_chance_mod": 0.0,     # +/- to hit chance (additive, e.g., 0.05 = +5%)
+        "hit_chance_mult": 1.0,    # Multiplier on hit chance (1.0 = no change)
         "crit_rate_mult": 1.0,     # Multiplier on crit rate (1.0 = normal)
         "push_mult_win": 1.0,      # Push multiplier if you win the round
         "push_mult_lose": 1.0,     # Opponent push multiplier if you lose
-        "opponent_hit_mod": 0.0,   # +/- to opponent's hit chance
+        "opponent_hit_mult": 1.0,  # Multiplier on opponent's hit chance
         "tie_advantage": False,    # Win ties if True
         "description": "No modifiers",
         "icon": "equal.circle.fill",
@@ -129,39 +131,39 @@ STYLE_MODIFIERS = {
     # Aggressive - more rolls, less accurate
     AttackStyle.AGGRESSIVE: {
         "roll_bonus": 1,           # +1 roll this round (capped by max)
-        "hit_chance_mod": -0.05,   # -5% hit chance (overextending)
+        "hit_chance_mult": 0.80,   # 20% less accurate (swinging wild)
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.0,
         "push_mult_lose": 1.0,
-        "opponent_hit_mod": 0.0,
+        "opponent_hit_mult": 1.0,
         "tie_advantage": False,
-        "description": "+1 roll, -5% hit chance",
+        "description": "+1 roll, -20% hit chance",
         "icon": "flame.fill",
     },
     
     # Precise - more accurate, fewer crits
     AttackStyle.PRECISE: {
         "roll_bonus": 0,
-        "hit_chance_mod": 0.08,    # +8% hit chance
-        "crit_rate_mult": 0.75,    # -25% crit rate (not swinging for fences)
+        "hit_chance_mult": 1.20,   # 20% more accurate (careful aim)
+        "crit_rate_mult": 0.50,    # 50% fewer crits (not swinging for fences)
         "push_mult_win": 1.0,
         "push_mult_lose": 1.0,
-        "opponent_hit_mod": 0.0,
+        "opponent_hit_mult": 1.0,
         "tie_advantage": False,
-        "description": "+8% hit chance, -25% crit rate",
+        "description": "+20% hit chance, -50% crit rate",
         "icon": "scope",
     },
     
     # Power - high risk/reward push multipliers
     AttackStyle.POWER: {
         "roll_bonus": 0,
-        "hit_chance_mod": 0.0,
+        "hit_chance_mult": 1.0,
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.25,     # +25% push if you win
-        "push_mult_lose": 1.10,    # Opponent gets +10% if you lose
-        "opponent_hit_mod": 0.0,
+        "push_mult_lose": 1.20,    # Opponent gets +20% if you lose (symmetric risk)
+        "opponent_hit_mult": 1.0,
         "tie_advantage": False,
-        "description": "Win: 1.25x push. Lose: enemy 1.1x push",
+        "description": "Win: 1.25x push. Lose: enemy 1.2x push",
         "icon": "bolt.fill",
     },
     
@@ -169,24 +171,24 @@ STYLE_MODIFIERS = {
     # Note: If -1 roll would drop you to 0, you get 1 but opponent gets +1 bonus
     AttackStyle.GUARD: {
         "roll_bonus": -1,          # -1 roll (risky if you have 1 base roll)
-        "hit_chance_mod": 0.0,
+        "hit_chance_mult": 1.0,
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.0,
         "push_mult_lose": 1.0,
-        "opponent_hit_mod": -0.08, # Opponent gets -8% hit chance
+        "opponent_hit_mult": 0.80, # Opponent is 20% less accurate
         "tie_advantage": False,
-        "description": "-1 roll, opponent -8% hit chance",
+        "description": "-1 roll, opponent -20% hit chance",
         "icon": "shield.fill",
     },
     
     # Feint - wins ties
     AttackStyle.FEINT: {
         "roll_bonus": 0,
-        "hit_chance_mod": 0.0,
+        "hit_chance_mult": 1.0,
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.0,
         "push_mult_lose": 1.0,
-        "opponent_hit_mod": 0.0,
+        "opponent_hit_mult": 1.0,
         "tie_advantage": True,     # Wins outcome ties
         "description": "Wins ties (hit vs hit, crit vs crit)",
         "icon": "arrow.triangle.branch",
@@ -207,15 +209,43 @@ def get_all_styles_config() -> list:
             "icon": STYLE_MODIFIERS[style]["icon"],
             # Include key modifiers for UI display
             "roll_bonus": STYLE_MODIFIERS[style]["roll_bonus"],
-            "hit_chance_mod": int(STYLE_MODIFIERS[style]["hit_chance_mod"] * 100),  # As percentage
-            "crit_rate_mod": int((STYLE_MODIFIERS[style]["crit_rate_mult"] - 1.0) * 100),  # As percentage change
+            # Multipliers shown as percentage change: 0.80 → -20%, 1.20 → +20%
+            "hit_chance_mod": int((STYLE_MODIFIERS[style]["hit_chance_mult"] - 1.0) * 100),
+            "crit_rate_mod": int((STYLE_MODIFIERS[style]["crit_rate_mult"] - 1.0) * 100),
             "push_mult_win": STYLE_MODIFIERS[style]["push_mult_win"],
             "push_mult_lose": STYLE_MODIFIERS[style]["push_mult_lose"],
-            "opponent_hit_mod": int(STYLE_MODIFIERS[style]["opponent_hit_mod"] * 100),
+            "opponent_hit_mod": int((STYLE_MODIFIERS[style]["opponent_hit_mult"] - 1.0) * 100),
             "wins_ties": STYLE_MODIFIERS[style]["tie_advantage"],
         }
         for style in AttackStyle.ALL_STYLES
     ]
+
+# ============================================================
+# OUTCOME DISPLAY CONFIGURATION
+# ============================================================
+# Labels and icons for roll outcomes - frontend uses these directly
+
+OUTCOME_CONFIG = {
+    "miss": {
+        "label": "MISS",
+        "icon": "xmark.circle.fill",
+        "color": "disabled",  # Maps to theme color
+    },
+    "hit": {
+        "label": "HIT",
+        "icon": "checkmark.circle.fill",
+        "color": "buttonSuccess",
+    },
+    "critical": {
+        "label": "CRIT",
+        "icon": "flame.fill",
+        "color": "imperialGold",
+    },
+}
+
+def get_outcome_config() -> dict:
+    """Get outcome display configuration for frontend."""
+    return OUTCOME_CONFIG
 
 # ============================================================
 # MATCH SETTINGS
@@ -370,4 +400,7 @@ def get_duel_game_config() -> dict:
         # Attack styles - ALL style definitions come from server
         "attack_styles": get_all_styles_config(),
         "default_style": AttackStyle.DEFAULT,
+        
+        # Outcome display config - labels, icons, colors for miss/hit/crit
+        "outcomes": get_outcome_config(),
     }

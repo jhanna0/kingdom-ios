@@ -55,26 +55,29 @@ Result: Both players see exactly ONE popup
 
 ## The 6 Attack Styles (Exact Specification)
 
+**All hit chance modifiers are MULTIPLICATIVE** - fair across all stat levels.
+A -20% penalty costs the same relative amount whether you have 30% or 70% base hit.
+
 ### Balanced (default)
 - No modifiers.
 
 ### Aggressive (attack-forward)
 - **Rolls:** +1 roll this round (still capped by your existing cap)
-- **Hit chance:** -10% (overextending)
-- **Effect:** more chances to spike, slightly less accurate.
+- **Hit chance:** ×0.80 (20% less accurate - swinging wild)
+- **Effect:** more chances to spike, but each swing is riskier.
 
 ### Precise (anti-miss)
-- **Hit chance:** +10% (clamped to your existing min/max)
-- **Crit rate:** -50% of its normal (you're not swinging for the fences)
-- **Effect:** fewer "all miss" rounds, fewer crits.
+- **Hit chance:** ×1.20 (20% more accurate - careful aim)
+- **Crit rate:** ×0.50 (50% fewer crits - not swinging for the fences)
+- **Effect:** fewer "all miss" rounds, but fewer crits too.
 
 ### Power (leadership-forward)
 - **If you win the round:** push multiplier ×1.25
-- **If you lose:** opponent push multiplier ×1.10 (you left yourself open)
+- **If you lose:** opponent push multiplier ×1.20 (you left yourself open)
 - **Effect:** higher drama; leadership already scales push, this amplifies it.
 
 ### Guard (defense-forward)
-- **Opponent hit chance:** -10% this round
+- **Opponent hit chance:** ×0.80 (opponent is 20% less accurate)
 - **Your rolls:** -1 roll (min 1)
 - **Effect:** reduces opponent spike potential; you trade offense.
 
@@ -95,10 +98,10 @@ Both players see style picker (styles from server config)
 Player A picks "Aggressive" → POST /duels/{id}/lock-style
 Player B picks "Guard" → POST /duels/{id}/lock-style
     ↓
-Server calculates COMBINED effects:
-  - A's hit chance: base - 5% (aggressive) - 8% (B's guard) = base - 13%
+Server calculates COMBINED effects (MULTIPLICATIVE):
+  - A's hit chance: base × 0.80 (aggressive) × 0.80 (B's guard) = base × 0.64
   - A's rolls: base + 1 (aggressive)
-  - B's hit chance: base (no self-modifier)
+  - B's hit chance: base × 1.0 (no self-modifier)
   - B's rolls: base - 1 (guard)
     ↓
 Timer expires OR both locked → Style phase ends
@@ -123,7 +126,7 @@ Player A clicks SWING again → gets "HIT"
 Player A clicks SWING again → gets "MISS"
     ↓
 Player A clicks STOP (or uses all swings)
-Server records A's BEST roll: HIT
+Server records A's LAST roll: HIT (swinging again would REPLACE this!)
     ↓
 Player A waits for B to finish
 ```
@@ -165,21 +168,17 @@ Server sends style config:
       "id": "aggressive",
       "name": "Aggressive",
       "icon": "flame.fill",
-      "description": "More chances to spike, slightly less accurate",
-      "effects": {
-        "self": ["+1 roll", "-5% hit chance"],
-        "opponent": []
-      }
+      "description": "+1 roll, -20% hit chance",
+      "hit_chance_mod": -20,
+      "roll_bonus": 1
     },
     {
       "id": "guard",
       "name": "Guard",
       "icon": "shield.fill",
-      "description": "Reduces opponent spike potential",
-      "effects": {
-        "self": ["-1 roll"],
-        "opponent": ["-8% hit chance"]
-      }
+      "description": "-1 roll, opponent -20% hit chance",
+      "roll_bonus": -1,
+      "opponent_hit_mod": -20
     }
   ]
 }
@@ -200,7 +199,7 @@ Show:
 ### Probability Bar
 Must show MODIFIED odds from server:
 ```
-Base: 65% hit → With Aggressive (-5%) + Enemy Guard (-8%) → 52% hit
+Base: 65% hit → With Aggressive (×0.80) + Enemy Guard (×0.80) → 41.6% hit
 ```
 Server sends the final calculated odds. Frontend just displays them.
 
@@ -220,7 +219,8 @@ Server sends the final calculated odds. Frontend just displays them.
   
 - **SUBMIT button** - always visible (right side, 50%)
   - Enabled after at least 1 swing, disabled before
-  - Shows "Lock [BEST]" or "Swing first" when disabled
+  - Shows "Lock [CURRENT]" (e.g. "Lock HIT") or "Swing first" when disabled
+  - **KEY DECISION**: Swinging again REPLACES your current roll - risk vs reward!
 
 - **Forfeit button** - in top-right header (flag icon)
   - NOT in the bottom button area
@@ -235,8 +235,8 @@ Server sends the final calculated odds. Frontend just displays them.
 Show:
 - Your style (icon + name)
 - Opponent's style (icon + name)  
-- Your best roll
-- Opponent's best roll
+- Your final roll (what you stopped with)
+- Opponent's final roll
 - Winner indicator
 - Push amount (with style multipliers applied)
 - If feint won a tie, show "FEINT WINS TIE!"
@@ -262,7 +262,7 @@ Does ONE swing, returns one result:
 ```
 
 #### POST /duels/{id}/stop
-Locks in current best roll, waits for opponent:
+Locks in your CURRENT roll (your last swing result), waits for opponent:
 ```json
 {
   "submitted": true,
@@ -317,5 +317,5 @@ turn_rolls JSONB
 1. **Style effects are MUTUAL** - Guard affects your OPPONENT's hit chance, not yours
 2. **Odds calculated on server** - Frontend never does math
 3. **One swing at a time** - User controls when to stop
-4. **Best roll kept** - Server tracks best outcome per player
+4. **Last roll counts** - Swinging again REPLACES your current roll (press your luck!)
 5. **Reveal shows everything** - Both styles, both outcomes, winner, push amount
