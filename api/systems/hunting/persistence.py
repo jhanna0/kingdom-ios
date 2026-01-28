@@ -265,6 +265,10 @@ def _serialize_hunt(hunt_session) -> dict:
         "items_dropped": hunt_session.items_dropped,
         "started_at": serialize_datetime(hunt_session.started_at),
         "completed_at": serialize_datetime(hunt_session.completed_at),
+        # Streak bonus fields
+        "streak_active": hunt_session.streak_active,
+        "show_streak_popup": hunt_session.show_streak_popup,
+        "streak_info": hunt_session.streak_info,
     }
 
 
@@ -405,4 +409,8 @@ def _deserialize_hunt(data: dict) -> "HuntSession":
         items_dropped=data.get("items_dropped", []),
         started_at=parse_datetime(data.get("started_at")),
         completed_at=parse_datetime(data.get("completed_at")),
+        # Streak bonus fields
+        streak_active=data.get("streak_active", False),
+        show_streak_popup=data.get("show_streak_popup", False),
+        streak_info=data.get("streak_info"),
     )

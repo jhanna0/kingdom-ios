@@ -1071,20 +1071,22 @@ class HuntManager:
         if outcome == "hit":
             # VICTORY! Animal slain
             # Check streak NOW - this is the kill screen!
-            streak_active = self._check_hunt_streak(db, session.created_by)
+            streak_active, streak_just_activated = self._check_hunt_streak(db, session.created_by)
             if streak_active:
                 session.streak_active = True
-                session.show_streak_popup = True  # Show on kill screen!
-                session.streak_info = {
-                    "title": "HOT STREAK!",
-                    "subtitle": "2x Meat",
-                    "description": f"{HUNT_STREAK_THRESHOLD} hunts in a row!",
-                    "multiplier": HUNT_STREAK_MEAT_MULTIPLIER,
-                    "threshold": HUNT_STREAK_THRESHOLD,
-                    "icon": "flame.fill",
-                    "color": "buttonDanger",
-                    "dismiss_button": "Claim",
-                }
+                # Only show popup when streak FIRST activates (exactly 3), not on 4, 5, 6...
+                if streak_just_activated:
+                    session.show_streak_popup = True
+                    session.streak_info = {
+                        "title": "HOT STREAK!",
+                        "subtitle": "2x Meat",
+                        "description": f"{HUNT_STREAK_THRESHOLD} hunts in a row!",
+                        "multiplier": HUNT_STREAK_MEAT_MULTIPLIER,
+                        "threshold": HUNT_STREAK_THRESHOLD,
+                        "icon": "flame.fill",
+                        "color": "buttonDanger",
+                        "dismiss_button": "Claim",
+                    }
             
             return {
                 "message": f"{session.animal_data['name']} slain!",
@@ -1418,29 +1420,46 @@ class HuntManager:
         
         return result
     
-    def _check_hunt_streak(self, db, player_id: int) -> bool:
+    def _check_hunt_streak(self, db, player_id: int) -> tuple:
         """
         Check if player has a hunt streak (N-1 previous successful hunts).
         
-        If they have N-1 consecutive successes, and current hunt succeeds,
-        that's N in a row = streak bonus active!
+        Returns: (streak_active, streak_just_activated)
+        - streak_active: True if N-1 previous hunts were successful (apply multiplier)
+        - streak_just_activated: True if this is EXACTLY the Nth hunt (show popup)
+        
+        Like fishing: only show popup when streak FIRST activates (exactly N),
+        not on every subsequent success (N+1, N+2, etc.)
         """
         from db.models import HuntSession as HuntSessionModel
         
         # Need N-1 previous successes for a streak of N
         required_previous = HUNT_STREAK_THRESHOLD - 1
         
-        # Query last N-1 completed hunts for this player
+        # Query last N completed hunts (one more than required to check if streak already existed)
         last_hunts = db.query(HuntSessionModel).filter(
             HuntSessionModel.created_by == player_id,
             HuntSessionModel.status.in_(['completed', 'failed'])
-        ).order_by(HuntSessionModel.completed_at.desc()).limit(required_previous).all()
+        ).order_by(HuntSessionModel.completed_at.desc()).limit(HUNT_STREAK_THRESHOLD).all()
         
-        # Check if we have enough hunts and all were successful
+        # Check if we have enough hunts and last N-1 were successful
         if len(last_hunts) < required_previous:
-            return False
+            return False, False
         
-        return all(h.status == 'completed' for h in last_hunts)
+        # Check if last N-1 hunts were all successful
+        streak_active = all(h.status == 'completed' for h in last_hunts[:required_previous])
+        
+        if not streak_active:
+            return False, False
+        
+        # Streak is active - now check if it JUST activated (show popup only once)
+        # If Nth previous hunt exists and was also successful, streak already existed
+        if len(last_hunts) >= HUNT_STREAK_THRESHOLD and last_hunts[required_previous].status == 'completed':
+            # Had a streak before this hunt too - don't show popup again
+            return True, False
+        
+        # This is exactly the Nth successful hunt in a row - show popup!
+        return True, True
     
     def _select_animal(self, session: HuntSession, force_tier: Optional[int] = None) -> None:
         """Select an animal based on tracking score."""
