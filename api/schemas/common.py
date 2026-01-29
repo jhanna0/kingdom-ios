@@ -45,12 +45,19 @@ class BuildingUpgradeCost(BaseModel):
     can_afford: bool
 
 
+class PerActionCost(BaseModel):
+    """Resource cost per action - FULLY DYNAMIC"""
+    resource: str  # e.g. "wood", "iron", "stone"
+    amount: int  # Amount required per action
+
+
 class BuildingTierInfo(BaseModel):
     """Info for a single building tier - FULLY DYNAMIC"""
     tier: int
     name: str  # e.g. "Wooden Palisade", "Stone Wall"
     benefit: str  # e.g. "+2 defenders", "20% protected"
     description: str  # e.g. "Basic wooden wall"
+    per_action_costs: List[PerActionCost] = []  # Resource costs per action (wood, iron, etc.)
 
 
 class BuildingClickAction(BaseModel):

@@ -12,7 +12,7 @@ from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
 from routers.alliances import are_empires_allied
-from .utils import check_cooldown_from_table, calculate_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
+from .utils import check_cooldown_from_table, calculate_cooldown, calculate_training_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
 from .training import TRAINING_TYPES
 from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost, calculate_training_gold_per_action, calculate_training_actions, get_all_skill_values
 
@@ -285,10 +285,12 @@ def get_action_status(
     kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first() if state.current_kingdom_id else None
     
     # Calculate cooldowns based on skills
+    # Building skill reduces building/work cooldowns
     work_cooldown = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
     patrol_cooldown = PATROL_COOLDOWN
     farm_cooldown = FARM_COOLDOWN
-    training_cooldown = TRAINING_COOLDOWN
+    # Science skill reduces training cooldowns
+    training_cooldown = calculate_training_cooldown(TRAINING_COOLDOWN, state.science or 1)
     
     # Count active patrollers in current kingdom
     active_patrollers = 0

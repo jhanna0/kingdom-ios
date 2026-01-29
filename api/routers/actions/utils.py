@@ -39,8 +39,9 @@ def format_datetime_iso(dt: datetime) -> str:
 
 
 def calculate_cooldown(base_minutes: float, skill_level: int) -> float:
-    """Calculate action cooldown based on building skill level.
+    """Calculate BUILDING action cooldown based on building skill level.
     
+    Building skill reduces building cooldowns (personal skill).
     Values are centralized in tiers.py SKILLS["building"]["mechanics"]["cooldown_reduction"]
     """
     from routers.tiers import get_building_cooldown_reduction
@@ -48,15 +49,15 @@ def calculate_cooldown(base_minutes: float, skill_level: int) -> float:
     return base_minutes * multiplier
 
 
-def calculate_training_reduction(science_level: int) -> float:
-    """Calculate training actions reduction based on science skill level.
+def calculate_training_cooldown(base_minutes: float, science_level: int) -> float:
+    """Calculate TRAINING action cooldown based on science skill level.
     
-    Values are centralized in tiers.py SKILLS["science"]["mechanics"]["training_reduction"]
-    
-    Returns the multiplier (e.g., 0.95 for 5% reduction).
+    Science skill reduces training cooldowns (personal skill).
+    Values are centralized in tiers.py SKILLS["science"]["mechanics"]["cooldown_reduction"]
     """
-    from routers.tiers import get_science_training_reduction
-    return get_science_training_reduction(science_level)
+    from routers.tiers import get_science_cooldown_reduction
+    multiplier = get_science_cooldown_reduction(science_level)
+    return base_minutes * multiplier
 
 
 def get_cooldown(db: Session, user_id: int, action_type: str) -> Optional[ActionCooldown]:

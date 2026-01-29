@@ -177,11 +177,15 @@ class CityAPI {
                     
                     // Convert all tiers info
                     let allTiers = building.all_tiers.map { tier in
-                        BuildingTierInfo(
+                        let perActionCosts = (tier.per_action_costs ?? []).map { cost in
+                            BuildingPerActionCost(resource: cost.resource, amount: cost.amount)
+                        }
+                        return BuildingTierInfo(
                             tier: tier.tier,
                             name: tier.name,
                             benefit: tier.benefit,
-                            tierDescription: tier.description
+                            tierDescription: tier.description,
+                            perActionCosts: perActionCosts
                         )
                     }
                     

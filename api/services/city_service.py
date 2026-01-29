@@ -88,7 +88,8 @@ def get_buildings_for_kingdom(
         upgrade_cost = None
         if include_upgrade_costs and level < max_level:
             next_level = level + 1
-            actions = calculate_actions_required(building_meta["display_name"], next_level, active_citizens_count)
+            farm_level = kingdom.farm_level if hasattr(kingdom, 'farm_level') else 0
+            actions = calculate_actions_required(building_meta["display_name"], next_level, active_citizens_count, farm_level)
             construction_cost = calculate_construction_cost(next_level, active_citizens_count)
             upgrade_cost = {
                 "actions_required": actions,
@@ -110,7 +111,8 @@ def get_buildings_for_kingdom(
                 "tier": tier_num,
                 "name": tier_data.get("name", f"Level {tier_num}"),
                 "benefit": tier_data.get("benefit", ""),
-                "description": tier_data.get("description", "")
+                "description": tier_data.get("description", ""),
+                "per_action_costs": tier_data.get("per_action_costs", [])
             })
         
         # Get click action if defined (only clickable if level > 0)

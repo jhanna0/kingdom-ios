@@ -8,12 +8,19 @@ struct BuildingUpgradeCost: Hashable {
     let canAfford: Bool
 }
 
+/// Resource cost per action for buildings - FULLY DYNAMIC from backend
+struct BuildingPerActionCost: Hashable {
+    let resource: String  // e.g. "wood", "iron", "stone"
+    let amount: Int  // Amount required per action
+}
+
 /// Info for a single building tier - FULLY DYNAMIC from backend
 struct BuildingTierInfo: Hashable {
     let tier: Int
     let name: String  // e.g. "Wooden Palisade", "Stone Wall"
     let benefit: String  // e.g. "+2 defenders", "20% protected"
     let tierDescription: String  // e.g. "Basic wooden wall"
+    let perActionCosts: [BuildingPerActionCost]  // Resource costs per action (wood, iron, etc.)
 }
 
 // Click action for a building - DYNAMIC from backend

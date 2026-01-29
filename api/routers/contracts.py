@@ -242,12 +242,14 @@ def create_contract(
         )
     
     # Calculate actions required using LIVE citizen count (players with this kingdom as hometown)
+    # Farm building reduces actions required
     active_citizens_count = get_active_citizens_count(db, kingdom_id)
+    farm_level = kingdom.farm_level if hasattr(kingdom, 'farm_level') else 0
     
     if total_actions_required:
         actions_required = total_actions_required
     else:
-        actions_required = calculate_actions_required(building_type, building_level, active_citizens_count)
+        actions_required = calculate_actions_required(building_type, building_level, active_citizens_count, farm_level)
     
     # Calculate upfront cost: actions_required × action_reward
     upfront_cost = actions_required * action_reward

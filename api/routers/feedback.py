@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from db import get_db
-from services.auth_service import get_current_user
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 

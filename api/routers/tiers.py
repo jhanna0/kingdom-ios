@@ -246,26 +246,41 @@ BUILDING_TYPES = {
         "display_name": "Walls",
         "icon": "building.2.fill",
         "category": "defense",
-        "description": "Defensive walls protect against coups and invasions",
+        "description": "Adds defense against invasions",
         "max_tier": 5,
         "sort_order": 20,
-        "benefit_formula": "+{level * 2} defenders in battles",
+        "benefit_formula": "+{level * 1} defense in battles",
         "tiers": {
-            1: {"name": "Wooden Palisade", "benefit": "+2 defenders", "description": "Basic wooden wall"},
-            2: {
-                "name": "Soft Wood Wall",
-                "benefit": "+4 defenders",
-                "description": "Pine and cedar fortification",
+            1: {
+                "name": "Wooden Palisade",
+                "benefit": "+1 defense to all citizens during invasions",
+                "description": "Basic wooden wall",
                 "per_action_costs": [{"resource": "wood", "amount": 50}]
             },
-            3: {
-                "name": "Hardened Wooden Wall",
-                "benefit": "+6 defenders",
-                "description": "Oak and ironwood fortification",
+            2: {
+                "name": "Hardwood Wall",
+                "benefit": "+2 defense to all citizens during invasions",
+                "description": "Reinforced wooden fortification",
                 "per_action_costs": [{"resource": "wood", "amount": 100}]
             },
-            4: {"name": "Fortress Wall", "benefit": "+8 defenders", "description": "Imposing fortress wall"},
-            5: {"name": "Castle Wall", "benefit": "+10 defenders, max fortification", "description": "Massive castle wall"},
+            3: {
+                "name": "Stone Wall",
+                "benefit": "+3 defense to all citizens during invasions",
+                "description": "Solid stone fortification",
+                "per_action_costs": [{"resource": "stone", "amount": 50}]
+            },
+            4: {
+                "name": "Fortress Wall",
+                "benefit": "+4 defense to all citizens during invasions",
+                "description": "Imposing stone fortress wall",
+                "per_action_costs": [{"resource": "stone", "amount": 100}]
+            },
+            5: {
+                "name": "Iron-Reinforced Wall",
+                "benefit": "+5 defense to all citizens during invasions",
+                "description": "Massive iron-reinforced castle wall",
+                "per_action_costs": [{"resource": "iron", "amount": 100}]
+            },
         }
     },
     "vault": {
@@ -322,32 +337,32 @@ BUILDING_TYPES = {
         "display_name": "Farm",
         "icon": "leaf.fill",
         "category": "economy",
-        "description": "Speeds up contract completion",
+        "description": "Reduces building actions required for citizens",
         "max_tier": 5,
         "sort_order": 60,
-        "benefit_formula": "Contracts complete {reduction}% faster",
+        "benefit_formula": "Building contracts require {reduction}% fewer actions",
         "tiers": {
-            1: {"name": "Garden", "benefit": "Contracts 5% faster", "reduction": 5, "description": "Small farm plots"},
-            2: {"name": "Fields", "benefit": "Contracts 10% faster", "reduction": 10, "description": "Farming fields"},
-            3: {"name": "Estate Farm", "benefit": "Contracts 20% faster", "reduction": 20, "description": "Large farm estate"},
-            4: {"name": "Agricultural Complex", "benefit": "Contracts 25% faster", "reduction": 25, "description": "Advanced farming"},
-            5: {"name": "Agricultural Empire", "benefit": "Contracts 33% faster", "reduction": 33, "description": "Massive food production"},
+            1: {"name": "Garden", "benefit": "Building contracts require 5% fewer actions", "reduction": 5, "description": "Small farm plots"},
+            2: {"name": "Fields", "benefit": "Building contracts require 7.5% fewer actions", "reduction": 7.5, "description": "Farming fields"},
+            3: {"name": "Estate Farm", "benefit": "Building contracts require 10% fewer actions", "reduction": 10, "description": "Large farm estate"},
+            4: {"name": "Agricultural Complex", "benefit": "Building contracts require 12.5% fewer actions", "reduction": 12.5, "description": "Advanced farming"},
+            5: {"name": "Agricultural Empire", "benefit": "Building contracts require 15% fewer actions", "reduction": 15, "description": "Massive food production"},
         }
     },
     "education": {
         "display_name": "Education Hall",
         "icon": "graduationcap.fill",
         "category": "civic",
-        "description": "Reduces training time for citizens",
+        "description": "Reduces training actions required for citizens",
         "max_tier": 5,
         "sort_order": 70,
-        "benefit_formula": "Citizens train skills {level * 5}% faster",
+        "benefit_formula": "Training requires {reduction}% fewer actions",
         "tiers": {
-            1: {"name": "School", "benefit": "Train 5% faster", "reduction": 5, "description": "Basic education"},
-            2: {"name": "Academy", "benefit": "Train 10% faster", "reduction": 10, "description": "Advanced learning"},
-            3: {"name": "University", "benefit": "Train 15% faster", "reduction": 15, "description": "Higher education"},
-            4: {"name": "Institute", "benefit": "Train 20% faster", "reduction": 20, "description": "Elite institution"},
-            5: {"name": "Grand Library", "benefit": "Train 25% faster", "reduction": 25, "description": "Knowledge center"},
+            1: {"name": "School", "benefit": "Training requires 5% fewer actions", "reduction": 5, "description": "Basic education"},
+            2: {"name": "Academy", "benefit": "Training requires 7.5% fewer actions", "reduction": 7.5, "description": "Advanced learning"},
+            3: {"name": "University", "benefit": "Training requires 10% fewer actions", "reduction": 10, "description": "Higher education"},
+            4: {"name": "Institute", "benefit": "Training requires 12.5% fewer actions", "reduction": 12.5, "description": "Elite institution"},
+            5: {"name": "Grand Library", "benefit": "Training requires 15% fewer actions", "reduction": 15, "description": "Knowledge center"},
         }
     },
     "lumbermill": {
@@ -579,16 +594,16 @@ SKILLS = {
         "stat_attribute": "building_skill",
         "icon": "hammer.fill",
         "category": "economy",
-        "description": "Improves construction and resource gathering",
+        "description": "Reduces building cooldowns",
         "benefits": {
-            1: ["-5% building action cooldowns"],
-            2: ["-8% building action cooldowns"],
-            3: ["-12% building action cooldowns"],
-            4: ["-15% building action cooldowns", "10% chance to refund building action cooldown"],
-            5: ["-18% building action cooldowns", "Ability to build two projects at once"]
+            1: ["-5% building cooldowns"],
+            2: ["-7.5% building cooldowns"],
+            3: ["-10% building cooldowns"],
+            4: ["-12.5% building cooldowns", "5% chance to refund building cooldown"],
+            5: ["-15% building cooldowns", "10% chance to refund building cooldown"]
         },
         "mechanics": {
-            "cooldown_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
+            "cooldown_reduction": {1: 0.05, 2: 0.075, 3: 0.10, 4: 0.125, 5: 0.15},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
@@ -611,16 +626,16 @@ SKILLS = {
         "stat_attribute": "science",
         "icon": "flask.fill",
         "category": "education",
-        "description": "Improves training efficiency and skill development",
+        "description": "Reduces skill training cooldowns",
         "benefits": {
-            1: ["-5% training actions required"],
-            2: ["-8% training actions required"],
-            3: ["-12% training actions required"],
-            4: ["-15% training actions required", "5% chance to refund training cooldown"],
-            5: ["-18% training actions required", "10% chance to refund training cooldown"]
+            1: ["-5% training cooldowns"],
+            2: ["-7.5% training cooldowns"],
+            3: ["-10% training cooldowns"],
+            4: ["-12.5% training cooldowns", "5% chance to refund training cooldown"],
+            5: ["-15% training cooldowns", "10% chance to refund training cooldown"]
         },
         "mechanics": {
-            "training_reduction": {1: 0.05, 2: 0.08, 3: 0.12, 4: 0.15, 5: 0.18},
+            "cooldown_reduction": {1: 0.05, 2: 0.075, 3: 0.10, 4: 0.125, 5: 0.15},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
@@ -816,18 +831,32 @@ def get_building_action_reduction(building_skill: int) -> float:
     return 1.0 - reduction
 
 
-def get_science_training_reduction(tier: int) -> float:
-    """Get science skill training actions reduction multiplier for a tier.
+def get_science_cooldown_reduction(tier: int) -> float:
+    """Get science skill training COOLDOWN reduction multiplier for a tier.
     
+    Science skill reduces training cooldowns (personal skill).
     Returns: multiplier to apply (e.g., 0.95 for 5% reduction)
     """
-    reduction = get_skill_mechanic("science", "training_reduction", tier)
+    reduction = get_skill_mechanic("science", "cooldown_reduction", tier)
     return 1.0 - reduction
 
 
 def get_science_refund_chance(tier: int) -> float:
     """Get science skill training cooldown refund chance for a tier."""
     return get_skill_mechanic("science", "refund_chance", tier)
+
+
+def get_farm_action_reduction(farm_level: int) -> float:
+    """Get farm building action reduction multiplier for building contracts.
+    
+    Farm building reduces building contract ACTIONS (kingdom building).
+    Returns: multiplier to apply (e.g., 0.95 for 5% reduction)
+    Values come from BUILDING_TYPES["farm"]["tiers"][level]["reduction"]
+    """
+    if farm_level <= 0:
+        return 1.0
+    reduction_percent = get_building_tier_value("farm", farm_level, "reduction", 0)
+    return 1.0 - (reduction_percent / 100.0)
 
 
 def get_building_tier_value(building_type: str, tier: int, value_name: str, default: float = 0.0) -> float:

@@ -46,8 +46,18 @@ def calculate_construction_cost(building_level: int, population: int) -> int:
     return int(base_cost * population_multiplier)
 
 
-def calculate_actions_required(building_type: str, building_level: int, population: int) -> int:
-    """Calculate total actions required"""
+def calculate_actions_required(building_type: str, building_level: int, population: int, farm_level: int = 0) -> int:
+    """Calculate total actions required for building contracts.
+    
+    Farm building reduces actions required (kingdom building benefit).
+    Values come from tiers.py BUILDING_TYPES["farm"]["tiers"][level]["reduction"]
+    """
+    from routers.tiers import get_farm_action_reduction
+    
     base_actions = BUILDING_BASE_ACTIONS_REQUIRED * math.pow(BUILDING_LEVEL_ACTIONS_EXPONENT, building_level - 1)
     population_multiplier = 1.0 + (population / BUILDING_POPULATION_ACTIONS_DIVISOR)
-    return int(base_actions * population_multiplier)
+    raw_actions = base_actions * population_multiplier
+    
+    # Apply farm reduction (kingdom building reduces actions)
+    farm_multiplier = get_farm_action_reduction(farm_level)
+    return max(5, int(raw_actions * farm_multiplier))

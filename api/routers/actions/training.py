@@ -11,7 +11,7 @@ import random
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, calculate_training_reduction, check_and_deduct_food_cost
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, calculate_training_cooldown, set_cooldown, check_and_deduct_food_cost
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -23,31 +23,29 @@ from routers.tiers import (
     SKILLS, SKILL_TYPES, 
     get_stat_value, increment_stat, get_total_skill_points, get_all_skill_values,
     calculate_training_gold_per_action, calculate_training_actions,
-    get_education_training_reduction
+    get_education_training_reduction, get_science_cooldown_reduction
 )
 
 # Training types = all skill types (for backward compatibility)
 TRAINING_TYPES = SKILL_TYPES
 
 
-def get_training_actions_with_reductions(current_tier: int, total_skill_points: int, education_level: int = 0, science_level: int = 0) -> int:
-    """Calculate actions required with education/science reductions applied.
+def get_training_actions_with_reductions(current_tier: int, total_skill_points: int, education_level: int = 0) -> int:
+    """Calculate actions required with education reduction applied.
     
-    Uses centralized formula from tiers.py, then applies reductions:
-    - Education building (kingdom): reduces training time
-    - Science skill (personal): reduces training actions required
+    Uses centralized formula from tiers.py, then applies reduction:
+    - Education building (kingdom): reduces training ACTIONS required
+    
+    Note: Science skill reduces COOLDOWNS, not actions (handled separately).
     """
     # Get base actions from centralized formula
     base_actions = calculate_training_actions(current_tier, total_skill_points)
     
-    # Education building reduces training time (values from tiers.py)
+    # Education building reduces training actions (values from tiers.py)
     education_multiplier = get_education_training_reduction(education_level)
     
-    # Science skill reduces training actions required (values from tiers.py)
-    science_multiplier = calculate_training_reduction(science_level)
-    
-    # Apply both reductions (multiplicative)
-    reduced_actions = int(base_actions * education_multiplier * science_multiplier)
+    # Apply reduction
+    reduced_actions = int(base_actions * education_multiplier)
     return max(5, reduced_actions)
 
 
@@ -85,12 +83,11 @@ def get_training_costs(
     for skill_type in SKILL_TYPES:
         info = get_training_info_for_skill(state, skill_type)
         
-        # Apply education/science reductions to actions
+        # Apply education reduction to actions (kingdom building)
         actions_required = get_training_actions_with_reductions(
             info["current_tier"],
             total_skill_points, 
-            education_level, 
-            science_level
+            education_level
         )
         
         costs[skill_type] = {
@@ -228,12 +225,9 @@ def purchase_training(
     # Get total skill points (affects actions required)
     total_skill_points = get_total_skill_points(state)
     
-    # Get player's science level for training reduction
-    science_level = state.science or 1
-    
-    # Apply education/science reductions to actions
+    # Apply education reduction to actions (kingdom building)
     actions_required = get_training_actions_with_reductions(
-        current_tier, total_skill_points, education_level, science_level
+        current_tier, total_skill_points, education_level
     )
     
     # Get current tax rate for display (actual tax applied at action time)
@@ -341,8 +335,12 @@ def work_on_training(
             )
     # else: OLD SYSTEM - gold_paid > 0 means they paid upfront, action is FREE
     
+    # Calculate cooldown with science skill reduction (personal skill reduces training cooldowns)
+    science_level = state.science or 1
+    cooldown_minutes = calculate_training_cooldown(TRAINING_COOLDOWN, science_level)
+    
     # Check and deduct food cost BEFORE cooldown check
-    food_result = check_and_deduct_food_cost(db, current_user.id, TRAINING_COOLDOWN, "training")
+    food_result = check_and_deduct_food_cost(db, current_user.id, cooldown_minutes, "training")
     if not food_result["success"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -350,12 +348,12 @@ def work_on_training(
         )
     
     # ATOMIC COOLDOWN CHECK + SET - prevents race conditions in serverless
-    cooldown_expires = datetime.utcnow() + timedelta(minutes=TRAINING_COOLDOWN)
+    cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     if not DEV_MODE:
         cooldown_result = check_and_set_slot_cooldown_atomic(
             db, current_user.id,
             action_type="training",
-            cooldown_minutes=TRAINING_COOLDOWN,
+            cooldown_minutes=cooldown_minutes,
             expires_at=cooldown_expires
         )
         
@@ -460,11 +458,11 @@ def work_on_training(
     if cooldown_refunded:
         message += " Your scientific knowledge instantly refunded your training!"
     
-    # Calculate next available time
+    # Calculate next available time (using science-reduced cooldown)
     if cooldown_refunded:
         next_available = datetime.utcnow()
     else:
-        next_available = datetime.utcnow() + timedelta(minutes=TRAINING_COOLDOWN)
+        next_available = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
     return {
         "success": True,
