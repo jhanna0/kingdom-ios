@@ -25,8 +25,16 @@ struct TradeOfferView: View {
                         // Header
                         headerSection
                         
-                        // Item Selection (gold is first item)
-                        itemSelectionSection
+                        // Offer Type Selector (Item or Gold)
+                        offerTypeSection
+                        
+                        // Item Selection (if item offer)
+                        if viewModel.offerType == "item" {
+                            itemSelectionSection
+                        }
+                        
+                        // Gold Amount (price for items, or amount for gold gifts)
+                        goldAmountSection
                         
                         // Message
                         messageSection
@@ -105,7 +113,7 @@ struct TradeOfferView: View {
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 14)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Sending to")
+                    Text("Trading with")
                         .font(FontStyles.labelSmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
@@ -122,69 +130,105 @@ struct TradeOfferView: View {
         .padding(.horizontal)
     }
     
-    // MARK: - Item Selection Section
+    // MARK: - Offer Type Section
     
-    private var itemSelectionSection: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            Text("What to Send")
+    private var offerTypeSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            Text("What do you want to send?")
                 .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    // Gold as first item
-                    goldItemButton
-                    
-                    // Regular items
-                    ForEach(viewModel.tradeableItems) { item in
-                        itemButton(for: item)
+            HStack(spacing: 12) {
+                // Item offer
+                Button(action: { 
+                    viewModel.offerType = "item"
+                    viewModel.goldAmount = 0
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "cube.fill")
+                            .font(FontStyles.iconMedium)
+                        Text("Sell Item")
+                            .font(FontStyles.labelBold)
                     }
+                    .foregroundColor(viewModel.offerType == "item" ? .white : KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(viewModel.offerType == "item" ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.parchment)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
                 }
-                .padding(4) // Prevent border clipping on all sides
+                
+                // Gold gift
+                Button(action: { 
+                    viewModel.offerType = "gold"
+                    viewModel.goldAmount = 1
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMedium)
+                        Text("Send Gold")
+                            .font(FontStyles.labelBold)
+                    }
+                    .foregroundColor(viewModel.offerType == "gold" ? .white : KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(viewModel.offerType == "gold" ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.parchment)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                }
             }
-            
-            // Quantity selector
-            quantitySelector
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
     
-    private var goldItemButton: some View {
-        let isSelected = viewModel.selectedItemId == "gold"
-        
-        return Button(action: {
-            viewModel.selectedItemId = "gold"
-            viewModel.quantity = 1
-        }) {
-            VStack(spacing: 4) {
-                Image(systemName: "g.circle.fill")
-                    .font(FontStyles.iconMedium)
-                Text("Gold")
-                    .font(FontStyles.labelSmall)
-                Text("x\(viewModel.playerGold)")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : KingdomTheme.Colors.inkMedium)
+    // MARK: - Item Selection Section
+    
+    private var itemSelectionSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Text("Select Item to Sell")
+                .font(FontStyles.headingMedium)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            if viewModel.tradeableItems.isEmpty {
+                Text("You don't have any items to trade")
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .padding(.vertical, 20)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(viewModel.tradeableItems) { item in
+                            itemButton(for: item)
+                        }
+                    }
+                    .padding(4)
+                }
+                
+                // Quantity selector
+                if viewModel.selectedItem != nil {
+                    quantitySelector
+                }
             }
-            .foregroundColor(isSelected ? .white : KingdomTheme.Colors.inkDark)
-            .frame(height: 72)
-            .padding(.horizontal, 14)
-            .background(isSelected ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.parchment)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.black, lineWidth: 2)
-            )
         }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .padding(.horizontal)
     }
     
     private func itemButton(for item: TradeableItem) -> some View {
-        let isSelected = viewModel.selectedItemId == item.itemId
+        let isSelected = viewModel.selectedItem?.itemId == item.itemId
         
         return Button(action: {
-            viewModel.selectedItemId = item.itemId
-            viewModel.quantity = 1
+            viewModel.selectedItem = item
+            viewModel.itemQuantity = 1
         }) {
             VStack(spacing: 4) {
                 Image(systemName: item.icon)
@@ -217,38 +261,107 @@ struct TradeOfferView: View {
                 
                 Spacer()
                 
-                Text("Available: \(viewModel.maxQuantity)")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                if let item = viewModel.selectedItem {
+                    Text("You have: \(item.quantity)")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
             }
             
-            HStack(spacing: 12) {
-                Text("\(viewModel.quantity)")
+            numberInputRow(
+                value: viewModel.itemQuantity,
+                icon: viewModel.selectedItem?.icon ?? "cube.fill",
+                iconColor: KingdomTheme.Colors.inkMedium,
+                onIncrement: { viewModel.incrementItemQuantity($0) },
+                onDecrement: { viewModel.decrementItemQuantity($0) }
+            )
+        }
+        .padding(.top, 8)
+    }
+    
+    // MARK: - Gold Amount Section
+    
+    private var goldAmountSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            HStack {
+                if viewModel.offerType == "gold" {
+                    Text("Amount to Send")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                } else {
+                    Text("Price")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("(0 = gift)")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                if viewModel.offerType == "gold" {
+                    Text("You have: \(viewModel.playerGold)g")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+            
+            numberInputRow(
+                value: viewModel.goldAmount,
+                icon: "g.circle.fill",
+                iconColor: KingdomTheme.Colors.imperialGold,
+                onIncrement: { viewModel.incrementGold($0) },
+                onDecrement: { viewModel.decrementGold($0) }
+            )
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Shared Number Input Row
+    
+    private func numberInputRow(
+        value: Int,
+        icon: String,
+        iconColor: Color,
+        onIncrement: @escaping (Int) -> Void,
+        onDecrement: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            // Value display - fills remaining width
+            HStack(spacing: 6) {
+                Text("\(value)")
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 70)
-                    .background(Color.white)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-                
-                VStack(spacing: 6) {
-                    stepperButton("+1") { viewModel.incrementQuantity(1) }
-                    stepperButton("-1") { viewModel.decrementQuantity(1) }
-                }
-                
-                VStack(spacing: 6) {
-                    stepperButton("+10") { viewModel.incrementQuantity(10) }
-                    stepperButton("-10") { viewModel.decrementQuantity(10) }
-                }
-                
-                VStack(spacing: 6) {
-                    stepperButton("+100") { viewModel.incrementQuantity(100) }
-                    stepperButton("-100") { viewModel.decrementQuantity(100) }
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(iconColor)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 70)
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 2)
+            )
+            
+            // Stepper buttons
+            VStack(spacing: 6) {
+                stepperButton("+1") { onIncrement(1) }
+                stepperButton("-1") { onDecrement(1) }
+            }
+            
+            VStack(spacing: 6) {
+                stepperButton("+10") { onIncrement(10) }
+                stepperButton("-10") { onDecrement(10) }
+            }
+            
+            VStack(spacing: 6) {
+                stepperButton("+100") { onIncrement(100) }
+                stepperButton("-100") { onDecrement(100) }
             }
         }
     }
@@ -258,7 +371,7 @@ struct TradeOfferView: View {
             Text(label)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.white)
-                .frame(width: 50, height: 32)
+                .frame(width: 44, height: 32)
                 .background(KingdomTheme.Colors.buttonPrimary)
                 .cornerRadius(6)
                 .overlay(
@@ -296,13 +409,20 @@ struct TradeOfferView: View {
     
     private var summarySection: some View {
         HStack(spacing: 12) {
-            Image(systemName: viewModel.selectedItemId == "gold" ? "g.circle.fill" : (viewModel.selectedTradeableItem?.icon ?? "cube.fill"))
-                .font(FontStyles.iconMedium)
-                .foregroundColor(viewModel.selectedItemId == "gold" ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.inkMedium)
-                .frame(width: 32)
+            if viewModel.offerType == "gold" {
+                Image(systemName: "g.circle.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.imperialGold)
+                    .frame(width: 32)
+            } else {
+                Image(systemName: viewModel.selectedItem?.icon ?? "cube.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(width: 32)
+            }
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sending to \(recipientName)")
+                Text("Offer to \(recipientName)")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
@@ -319,12 +439,16 @@ struct TradeOfferView: View {
     }
     
     private var summaryText: String {
-        if viewModel.selectedItemId == "gold" {
-            return "\(viewModel.quantity) Gold"
-        } else if let item = viewModel.selectedTradeableItem {
-            return "\(viewModel.quantity) \(item.displayName)"
+        if viewModel.offerType == "gold" {
+            return "Sending \(viewModel.goldAmount) gold"
+        } else if let item = viewModel.selectedItem {
+            if viewModel.goldAmount > 0 {
+                return "\(viewModel.itemQuantity) \(item.displayName) for \(viewModel.goldAmount)g"
+            } else {
+                return "\(viewModel.itemQuantity) \(item.displayName) (gift)"
+            }
         }
-        return "Nothing selected"
+        return "Select an item"
     }
     
     // MARK: - Create Offer Button
@@ -374,9 +498,11 @@ class TradeOfferViewModel: ObservableObject {
     @Published var isProcessing = false
     @Published var hasMerchantSkill = true
     
+    @Published var offerType: String = "item"  // "item" or "gold"
     @Published var tradeableItems: [TradeableItem] = []
-    @Published var selectedItemId: String = "gold"
-    @Published var quantity: Int = 1
+    @Published var selectedItem: TradeableItem?
+    @Published var itemQuantity: Int = 1
+    @Published var goldAmount: Int = 0  // Price for items, amount for gold gifts
     @Published var playerGold: Int = 0
     @Published var message: String = ""
     
@@ -387,29 +513,44 @@ class TradeOfferViewModel: ObservableObject {
     
     private let api = KingdomAPIService.shared
     
-    var selectedTradeableItem: TradeableItem? {
-        tradeableItems.first { $0.itemId == selectedItemId }
+    var minGold: Int {
+        offerType == "gold" ? 1 : 0
     }
     
-    var maxQuantity: Int {
-        if selectedItemId == "gold" {
+    var maxGold: Int {
+        if offerType == "gold" {
             return playerGold
-        } else if let item = selectedTradeableItem {
-            return item.quantity
+        } else {
+            // For item pricing, no practical limit (recipient needs to have the gold)
+            return 999999
         }
-        return 0
     }
     
     var isValid: Bool {
-        quantity > 0 && quantity <= maxQuantity
+        if offerType == "gold" {
+            return goldAmount > 0 && goldAmount <= playerGold
+        } else {
+            guard let item = selectedItem else { return false }
+            return itemQuantity > 0 && itemQuantity <= item.quantity
+        }
     }
     
-    func incrementQuantity(_ delta: Int) {
-        quantity = min(maxQuantity, quantity + delta)
+    func incrementItemQuantity(_ delta: Int) {
+        if let item = selectedItem {
+            itemQuantity = min(item.quantity, itemQuantity + delta)
+        }
     }
     
-    func decrementQuantity(_ delta: Int) {
-        quantity = max(1, quantity - delta)
+    func decrementItemQuantity(_ delta: Int) {
+        itemQuantity = max(1, itemQuantity - delta)
+    }
+    
+    func incrementGold(_ delta: Int) {
+        goldAmount = min(maxGold, goldAmount + delta)
+    }
+    
+    func decrementGold(_ delta: Int) {
+        goldAmount = max(minGold, goldAmount - delta)
     }
     
     func loadTradeableItems() async {
@@ -421,8 +562,11 @@ class TradeOfferViewModel: ObservableObject {
             tradeableItems = response.items
             playerGold = response.gold
             hasMerchantSkill = true
-            selectedItemId = "gold"
-            quantity = 1
+            
+            // Select first item by default
+            if let first = tradeableItems.first {
+                selectedItem = first
+            }
         } catch {
             print("❌ Failed to load tradeable items: \(error)")
             hasMerchantSkill = false
@@ -435,13 +579,12 @@ class TradeOfferViewModel: ObservableObject {
         defer { isProcessing = false }
         
         do {
-            let isGold = selectedItemId == "gold"
             let response = try await api.trades.createOffer(
                 recipientId: recipientId,
-                offerType: isGold ? "gold" : "item",
-                itemType: isGold ? nil : selectedItemId,
-                itemQuantity: isGold ? nil : quantity,
-                goldAmount: isGold ? quantity : 0,
+                offerType: offerType,
+                itemType: offerType == "item" ? selectedItem?.itemId : nil,
+                itemQuantity: offerType == "item" ? itemQuantity : nil,
+                goldAmount: goldAmount,
                 message: message.isEmpty ? nil : message
             )
             

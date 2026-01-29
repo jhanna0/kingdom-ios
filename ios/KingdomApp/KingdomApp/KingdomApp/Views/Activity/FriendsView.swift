@@ -16,9 +16,19 @@ struct FriendsView: View {
                         // Header
                         headerSection
                         
-                        // Pending Trade Offers (Merchant skill)
+                        // Incoming Trade Offers
                         if !viewModel.incomingTrades.isEmpty {
                             pendingTradesSection
+                        }
+                        
+                        // Outgoing Trade Offers
+                        if !viewModel.outgoingTrades.isEmpty {
+                            outgoingTradesSection
+                        }
+                        
+                        // Recent Trade Results (accepted/declined/etc)
+                        if !viewModel.tradeHistory.isEmpty {
+                            tradeHistorySection
                         }
                         
                         // Pending Duel Challenges

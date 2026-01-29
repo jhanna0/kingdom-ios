@@ -15,6 +15,7 @@ class FriendsViewModel: ObservableObject {
     // Trade offers
     @Published var incomingTrades: [TradeOffer] = []
     @Published var outgoingTrades: [TradeOffer] = []
+    @Published var tradeHistory: [TradeOffer] = []
     @Published var pendingTradeCount: Int = 0
     @Published var hasMerchantSkill: Bool = false
     
@@ -110,9 +111,10 @@ class FriendsViewModel: ObservableObject {
             let response = try await api.trades.listTrades()
             incomingTrades = response.incoming
             outgoingTrades = response.outgoing
+            tradeHistory = response.history
             pendingTradeCount = response.incoming.count
             hasMerchantSkill = true
-            print("✅ Loaded \(incomingTrades.count) incoming, \(outgoingTrades.count) outgoing trades")
+            print("✅ Loaded \(incomingTrades.count) incoming, \(outgoingTrades.count) outgoing, \(tradeHistory.count) history trades")
         } catch {
             // Merchant skill not available or other error
             print("❌ Failed to load trades: \(error)")

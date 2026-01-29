@@ -103,6 +103,173 @@ struct TradeOfferCard: View {
     }
 }
 
+// MARK: - Outgoing Trade Card
+
+struct OutgoingTradeCard: View {
+    let trade: TradeOffer
+    let onCancel: () async -> Void
+    
+    @State private var isProcessing = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            HStack(spacing: 12) {
+                // Recipient avatar
+                Text(String(trade.recipientName.prefix(1)).uppercased())
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 10)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("To \(trade.recipientName)")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    // Offer description
+                    HStack(spacing: 4) {
+                        if trade.offerType == "gold" {
+                            Image(systemName: "g.circle.fill")
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            Text("Sending \(trade.goldAmount)g")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else if let itemIcon = trade.itemIcon, let itemName = trade.itemDisplayName, let qty = trade.itemQuantity {
+                            Image(systemName: itemIcon)
+                                .font(FontStyles.iconMini)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            if trade.goldAmount > 0 {
+                                Text("\(qty) \(itemName) for \(trade.goldAmount)g")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            } else {
+                                Text("\(qty) \(itemName) (gift)")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            }
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // Cancel button
+                Button(action: {
+                    isProcessing = true
+                    Task {
+                        await onCancel()
+                        isProcessing = false
+                    }
+                }) {
+                    Text("Cancel")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
+                .disabled(isProcessing)
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Trade History Card
+
+struct TradeHistoryCard: View {
+    let trade: TradeOffer
+    
+    var statusColor: Color {
+        switch trade.status {
+        case .accepted:
+            return KingdomTheme.Colors.buttonSuccess
+        case .declined:
+            return KingdomTheme.Colors.buttonDanger
+        case .cancelled:
+            return KingdomTheme.Colors.inkMedium
+        case .expired:
+            return KingdomTheme.Colors.inkLight
+        default:
+            return KingdomTheme.Colors.inkMedium
+        }
+    }
+    
+    var statusText: String {
+        switch trade.status {
+        case .accepted:
+            return "Accepted"
+        case .declined:
+            return "Declined"
+        case .cancelled:
+            return "Cancelled"
+        case .expired:
+            return "Expired"
+        default:
+            return "Unknown"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Direction indicator
+            Image(systemName: trade.isIncoming ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                .font(FontStyles.iconMedium)
+                .foregroundColor(trade.isIncoming ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.imperialGold)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // Who and what
+                HStack(spacing: 4) {
+                    Text(trade.isIncoming ? "From \(trade.senderName)" : "To \(trade.recipientName)")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                
+                // Offer description
+                HStack(spacing: 4) {
+                    if trade.offerType == "gold" {
+                        Image(systemName: "g.circle.fill")
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        Text("\(trade.goldAmount)g")
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    } else if let itemIcon = trade.itemIcon, let itemName = trade.itemDisplayName, let qty = trade.itemQuantity {
+                        Image(systemName: itemIcon)
+                            .font(FontStyles.iconMini)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        if trade.goldAmount > 0 {
+                            Text("\(qty) \(itemName) for \(trade.goldAmount)g")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        } else {
+                            Text("\(qty) \(itemName)")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        }
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Status badge
+            Text(statusText)
+                .font(FontStyles.labelBold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .brutalistBadge(backgroundColor: statusColor, cornerRadius: 8, shadowOffset: 1, borderWidth: 1.5)
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .padding(.horizontal)
+    }
+}
+
 // MARK: - Duel Challenge Card
 
 struct DuelChallengeCard: View {

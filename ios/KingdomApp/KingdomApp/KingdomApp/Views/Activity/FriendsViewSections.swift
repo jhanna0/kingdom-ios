@@ -261,7 +261,7 @@ extension FriendsView {
         }
     }
     
-    // MARK: - Pending Trades Section
+    // MARK: - Pending Trades Section (Incoming)
     
     var pendingTradesSection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
@@ -271,11 +271,11 @@ extension FriendsView {
                 .padding(.horizontal)
             
             HStack {
-                Image(systemName: "arrow.left.arrow.right")
+                Image(systemName: "arrow.down.circle.fill")
                     .font(FontStyles.iconMedium)
                     .foregroundColor(KingdomTheme.Colors.buttonPrimary)
                 
-                Text("Trade Offers")
+                Text("Incoming Offers")
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
@@ -299,6 +299,64 @@ extension FriendsView {
                         await viewModel.declineTrade(trade.id)
                     }
                 )
+            }
+        }
+    }
+    
+    // MARK: - Outgoing Trades Section
+    
+    var outgoingTradesSection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+            
+            HStack {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.imperialGold)
+                
+                Text("Your Pending Offers")
+                    .font(FontStyles.headingLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            .padding(.horizontal)
+            
+            ForEach(viewModel.outgoingTrades) { trade in
+                OutgoingTradeCard(
+                    trade: trade,
+                    onCancel: {
+                        await viewModel.cancelTrade(trade.id)
+                        NotificationCenter.default.post(name: .playerStateDidChange, object: nil)
+                    }
+                )
+            }
+        }
+    }
+    
+    // MARK: - Trade History Section
+    
+    var tradeHistorySection: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+                .padding(.horizontal)
+            
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Recent Trade Results")
+                    .font(FontStyles.headingLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            .padding(.horizontal)
+            
+            ForEach(viewModel.tradeHistory.prefix(5)) { trade in
+                TradeHistoryCard(trade: trade)
             }
         }
     }
