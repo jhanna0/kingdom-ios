@@ -349,14 +349,35 @@ extension FriendsView {
                     .font(FontStyles.iconMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
-                Text("Recent Trade Results")
+                Text("Recent Trades")
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
             .padding(.horizontal)
             
-            ForEach(viewModel.tradeHistory.prefix(5)) { trade in
+            // Show only 2 trades inline
+            ForEach(viewModel.tradeHistory.prefix(2)) { trade in
                 TradeHistoryCard(trade: trade)
+            }
+            
+            // "See More" NavigationLink if more than 2 trades
+            if viewModel.tradeHistory.count > 2 {
+                NavigationLink(destination: AllTradeHistoryView(trades: Array(viewModel.tradeHistory.prefix(5)))) {
+                    HStack(spacing: 6) {
+                        Text("See More")
+                            .font(FontStyles.headingSmall)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(FontStyles.iconSmall)
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
             }
         }
     }

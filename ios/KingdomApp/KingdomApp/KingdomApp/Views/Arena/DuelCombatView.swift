@@ -2539,6 +2539,7 @@ class DuelCombatViewModel: ObservableObject {
                 await processEvent(event)
             }
             isProcessingQueue = false
+            isAnimating = false  // Re-enable buttons after queue is done
         }
     }
     
@@ -2687,6 +2688,8 @@ class DuelCombatViewModel: ObservableObject {
         guard let matchId = matchId else { return }
         guard match?.canSwing == true && !isAnimating && !isProcessingQueue else { return }
         
+        isAnimating = true  // Block immediately to prevent double-taps
+        
         do {
             let r = try await api.swing(matchId: matchId)
             
@@ -2722,9 +2725,13 @@ class DuelCombatViewModel: ObservableObject {
                 enqueueAPIResponse(match: m)
             }
             
-            if !r.success { errorMessage = r.message }
+            if !r.success {
+                errorMessage = r.message
+                isAnimating = false
+            }
         } catch {
             errorMessage = error.localizedDescription
+            isAnimating = false
         }
     }
     
@@ -2780,12 +2787,18 @@ class DuelCombatViewModel: ObservableObject {
         guard let matchId = matchId else { return }
         guard match?.canStop == true && !isAnimating && !isProcessingQueue else { return }
         
+        isAnimating = true  // Block immediately to prevent double-taps
+        
         do {
             let r = try await api.stop(matchId: matchId)
             if let m = r.match { enqueueAPIResponse(match: m) }
-            if !r.success { errorMessage = r.message }
+            if !r.success {
+                errorMessage = r.message
+                isAnimating = false
+            }
         } catch {
             errorMessage = error.localizedDescription
+            isAnimating = false
         }
     }
     

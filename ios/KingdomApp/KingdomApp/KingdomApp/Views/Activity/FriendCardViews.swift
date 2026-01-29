@@ -229,3 +229,30 @@ struct AllFriendsView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
+
+// MARK: - All Trade History View
+
+struct AllTradeHistoryView: View {
+    let trades: [TradeOffer]
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    ForEach(trades) { trade in
+                        TradeHistoryCard(trade: trade)
+                    }
+                }
+                .padding(.vertical)
+            }
+        }
+        .navigationTitle("Trade History")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+    }
+}

@@ -1072,11 +1072,15 @@ class HuntManager:
             # VICTORY! Animal slain
             # Check streak NOW - this is the kill screen!
             streak_active, streak_just_activated = self._check_hunt_streak(db, session.created_by)
+            
+            # ALWAYS explicitly set show_streak_popup based on streak_just_activated
+            # This ensures it's False on hunts 4, 5, 6... and only True on hunt 3
+            session.show_streak_popup = streak_just_activated
+            
             if streak_active:
                 session.streak_active = True
-                # Only show popup when streak FIRST activates (exactly 3), not on 4, 5, 6...
+                # Only populate streak_info when streak FIRST activates (exactly 3)
                 if streak_just_activated:
-                    session.show_streak_popup = True
                     session.streak_info = {
                         "title": "HOT STREAK!",
                         "subtitle": "2x Meat",

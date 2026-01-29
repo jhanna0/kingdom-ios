@@ -9,8 +9,8 @@ struct APIBuildingUpgradeCost: Codable {
     let can_afford: Bool
 }
 
-/// Resource cost per action - FULLY DYNAMIC from backend
-struct APIPerActionCost: Codable {
+/// Resource cost per action for building tiers
+struct APIBuildingPerActionCost: Codable {
     let resource: String  // e.g. "wood", "iron", "stone"
     let amount: Int  // Amount required per action
 }
@@ -21,7 +21,7 @@ struct APIBuildingTierInfo: Codable {
     let name: String  // e.g. "Wooden Palisade", "Stone Wall"
     let benefit: String  // e.g. "+2 defenders", "20% protected"
     let description: String  // e.g. "Basic wooden wall"
-    let per_action_costs: [APIPerActionCost]?  // Resource costs per action (wood, iron, etc.)
+    let per_action_costs: [APIBuildingPerActionCost]?  // Resource costs per action (wood, iron, etc.)
 }
 
 /// Click action for a building - DYNAMIC from backend

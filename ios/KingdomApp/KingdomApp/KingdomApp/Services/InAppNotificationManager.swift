@@ -195,7 +195,6 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
         window.rootViewController = hostingController
         window.windowLevel = .alert + 2 // Above alerts and blocking errors
         window.backgroundColor = .clear
-        window.isUserInteractionEnabled = true
         window.makeKeyAndVisible()
         
         self.overlayWindow = window
@@ -249,7 +248,11 @@ private struct InAppNotificationWindowContent: View {
     @State private var dragOffset: CGFloat = 0
     
     var body: some View {
-        VStack {
+        GeometryReader { _ in
+            Color.clear
+        }
+        .allowsHitTesting(false)
+        .overlay(alignment: .top) {
             if isVisible {
                 InAppNotificationToastView(
                     notification: notification,
@@ -279,12 +282,10 @@ private struct InAppNotificationWindowContent: View {
                             }
                         }
                 )
+                .padding(.top, 60) // Below status bar and notch
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
-            
-            Spacer()
         }
-        .padding(.top, 60) // Below status bar and notch
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                 isVisible = true
