@@ -413,9 +413,9 @@ struct MyPropertiesView: View {
                 Spacer()
             }
             
-            // Cost row (reuses ActionCostRewardRow styling)
+            // Cost table - matching SkillDetailView format
             if let status = upgradeStatus {
-                ActionCostRewardRow(costs: buildUpgradeCostItems(status: status), rewards: [])
+                upgradeCostTable(status: status, fromTier: property.tier, toTier: property.tier + 1)
             }
             
             // Button or progress
@@ -454,39 +454,106 @@ struct MyPropertiesView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 
-    private func buildUpgradeCostItems(status: PropertyAPI.PropertyUpgradeStatus) -> [CostItem] {
-        var items: [CostItem] = []
+    // MARK: - Upgrade Cost Table (matches SkillDetailView format)
+    
+    @ViewBuilder
+    private func upgradeCostTable(status: PropertyAPI.PropertyUpgradeStatus, fromTier: Int, toTier: Int) -> some View {
+        let actions = status.actions_required
+        let goldPerAction = status.gold_cost.map { actions > 0 ? Double($0) / Double(actions) : 0 } ?? 0
+        let perActionCosts = status.per_action_costs ?? []
+        let totalGold = status.gold_cost ?? 0
         
-        // If can't afford overall, all icons go red
-        let canAfford = status.can_afford
-        
-        if let goldCost = status.gold_cost, goldCost > 0 {
-            items.append(CostItem(
-                icon: "g.circle.fill",
-                amount: goldCost,
-                canAfford: canAfford
-            ))
-        }
-        
-        if status.actions_required > 0 {
-            items.append(CostItem(
-                icon: "hammer.fill",
-                amount: status.actions_required,
-                canAfford: canAfford
-            ))
-        }
-        
-        if let perActionCosts = status.per_action_costs {
-            for cost in perActionCosts where cost.amount > 0 {
-                items.append(CostItem(
-                    icon: cost.icon,
-                    amount: cost.amount,
-                    canAfford: canAfford
-                ))
+        VStack(alignment: .leading, spacing: 8) {
+            // Cost table - horizontal scroll for many columns
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Table header
+                    HStack(spacing: 16) {
+                        Text("Upgrade")
+                            .frame(width: 100, alignment: .leading)
+                        
+                        Text("Actions")
+                            .frame(width: 60, alignment: .center)
+                        
+                        Text("Gold/Act")
+                            .frame(width: 70, alignment: .center)
+                        
+                        // Dynamic resource columns
+                        ForEach(perActionCosts, id: \.resource) { cost in
+                            Text("\(resourceName(cost.resource))/Act")
+                                .frame(width: 70, alignment: .center)
+                        }
+                    }
+                    .font(FontStyles.labelBold)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                        .overlay(Color.black.opacity(0.1))
+                    
+                    // Table row with values
+                    HStack(spacing: 16) {
+                        Text("\(tierDisplayName(fromTier)) → \(tierDisplayName(toTier))")
+                            .frame(width: 100, alignment: .leading)
+                        
+                        Text("\(actions)")
+                            .frame(width: 60, alignment: .center)
+                        
+                        Text("\(Int(goldPerAction))g")
+                            .frame(width: 70, alignment: .center)
+                        
+                        // Dynamic resource values
+                        ForEach(perActionCosts, id: \.resource) { cost in
+                            Text("\(cost.amount)")
+                                .frame(width: 70, alignment: .center)
+                        }
+                    }
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                }
             }
+            .background(Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black, lineWidth: 2)
+            )
+            
+            // Total summary
+            Text("Total cost is \(buildTotalSummary(totalGold: totalGold, actions: actions, perActionCosts: perActionCosts)).")
+                .font(FontStyles.bodySmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+        }
+    }
+    
+    private func tierDisplayName(_ tier: Int) -> String {
+        if tier <= 0 { return "None" }
+        return TierManager.shared.propertyTierName(tier)
+    }
+    
+    private func resourceName(_ resource: String) -> String {
+        TierManager.shared.resourceInfo(resource)?.displayName ?? resource.capitalized
+    }
+    
+    private func buildTotalSummary(totalGold: Int, actions: Int, perActionCosts: [PropertyAPI.ResourceCost]) -> String {
+        var parts: [String] = []
+        
+        if totalGold > 0 {
+            parts.append("\(totalGold)g")
         }
         
-        return items
+        for cost in perActionCosts where cost.amount > 0 {
+            let total = cost.amount * actions
+            let name = resourceName(cost.resource).lowercased()
+            parts.append("\(total) \(name)")
+        }
+        
+        return parts.joined(separator: ", ")
     }
     
     // MARK: - Construction Progress

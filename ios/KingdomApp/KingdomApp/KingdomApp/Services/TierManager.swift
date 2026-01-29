@@ -32,11 +32,11 @@ class TierManager {
         
         // Property defaults (icons match backend PROPERTY_TIERS)
         properties = PropertyTiersData(maxTier: 5, tiers: [
-            1: PropertyTierInfo(name: "Land", icon: "square.dashed", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil),
-            2: PropertyTierInfo(name: "House", icon: "house.fill", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil),
-            3: PropertyTierInfo(name: "Workshop", icon: "hammer.fill", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil),
-            4: PropertyTierInfo(name: "Beautiful Property", icon: "building.columns.fill", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil),
-            5: PropertyTierInfo(name: "Estate", icon: "shield.fill", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil)
+            1: PropertyTierInfo(name: "Land", icon: "square.dashed", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
+            2: PropertyTierInfo(name: "House", icon: "house.fill", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
+            3: PropertyTierInfo(name: "Workshop", icon: "hammer.fill", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
+            4: PropertyTierInfo(name: "Beautiful Property", icon: "building.columns.fill", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
+            5: PropertyTierInfo(name: "Estate", icon: "shield.fill", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [])
         ])
         
         // Skill tier names
@@ -90,17 +90,26 @@ class TierManager {
                 var tiers: [Int: PropertyTierInfo] = [:]
                 for (key, value) in propertyData.tiers {
                     if let tier = Int(key) {
+                        // Convert per-action costs
+                        let perActionCosts = (value.per_action_costs ?? []).map { cost in
+                            PropertyPerActionCost(resource: cost.resource, amount: cost.amount)
+                        }
+                        
                         tiers[tier] = PropertyTierInfo(
                             name: value.name,
                             icon: value.icon ?? "star.fill",
                             description: value.description,
                             benefits: value.benefits,
                             baseGoldCost: value.base_gold_cost,
-                            baseActionsRequired: value.base_actions_required
+                            baseActionsRequired: value.base_actions_required,
+                            goldPerAction: value.gold_per_action,
+                            totalGoldCost: value.total_gold_cost,
+                            perActionCosts: perActionCosts
                         )
                     }
                 }
                 self.properties = PropertyTiersData(maxTier: propertyData.max_tier, tiers: tiers)
+                print("   - Loaded \(tiers.count) property tiers with per-action costs")
             }
             
             // Equipment - convert string keys to int
@@ -260,6 +269,18 @@ class TierManager {
     
     func propertyTierActions(_ tier: Int) -> Int? {
         properties?.tiers[tier]?.baseActionsRequired
+    }
+    
+    func propertyGoldPerAction(_ tier: Int) -> Double? {
+        properties?.tiers[tier]?.goldPerAction
+    }
+    
+    func propertyTotalGoldCost(_ tier: Int) -> Int? {
+        properties?.tiers[tier]?.totalGoldCost
+    }
+    
+    func propertyPerActionCosts(_ tier: Int) -> [PropertyPerActionCost] {
+        properties?.tiers[tier]?.perActionCosts ?? []
     }
     
     // MARK: - Equipment Accessors
@@ -431,6 +452,12 @@ struct PropertyTiersResponseData: Codable {
     let tiers: [String: PropertyTierInfoResponse]  // String keys because JSON
 }
 
+/// Per-action resource cost (e.g., wood, iron per action)
+struct PropertyPerActionCostResponse: Codable {
+    let resource: String
+    let amount: Int
+}
+
 struct PropertyTierInfoResponse: Codable {
     let name: String
     let icon: String?
@@ -438,6 +465,10 @@ struct PropertyTierInfoResponse: Codable {
     let benefits: [String]
     let base_gold_cost: Int?
     let base_actions_required: Int?
+    // New fields from backend
+    let gold_per_action: Double?
+    let total_gold_cost: Int?
+    let per_action_costs: [PropertyPerActionCostResponse]?
 }
 
 struct EquipmentTiersResponseData: Codable {
@@ -502,6 +533,12 @@ struct PropertyTiersData {
     let tiers: [Int: PropertyTierInfo]
 }
 
+/// Per-action resource cost (wood, iron, etc.)
+struct PropertyPerActionCost {
+    let resource: String
+    let amount: Int
+}
+
 struct PropertyTierInfo {
     let name: String
     let icon: String
@@ -509,6 +546,10 @@ struct PropertyTierInfo {
     let benefits: [String]
     let baseGoldCost: Int?
     let baseActionsRequired: Int?
+    // New fields for proper cost display
+    let goldPerAction: Double?
+    let totalGoldCost: Int?
+    let perActionCosts: [PropertyPerActionCost]
 }
 
 struct EquipmentTiersData {

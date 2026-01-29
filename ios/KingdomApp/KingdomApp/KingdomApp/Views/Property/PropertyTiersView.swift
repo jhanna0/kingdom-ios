@@ -110,37 +110,79 @@ struct PropertyTiersView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Cost section - show per-action cost
-            if let totalCost = tierManager.propertyTierCost(tier), let actions = tierManager.propertyTierActions(tier), actions > 0 {
-                let goldPerAction = totalCost / actions  // Calculate per-action cost
+            // Cost section - EXACTLY matching SkillDetailView format
+            if let actions = tierManager.propertyTierActions(tier), actions > 0 {
+                let goldPerAction = tierManager.propertyGoldPerAction(tier) ?? 0
+                let perActionCosts = tierManager.propertyPerActionCosts(tier)
                 
-                VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-                    sectionHeader(icon: "dollarsign.circle.fill", title: "Cost Per Action")
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionHeader(icon: "dollarsign.circle.fill", title: "Upgrade Cost")
                     
-                    HStack(spacing: 12) {
-                        // Gold per action
-                        HStack(spacing: 6) {
-                            Image(systemName: "g.circle.fill")
-                                .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.goldLight)
-                            Text("\(goldPerAction)g")
-                                .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                        }
-                        
-                        Text("×")
+                    // Cost table - horizontal scroll for many columns
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            // Table header
+                            HStack(spacing: 16) {
+                                Text("Upgrade")
+                                    .frame(width: 100, alignment: .leading)
+                                
+                                Text("Actions")
+                                    .frame(width: 60, alignment: .center)
+                                
+                                Text("Gold/Act")
+                                    .frame(width: 70, alignment: .center)
+                                
+                                // Dynamic resource columns
+                                ForEach(perActionCosts, id: \.resource) { cost in
+                                    Text("\(resourceDisplayName(cost.resource))/Act")
+                                        .frame(width: 70, alignment: .center)
+                                }
+                            }
+                            .font(FontStyles.labelBold)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        // Actions required
-                        HStack(spacing: 6) {
-                            Image(systemName: "hammer.fill")
-                                .font(FontStyles.iconSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            Text("\(actions) actions")
-                                .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            
+                            Divider()
+                                .overlay(Color.black.opacity(0.1))
+                            
+                            // Table row with values
+                            HStack(spacing: 16) {
+                                Text("\(tierName(tier - 1)) → \(tierName(tier))")
+                                    .frame(width: 100, alignment: .leading)
+                                
+                                Text("\(actions)")
+                                    .frame(width: 60, alignment: .center)
+                                
+                                Text("\(Int(goldPerAction))g")
+                                    .frame(width: 70, alignment: .center)
+                                
+                                // Dynamic resource values
+                                ForEach(perActionCosts, id: \.resource) { cost in
+                                    Text("\(cost.amount)")
+                                        .frame(width: 70, alignment: .center)
+                                }
+                            }
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
                         }
                     }
+                    .background(Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                    .padding(.top, 4)
+                    
+                    // Total summary
+                    Text("Total cost is \(buildTotalSummary(actions: actions, goldPerAction: goldPerAction, perActionCosts: perActionCosts)).")
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
                 }
                 
                 Rectangle()
@@ -275,11 +317,34 @@ struct PropertyTiersView: View {
     
     private func tierName(_ tier: Int) -> String {
         // Fetch from backend tier manager (single source of truth)
+        if tier <= 0 {
+            return "None"
+        }
         return tierManager.propertyTierName(tier)
     }
     
     private func tierBenefits(_ tier: Int) -> [String] {
         // Fetch from backend tier manager (single source of truth)
         return tierManager.propertyTierBenefits(tier)
+    }
+    
+    private func resourceDisplayName(_ resource: String) -> String {
+        // Get display name from TierManager, fallback to capitalized resource
+        return tierManager.resourceInfo(resource)?.displayName ?? resource.capitalized
+    }
+    
+    private func buildTotalSummary(actions: Int, goldPerAction: Double, perActionCosts: [PropertyPerActionCost]) -> String {
+        var parts: [String] = []
+        
+        let totalGold = Int(goldPerAction) * actions
+        parts.append("\(totalGold)g")
+        
+        for cost in perActionCosts {
+            let total = cost.amount * actions
+            let name = resourceDisplayName(cost.resource).lowercased()
+            parts.append("\(total) \(name)")
+        }
+        
+        return parts.joined(separator: ", ")
     }
 }
