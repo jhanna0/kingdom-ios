@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden, feedback
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -235,6 +235,7 @@ app.include_router(equipment.router)  # View and equip weapons/armor
 app.include_router(foraging.router)  # Foraging minigame - scratch ticket style
 app.include_router(science.router)  # Science minigame - high/low guessing
 app.include_router(garden.router)  # Personal garden - plant, water, harvest
+app.include_router(feedback.router)  # In-app feedback submission
 
 
 # ===== WebSocket Endpoint (Local Development) =====

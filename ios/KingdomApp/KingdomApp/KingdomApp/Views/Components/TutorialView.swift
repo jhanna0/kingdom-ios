@@ -104,6 +104,10 @@ struct TutorialView: View {
                     .id(section.id)
             }
             
+            // Feedback Section
+            feedbackCard
+                .id("feedback")
+            
             Spacer(minLength: 40)
         }
     }
@@ -174,13 +178,39 @@ struct TutorialView: View {
                     }
                     .buttonStyle(.plain)
                     
-                    if section.id != sections.last?.id {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.08))
-                            .frame(height: 1)
-                            .padding(.leading, 42)
-                    }
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.leading, 42)
                 }
+                
+                // Send Feedback link
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo("feedback", anchor: .top)
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "envelope.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                            .frame(width: 20)
+                        
+                        Text("Send Feedback")
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .background(
@@ -301,6 +331,80 @@ struct TutorialView: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
             }
+        }
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black)
+                    .offset(x: 3, y: 3)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KingdomTheme.Colors.parchmentLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+            }
+        )
+    }
+    
+    // MARK: - Feedback Card
+    
+    private var feedbackCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 32, height: 32)
+                        .offset(x: 2, y: 2)
+                    Circle()
+                        .fill(KingdomTheme.Colors.buttonPrimary)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                    Image(systemName: "envelope.fill")
+                        .font(FontStyles.iconTiny)
+                        .foregroundColor(.white)
+                }
+                
+                Text("Send Feedback")
+                    .font(FontStyles.headingSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+            }
+            .padding(12)
+            
+            Rectangle()
+                .fill(Color.black.opacity(0.15))
+                .frame(height: 1)
+                .padding(.horizontal, 12)
+            
+            // Content
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Questions, bugs, feedback, suggestions? Let us know!")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                NavigationLink {
+                    FeedbackView()
+                } label: {
+                    HStack {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 12))
+                        Text("Send Feedback")
+                            .font(FontStyles.labelSmall)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonPrimary, fullWidth: true))
+            }
+            .padding(12)
         }
         .background(
             ZStack {
@@ -799,6 +903,122 @@ private enum MarkdownElement {
     case paragraph(AttributedString)
     case bullet(AttributedString)
     case numbered(String, AttributedString)
+}
+
+// MARK: - Feedback View
+
+struct FeedbackView: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var message = ""
+    @State private var isSubmitting = false
+    @State private var showSuccess = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                ZStack(alignment: .topLeading) {
+                    if message.isEmpty {
+                        Text("Let's hear it")
+                            .font(KingdomTheme.Typography.body())
+                            .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.6))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 20)
+                    }
+                    
+                    TextEditor(text: $message)
+                        .font(KingdomTheme.Typography.body())
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .tint(KingdomTheme.Colors.inkDark)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 150)
+                        .padding(12)
+                }
+                .background(Color.white)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(KingdomTheme.Colors.inkLight.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.horizontal)
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.error)
+                }
+                
+                Button {
+                    submitFeedback()
+                } label: {
+                    HStack {
+                        if isSubmitting {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        }
+                        Text(isSubmitting ? "Sending..." : "Send Feedback")
+                    }
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .brutalistBadge(
+                    backgroundColor: message.count >= 5 ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkSubtle,
+                    cornerRadius: 8,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+                .padding(.horizontal)
+                .disabled(message.count < 5 || isSubmitting)
+                
+                Spacer()
+            }
+            .padding(.top)
+        }
+        .navigationTitle("Send Feedback")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+        .alert("Thanks!", isPresented: $showSuccess) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text("Your feedback has been sent.")
+        }
+    }
+    
+    private func submitFeedback() {
+        isSubmitting = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                struct FeedbackRequest: Encodable {
+                    let message: String
+                }
+                let request = try APIClient.shared.request(
+                    endpoint: "/feedback",
+                    method: "POST",
+                    body: FeedbackRequest(message: message)
+                )
+                let _: [String: Bool] = try await APIClient.shared.execute(request)
+                await MainActor.run {
+                    isSubmitting = false
+                    showSuccess = true
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmitting = false
+                    errorMessage = "Failed to send. Try again."
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Preview
