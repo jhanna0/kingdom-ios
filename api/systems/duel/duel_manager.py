@@ -558,14 +558,34 @@ class DuelManager:
                 raise ValueError("Must swing at least once before stopping")
             raise ValueError("Cannot stop right now")
         
+        print(f"DUEL_DEBUG stop() BEFORE: ch_best={match.challenger_best_outcome!r}, op_best={match.opponent_best_outcome!r}")
+        
         # Submit
         match.submit_player(player_id)
         
         best_outcome = match.get_player_best_outcome(player_id)
-        opponent_submitted = match.both_submitted()
+        both = match.both_submitted()
+        
+        print(f"DUEL_DEBUG stop() AFTER submit: both={both}, ch_best={match.challenger_best_outcome!r}, op_best={match.opponent_best_outcome!r}")
         
         db.commit()
         db.refresh(match)
+        
+        print(f"DUEL_DEBUG stop() AFTER REFRESH: ch_best={match.challenger_best_outcome!r}, op_best={match.opponent_best_outcome!r}")
+        print(f"DUEL_DEBUG stop() AFTER REFRESH: ch_rolls={match.challenger_round_rolls}")
+        print(f"DUEL_DEBUG stop() AFTER REFRESH: op_rolls={match.opponent_round_rolls}")
+        
+        # DEFENSIVE: If outcomes were lost in refresh (missing DB columns?), recover from rolls
+        if match.challenger_best_outcome is None and match.challenger_round_rolls:
+            last_roll = match.challenger_round_rolls[-1] if match.challenger_round_rolls else None
+            if last_roll:
+                match.challenger_best_outcome = last_roll.get("outcome", "miss")
+                print(f"DUEL_DEBUG   RECOVERED challenger_best_outcome from rolls: {match.challenger_best_outcome!r}")
+        if match.opponent_best_outcome is None and match.opponent_round_rolls:
+            last_roll = match.opponent_round_rolls[-1] if match.opponent_round_rolls else None
+            if last_roll:
+                match.opponent_best_outcome = last_roll.get("outcome", "miss")
+                print(f"DUEL_DEBUG   RECOVERED opponent_best_outcome from rolls: {match.opponent_best_outcome!r}")
         
         # Check if round should resolve
         round_resolved = False
@@ -610,6 +630,15 @@ class DuelManager:
         ch_rank = OUTCOME_RANK.get(ch_best, 0)
         op_rank = OUTCOME_RANK.get(op_best, 0)
         
+        # DUEL_DEBUG: Print all values for debugging
+        print(f"DUEL_DEBUG _resolve_round match_id={match.id}")
+        print(f"DUEL_DEBUG   challenger_id={match.challenger_id}, opponent_id={match.opponent_id}")
+        print(f"DUEL_DEBUG   challenger_best_outcome (raw)={match.challenger_best_outcome!r}")
+        print(f"DUEL_DEBUG   opponent_best_outcome (raw)={match.opponent_best_outcome!r}")
+        print(f"DUEL_DEBUG   ch_best={ch_best!r}, op_best={op_best!r}")
+        print(f"DUEL_DEBUG   ch_rank={ch_rank}, op_rank={op_rank}")
+        print(f"DUEL_DEBUG   ch_push={ch_push}, op_push={op_push}")
+        
         winner_side = None
         push_amount = 0.0
         decisive_outcome = None
@@ -620,13 +649,17 @@ class DuelManager:
             winner_side = "challenger"
             decisive_outcome = ch_best
             push_amount = ch_push
+            print(f"DUEL_DEBUG   DECISION: ch_rank({ch_rank}) > op_rank({op_rank}) -> challenger wins")
         elif op_rank > ch_rank:
             winner_side = "opponent"
             decisive_outcome = op_best
             push_amount = op_push
+            print(f"DUEL_DEBUG   DECISION: op_rank({op_rank}) > ch_rank({ch_rank}) -> opponent wins")
         else:
             # Tie - check feint
+            print(f"DUEL_DEBUG   DECISION: TIE ch_rank={ch_rank} == op_rank={op_rank}, checking feint")
             feint_winner = self._check_feint_tiebreaker(ch_style, op_style)
+            print(f"DUEL_DEBUG   feint_winner={feint_winner}, ch_style={ch_style}, op_style={op_style}")
             if feint_winner == "challenger":
                 winner_side = "challenger"
                 decisive_outcome = ch_best
@@ -638,6 +671,7 @@ class DuelManager:
             else:
                 # True tie - parried, no push
                 is_parried = True
+                print(f"DUEL_DEBUG   PARRIED - true tie, no feint advantage")
         
         # Apply style push multipliers
         if winner_side and push_amount > 0:
@@ -669,6 +703,7 @@ class DuelManager:
             db.add(action)
         
         # Build resolution data
+        # Include explicit challenger_won/opponent_won so iOS doesn't calculate
         resolution = {
             "round_number": match.round_number,
             "challenger_best": ch_best,
@@ -684,7 +719,16 @@ class DuelManager:
             "push_amount": round(push_amount, 2),
             "bar_before": round(bar_before, 2),
             "bar_after": round(match.control_bar, 2),
+            # EXPLICIT booleans - iOS should use these, NOT calculate
+            "challenger_won": winner_side == "challenger",
+            "opponent_won": winner_side == "opponent",
         }
+        
+        print(f"DUEL_DEBUG   FINAL RESOLUTION: winner_side={winner_side!r}, parried={is_parried}, push={push_amount}")
+        print(f"DUEL_DEBUG   challenger_won={winner_side == 'challenger'}, opponent_won={winner_side == 'opponent'}")
+        print(f"DUEL_DEBUG   challenger_best={ch_best!r}, opponent_best={op_best!r}")
+        print(f"DUEL_DEBUG   challenger_rolls={match.challenger_round_rolls}")
+        print(f"DUEL_DEBUG   opponent_rolls={match.opponent_round_rolls}")
         
         # Check for match winner
         if match_winner:

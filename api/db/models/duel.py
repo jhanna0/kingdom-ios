@@ -411,13 +411,15 @@ class DuelMatch(Base):
         if not side:
             raise ValueError("Player not in this match")
         
+        print(f"DUEL_DEBUG record_swing: match={self.id}, player={player_id}, side={side}, outcome={outcome!r}")
+        
         # Build roll data
         if side == "challenger":
             swing_number = (self.challenger_swings_used or 0) + 1
-            rolls = self.challenger_round_rolls or []
+            rolls = list(self.challenger_round_rolls or [])  # COPY to trigger SQLAlchemy change detection
         else:
             swing_number = (self.opponent_swings_used or 0) + 1
-            rolls = self.opponent_round_rolls or []
+            rolls = list(self.opponent_round_rolls or [])  # COPY to trigger SQLAlchemy change detection
         
         roll_data = {
             "roll_number": swing_number,
@@ -426,22 +428,26 @@ class DuelMatch(Base):
         }
         rolls.append(roll_data)
         
+        print(f"DUEL_DEBUG   rolls after append: {rolls}")
+        
         # Update state
         if side == "challenger":
             self.challenger_swings_used = swing_number
-            self.challenger_round_rolls = rolls
+            self.challenger_round_rolls = rolls  # Assign NEW list so SQLAlchemy detects change
             
             # Track LAST outcome (not best!) - this creates the "press your luck" decision
             # Swinging again REPLACES your current result, so you risk losing a good roll
             self.challenger_best_outcome = outcome
             self.challenger_best_push = push_amount
+            print(f"DUEL_DEBUG   -> challenger_best_outcome={outcome!r}")
         else:
             self.opponent_swings_used = swing_number
-            self.opponent_round_rolls = rolls
+            self.opponent_round_rolls = rolls  # Assign NEW list so SQLAlchemy detects change
             
             # Track LAST outcome (not best!) - this creates the "press your luck" decision
             self.opponent_best_outcome = outcome
             self.opponent_best_push = push_amount
+            print(f"DUEL_DEBUG   -> opponent_best_outcome={outcome!r}")
         
         return roll_data
     
@@ -687,8 +693,14 @@ class DuelMatch(Base):
             atk = my_stats.get("attack", 0)
             defense = opp_stats.get("defense", 0)
             
-            # Base odds (without style modifiers)
-            base_miss_pct, base_hit_pct, base_crit_pct = calculate_duel_roll_chances(atk, defense)
+            # Base odds - MUST USE SAME FORMULA AS COMBAT (calculate_duel_hit_chance)
+            # Combat uses: hit_chance = (attack + 1) / ((defense + 1) * 2)
+            # Crit is 15% of hit range
+            from systems.duel.config import calculate_duel_hit_chance, DUEL_CRITICAL_MULTIPLIER
+            base_hit_chance = calculate_duel_hit_chance(atk, defense)
+            base_miss_pct = int(round((1.0 - base_hit_chance) * 100))
+            base_crit_pct = int(round(base_hit_chance * DUEL_CRITICAL_MULTIPLIER * 100))
+            base_hit_pct = 100 - base_miss_pct - base_crit_pct
             base_odds = {"miss": base_miss_pct, "hit": base_hit_pct, "crit": base_crit_pct}
             
             miss_pct, hit_pct, crit_pct = base_miss_pct, base_hit_pct, base_crit_pct
@@ -698,21 +710,27 @@ class DuelMatch(Base):
                 my_mods = get_style_modifiers(my_style or AttackStyle.BALANCED)
                 opp_mods = get_style_modifiers(opp_style or AttackStyle.BALANCED)
                 
-                # Hit chance modification (my style + opponent's debuff on me)
-                hit_mod = my_mods.get("hit_chance_mod", 0) + opp_mods.get("opponent_hit_mod", 0)
-                hit_mod_pct = int(hit_mod * 100)
+                # Hit chance modification (MULTIPLICATIVE - same as combat)
+                # my hit_chance_mult * opponent's opponent_hit_mult
+                my_hit_mult = my_mods.get("hit_chance_mult", 1.0)
+                opp_debuff_mult = opp_mods.get("opponent_hit_mult", 1.0)
                 
                 # Crit rate modification
                 crit_mult = my_mods.get("crit_rate_mult", 1.0)
                 
-                # Recalculate
-                base_hit = (100 - miss_pct) / 100.0
-                modified_hit = max(0.10, min(0.90, base_hit + hit_mod))
+                # Recalculate using MULTIPLICATIVE modifiers (same formula as combat)
+                # Use base_hit_chance directly, not percentage conversion
+                modified_hit = max(0.10, min(0.90, base_hit_chance * my_hit_mult * opp_debuff_mult))
                 miss_pct = int(round((1.0 - modified_hit) * 100))
-                crit_pct = int(round(modified_hit * 0.15 * crit_mult * 100))
+                crit_pct = int(round(modified_hit * DUEL_CRITICAL_MULTIPLIER * crit_mult * 100))
                 hit_pct = 100 - miss_pct - crit_pct
+                
+                print(f"DUEL_DEBUG ODDS: player={player_id}, my_style={my_style}, opp_style={opp_style}")
+                print(f"DUEL_DEBUG ODDS: base_hit_chance={base_hit_chance}, my_hit_mult={my_hit_mult}, opp_debuff_mult={opp_debuff_mult}, crit_mult={crit_mult}")
+                print(f"DUEL_DEBUG ODDS: modified_hit={modified_hit}, miss={miss_pct}, hit={hit_pct}, crit={crit_pct}")
             
             current_odds = {"miss": miss_pct, "hit": hit_pct, "crit": crit_pct}
+            print(f"DUEL_DEBUG ODDS SENT: player={player_id}, current_odds={current_odds}")
         
         # Calculate opponent's base and final swings
         opp_base_swings = min(1 + opp_stats.get("attack", 0), DUEL_MAX_ROLLS_PER_ROUND_CAP)
@@ -732,26 +750,30 @@ class DuelMatch(Base):
             opp_atk = opp_stats.get("attack", 0)
             my_def = my_stats.get("defense", 0)
             
-            # Base odds (without style modifiers)
-            opp_base_miss, opp_base_hit, opp_base_crit = calculate_duel_roll_chances(opp_atk, my_def)
+            # Base odds - MUST USE SAME FORMULA AS COMBAT (calculate_duel_hit_chance)
+            opp_base_hit_chance = calculate_duel_hit_chance(opp_atk, my_def)
+            opp_base_miss = int(round((1.0 - opp_base_hit_chance) * 100))
+            opp_base_crit = int(round(opp_base_hit_chance * DUEL_CRITICAL_MULTIPLIER * 100))
+            opp_base_hit = 100 - opp_base_miss - opp_base_crit
             opponent_base_odds = {"miss": opp_base_miss, "hit": opp_base_hit, "crit": opp_base_crit}
             
             opp_miss, opp_hit, opp_crit = opp_base_miss, opp_base_hit, opp_base_crit
             
             # Apply style modifiers if styles are revealed
             if show_opp_style and (my_style or opp_style):
-                # Opponent's hit chance modification (their style + my debuff on them)
+                # Opponent's hit chance modification (MULTIPLICATIVE - same as combat)
                 opp_mods = get_style_modifiers(opp_style or AttackStyle.BALANCED)
                 my_mods = get_style_modifiers(my_style or AttackStyle.BALANCED)
                 
-                opp_hit_mod = opp_mods.get("hit_chance_mod", 0) + my_mods.get("opponent_hit_mod", 0)
+                opp_hit_mult = opp_mods.get("hit_chance_mult", 1.0)
+                my_debuff_mult = my_mods.get("opponent_hit_mult", 1.0)
                 opp_crit_mult = opp_mods.get("crit_rate_mult", 1.0)
                 
-                # Recalculate opponent's odds
-                opp_base_hit_rate = (100 - opp_miss) / 100.0
-                opp_modified_hit = max(0.10, min(0.90, opp_base_hit_rate + opp_hit_mod))
+                # Recalculate opponent's odds using MULTIPLICATIVE modifiers
+                # Use base hit chance, not percentage (same as combat formula)
+                opp_modified_hit = max(0.10, min(0.90, opp_base_hit_chance * opp_hit_mult * my_debuff_mult))
                 opp_miss = int(round((1.0 - opp_modified_hit) * 100))
-                opp_crit = int(round(opp_modified_hit * 0.15 * opp_crit_mult * 100))
+                opp_crit = int(round(opp_modified_hit * DUEL_CRITICAL_MULTIPLIER * opp_crit_mult * 100))
                 opp_hit = 100 - opp_miss - opp_crit
             
             opponent_current_odds = {"miss": opp_miss, "hit": opp_hit, "crit": opp_crit}

@@ -471,12 +471,16 @@ def execute_swing(
                     is_challenger = (pid == db_match.challenger_id)
                     if parried:
                         your_push_amount = 0.0
+                        you_won = False
                     elif winner_side == "challenger":
                         your_push_amount = raw_push if is_challenger else -raw_push
+                        you_won = is_challenger
                     elif winner_side == "opponent":
                         your_push_amount = -raw_push if is_challenger else raw_push
+                        you_won = not is_challenger
                     else:
                         your_push_amount = 0.0
+                        you_won = False
                     
                     event_type = DuelEvents.DUEL_ENDED if resolution.get("game_over") else DuelEvents.DUEL_ROUND_RESOLVED
                     broadcast_duel_event(
@@ -484,6 +488,7 @@ def execute_swing(
                         match=db_match.to_dict_for_player(pid),
                         target_user_ids=_get_apple_user_ids(db, [pid]),
                         data={
+                            "result": resolution,  # iOS reads "result"
                             "resolution": resolution,
                             "round_number": resolution.get("round_number"),
                             "winner_side": resolution.get("winner_side"),
@@ -491,13 +496,18 @@ def execute_swing(
                             "opponent_rolls": resolution.get("opponent_rolls"),
                             "challenger_style": resolution.get("challenger_style"),
                             "opponent_style": resolution.get("opponent_style"),
-                            "push_amount": resolution.get("push_amount"),  # Raw (always positive)
-                            "your_push_amount": your_push_amount,  # Signed for this player
+                            "challenger_best": resolution.get("challenger_best"),
+                            "opponent_best": resolution.get("opponent_best"),
+                            "push_amount": resolution.get("push_amount"),
+                            "your_push_amount": your_push_amount,
+                            "you_won": you_won,
                             "bar_before": resolution.get("bar_before"),
                             "bar_after": resolution.get("bar_after"),
                             "parried": resolution.get("parried"),
                             "feint_winner": resolution.get("feint_winner"),
                             "game_over": resolution.get("game_over"),
+                            "challenger_won": resolution.get("challenger_won"),
+                            "opponent_won": resolution.get("opponent_won"),
                         }
                     )
         
@@ -581,18 +591,27 @@ def stop_swinging(
                 raw_push = resolution.get("push_amount", 0)
                 parried = resolution.get("parried", False)
                 
+                print(f"DUEL_DEBUG STOP ROUTER: winner_side={winner_side!r}, raw_push={raw_push}, parried={parried}")
+                print(f"DUEL_DEBUG STOP ROUTER: ch_best={resolution.get('challenger_best')!r}, op_best={resolution.get('opponent_best')!r}")
+                
                 for pid in [db_match.challenger_id, db_match.opponent_id]:
                     # Calculate YOUR push amount with correct sign for this player's perspective
                     # Positive = you won/pushed forward, Negative = you lost/got pushed back
                     is_challenger = (pid == db_match.challenger_id)
                     if parried:
                         your_push_amount = 0.0
+                        you_won = False
                     elif winner_side == "challenger":
                         your_push_amount = raw_push if is_challenger else -raw_push
+                        you_won = is_challenger
                     elif winner_side == "opponent":
                         your_push_amount = -raw_push if is_challenger else raw_push
+                        you_won = not is_challenger
                     else:
                         your_push_amount = 0.0
+                        you_won = False
+                    
+                    print(f"DUEL_DEBUG STOP ROUTER: pid={pid}, is_challenger={is_challenger}, your_push={your_push_amount}, you_won={you_won}")
                     
                     event_type = DuelEvents.DUEL_ENDED if resolution.get("game_over") else DuelEvents.DUEL_ROUND_RESOLVED
                     broadcast_duel_event(
@@ -600,6 +619,7 @@ def stop_swinging(
                         match=db_match.to_dict_for_player(pid),
                         target_user_ids=_get_apple_user_ids(db, [pid]),
                         data={
+                            "result": resolution,  # iOS reads "result"
                             "resolution": resolution,
                             "round_number": resolution.get("round_number"),
                             "winner_side": resolution.get("winner_side"),
@@ -607,13 +627,18 @@ def stop_swinging(
                             "opponent_rolls": resolution.get("opponent_rolls"),
                             "challenger_style": resolution.get("challenger_style"),
                             "opponent_style": resolution.get("opponent_style"),
-                            "push_amount": resolution.get("push_amount"),  # Raw (always positive)
-                            "your_push_amount": your_push_amount,  # Signed for this player
+                            "challenger_best": resolution.get("challenger_best"),
+                            "opponent_best": resolution.get("opponent_best"),
+                            "push_amount": resolution.get("push_amount"),
+                            "your_push_amount": your_push_amount,
+                            "you_won": you_won,
                             "bar_before": resolution.get("bar_before"),
                             "bar_after": resolution.get("bar_after"),
                             "parried": resolution.get("parried"),
                             "feint_winner": resolution.get("feint_winner"),
                             "game_over": resolution.get("game_over"),
+                            "challenger_won": resolution.get("challenger_won"),
+                            "opponent_won": resolution.get("opponent_won"),
                         }
                     )
         

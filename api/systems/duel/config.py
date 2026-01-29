@@ -29,17 +29,17 @@ DUEL_HIT_MULTIPLIER = HIT_MULTIPLIER
 # ============================================================
 
 # Base push per hit (before leadership bonus)
-DUEL_PUSH_BASE = 4.0  # 4% base push
+DUEL_PUSH_BASE = 8.0  # 8% base push (faster matches)
 
 # Leadership bonus: each level adds this much to the multiplier
 # push = BASE * (1 + leadership * BONUS)
 # Leadership is 0-5, so with 0.20 bonus per level:
-# leadership 0: push = 4.0 * 1.0 = 4.0%
-# leadership 1: push = 4.0 * 1.20 = 4.8%
-# leadership 2: push = 4.0 * 1.40 = 5.6%
-# leadership 3: push = 4.0 * 1.60 = 6.4%
-# leadership 4: push = 4.0 * 1.80 = 7.2%
-# leadership 5: push = 4.0 * 2.0 = 8.0%
+# leadership 0: push = 8.0 * 1.0 = 8.0%
+# leadership 1: push = 8.0 * 1.20 = 9.6%
+# leadership 2: push = 8.0 * 1.40 = 11.2%
+# leadership 3: push = 8.0 * 1.60 = 12.8%
+# leadership 4: push = 8.0 * 1.80 = 14.4%
+# leadership 5: push = 8.0 * 2.0 = 16.0%
 DUEL_LEADERSHIP_BONUS = 0.20  # 20% more push per leadership level
 
 # Critical hits push harder (same multiplier as battles)
@@ -306,9 +306,9 @@ def calculate_duel_push(leadership: int, is_critical: bool = False) -> float:
     Higher leadership = harder push!
     
     Examples (leadership is 0-5):
-      leadership 0: hit=4.0%, crit=6.0%
-      leadership 3: hit=6.4%, crit=9.6%
-      leadership 5: hit=8.0%, crit=12.0%
+      leadership 0: hit=8.0%, crit=12.0%
+      leadership 3: hit=12.8%, crit=19.2%
+      leadership 5: hit=16.0%, crit=24.0%
     """
     multiplier = 1.0 + (leadership * DUEL_LEADERSHIP_BONUS)
     base_push = DUEL_PUSH_BASE * multiplier
