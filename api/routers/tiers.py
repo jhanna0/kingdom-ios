@@ -306,14 +306,14 @@ BUILDING_TYPES = {
         "description": "Produces stone and iron resources",
         "max_tier": 5,
         "sort_order": 40,
-        "benefit_formula": "Produces stone and iron each level",
+        "benefit_formula": "Higher levels unlock iron with better odds",
         "click_action": {"type": "gathering", "resource": "stone"},
         "tiers": {
-            1: {"name": "Quarry", "benefit": "Provides 200 stone per day", "stone_per_action": 10, "description": "Basic stone quarry"},
-            2: {"name": "Iron Mine", "benefit": "Provides 200 iron per day", "iron_per_action": 10, "description": "Iron ore extraction"},
-            3: {"name": "Deep Mine", "benefit": "Provides 400 stone per day", "stone_per_action": 20, "description": "Deeper stone quarry"},
-            4: {"name": "Industrial Mine", "benefit": "Provides 400 iron per day", "iron_per_action": 20, "description": "Advanced iron extraction"},
-            5: {"name": "Mining Complex", "benefit": "Provides 600 stone + 600 iron per day", "stone_per_action": 30, "iron_per_action": 30, "description": "Full-scale mining operation"},
+            1: {"name": "Quarry", "benefit": "200 stone/day", "description": "Basic stone quarry"},
+            2: {"name": "Iron Mine", "benefit": "400 resources/day, 50% iron", "description": "Unlocks iron ore extraction"},
+            3: {"name": "Deep Mine", "benefit": "600 resources/day, 60% iron", "description": "Deeper ore veins"},
+            4: {"name": "Industrial Mine", "benefit": "800 resources/day, 70% iron", "description": "Advanced extraction"},
+            5: {"name": "Mining Complex", "benefit": "1000 resources/day, 80% iron", "description": "Full-scale mining operation"},
         }
     },
     "market": {

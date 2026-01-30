@@ -1,8 +1,9 @@
 """
-Resource Gathering action - Click to gather wood/iron
+Resource Gathering action - Click to gather wood/iron/stone
 1 second backend cooldown to prevent scripted abuse
 Daily limit: 200 * hometown building level per resource
 """
+import random
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta, time
@@ -37,9 +38,13 @@ def get_daily_limit(db: Session, user: User, resource_type: str) -> int:
     # Get building level based on resource type
     if resource_type == "wood":
         level = getattr(hometown, 'lumbermill_level', 0) or 0
-    elif resource_type == "stone" or resource_type == "iron":
-        # Both stone and iron come from the mine
+    elif resource_type == "stone":
+        # Stone unlocks at mine level 1
         level = getattr(hometown, 'mine_level', 0) or 0
+    elif resource_type == "iron":
+        # Iron unlocks at mine level 2
+        mine_level = getattr(hometown, 'mine_level', 0) or 0
+        level = max(0, mine_level - 1)  # Level 2 mine = level 1 for iron limit
     else:
         level = 0
     
@@ -142,20 +147,39 @@ def gather_resource(
             detail=f"Invalid resource type: {resource_type}"
         )
     
+    # Mine level 2+ gives scaling chance of iron instead of stone
+    # Level 2: 50%, Level 3: 60%, Level 4: 70%, Level 5: 80%
+    if resource_type == "stone":
+        hometown = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+        mine_level = getattr(hometown, 'mine_level', 0) or 0 if hometown else 0
+        if mine_level >= 2:
+            iron_chance = 0.40 + (mine_level * 0.10)  # L2=50%, L3=60%, L4=70%, L5=80%
+            if random.random() < iron_chance:
+                resource_type = "iron"
+                resource_config = GatherConfig.get_resource(resource_type)
+    
     # CHECK DAILY LIMIT - wood uses lumbermill_level, iron uses mine_level
     daily_limit = get_daily_limit(db, current_user, resource_type)
     gathered_today = get_gathered_today(db, current_user.id, resource_type)
     
     if daily_limit <= 0:
         # No building = can't gather
-        building_needed = "lumbermill" if resource_type == "wood" else "mine"
+        if resource_type == "wood":
+            msg = "Your hometown needs a lumbermill to gather wood."
+        elif resource_type == "stone":
+            msg = "Your hometown needs a mine to quarry stone."
+        elif resource_type == "iron":
+            msg = "Your hometown needs a level 2 mine to extract iron."
+        else:
+            msg = f"Your hometown cannot gather {resource_type}."
+        
         return {
             "resource_type": resource_type,
             "tier": "black",
             "amount": 0,
             "new_total": getattr(state, resource_config["player_field"], 0),
             "exhausted": True,
-            "exhausted_message": f"Your hometown needs a {building_needed} to gather {resource_type}."
+            "exhausted_message": msg
         }
     
     if gathered_today >= daily_limit:
