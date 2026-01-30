@@ -12,6 +12,7 @@ from db.models import User, PlayerState, Contract, CoupEvent, InvasionEvent, Pro
 from db.models.activity_log import PlayerActivityLog
 from sqlalchemy import func
 from routers.auth import get_current_user
+from routers.tiers import PROPERTY_TIERS
 from schemas.activity import ActivityLogEntry, PlayerActivityResponse
 
 
@@ -159,7 +160,7 @@ def _get_property_activities(db: Session, user_id: int, limit: int = 50) -> List
             user_id=user_id,
             action_type="property_purchase",
             action_category="economy",
-            description=f"Purchased T{prop.tier} property in {prop.kingdom_name}",
+            description=f"Purchased {PROPERTY_TIERS.get(prop.tier, {}).get('name', 'Land')} in {prop.kingdom_name}",
             kingdom_id=prop.kingdom_id,
             kingdom_name=prop.kingdom_name,
             details={

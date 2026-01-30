@@ -180,8 +180,8 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         
-        // Create the toast view wrapped in animation container
-        let toastView = InAppNotificationWindowContent(
+        // Create the toast view
+        let toastView = InAppNotificationToastView(
             notification: notification,
             onDismiss: { [weak self] in
                 self?.dismissCurrent()
@@ -191,14 +191,34 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
         let hostingController = UIHostingController(rootView: AnyView(toastView))
         hostingController.view.backgroundColor = .clear
         
+        // Size to fit the content
+        let screenWidth = windowScene.screen.bounds.width
+        let targetSize = hostingController.sizeThatFits(in: CGSize(width: screenWidth - 32, height: .infinity))
+        
+        // Create a small window just for the toast - NOT full screen
         let window = UIWindow(windowScene: windowScene)
+        window.frame = CGRect(
+            x: 16,
+            y: 60, // Below status bar/notch
+            width: screenWidth - 32,
+            height: targetSize.height + 20
+        )
         window.rootViewController = hostingController
-        window.windowLevel = .alert + 2 // Above alerts and blocking errors
+        window.windowLevel = UIWindow.Level(rawValue: CGFloat.greatestFiniteMagnitude)
         window.backgroundColor = .clear
-        window.makeKeyAndVisible()
+        window.clipsToBounds = false
+        window.isHidden = false
         
         self.overlayWindow = window
         self.hostingController = hostingController
+        
+        // Animate in
+        window.transform = CGAffineTransform(translationX: 0, y: -150)
+        window.alpha = 0
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0) {
+            window.transform = .identity
+            window.alpha = 1
+        }
         
         print("📲 InApp: Showing notification - \(notification.type.title)")
         
@@ -211,13 +231,14 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
     /// Dismiss current notification and show next in queue
     @MainActor
     func dismissCurrent() {
-        guard overlayWindow != nil else { return }
+        guard let window = overlayWindow else { return }
         
-        // Hide with animation
-        UIView.animate(withDuration: 0.3, animations: { [weak self] in
-            self?.overlayWindow?.alpha = 0
+        // Slide up and fade out
+        UIView.animate(withDuration: 0.25, animations: {
+            window.transform = CGAffineTransform(translationX: 0, y: -150)
+            window.alpha = 0
         }, completion: { [weak self] _ in
-            self?.overlayWindow?.isHidden = true
+            window.isHidden = true
             self?.overlayWindow = nil
             self?.hostingController = nil
             self?.currentNotification = nil
@@ -237,69 +258,14 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
     
 }
 
-// MARK: - Window Content View
-
-/// The content view for the notification window - handles its own animation state
-private struct InAppNotificationWindowContent: View {
-    let notification: InAppNotification
-    let onDismiss: () -> Void
-    
-    @State private var isVisible = false
-    @State private var dragOffset: CGFloat = 0
-    
-    var body: some View {
-        GeometryReader { _ in
-            Color.clear
-        }
-        .allowsHitTesting(false)
-        .overlay(alignment: .top) {
-            if isVisible {
-                InAppNotificationToastView(
-                    notification: notification,
-                    onDismiss: onDismiss
-                )
-                .offset(y: dragOffset)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            if value.translation.height < 0 {
-                                dragOffset = value.translation.height
-                            }
-                        }
-                        .onEnded { value in
-                            if value.translation.height < -50 {
-                                // Swipe up to dismiss
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    dragOffset = -200
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    onDismiss()
-                                }
-                            } else {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    dragOffset = 0
-                                }
-                            }
-                        }
-                )
-                .padding(.top, 60) // Below status bar and notch
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                isVisible = true
-            }
-        }
-    }
-}
-
 // MARK: - Toast View
 
 /// The actual toast notification view - uses brutalist style matching TravelNotificationToast
 private struct InAppNotificationToastView: View {
     let notification: InAppNotification
     let onDismiss: () -> Void
+    
+    @State private var dragOffset: CGFloat = 0
     
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -361,6 +327,26 @@ private struct InAppNotificationToastView: View {
             x: KingdomTheme.Shadows.brutalistSoft.x,
             y: KingdomTheme.Shadows.brutalistSoft.y
         )
-        .padding(.horizontal)
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // Only allow dragging up
+                    if value.translation.height < 0 {
+                        dragOffset = value.translation.height
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.height < -30 {
+                        // Swiped up - dismiss
+                        onDismiss()
+                    } else {
+                        // Snap back
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
     }
 }
