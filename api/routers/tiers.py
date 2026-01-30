@@ -306,7 +306,7 @@ BUILDING_TYPES = {
         "description": "Produces stone and iron resources",
         "max_tier": 5,
         "sort_order": 40,
-        "benefit_formula": "Higher levels unlock iron with better odds",
+        "benefit_formula": "Produces stone and iron resources",
         "click_action": {"type": "gathering", "resource": "stone"},
         "tiers": {
             1: {"name": "Quarry", "benefit": "200 stone/day", "description": "Basic stone quarry"},

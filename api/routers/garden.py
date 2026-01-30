@@ -15,6 +15,7 @@ import random
 
 from db import get_db, User, Property
 from db.models.garden import GardenSlot, PlantStatus, PlantType
+from db.models.garden_history import GardenHistory
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.resources import RESOURCES
@@ -149,7 +150,7 @@ def add_to_inventory(db: Session, user_id: int, item_id: str, amount: int):
         db.add(inv)
 
 
-def check_and_update_slot_status(slot: GardenSlot) -> GardenSlot:
+def check_and_update_slot_status(slot: GardenSlot, db: Session = None) -> GardenSlot:
     """
     Check if a growing slot has died from not being watered.
     Updates the slot status if needed.
@@ -161,6 +162,19 @@ def check_and_update_slot_status(slot: GardenSlot) -> GardenSlot:
     watering_deadline = slot.last_watered_at + timedelta(hours=GARDEN_CONFIG["death_timer_hours"])
     if datetime.utcnow() > watering_deadline:
         slot.status = PlantStatus.DEAD
+        
+        # Log the death event
+        if db:
+            history = GardenHistory(
+                user_id=slot.user_id,
+                slot_index=slot.slot_index,
+                action="died",
+                plant_type=slot.plant_type.value if slot.plant_type else None,
+                flower_color=slot.flower_color,
+                flower_rarity=slot.flower_rarity,
+                planted_at=slot.planted_at
+            )
+            db.add(history)
     
     return slot
 
@@ -185,7 +199,7 @@ def get_or_create_garden_slots(db: Session, user_id: int) -> list[GardenSlot]:
     
     # Check and update status for each slot
     for slot in slots:
-        check_and_update_slot_status(slot)
+        check_and_update_slot_status(slot, db)
     
     db.commit()
     return slots
@@ -441,6 +455,18 @@ def plant_seed(
     slot.flower_color = determined_color
     slot.flower_rarity = determined_rarity
     
+    # Log the planting event
+    history = GardenHistory(
+        user_id=current_user.id,
+        slot_index=slot_index,
+        action="planted",
+        plant_type=determined_type.value,
+        flower_color=determined_color,
+        flower_rarity=determined_rarity,
+        planted_at=slot.planted_at
+    )
+    db.add(history)
+    
     db.commit()
     
     seed_info = RESOURCES.get(GARDEN_CONFIG["seed_item_id"], {})
@@ -570,6 +596,17 @@ def harvest_plant(
     # Add wheat to inventory
     add_to_inventory(db, current_user.id, "wheat", wheat_amount)
     
+    # Log the harvest event
+    history = GardenHistory(
+        user_id=current_user.id,
+        slot_index=slot_index,
+        action="harvested",
+        plant_type="wheat",
+        planted_at=slot.planted_at,
+        wheat_gained=wheat_amount
+    )
+    db.add(history)
+    
     # Clear the slot
     slot.status = PlantStatus.EMPTY
     slot.plant_type = None
@@ -618,6 +655,19 @@ def discard_plant(
         raise HTTPException(status_code=400, detail="Nothing to discard in this slot.")
     
     was_flower = slot.plant_type == PlantType.FLOWER
+    was_dead = slot.status == PlantStatus.DEAD
+    
+    # Log the discard event
+    history = GardenHistory(
+        user_id=current_user.id,
+        slot_index=slot_index,
+        action="discarded",
+        plant_type=slot.plant_type.value if slot.plant_type else None,
+        flower_color=slot.flower_color,
+        flower_rarity=slot.flower_rarity,
+        planted_at=slot.planted_at
+    )
+    db.add(history)
     
     # Clear the slot
     slot.status = PlantStatus.EMPTY
@@ -632,6 +682,8 @@ def discard_plant(
     
     if was_flower:
         message = "Cleared the flower. The slot is now empty for replanting."
+    elif was_dead:
+        message = "Cleared the dead plant. Ready for replanting!"
     else:
         message = "Cleared the slot. Ready for replanting!"
     
