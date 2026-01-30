@@ -27,6 +27,17 @@ RESOURCE_TYPES = {
         "icon": "tree.fill",
         "description": "Chop trees for lumber",
         "player_field": "wood",  # Field name on PlayerState
+        "visual_type": "tree",   # Frontend uses this to pick shape/animation
+        "action_verb": "Chop",   # Frontend displays "Chop Wood"
+    },
+    "stone": {
+        "id": "stone",
+        "name": "Stone",
+        "icon": "square.stack.3d.up.fill",
+        "description": "Quarry rocks for stone",
+        "player_field": "stone",  # Field name on PlayerState
+        "visual_type": "rock",    # Frontend uses this to pick shape/animation
+        "action_verb": "Mine",    # Frontend displays "Mine Stone"
     },
     "iron": {
         "id": "iron",
@@ -34,6 +45,8 @@ RESOURCE_TYPES = {
         "icon": "mountain.2.fill",
         "description": "Mine rocks for ore",
         "player_field": "iron",  # Field name on PlayerState
+        "visual_type": "rock",   # Frontend uses this to pick shape/animation
+        "action_verb": "Mine",   # Frontend displays "Mine Iron"
     },
 }
 
@@ -124,6 +137,8 @@ class GatherConfig:
                 "name": r["name"],
                 "icon": r["icon"],
                 "description": r["description"],
+                "visual_type": r["visual_type"],
+                "action_verb": r["action_verb"],
             }
             for r in cls.RESOURCES.values()
         ]

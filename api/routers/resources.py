@@ -74,6 +74,16 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "column",
     },
+    "stone": {
+        "display_name": "Stone",
+        "icon": "square.stack.3d.up.fill",
+        "color": "parchmentDark",
+        "description": "Quarried stone for building walls and structures",
+        "category": "material",
+        "display_order": 13,
+        "is_tradeable": True,
+        "storage_type": "column",
+    },
 
     # ===== HUNTING DROPS (20-29) =====
     # Resources from hunting animals

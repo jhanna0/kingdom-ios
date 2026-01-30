@@ -37,7 +37,8 @@ def get_daily_limit(db: Session, user: User, resource_type: str) -> int:
     # Get building level based on resource type
     if resource_type == "wood":
         level = getattr(hometown, 'lumbermill_level', 0) or 0
-    elif resource_type == "iron":
+    elif resource_type == "stone" or resource_type == "iron":
+        # Both stone and iron come from the mine
         level = getattr(hometown, 'mine_level', 0) or 0
     else:
         level = 0
@@ -138,7 +139,7 @@ def gather_resource(
     if not resource_config:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid resource type: {resource_type}. Must be 'wood' or 'iron'."
+            detail=f"Invalid resource type: {resource_type}"
         )
     
     # CHECK DAILY LIMIT - wood uses lumbermill_level, iron uses mine_level
@@ -147,13 +148,14 @@ def gather_resource(
     
     if daily_limit <= 0:
         # No building = can't gather
+        building_needed = "lumbermill" if resource_type == "wood" else "mine"
         return {
             "resource_type": resource_type,
             "tier": "black",
             "amount": 0,
             "new_total": getattr(state, resource_config["player_field"], 0),
             "exhausted": True,
-            "exhausted_message": f"Your hometown needs a {'lumbermill' if resource_type == 'wood' else 'mine'} to gather {resource_type}."
+            "exhausted_message": f"Your hometown needs a {building_needed} to gather {resource_type}."
         }
     
     if gathered_today >= daily_limit:
@@ -167,7 +169,7 @@ def gather_resource(
 
         # Daily limit reached - get building level for message
         building_level = daily_limit // DAILY_LIMIT_PER_LEVEL
-        resource_verb = "chopped" if resource_type == "wood" else "mined"
+        resource_verb = "chopped" if resource_type == "wood" else "quarried" if resource_type == "stone" else "mined"
         return {
             "resource_type": resource_type,
             "tier": "black", 

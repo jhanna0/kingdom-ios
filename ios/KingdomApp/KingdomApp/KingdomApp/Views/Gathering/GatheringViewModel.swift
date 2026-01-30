@@ -23,9 +23,8 @@ class GatheringViewModel: ObservableObject {
     // Last gather result (for display)
     @Published var lastResult: GatherResponse?
     
-    // Running totals
-    @Published var woodTotal: Int = 0
-    @Published var ironTotal: Int = 0
+    // Running totals (keyed by resource id)
+    @Published var resourceTotals: [String: Int] = [:]
     
     // Cooldown state
     @Published var isOnCooldown = false
@@ -47,16 +46,29 @@ class GatheringViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     
+    /// Get the config for the currently selected resource
+    var currentResourceConfig: GatherResourceConfig? {
+        config?.resources.first { $0.id == selectedResource }
+    }
+    
     var currentTotal: Int {
-        selectedResource == "wood" ? woodTotal : ironTotal
+        resourceTotals[selectedResource] ?? 0
     }
     
     var resourceIcon: String {
-        selectedResource == "wood" ? "tree.fill" : "mountain.2.fill"
+        currentResourceConfig?.icon ?? "questionmark"
     }
     
     var resourceName: String {
-        selectedResource == "wood" ? "Wood" : "Iron"
+        currentResourceConfig?.name ?? selectedResource.capitalized
+    }
+    
+    var visualType: String {
+        currentResourceConfig?.visualType ?? (selectedResource == "wood" ? "tree" : "rock")
+    }
+    
+    var actionVerb: String {
+        currentResourceConfig?.actionVerb ?? (selectedResource == "wood" ? "Chop" : "Mine")
     }
     
     var canGather: Bool {
@@ -94,12 +106,8 @@ class GatheringViewModel: ObservableObject {
             // Update state
             lastResult = response
             
-            // Update totals
-            if selectedResource == "wood" {
-                woodTotal = response.newTotal
-            } else {
-                ironTotal = response.newTotal
-            }
+            // Update totals for this resource
+            resourceTotals[selectedResource] = response.newTotal
             
             // Update session stats
             sessionGathered += response.amount
@@ -145,7 +153,7 @@ class GatheringViewModel: ObservableObject {
     // MARK: - Resource Selection
     
     func selectResource(_ resource: String) {
-        guard resource == "wood" || resource == "iron" else { return }
+        // Accept any resource string - validation happens on backend
         selectedResource = resource
         lastResult = nil
         showResultAnimation = false

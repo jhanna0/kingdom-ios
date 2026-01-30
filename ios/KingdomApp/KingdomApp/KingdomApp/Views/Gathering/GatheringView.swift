@@ -395,7 +395,7 @@ struct GatheringView: View {
             
             Spacer()
             
-            Text(viewModel.selectedResource == "wood" ? "Chop Wood" : "Mine Ore")
+            Text("\(viewModel.actionVerb) \(viewModel.resourceName)")
                 .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
@@ -534,7 +534,7 @@ struct GatheringView: View {
     
     @ViewBuilder
     private var resourceShape: some View {
-        if viewModel.selectedResource == "wood" {
+        if viewModel.visualType == "tree" {
             TreeShape()
         } else {
             RockShape()
@@ -544,7 +544,7 @@ struct GatheringView: View {
     // MARK: - Instruction Text
     
     private var instructionText: some View {
-        Text(viewModel.selectedResource == "wood" ? "Slash through the target!" : "Strike the ore!")
+        Text(viewModel.visualType == "tree" ? "Slash through the target!" : "Strike the ore!")
             .font(FontStyles.bodySmall)
             .foregroundColor(KingdomTheme.Colors.inkLight)
     }
@@ -552,13 +552,12 @@ struct GatheringView: View {
     // MARK: - Helpers
     
     private var resourceColor: Color {
-        switch viewModel.selectedResource {
-        case "wood":
+        // Use visual type to determine color theme
+        if viewModel.visualType == "tree" {
             return KingdomTheme.Colors.buttonPrimary
-        case "iron":
+        } else {
+            // Rock/ore resources use a stone gray
             return Color(red: 0.5, green: 0.48, blue: 0.45)
-        default:
-            return KingdomTheme.Colors.inkMedium
         }
     }
     
@@ -566,10 +565,9 @@ struct GatheringView: View {
         let w = size.width
         let h = size.height
         
-        if viewModel.selectedResource == "wood" {
+        if viewModel.visualType == "tree" {
             // Pick a random point along one of the branches
-            // Branches defined as (start, end) matching TreeShape
-            // Positions on trunk and branches
+            // Positions on trunk and branches matching TreeShape
             let spots: [CGPoint] = [
                 // Trunk (multiple spots along it)
                 CGPoint(x: w * 0.5, y: h * 0.15),
@@ -588,7 +586,7 @@ struct GatheringView: View {
             
             sweetspotPosition = spots.randomElement()!
         } else {
-            // On the rock - spread across the rock area
+            // Rock visual - spread across the rock area
             let x = w * CGFloat.random(in: 0.2...0.8)
             let y = h * CGFloat.random(in: 0.15...0.8)
             sweetspotPosition = CGPoint(x: x, y: y)

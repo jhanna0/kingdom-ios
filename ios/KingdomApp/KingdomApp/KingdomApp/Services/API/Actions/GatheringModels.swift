@@ -47,6 +47,14 @@ struct GatherResourceConfig: Codable, Identifiable {
     let name: String
     let icon: String
     let description: String
+    let visualType: String?   // "tree" or "rock" - determines shape/animation
+    let actionVerb: String?   // "Chop" or "Mine" - for nav title
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, icon, description
+        case visualType = "visual_type"
+        case actionVerb = "action_verb"
+    }
 }
 
 struct GatherTierConfig: Codable, Identifiable {
