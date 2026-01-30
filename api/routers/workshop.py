@@ -38,11 +38,12 @@ CRAFTABLE_ITEMS = {
         "display_name": "Hunting Bow",
         "icon": "arrow.up.right",
         "color": "buttonSuccess",
-        "description": "A sturdy bow for hunting. Gives +2 attack during hunts.",
+        "description": "A bow strung with sinew. +10% strike chance during hunts.",
         "type": "weapon",
         "tier": 1,
-        "attack_bonus": 2,
+        "attack_bonus": 0,
         "defense_bonus": 0,
+        "strike_hit_chance_bonus": 0.10,  # +10% strike phase hit chance (like rabbit foot for tracking)
         "actions_required": 10,  # Crafting takes real effort over time
         "recipe": {
             "sinew": 5,
@@ -53,11 +54,11 @@ CRAFTABLE_ITEMS = {
         "display_name": "Fur Armor",
         "icon": "shield.lefthalf.filled",
         "color": "buttonWarning",
-        "description": "Crude but effective armor made from animal fur.",
+        "description": "Crude but warm armor made from animal fur. +1 defense.",
         "type": "armor",
         "tier": 1,
         "attack_bonus": 0,
-        "defense_bonus": 2,
+        "defense_bonus": 1,
         "actions_required": 10,  # Crafting takes real effort over time
         "recipe": {
             "fur": 10

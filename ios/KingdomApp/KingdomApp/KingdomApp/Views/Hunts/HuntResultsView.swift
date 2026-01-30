@@ -6,7 +6,6 @@ struct HuntResultsView: View {
     @ObservedObject var viewModel: HuntViewModel
     @State private var showContent = false
     @State private var meatCountUp: Int = 0
-    @State private var showStreakPopup: Bool = false
     
     var body: some View {
         ZStack {
@@ -33,25 +32,10 @@ struct HuntResultsView: View {
                     .opacity(showContent ? 1 : 0)
             }
             
-            if showStreakPopup, let streakInfo = viewModel.hunt?.streak_info {
-                StreakBonusPopup(
-                    title: streakInfo.title,
-                    subtitle: streakInfo.subtitle,
-                    description: streakInfo.description,
-                    multiplier: streakInfo.multiplier,
-                    icon: streakInfo.icon,
-                    color: streakInfo.color,
-                    dismissButton: streakInfo.dismiss_button
-                ) { showStreakPopup = false }
-            }
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(0.15)) { showContent = true }
             if let total = viewModel.hunt?.rewards?.total_meat { animateMeatCountUp(to: total) }
-            checkAndShowStreakPopup()
-        }
-        .onChange(of: viewModel.shouldShowStreakPopup) { _, show in
-            if show { checkAndShowStreakPopup() }
         }
     }
     
@@ -258,11 +242,6 @@ struct HuntResultsView: View {
     
     private var resultSubtitle: String {
         viewModel.hunt?.status == .completed ? "Successful hunt!" : "Better luck next time"
-    }
-    
-    private func checkAndShowStreakPopup() {
-        guard viewModel.shouldShowStreakPopup, !showStreakPopup else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { showStreakPopup = true }
     }
     
     private func animateMeatCountUp(to target: Int) {

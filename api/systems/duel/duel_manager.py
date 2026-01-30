@@ -333,14 +333,17 @@ class DuelManager:
             match.opponent_style = style
             match.opponent_style_locked_at = now
         
-        both_locked = match.both_styles_locked()
-        
-        # If both locked, transition to style reveal then swing phase
-        if both_locked:
-            self._transition_to_swing_phase(match)
-        
         db.commit()
         db.refresh(match)
+        
+        # Check AFTER commit if both are locked - handles race condition
+        # where both players lock simultaneously
+        both_locked = match.both_styles_locked()
+        
+        if both_locked and match.in_style_selection:
+            self._transition_to_swing_phase(match)
+            db.commit()
+            db.refresh(match)
         
         return {
             "success": True,
@@ -447,6 +450,12 @@ class DuelManager:
         # Check style phase timeout first
         if match.in_style_selection and match.style_phase_expired():
             self.check_style_phase_timeout(db, match_id)
+            db.refresh(match)
+        
+        # Recovery: if both styles locked but still in style_selection (race condition aftermath)
+        if match.in_style_selection and match.both_styles_locked():
+            self._transition_to_swing_phase(match)
+            db.commit()
             db.refresh(match)
         
         # Must be in swing phase (or style reveal which auto-transitions)
@@ -765,7 +774,7 @@ class DuelManager:
                 winner_state.gold += match.winner_gold_earned
     
     def _update_duel_stats(self, db: Session, user_id: int, won: bool, gold: int) -> None:
-        """Update player's duel statistics."""
+        """Update players duel statistics."""
         stats = db.query(DuelStats).filter(DuelStats.user_id == user_id).first()
         
         if not stats:
@@ -838,25 +847,24 @@ class DuelManager:
         op_feint = op_mods["tie_advantage"]
         
         if ch_feint and op_feint:
-            # Both have feint - better roll wins (lower roll is better since we use roll_value < threshold)
-            # But for display, we show the raw value and the higher number wins the tiebreaker
+            # Both have feint - LOWER roll wins (lower is always better in our system)
+            # Note: roll["value"] is already 0-100 scale (multiplied in record_swing)
             ch_roll = ch_rolls[-1]["value"] if ch_rolls else 0
             op_roll = op_rolls[-1]["value"] if op_rolls else 0
             print(f"DUEL_DEBUG   Both feint: ch_roll={ch_roll}, op_roll={op_roll}")
             
-            # Tiebreaker data for frontend animation
+            # Tiebreaker data for frontend animation (values already 0-100, round to int for display)
             tiebreaker_data = {
                 "type": "feint_vs_feint",
-                "challenger_roll": round(ch_roll * 100, 1),  # Convert to percentage for display
-                "opponent_roll": round(op_roll * 100, 1),
-                "challenger_raw": ch_roll,
-                "opponent_raw": op_roll,
+                "challenger_roll": round(ch_roll),
+                "opponent_roll": round(op_roll),
             }
             
-            if ch_roll > op_roll:
+            # LOWER roll wins the tiebreaker
+            if ch_roll < op_roll:
                 tiebreaker_data["winner"] = "challenger"
                 return "challenger", tiebreaker_data
-            elif op_roll > ch_roll:
+            elif op_roll < ch_roll:
                 tiebreaker_data["winner"] = "opponent"
                 return "opponent", tiebreaker_data
             # Exact same roll = true tie (rare)
@@ -993,13 +1001,21 @@ class DuelManager:
     # QUERIES
     # =========================================================================
     
-    def get_match(self, db: Session, match_id: int) -> Optional[DuelMatch]:
-        """Get a match by ID."""
-        return db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+    def get_match(self, db: Session, match_id: int, auto_fix: bool = True) -> Optional[DuelMatch]:
+        """Get a match by ID. Optionally auto-fix stuck states."""
+        match = db.query(DuelMatch).filter(DuelMatch.id == match_id).first()
+        
+        # Auto-fix stuck state: both styles locked but still in style_selection
+        if auto_fix and match and match.is_fighting and match.in_style_selection and match.both_styles_locked():
+            self._transition_to_swing_phase(match)
+            db.commit()
+            db.refresh(match)
+        
+        return match
     
     def get_active_match_for_player(self, db: Session, player_id: int) -> Optional[DuelMatch]:
         """Get player's active match."""
-        return db.query(DuelMatch).filter(
+        match = db.query(DuelMatch).filter(
             DuelMatch.status.in_([
                 DuelStatus.WAITING.value,
                 DuelStatus.PENDING_ACCEPTANCE.value,
@@ -1008,6 +1024,14 @@ class DuelManager:
             ]),
             (DuelMatch.challenger_id == player_id) | (DuelMatch.opponent_id == player_id)
         ).first()
+        
+        # Auto-fix stuck state: both styles locked but still in style_selection
+        if match and match.is_fighting and match.in_style_selection and match.both_styles_locked():
+            self._transition_to_swing_phase(match)
+            db.commit()
+            db.refresh(match)
+        
+        return match
     
     def get_player_stats(self, db: Session, user_id: int) -> Optional[DuelStats]:
         """Get player's duel stats."""

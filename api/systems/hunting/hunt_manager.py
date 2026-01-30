@@ -647,6 +647,8 @@ class HuntManager:
         effective_hit_chance = ROLL_HIT_CHANCE
         if phase == HuntPhase.TRACK:
             effective_hit_chance += self._get_tracking_bonus_from_items(db, session.created_by)
+        elif phase == HuntPhase.STRIKE:
+            effective_hit_chance += self._get_strike_bonus_from_items(db, session.created_by)
         
         state = PhaseState(
             phase=phase,
@@ -717,6 +719,9 @@ class HuntManager:
         # Check for item bonuses during tracking phase
         if state.phase == HuntPhase.TRACK:
             effective_hit_chance += self._get_tracking_bonus_from_items(db, player_id)
+        # Check for item bonuses during strike phase (hunting bow, etc.)
+        elif state.phase == HuntPhase.STRIKE:
+            effective_hit_chance += self._get_strike_bonus_from_items(db, player_id)
         
         is_success = roll_value < effective_hit_chance
         
@@ -815,6 +820,35 @@ class HuntManager:
         ).all()
         
         return sum(bonus_items[entry.item_id] for entry in owned)
+
+    def _get_strike_bonus_from_items(self, db, player_id: int) -> float:
+        """
+        Check player inventory/equipment for items that boost strike hit chance.
+        Hunting Bow gives +10% strike hit chance (like Rabbit Foot for tracking).
+        
+        Returns:
+            Float bonus to add to base hit chance (e.g., 0.10 for +10%)
+        """
+        from db.models.inventory import PlayerInventory
+        from db.models.player_item import PlayerItem
+        from routers.workshop import CRAFTABLE_ITEMS
+        
+        total_bonus = 0.0
+        
+        # Check crafted items (hunting_bow, etc.) from player_items table
+        # These are equipped items from the workshop
+        equipped_items = db.query(PlayerItem).filter(
+            PlayerItem.user_id == player_id,
+            PlayerItem.is_equipped == True
+        ).all()
+        
+        for item in equipped_items:
+            item_config = CRAFTABLE_ITEMS.get(item.item_id, {})
+            bonus = item_config.get("strike_hit_chance_bonus", 0)
+            if bonus > 0:
+                total_bonus += bonus
+        
+        return total_bonus
 
     def _apply_roll_to_phase(
         self, 

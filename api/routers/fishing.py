@@ -115,27 +115,12 @@ def add_rewards_to_inventory(db: Session, player_id: int, session: FishingSessio
     """
     Add fishing rewards to player's inventory.
     
-    Note: Pet fish are added immediately when caught (in reel endpoint),
-    so we only add meat here at session end.
+    Note: Both meat and pet fish are now added immediately in the reel endpoint.
+    This function exists for any future end-of-session rewards.
     """
-    # Add meat
-    if session.total_meat > 0:
-        meat_entry = db.query(PlayerInventory).filter(
-            PlayerInventory.user_id == player_id,
-            PlayerInventory.item_id == "meat"
-        ).first()
-        
-        if meat_entry:
-            meat_entry.quantity += session.total_meat
-        else:
-            meat_entry = PlayerInventory(
-                user_id=player_id,
-                item_id="meat",
-                quantity=session.total_meat
-            )
-            db.add(meat_entry)
-    
-    # Pet fish already added in reel endpoint when caught - don't double add!
+    # Meat is now added immediately on each catch in reel endpoint - don't double add!
+    # Pet fish also added immediately in reel endpoint.
+    pass
 
 
 def broadcast_rare_loot(db: Session, player_id: int) -> None:
@@ -368,7 +353,26 @@ def reel_in(
     # Execute reel with all rolls pre-calculated
     result = _manager.execute_reel(session, stats["defense"])
     
-    # If caught and pet fish dropped, broadcast and add to inventory NOW
+    # If caught, add meat to inventory immediately (streak bonus already applied in manager)
+    if result.outcome == "caught":
+        meat_earned = result.outcome_display.get("meat_earned", 0)
+        if meat_earned > 0:
+            meat_entry = db.query(PlayerInventory).filter(
+                PlayerInventory.user_id == player_id,
+                PlayerInventory.item_id == "meat"
+            ).first()
+            
+            if meat_entry:
+                meat_entry.quantity += meat_earned
+            else:
+                meat_entry = PlayerInventory(
+                    user_id=player_id,
+                    item_id="meat",
+                    quantity=meat_earned
+                )
+                db.add(meat_entry)
+    
+    # If pet fish dropped, broadcast and add to inventory NOW
     if result.outcome == "caught" and result.outcome_display.get("rare_loot_dropped"):
         # Add pet fish to inventory immediately
         pet_entry = db.query(PlayerInventory).filter(

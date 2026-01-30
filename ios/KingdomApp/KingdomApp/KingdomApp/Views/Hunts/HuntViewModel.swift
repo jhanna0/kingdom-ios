@@ -690,8 +690,8 @@ class HuntViewModel: ObservableObject {
         shouldAnimateMasterRoll = false
         selectedCreatureId = nil
         
-        // Immediately create and start a new hunt (skip intro on restart)
-        await createHunt(kingdomId: kingdomId, skipIntro: true)
+        // Immediately create and start a new hunt
+        await createHunt(kingdomId: kingdomId, skipIntro: false)
     }
 }
 

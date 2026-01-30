@@ -54,16 +54,6 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "column",
     },
-    "steel": {
-        "display_name": "Steel",
-        "icon": "cube.fill",
-        "color": "blue",
-        "description": "Advanced crafting material for superior equipment",
-        "category": "material",
-        "display_order": 11,
-        "is_tradeable": True,
-        "storage_type": "column",
-    },
     "wood": {
         "display_name": "Wood",
         "icon": "tree.fill",
@@ -265,15 +255,16 @@ def sync_items_to_db(db: Session):
     print(f"✅ Synced {len(RESOURCES)} items to database")
 
 # ===== HUNTING BOW - Craftable with sinew + wood =====
+# Gives +10% strike hit chance during hunts (like rabbit foot for tracking)
 
 HUNTING_BOW = {
     "id": "hunting_bow",
     "display_name": "Hunting Bow",
     "icon": "arrow.up.right",
     "color": "green",
-    "description": "A sturdy bow for hunting. Gives +2 attack during hunts.",
-    "attack_bonus": 2,
-    "recipe": {"wood": 10, "sinew": 3},
+    "description": "A bow strung with sinew. +10% strike chance during hunts.",
+    "strike_hit_chance_bonus": 0.10,
+    "recipe": {"wood": 100, "sinew": 5},
 }
 
 

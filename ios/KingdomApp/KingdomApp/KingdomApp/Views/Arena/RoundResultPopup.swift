@@ -238,11 +238,12 @@ struct RoundResultPopup: View {
                 
                 if isRevealed {
                     if showNumber, let value = tiebreakerValue {
-                        // Show the roll number for tiebreaker
-                        Text(String(format: "%.0f", value))
-                            .font(.system(size: 16, weight: .black, design: .monospaced))
+                        // Show the roll number for tiebreaker (lower is better)
+                        Text("\(Int(value))")
+                            .font(.system(size: 18, weight: .black, design: .monospaced))
                             .foregroundColor(KingdomTheme.Colors.inkDark)
-                            .rotation3DEffect(.degrees(0), axis: (x: 0, y: 1, z: 0))
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
                     } else {
                         // Show the outcome icon
                         Image(systemName: config.icon)
@@ -272,10 +273,9 @@ struct RoundResultPopup: View {
                     }
                     .foregroundColor(KingdomTheme.Colors.imperialGold)
                 } else if showNumber {
-                    Text(String(format: "%.0f", tiebreakerValue ?? 0))
+                    // Hidden placeholder - number is shown in the badge above
+                    Text("")
                         .font(.system(size: 9, weight: .black))
-                        .foregroundColor(KingdomTheme.Colors.inkLight)
-                        .opacity(0) // Hide duplicate, number is in badge
                 } else {
                     Text(config.label)
                         .font(.system(size: 9, weight: .black))

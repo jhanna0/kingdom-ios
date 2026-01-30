@@ -393,9 +393,9 @@ def get_hunt_config():
         },
         "notes": {
             "rewards": "Hunts drop MEAT + GOLD (equal, taxed) + fur (uncommon) + sinew (rare)",
-            "fur": "Drops from deer and larger game - used to craft defense armor",
+            "fur": "Drops from deer and larger game - used to craft Fur Armor (+1 defense)",
             "sinew": "Rarer drop from boar and larger game - used to craft hunting bow",
-            "bow": "Craft hunting bow with 10 wood + 3 sinew for +2 attack in hunts",
+            "bow": "Craft hunting bow with 100 wood + 5 sinew for +10% strike hit chance",
         },
         "hunting_permit": {
             "cost": HUNTING_PERMIT_COST,
@@ -903,11 +903,18 @@ def execute_roll(
         }
     )
     
+    # Override phase_state hit_chance with player's actual effective hit chance
+    phase_state = result.get("phase_state")
+    if phase_state and "display" in phase_state:
+        player_hit_chance = result.get("effective_hit_chance", 15)
+        phase_state["display"]["hit_chance"] = player_hit_chance
+        phase_state["effective_hit_chance_percent"] = player_hit_chance
+    
     return RollResponse(
         success=True,
         message=result["roll_result"]["message"],
         roll_result=result.get("roll_result"),
-        phase_state=result.get("phase_state"),
+        phase_state=phase_state,
         phase_update=result.get("phase_update"),
         hunt=result.get("hunt"),
     )
@@ -1163,12 +1170,34 @@ def get_hunt_status(
     hunt_id: str,
     db: Session = Depends(get_db),
     manager: HuntManager = Depends(get_hunt_manager),
+    current_user: User = Depends(get_current_user),
 ):
-    """Get current hunt status."""
+    """Get current hunt status with player-specific hit chance."""
     session = manager.get_hunt(db, hunt_id)
     if not session:
         raise HTTPException(status_code=404, detail="Hunt not found")
     
-    return session.to_dict()
+    result = session.to_dict()
+    
+    # Calculate player-specific effective hit chance (includes their item bonuses)
+    if session.current_phase_state:
+        from systems.hunting.config import ROLL_HIT_CHANCE
+        
+        effective_hit_chance = ROLL_HIT_CHANCE
+        phase = session.current_phase_state.phase
+        
+        if phase == HuntPhase.TRACK:
+            effective_hit_chance += manager._get_tracking_bonus_from_items(db, current_user.id)
+        elif phase == HuntPhase.STRIKE:
+            effective_hit_chance += manager._get_strike_bonus_from_items(db, current_user.id)
+        
+        # Override the hit chance with player-specific value
+        player_hit_chance_percent = int(effective_hit_chance * 100)
+        if "current_phase" in result and result["current_phase"]:
+            if "display" in result["current_phase"]:
+                result["current_phase"]["display"]["hit_chance"] = player_hit_chance_percent
+            result["current_phase"]["effective_hit_chance_percent"] = player_hit_chance_percent
+    
+    return result
 
 
