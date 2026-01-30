@@ -479,18 +479,19 @@ struct RecentMatchRow: View {
                 .foregroundColor(KingdomTheme.Colors.inkLight)
             
             // Opponent
-            Text(match.opponent?.name ?? "???")
+            Text(match.opponentName)
                 .font(FontStyles.bodySmall)
-                .foregroundColor(match.opponent?.id == playerId ? KingdomTheme.Colors.royalBlue : KingdomTheme.Colors.inkDark)
-                .fontWeight(match.opponent?.id == playerId ? .bold : .regular)
+                .foregroundColor((match.opponentInfo?.id ?? match.opponent?.id) == playerId ? KingdomTheme.Colors.royalBlue : KingdomTheme.Colors.inkDark)
+                .fontWeight((match.opponentInfo?.id ?? match.opponent?.id) == playerId ? .bold : .regular)
                 .lineLimit(1)
             
             Spacer()
             
             // Result badge
             if let winner = match.winner {
+                let opponentId = match.opponentInfo?.id ?? match.opponent?.id
                 let didWin = winner.id == playerId
-                let wasInMatch = match.challenger.id == playerId || match.opponent?.id == playerId
+                let wasInMatch = match.challenger.id == playerId || opponentId == playerId
                 
                 if wasInMatch {
                     Text(didWin ? "Won" : "Lost")
@@ -506,7 +507,7 @@ struct RecentMatchRow: View {
                         )
                 } else {
                     // Show winner's name based on side
-                    let winnerName = winner.side == "challenger" ? match.challenger.name : match.opponent?.name
+                    let winnerName = winner.side == "challenger" ? match.challenger.name : match.opponentName
                     Text(winnerName ?? "Winner")
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)

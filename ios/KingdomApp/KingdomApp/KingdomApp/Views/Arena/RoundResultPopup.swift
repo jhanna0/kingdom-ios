@@ -7,6 +7,17 @@ struct RollDisplay: Identifiable {
     let outcome: String  // hit, miss, critical
 }
 
+// MARK: - Tiebreaker Display Data
+struct TiebreakerDisplay {
+    let type: String          // "feint_vs_feint" or "feint_wins"
+    let winner: String?       // "me" or "opponent" (from player perspective)
+    let myRollValue: Double?  // Roll value as percentage (0-100) - only for feint_vs_feint
+    let oppRollValue: Double? // Roll value as percentage (0-100) - only for feint_vs_feint
+    
+    var isFeintVsFeint: Bool { type == "feint_vs_feint" }
+    var iWonTiebreaker: Bool { winner == "me" }
+}
+
 // MARK: - Round Result Data
 struct RoundResultData {
     let pushAmount: Double  // Positive = you pushed, negative = opponent pushed
@@ -20,6 +31,8 @@ struct RoundResultData {
     // NEW: actual rolls for display
     let myRolls: [RollDisplay]
     let opponentRolls: [RollDisplay]
+    // NEW: tiebreaker data for animation
+    let tiebreaker: TiebreakerDisplay?
 }
 
 // MARK: - Round Result Popup
@@ -37,11 +50,16 @@ struct RoundResultPopup: View {
     @State private var myRollsRevealed: Int = 0
     @State private var oppRollsRevealed: Int = 0
     @State private var animatedPush: Double = 0
+    // Tiebreaker animation states - flips last roll cards to show numbers
+    @State private var myLastRollFlipped: Bool = false
+    @State private var oppLastRollFlipped: Bool = false
+    @State private var tiebreakerWinnerHighlighted: Bool = false
     
     enum AnimationPhase {
         case initial
         case showingMySwings
         case showingOppSwings
+        case showingTiebreaker   // Feint tiebreaker - flips last rolls to show numbers
         case showingResult
         case showingPush
         case complete
@@ -67,7 +85,8 @@ struct RoundResultPopup: View {
                     revealedCount: myRollsRevealed,
                     color: myColor,
                     style: data.myStyle,
-                    isVisible: phase != .initial
+                    isVisible: phase != .initial,
+                    isMySection: true
                 )
                 
                 // OPPONENT'S SWINGS
@@ -77,7 +96,8 @@ struct RoundResultPopup: View {
                     revealedCount: oppRollsRevealed,
                     color: enemyColor,
                     style: data.oppStyle,
-                    isVisible: phase.rawValue >= AnimationPhase.showingOppSwings.rawValue
+                    isVisible: phase.rawValue >= AnimationPhase.showingOppSwings.rawValue,
+                    isMySection: false
                 )
                 
                 // RESULT BANNER
@@ -147,7 +167,7 @@ struct RoundResultPopup: View {
     
     // MARK: - Swings Section
     
-    private func swingsSection(title: String, rolls: [RollDisplay], revealedCount: Int, color: Color, style: String, isVisible: Bool) -> some View {
+    private func swingsSection(title: String, rolls: [RollDisplay], revealedCount: Int, color: Color, style: String, isVisible: Bool, isMySection: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header with style chip
             HStack {
@@ -168,7 +188,19 @@ struct RoundResultPopup: View {
                         .foregroundColor(KingdomTheme.Colors.inkLight)
                 } else {
                     ForEach(Array(rolls.enumerated()), id: \.element.id) { index, roll in
-                        rollBadge(roll: roll, color: color, isRevealed: index < revealedCount)
+                        let isLastRoll = index == rolls.count - 1
+                        let shouldShowNumber = isLastRoll && data.tiebreaker != nil && (isMySection ? myLastRollFlipped : oppLastRollFlipped)
+                        let tiebreakerValue = isMySection ? data.tiebreaker?.myRollValue : data.tiebreaker?.oppRollValue
+                        let isWinner = isLastRoll && tiebreakerWinnerHighlighted && data.tiebreaker != nil && (isMySection ? data.tiebreaker?.iWonTiebreaker == true : data.tiebreaker?.iWonTiebreaker == false && data.tiebreaker?.winner != nil)
+                        
+                        rollBadge(
+                            roll: roll,
+                            color: color,
+                            isRevealed: index < revealedCount,
+                            showNumber: shouldShowNumber,
+                            tiebreakerValue: tiebreakerValue,
+                            isWinner: isWinner
+                        )
                     }
                 }
                 Spacer()
@@ -184,7 +216,7 @@ struct RoundResultPopup: View {
         .offset(y: isVisible ? 0 : 10)
     }
     
-    private func rollBadge(roll: RollDisplay, color: Color, isRevealed: Bool) -> some View {
+    private func rollBadge(roll: RollDisplay, color: Color, isRevealed: Bool, showNumber: Bool = false, tiebreakerValue: Double? = nil, isWinner: Bool = false) -> some View {
         let config = getOutcomeConfig(roll.outcome)
         
         return VStack(spacing: 4) {
@@ -195,32 +227,65 @@ struct RoundResultPopup: View {
                     .frame(width: 44, height: 44)
                     .offset(x: 2, y: 2)
                 
-                // Badge - just the icon, no number
+                // Badge background - changes when showing number for tiebreaker
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isRevealed ? config.color : KingdomTheme.Colors.disabled.opacity(0.5))
+                    .fill(isRevealed ? (showNumber ? KingdomTheme.Colors.parchmentLight : config.color) : KingdomTheme.Colors.disabled.opacity(0.5))
                     .frame(width: 44, height: 44)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isWinner ? KingdomTheme.Colors.imperialGold : Color.black, lineWidth: isWinner ? 3 : 2)
+                    )
                 
                 if isRevealed {
-                    Image(systemName: config.icon)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
+                    if showNumber, let value = tiebreakerValue {
+                        // Show the roll number for tiebreaker
+                        Text(String(format: "%.0f", value))
+                            .font(.system(size: 16, weight: .black, design: .monospaced))
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .rotation3DEffect(.degrees(0), axis: (x: 0, y: 1, z: 0))
+                    } else {
+                        // Show the outcome icon
+                        Image(systemName: config.icon)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 } else {
                     Text("?")
                         .font(.system(size: 20, weight: .black))
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
+            .rotation3DEffect(
+                .degrees(showNumber ? 360 : 0),
+                axis: (x: 0, y: 1, z: 0)
+            )
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showNumber)
             
-            // Outcome label from server config
+            // Label below - changes for tiebreaker winner
             if isRevealed {
-                Text(config.label)
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundColor(config.color)
+                if isWinner {
+                    HStack(spacing: 2) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 8, weight: .bold))
+                        Text("WINS")
+                            .font(.system(size: 8, weight: .black))
+                    }
+                    .foregroundColor(KingdomTheme.Colors.imperialGold)
+                } else if showNumber {
+                    Text(String(format: "%.0f", tiebreakerValue ?? 0))
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(KingdomTheme.Colors.inkLight)
+                        .opacity(0) // Hide duplicate, number is in badge
+                } else {
+                    Text(config.label)
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(config.color)
+                }
             }
         }
-        .scaleEffect(isRevealed ? 1.0 : 0.9)
+        .scaleEffect(isWinner ? 1.15 : (isRevealed ? 1.0 : 0.9))
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRevealed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isWinner)
     }
     
     /// Get outcome display config from server, with fallback
@@ -408,15 +473,51 @@ struct RoundResultPopup: View {
         
         let oppRollsTime = myRollsTime + 0.3 + Double(data.opponentRolls.count) * 0.25 + 0.4
         
+        // Check if we have a tiebreaker to show (feint vs feint with roll comparison)
+        let hasTiebreaker = data.tiebreaker?.isFeintVsFeint == true
+        var tiebreakerEndTime = oppRollsTime
+        
+        // Tiebreaker: flip last roll cards to show numbers
+        if hasTiebreaker {
+            DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    phase = .showingTiebreaker
+                }
+            }
+            
+            // Flip my last roll card to show number
+            DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime + 0.3) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    myLastRollFlipped = true
+                }
+            }
+            
+            // Flip opponent's last roll card to show number
+            DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime + 0.7) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    oppLastRollFlipped = true
+                }
+            }
+            
+            // Highlight the winner
+            DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime + 1.2) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    tiebreakerWinnerHighlighted = true
+                }
+            }
+            
+            tiebreakerEndTime = oppRollsTime + 1.8
+        }
+        
         // Phase 3: Show result
-        DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + tiebreakerEndTime) {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                 phase = .showingResult
             }
         }
         
         // Phase 4: Show push
-        DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime + 0.6) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + tiebreakerEndTime + 0.6) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 phase = .showingPush
             }
@@ -426,7 +527,7 @@ struct RoundResultPopup: View {
         }
         
         // Phase 5: Complete - show button
-        DispatchQueue.main.asyncAfter(deadline: .now() + oppRollsTime + 1.4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + tiebreakerEndTime + 1.4) {
             withAnimation(.easeOut(duration: 0.3)) {
                 phase = .complete
             }
@@ -441,9 +542,10 @@ extension RoundResultPopup.AnimationPhase: Comparable {
         case .initial: return 0
         case .showingMySwings: return 1
         case .showingOppSwings: return 2
-        case .showingResult: return 3
-        case .showingPush: return 4
-        case .complete: return 5
+        case .showingTiebreaker: return 3
+        case .showingResult: return 4
+        case .showingPush: return 5
+        case .complete: return 6
         }
     }
     

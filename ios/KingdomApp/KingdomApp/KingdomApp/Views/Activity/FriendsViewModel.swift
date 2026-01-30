@@ -49,6 +49,41 @@ class FriendsViewModel: ObservableObject {
         }
     }
     
+    /// Load all dashboard data in a single API call (friends, trades, alliances, activity)
+    func loadDashboard() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let response = try await api.friends.getDashboard()
+            
+            // Friends
+            friends = response.friends.sorted { ($0.isOnline ?? false) && !($1.isOnline ?? false) }
+            pendingReceived = response.pendingReceived
+            pendingSent = response.pendingSent
+            
+            // Trades
+            incomingTrades = response.incomingTrades
+            outgoingTrades = response.outgoingTrades
+            tradeHistory = response.tradeHistory
+            pendingTradeCount = response.incomingTrades.count
+            hasMerchantSkill = response.hasMerchantSkill
+            
+            // Alliances
+            pendingAlliancesSent = response.pendingAlliancesSent
+            pendingAlliancesReceived = response.pendingAlliancesReceived
+            isRuler = response.isRuler
+            
+            // Friend Activity
+            friendActivities = response.friendActivities
+            
+            print("✅ Loaded dashboard: \(friends.count) friends, \(incomingTrades.count) trades, \(pendingAlliancesReceived.count) alliance requests")
+        } catch {
+            print("❌ Failed to load dashboard: \(error)")
+            errorMessage = "Failed to load data"
+        }
+    }
+    
     func acceptFriend(_ friendId: Int) async {
         do {
             _ = try await api.friends.acceptFriendRequest(friendId: friendId)

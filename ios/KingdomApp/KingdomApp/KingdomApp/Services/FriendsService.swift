@@ -14,6 +14,17 @@ class FriendsService {
         return try await client.execute(request)
     }
     
+    // MARK: - Dashboard (consolidated data for FriendsView)
+    
+    func getDashboard() async throws -> FriendsDashboardResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/friends/dashboard")
+        return try await client.execute(request)
+    }
+    
     // MARK: - Add Friend
     
     func addFriend(username: String) async throws -> AddFriendResponse {

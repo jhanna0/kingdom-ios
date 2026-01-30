@@ -181,16 +181,16 @@ STYLE_MODIFIERS = {
         "icon": "shield.fill",
     },
     
-    # Feint - wins ties
+    # Feint - wins ties, but risky if you lose
     AttackStyle.FEINT: {
         "roll_bonus": 0,
         "hit_chance_mult": 1.0,
         "crit_rate_mult": 1.0,
         "push_mult_win": 1.0,
-        "push_mult_lose": 1.0,
+        "push_mult_lose": 1.25,    # Opponent pushes 25% harder if you lose
         "opponent_hit_mult": 1.0,
         "tie_advantage": True,     # Wins outcome ties
-        "description": "Wins ties (hit vs hit, crit vs crit)",
+        "description": "Wins ties (better roll breaks feint vs feint). +25% push if you lose.",
         "icon": "arrow.triangle.branch",
     },
 }

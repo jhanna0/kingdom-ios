@@ -2458,6 +2458,38 @@ class DuelCombatViewModel: ObservableObject {
                 RollDisplay(value: $0.value, outcome: $0.outcome)
             }
             
+            // Extract tiebreaker data from result (for feint animation)
+            var tiebreakerDisplay: TiebreakerDisplay? = nil
+            if let tiebreakerDict = resultDict?["tiebreaker"] as? [String: Any] {
+                let tbType = tiebreakerDict["type"] as? String ?? "feint_wins"
+                let tbWinnerRaw = tiebreakerDict["winner"] as? String
+                
+                // Convert from challenger/opponent to me/opponent perspective
+                let tbWinner: String? = {
+                    guard let w = tbWinnerRaw else { return nil }
+                    if isChallenger == true {
+                        return w == "challenger" ? "me" : "opponent"
+                    } else {
+                        return w == "opponent" ? "me" : "opponent"
+                    }
+                }()
+                
+                // For feint_vs_feint, extract roll values (already as percentages from backend)
+                let chRoll = tiebreakerDict["challenger_roll"] as? Double
+                let opRoll = tiebreakerDict["opponent_roll"] as? Double
+                
+                // Map rolls to my/opp perspective
+                let myRollValue = isChallenger == true ? chRoll : opRoll
+                let oppRollValue = isChallenger == true ? opRoll : chRoll
+                
+                tiebreakerDisplay = TiebreakerDisplay(
+                    type: tbType,
+                    winner: tbWinner,
+                    myRollValue: myRollValue,
+                    oppRollValue: oppRollValue
+                )
+            }
+            
             let historyEntry = DuelRoundHistoryEntry(
                 id: roundNumber,
                 myStyle: myStyle,
@@ -2490,7 +2522,8 @@ class DuelCombatViewModel: ObservableObject {
                 roundNumber: roundNumber,
                 parried: parried,
                 myRolls: myRolls,
-                opponentRolls: oppRolls
+                opponentRolls: oppRolls,
+                tiebreaker: tiebreakerDisplay
             )
             
             // NOTE: rolls is nil - we don't want the confusing one-by-one animation
@@ -2562,16 +2595,19 @@ class DuelCombatViewModel: ObservableObject {
             await withCheckedContinuation { continuation in
                 animationContinuation = continuation
             }
-            try? await Task.sleep(nanoseconds: 800_000_000)  // 0.8 seconds to see result
+            // No delay here - animation itself shows the result.
+            // Match state updates immediately after animation completes.
         }
         
-        // STEP 2: Update match state
+        // STEP 2: Update match state AND re-enable buttons ATOMICALLY
+        // This ensures canSwing/canStop/swingsRemaining are correct when buttons enable
         if let m = event.match {
             match = m
             if let matchOdds = m.currentOdds {
                 odds = Odds(miss: matchOdds.miss, hit: matchOdds.hit, crit: matchOdds.crit)
             }
         }
+        isAnimating = false  // Buttons now enabled with correct state
         
         // STEP 3: Show style reveal if we have style data (before push popup)
         // NOTE: This should ONLY happen for stylesRevealed event, NOT for roundResolved
@@ -2615,7 +2651,9 @@ class DuelCombatViewModel: ObservableObject {
             }
         }
         currentRoll = nil
-        isAnimating = false
+        // NOTE: Do NOT set isAnimating = false here!
+        // processEvent() manages button state to ensure atomic update with match state.
+        // Setting it here caused desync where buttons enabled with stale canSwing/canStop values.
         
         // Resume queue processing
         animationContinuation?.resume()

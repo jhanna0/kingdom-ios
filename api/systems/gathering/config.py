@@ -77,8 +77,8 @@ TIER_ORDER = ["black", "brown", "green"]
 # Base probabilities for each tier (must sum to 1.0)
 
 TIER_PROBABILITIES = {
-    "black": 0.50,   # 50% chance - nothing
-    "brown": 0.35,   # 35% chance - 1 resource
+    "black": 0.40,   # 50% chance - nothing
+    "brown": 0.45,   # 35% chance - 1 resource
     "green": 0.15,   # 15% chance - 2 resources
 }
 

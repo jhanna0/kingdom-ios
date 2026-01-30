@@ -345,10 +345,6 @@ extension FriendsView {
                 .padding(.horizontal)
             
             HStack {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
                 Text("Recent Trades")
                     .font(FontStyles.headingLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)

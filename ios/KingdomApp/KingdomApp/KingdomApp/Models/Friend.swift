@@ -91,6 +91,41 @@ struct FriendListResponse: Codable {
     }
 }
 
+/// Consolidated response for FriendsView - all data in one API call
+struct FriendsDashboardResponse: Codable {
+    let success: Bool
+    // Friends
+    let friends: [Friend]
+    let pendingReceived: [Friend]
+    let pendingSent: [Friend]
+    // Trades
+    let incomingTrades: [TradeOffer]
+    let outgoingTrades: [TradeOffer]
+    let tradeHistory: [TradeOffer]
+    let hasMerchantSkill: Bool
+    // Alliances
+    let pendingAlliancesSent: [AllianceResponse]
+    let pendingAlliancesReceived: [AllianceResponse]
+    let isRuler: Bool
+    // Friend Activity
+    let friendActivities: [ActivityLogEntry]
+    
+    enum CodingKeys: String, CodingKey {
+        case success
+        case friends
+        case pendingReceived = "pending_received"
+        case pendingSent = "pending_sent"
+        case incomingTrades = "incoming_trades"
+        case outgoingTrades = "outgoing_trades"
+        case tradeHistory = "trade_history"
+        case hasMerchantSkill = "has_merchant_skill"
+        case pendingAlliancesSent = "pending_alliances_sent"
+        case pendingAlliancesReceived = "pending_alliances_received"
+        case isRuler = "is_ruler"
+        case friendActivities = "friend_activities"
+    }
+}
+
 struct AddFriendResponse: Codable {
     let success: Bool
     let message: String

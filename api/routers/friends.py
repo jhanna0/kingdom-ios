@@ -22,6 +22,31 @@ from routers.actions.utils import format_datetime_iso
 router = APIRouter(prefix="/friends", tags=["friends"])
 
 
+# ===== Dashboard Response Schema =====
+
+from pydantic import BaseModel
+from typing import Any
+
+class FriendsDashboardResponse(BaseModel):
+    """Consolidated response for FriendsView - all data in one call"""
+    success: bool
+    # Friends
+    friends: List[Any]
+    pending_received: List[Any]
+    pending_sent: List[Any]
+    # Trades
+    incoming_trades: List[Any]
+    outgoing_trades: List[Any]
+    trade_history: List[Any]
+    has_merchant_skill: bool
+    # Alliances
+    pending_alliances_sent: List[Any]
+    pending_alliances_received: List[Any]
+    is_ruler: bool
+    # Friend Activity
+    friend_activities: List[Any]
+
+
 # ===== Helper Functions =====
 
 def _convert_to_friend_activity(activity) -> dict:
@@ -214,6 +239,204 @@ def list_friends(
         friends=friends,
         pending_received=pending_received,
         pending_sent=pending_sent
+    )
+
+
+@router.get("/dashboard", response_model=FriendsDashboardResponse)
+def get_friends_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all data needed for FriendsView in a single call.
+    
+    Returns:
+    - Friends list (accepted, pending received, pending sent)
+    - Trade offers (incoming, outgoing, history)
+    - Alliance proposals (sent, received)
+    - Friend activity feed
+    """
+    user_id = current_user.id
+    
+    # ===== FRIENDS =====
+    friendships = db.query(Friend).filter(
+        or_(
+            Friend.user_id == user_id,
+            Friend.friend_user_id == user_id
+        )
+    ).all()
+    
+    friends = []
+    pending_received = []
+    pending_sent = []
+    
+    for friendship in friendships:
+        friend_response = _get_friend_response(db, friendship, user_id)
+        
+        if friendship.status == 'accepted':
+            friends.append(friend_response)
+        elif friendship.status == 'pending':
+            if friendship.user_id == user_id:
+                pending_sent.append(friend_response)
+            else:
+                pending_received.append(friend_response)
+    
+    friends.sort(key=lambda f: f.last_seen or '', reverse=True)
+    
+    # ===== TRADES =====
+    from db import TradeOffer, TradeOfferStatus
+    from routers.trades import (
+        trade_offer_to_response, 
+        check_merchant_skill, 
+        TRADE_OFFER_EXPIRY_HOURS,
+        modify_player_resource
+    )
+    
+    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+    has_merchant_skill = False
+    incoming_trades = []
+    outgoing_trades = []
+    trade_history = []
+    
+    if state and check_merchant_skill(state):
+        has_merchant_skill = True
+        
+        # Expire old pending offers
+        expire_threshold = datetime.utcnow() - timedelta(hours=TRADE_OFFER_EXPIRY_HOURS)
+        expired_offers = db.query(TradeOffer).filter(
+            TradeOffer.status == TradeOfferStatus.PENDING.value,
+            TradeOffer.created_at < expire_threshold
+        ).all()
+        
+        for offer in expired_offers:
+            sender_state = db.query(PlayerState).filter(PlayerState.user_id == offer.sender_id).first()
+            if sender_state:
+                if offer.offer_type == "item" and offer.item_type:
+                    modify_player_resource(db, sender_state, offer.item_type, offer.item_quantity)
+                elif offer.offer_type == "gold":
+                    sender_state.gold += offer.gold_amount
+            offer.status = TradeOfferStatus.EXPIRED.value
+        
+        db.commit()
+        
+        # Get trades
+        incoming = db.query(TradeOffer).filter(
+            TradeOffer.recipient_id == user_id,
+            TradeOffer.status == TradeOfferStatus.PENDING.value
+        ).order_by(TradeOffer.created_at.desc()).all()
+        
+        outgoing = db.query(TradeOffer).filter(
+            TradeOffer.sender_id == user_id,
+            TradeOffer.status == TradeOfferStatus.PENDING.value
+        ).order_by(TradeOffer.created_at.desc()).all()
+        
+        history = db.query(TradeOffer).filter(
+            or_(TradeOffer.sender_id == user_id, TradeOffer.recipient_id == user_id),
+            TradeOffer.status != TradeOfferStatus.PENDING.value
+        ).order_by(TradeOffer.updated_at.desc()).limit(20).all()
+        
+        incoming_trades = [trade_offer_to_response(db, o, user_id).model_dump() for o in incoming]
+        outgoing_trades = [trade_offer_to_response(db, o, user_id).model_dump() for o in outgoing]
+        trade_history = [trade_offer_to_response(db, o, user_id).model_dump() for o in history]
+    
+    # ===== ALLIANCES =====
+    from db import Kingdom, Alliance
+    from routers.alliances import _get_player_empire_id, _expire_old_alliances, _alliance_to_response
+    
+    _expire_old_alliances(db)
+    
+    is_ruler = False
+    pending_alliances_sent = []
+    pending_alliances_received = []
+    
+    my_empire_id = _get_player_empire_id(db, current_user, state) if state else None
+    
+    if my_empire_id:
+        is_ruler = True
+        
+        # Get sent proposals
+        sent = db.query(Alliance).filter(
+            Alliance.status == 'pending',
+            Alliance.proposal_expires_at > datetime.utcnow(),
+            Alliance.initiator_empire_id == my_empire_id
+        ).all()
+        
+        # Get received proposals
+        received = db.query(Alliance).filter(
+            Alliance.status == 'pending',
+            Alliance.proposal_expires_at > datetime.utcnow(),
+            Alliance.target_empire_id == my_empire_id
+        ).all()
+        
+        pending_alliances_sent = [_alliance_to_response(a).model_dump() for a in sent]
+        pending_alliances_received = [_alliance_to_response(a).model_dump() for a in received]
+    
+    # ===== FRIEND ACTIVITY =====
+    from routers.activity import (
+        _get_contract_activities,
+        _get_coup_activities,
+        _get_invasion_activities,
+        _get_property_activities,
+        _get_training_activities,
+        _get_action_log_activities
+    )
+    
+    # Get friend IDs
+    friend_ids = []
+    for friendship in friendships:
+        if friendship.status == 'accepted':
+            friend_id = friendship.friend_user_id if friendship.user_id == user_id else friendship.user_id
+            friend_ids.append(friend_id)
+    
+    # Include self
+    all_user_ids = friend_ids + [user_id]
+    all_activities = []
+    
+    for uid in all_user_ids:
+        the_user = db.query(User).filter(User.id == uid).first()
+        if not the_user:
+            continue
+        
+        user_state = db.query(PlayerState).filter(PlayerState.user_id == uid).first()
+        if not user_state:
+            continue
+        
+        user_activities = []
+        user_activities.extend(_get_contract_activities(db, uid, 20))
+        user_activities.extend(_get_coup_activities(db, uid, 20))
+        user_activities.extend(_get_invasion_activities(db, uid, 20))
+        user_activities.extend(_get_property_activities(db, uid, 20))
+        user_activities.extend(_get_training_activities(db, uid, user_state, 10))
+        user_activities.extend(_get_action_log_activities(db, uid, 20, exclude_types=["travel_fee"]))
+        
+        for activity in user_activities:
+            activity.username = the_user.display_name
+            activity.display_name = the_user.display_name
+            activity.user_level = user_state.level
+        
+        all_activities.extend(user_activities)
+    
+    # Filter to last 7 days
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    all_activities = [a for a in all_activities if a.created_at >= cutoff]
+    all_activities.sort(key=lambda x: x.created_at, reverse=True)
+    all_activities = all_activities[:50]
+    
+    friend_activities = [a.model_dump() for a in all_activities]
+    
+    return FriendsDashboardResponse(
+        success=True,
+        friends=[f.model_dump() for f in friends],
+        pending_received=[f.model_dump() for f in pending_received],
+        pending_sent=[f.model_dump() for f in pending_sent],
+        incoming_trades=incoming_trades,
+        outgoing_trades=outgoing_trades,
+        trade_history=trade_history,
+        has_merchant_skill=has_merchant_skill,
+        pending_alliances_sent=pending_alliances_sent,
+        pending_alliances_received=pending_alliances_received,
+        is_ruler=is_ruler,
+        friend_activities=friend_activities
     )
 
 

@@ -643,6 +643,7 @@ class DuelManager:
         push_amount = 0.0
         decisive_outcome = None
         feint_winner = None
+        tiebreaker_data = None
         is_parried = False
         
         if ch_rank > op_rank:
@@ -658,8 +659,10 @@ class DuelManager:
         else:
             # Tie - check feint
             print(f"DUEL_DEBUG   DECISION: TIE ch_rank={ch_rank} == op_rank={op_rank}, checking feint")
-            feint_winner = self._check_feint_tiebreaker(ch_style, op_style)
-            print(f"DUEL_DEBUG   feint_winner={feint_winner}, ch_style={ch_style}, op_style={op_style}")
+            ch_rolls = match.challenger_round_rolls or []
+            op_rolls = match.opponent_round_rolls or []
+            feint_winner, tiebreaker_data = self._check_feint_tiebreaker(ch_style, op_style, ch_rolls, op_rolls)
+            print(f"DUEL_DEBUG   feint_winner={feint_winner}, tiebreaker_data={tiebreaker_data}, ch_style={ch_style}, op_style={op_style}")
             if feint_winner == "challenger":
                 winner_side = "challenger"
                 decisive_outcome = ch_best
@@ -715,6 +718,7 @@ class DuelManager:
             "winner_side": winner_side,
             "decisive_outcome": decisive_outcome,
             "feint_winner": feint_winner,
+            "tiebreaker": tiebreaker_data,  # Includes roll values for tiebreaker animation
             "parried": is_parried,
             "push_amount": round(push_amount, 2),
             "bar_before": round(bar_before, 2),
@@ -813,8 +817,20 @@ class DuelManager:
         loser_mods = get_style_modifiers(loser_style or AttackStyle.BALANCED)
         return (winner_mods["push_mult_win"], loser_mods["push_mult_lose"])
     
-    def _check_feint_tiebreaker(self, ch_style: str, op_style: str) -> Optional[str]:
-        """Check if feint wins a tie. Returns winning side or None."""
+    def _check_feint_tiebreaker(
+        self, 
+        ch_style: str, 
+        op_style: str,
+        ch_rolls: list = None,
+        op_rolls: list = None
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Check if feint wins a tie.
+        
+        Returns: (winning_side, tiebreaker_data)
+            - winning_side: "challenger", "opponent", or None
+            - tiebreaker_data: dict with roll values for animation, or None if no tiebreaker
+        """
         ch_mods = get_style_modifiers(ch_style or AttackStyle.BALANCED)
         op_mods = get_style_modifiers(op_style or AttackStyle.BALANCED)
         
@@ -822,12 +838,50 @@ class DuelManager:
         op_feint = op_mods["tie_advantage"]
         
         if ch_feint and op_feint:
-            return None  # Both have feint, cancel out
+            # Both have feint - better roll wins (lower roll is better since we use roll_value < threshold)
+            # But for display, we show the raw value and the higher number wins the tiebreaker
+            ch_roll = ch_rolls[-1]["value"] if ch_rolls else 0
+            op_roll = op_rolls[-1]["value"] if op_rolls else 0
+            print(f"DUEL_DEBUG   Both feint: ch_roll={ch_roll}, op_roll={op_roll}")
+            
+            # Tiebreaker data for frontend animation
+            tiebreaker_data = {
+                "type": "feint_vs_feint",
+                "challenger_roll": round(ch_roll * 100, 1),  # Convert to percentage for display
+                "opponent_roll": round(op_roll * 100, 1),
+                "challenger_raw": ch_roll,
+                "opponent_raw": op_roll,
+            }
+            
+            if ch_roll > op_roll:
+                tiebreaker_data["winner"] = "challenger"
+                return "challenger", tiebreaker_data
+            elif op_roll > ch_roll:
+                tiebreaker_data["winner"] = "opponent"
+                return "opponent", tiebreaker_data
+            # Exact same roll = true tie (rare)
+            tiebreaker_data["winner"] = None
+            return None, tiebreaker_data
+        
         if ch_feint:
-            return "challenger"
+            # Challenger has feint, wins the tie
+            tiebreaker_data = {
+                "type": "feint_wins",
+                "feint_side": "challenger",
+                "winner": "challenger",
+            }
+            return "challenger", tiebreaker_data
+        
         if op_feint:
-            return "opponent"
-        return None
+            # Opponent has feint, wins the tie
+            tiebreaker_data = {
+                "type": "feint_wins",
+                "feint_side": "opponent",
+                "winner": "opponent",
+            }
+            return "opponent", tiebreaker_data
+        
+        return None, None
     
     def _calculate_outcome(
         self,

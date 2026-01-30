@@ -26,23 +26,12 @@ struct FriendsView: View {
                             outgoingTradesSection
                         }
                         
-                        // Recent Trade Results (accepted/declined/etc)
-                        if !viewModel.tradeHistory.isEmpty {
-                            tradeHistorySection
-                        }
-                        
-                        // Pending Duel Challenges
-                        if !viewModel.incomingDuelChallenges.isEmpty {
-                            duelChallengesSection
-                        }
-                        
                         // Alliance Requests Received (Rulers only)
                         if !viewModel.pendingAlliancesReceived.isEmpty {
                             allianceRequestsSection
                         }
                         
                         // Pending Alliances Sent (Rulers only)
-                        // Note: Active Alliances are now shown in KingdomInfoSheetView for hometown
                         if !viewModel.pendingAlliancesSent.isEmpty {
                             pendingAlliancesSentSection
                         }
@@ -63,6 +52,11 @@ struct FriendsView: View {
                         // Friend Activity Section
                         if !viewModel.friendActivities.isEmpty {
                             friendActivitySection
+                        }
+                        
+                        // Recent Trade Results (accepted/declined/etc)
+                        if !viewModel.tradeHistory.isEmpty {
+                            tradeHistorySection
                         }
                     }
                     .padding(.vertical)
@@ -90,11 +84,7 @@ struct FriendsView: View {
                 }
             }
             .task {
-                await viewModel.loadFriends()
-                await viewModel.loadFriendActivity()
-                await viewModel.loadTrades()
-                await viewModel.loadAlliances()
-                await viewModel.loadDuelChallenges()
+                await viewModel.loadDashboard()
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {

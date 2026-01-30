@@ -738,6 +738,27 @@ struct DuelStopResponse: Codable {
     }
 }
 
+/// Tiebreaker data for feint animation
+struct DuelTiebreaker: Codable {
+    let type: String?           // "feint_vs_feint" or "feint_wins"
+    let winner: String?         // "challenger" or "opponent"
+    let feintSide: String?      // Which side had feint (for feint_wins type)
+    let challengerRoll: Double? // Roll value as percentage (0-100) for display
+    let opponentRoll: Double?   // Roll value as percentage (0-100) for display
+    
+    enum CodingKeys: String, CodingKey {
+        case type, winner
+        case feintSide = "feint_side"
+        case challengerRoll = "challenger_roll"
+        case opponentRoll = "opponent_roll"
+    }
+    
+    /// Whether this is a feint vs feint tiebreaker (shows roll numbers)
+    var isFeintVsFeint: Bool {
+        type == "feint_vs_feint"
+    }
+}
+
 /// Round resolution data
 struct DuelRoundResolution: Codable {
     let roundNumber: Int?
@@ -750,6 +771,7 @@ struct DuelRoundResolution: Codable {
     let winnerSide: String?
     let decisiveOutcome: String?
     let feintWinner: String?
+    let tiebreaker: DuelTiebreaker?  // Tiebreaker animation data
     let parried: Bool?
     let pushAmount: Double?
     let barBefore: Double?
@@ -768,6 +790,7 @@ struct DuelRoundResolution: Codable {
         case winnerSide = "winner_side"
         case decisiveOutcome = "decisive_outcome"
         case feintWinner = "feint_winner"
+        case tiebreaker
         case parried
         case pushAmount = "push_amount"
         case barBefore = "bar_before"
