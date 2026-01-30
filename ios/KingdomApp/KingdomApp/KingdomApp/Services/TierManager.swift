@@ -7,6 +7,11 @@ import Foundation
 class TierManager {
     static let shared = TierManager()
     
+    // MARK: - Cache Configuration
+    private static let cacheKey = "TierManager.cachedTiersData"
+    private static let cacheTimestampKey = "TierManager.cacheTimestamp"
+    private static let cacheTTLSeconds: TimeInterval = 2 * 60 * 60  // 2 hours
+    
     var isLoaded: Bool = false
     var resources: [String: ResourceInfo] = [:]  // Resource configurations from backend
     var properties: PropertyTiersData?
@@ -24,6 +29,60 @@ class TierManager {
     private init() {
         // Provide fallback defaults so UI doesn't break before loading
         loadDefaults()
+    }
+    
+    // MARK: - Cache Management
+    
+    /// Check if cached tier data is still valid
+    private func isCacheValid() -> Bool {
+        guard let timestamp = UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as? Date else {
+            return false
+        }
+        let age = Date().timeIntervalSince(timestamp)
+        return age < Self.cacheTTLSeconds
+    }
+    
+    /// Load tier data from disk cache
+    private func loadFromCache() -> AllTiersResponse? {
+        guard isCacheValid(),
+              let data = UserDefaults.standard.data(forKey: Self.cacheKey) else {
+            return nil
+        }
+        
+        do {
+            let response = try JSONDecoder().decode(AllTiersResponse.self, from: data)
+            print("📦 TierManager: Loaded from cache (valid for \(Int(Self.cacheTTLSeconds - Date().timeIntervalSince(UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as! Date)))s more)")
+            return response
+        } catch {
+            print("⚠️ TierManager: Cache decode failed: \(error)")
+            return nil
+        }
+    }
+    
+    /// Save tier data to disk cache
+    private func saveToCache(_ response: AllTiersResponse) {
+        do {
+            let data = try JSONEncoder().encode(response)
+            UserDefaults.standard.set(data, forKey: Self.cacheKey)
+            UserDefaults.standard.set(Date(), forKey: Self.cacheTimestampKey)
+            print("💾 TierManager: Saved to cache")
+        } catch {
+            print("⚠️ TierManager: Cache save failed: \(error)")
+        }
+    }
+    
+    /// Clear the tier cache - forces refresh on next load
+    func clearCache() {
+        UserDefaults.standard.removeObject(forKey: Self.cacheKey)
+        UserDefaults.standard.removeObject(forKey: Self.cacheTimestampKey)
+        isLoaded = false
+        print("🗑️ TierManager: Cache cleared")
+    }
+    
+    /// Force refresh from backend (ignores cache)
+    func forceRefresh() async throws {
+        clearCache()
+        try await loadAllTiers()
     }
     
     private func loadDefaults() {
@@ -60,12 +119,28 @@ class TierManager {
     // MARK: - Load All Tiers
     
     func loadAllTiers() async throws {
+        // Check cache first
+        if let cachedResponse = loadFromCache() {
+            await processResponse(cachedResponse)
+            return
+        }
+        
+        // Cache miss or expired - fetch from backend
         print("🎯 TierManager: Fetching ALL tier data from backend /tiers endpoint...")
         
         let request = client.request(endpoint: "/tiers", method: "GET")
         print("🌐 TierManager: Making API call to /tiers...")
         let response: AllTiersResponse = try await client.execute(request)
         print("✅ TierManager: Received response from /tiers")
+        
+        // Save to cache for next time
+        saveToCache(response)
+        
+        await processResponse(response)
+    }
+    
+    /// Process the tier response (from cache or network)
+    private func processResponse(_ response: AllTiersResponse) async {
         
         await MainActor.run {
             // Resources - load from backend

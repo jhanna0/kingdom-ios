@@ -587,9 +587,17 @@ private struct EventHandlers: ViewModifier {
             .onChange(of: showTravelNotification) { _, _ in }  // Placeholder for type inference
             .task {
                 NotificationManager.shared.clearDeliveredNotifications()
-                await appInit.initialize()
+                
+                // Run independent startup tasks in PARALLEL for speed
+                async let initTask: () = appInit.initialize()  // /tiers + /notifications/updates
+                async let badgeTask: () = loadNotificationBadge()  // /notifications/summary
+                
+                // Wait for both to complete
+                await initTask
+                await badgeTask
+                
+                // These must run AFTER appInit completes (depends on ruledKingdoms)
                 syncRuledKingdomsToPlayer()
-                await loadNotificationBadge()
                 viewModel.loadInitialCooldown()
                 
                 // Connect to game events WebSocket for real-time updates (duels, etc.)

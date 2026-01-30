@@ -141,6 +141,41 @@ struct SettingsView: View {
                     )
                 }
                 
+                // Data Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Data")
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.bold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 16)
+                    
+                    // Clear Cache Button
+                    Button {
+                        Task {
+                            try? await TierManager.shared.forceRefresh()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(FontStyles.iconSmall)
+                            Text("Clear Cache & Refresh")
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                        }
+                        .padding()
+                    }
+                    .brutalistCard(
+                        backgroundColor: KingdomTheme.Colors.parchmentLight,
+                        cornerRadius: 12
+                    )
+                }
+                
                 // Account Section
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Account")

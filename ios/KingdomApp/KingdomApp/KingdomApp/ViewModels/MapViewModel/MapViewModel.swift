@@ -88,11 +88,8 @@ class MapViewModel: ObservableObject {
         
         print("📱 MapViewModel initialized")
         
-        // IMMEDIATELY sync player ID with backend if authenticated
-        // This prevents the "local UUID vs backend UUID" mismatch bug
-        Task {
-            await syncPlayerIdWithBackend()
-        }
+        // Player ID sync happens in /player/state via updateFromAPIState()
+        // No separate /auth/me call needed
         
         // Monitor war state changes for music
         setupWarStateMonitoring()
@@ -229,39 +226,8 @@ class MapViewModel: ObservableObject {
     
     // MARK: - Player Sync
     
-    /// Sync player ID with backend user ID (called on init)
-    /// This fixes the bug where local player had different ID than backend user
-    func syncPlayerIdWithBackend() async {
-        guard apiService.isAuthenticated else {
-            print("⚠️ Not authenticated - using local player ID")
-            return
-        }
-        
-        // Fetch current user from backend
-        do {
-            let request = APIClient.shared.request(endpoint: "/auth/me")
-            let userData: UserData = try await APIClient.shared.execute(request)
-            
-        await MainActor.run {
-            player.playerId = userData.id  // Integer from Postgres auto-increment
-            player.name = userData.display_name
-            player.gold = userData.gold  // FIX: Sync gold from backend
-            player.level = userData.level
-            player.experience = userData.experience
-            player.reputation = userData.reputation
-            // Backend is source of truth - no local caching
-            
-            print("✅ Synced player ID with backend: \(userData.id)")
-            print("   - Gold: \(userData.gold)")
-            print("   - Level: \(userData.level)")
-            
-            // Re-sync kingdoms after ID update
-            syncPlayerKingdoms()
-        }
-        } catch {
-            print("⚠️ Failed to sync player ID from backend: \(error)")
-        }
-    }
+    // NOTE: Player ID sync now happens in /player/state via player.updateFromAPIState()
+    // No separate /auth/me call needed - removed duplicate call
     
     /// Sync ruled kingdoms - now deprecated, use backend data only
     /// The /notifications/updates endpoint provides the kingdoms array which is source of truth

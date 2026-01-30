@@ -692,6 +692,10 @@ class Player: ObservableObject {
     
     /// Update player from API state
     func updateFromAPIState(_ apiState: APIPlayerState) {
+        // Identity - sync player ID with backend
+        playerId = apiState.id
+        name = apiState.display_name
+        
         // Core Stats
         gold = apiState.gold
         level = apiState.level

@@ -148,10 +148,11 @@ async def get_weather_for_kingdom(
     weather_data = await fetch_weather_from_api(city.center_lat, city.center_lon)
     
     if weather_data:
-        # Save to database cache
-        city.weather_data = weather_data
-        city.weather_cached_at = datetime.utcnow()
-        db.commit()
+        # Only cache REAL weather data (not fallback)
+        if not weather_data.get("is_fallback"):
+            city.weather_data = weather_data
+            city.weather_cached_at = datetime.utcnow()
+            db.commit()
     
     return weather_data
 
@@ -301,7 +302,7 @@ def _get_weather_icon(condition: str) -> str:
 
 
 def _get_default_weather() -> dict:
-    """Default clear weather for development/fallback"""
+    """Default clear weather for development/fallback - NOT CACHED"""
     effects = WEATHER_EFFECTS[WeatherCondition.CLEAR]
     
     return {
@@ -313,7 +314,8 @@ def _get_default_weather() -> dict:
         "effects": {k: v for k, v in effects.items() if k not in ["description", "flavor_text"]},
         "display_description": effects.get("description", ""),
         "flavor_text": effects.get("flavor_text", ""),
-        "cached_at": datetime.utcnow().isoformat() + "Z"
+        "cached_at": datetime.utcnow().isoformat() + "Z",
+        "is_fallback": True  # Mark as fallback - DO NOT CACHE
     }
 
 
