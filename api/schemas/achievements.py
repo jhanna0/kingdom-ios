@@ -101,6 +101,10 @@ class ClaimRewardResponse(BaseModel):
     new_experience: int
     new_level: Optional[int] = None  # If leveled up
     
+    # Tax info (if applicable)
+    tax_amount: Optional[int] = None
+    tax_rate: Optional[int] = None
+    
     # The claimed achievement info
     achievement_type: str
     tier: int

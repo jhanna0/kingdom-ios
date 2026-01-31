@@ -12,6 +12,7 @@ from db import get_db
 from db.models.user import User
 from db.models.player_state import PlayerState
 from routers.auth import get_current_user
+from routers.actions.tax_utils import apply_kingdom_tax
 from schemas.achievements import (
     Achievement,
     AchievementTier,
@@ -415,9 +416,19 @@ def claim_achievement_reward(
     gold_reward = rewards_data.get("gold", 0)
     xp_reward = rewards_data.get("experience", 0)
     
-    # Grant rewards
+    # Apply kingdom tax to gold reward
+    tax_amount = 0
+    tax_rate = 0
+    net_gold = gold_reward
+    
+    if gold_reward > 0 and state.hometown_kingdom_id:
+        net_gold, tax_amount, tax_rate = apply_kingdom_tax(
+            db, state.hometown_kingdom_id, state, gold_reward
+        )
+    
+    # Grant rewards (net gold after tax)
     old_level = state.level
-    state.gold = (state.gold or 0) + gold_reward
+    state.gold = (state.gold or 0) + net_gold
     state.experience = (state.experience or 0) + xp_reward
     
     # Check for level up (simple check - can be expanded)
@@ -443,13 +454,15 @@ def claim_achievement_reward(
         success=True,
         message=f"Claimed {tier_data['display_name']}!",
         rewards_granted=AchievementRewards(
-            gold=gold_reward,
+            gold=int(net_gold),  # Net gold after tax
             experience=xp_reward,
             items=rewards_data.get("items", [])
         ),
         new_gold=int(state.gold),
         new_experience=state.experience,
         new_level=new_level,
+        tax_amount=int(tax_amount) if tax_amount > 0 else None,
+        tax_rate=tax_rate if tax_rate > 0 else None,
         achievement_type=tier_data["achievement_type"],
         tier=tier_data["tier"],
         display_name=tier_data["display_name"]
