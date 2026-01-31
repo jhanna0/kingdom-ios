@@ -25,6 +25,7 @@ from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
 from .utils import set_cooldown, check_cooldown_from_table, format_datetime_iso, check_and_deduct_food_cost, log_activity
 from db.models.kingdom_event import KingdomEvent
+from sqlalchemy import text as sql_text
 
 router = APIRouter()
 
@@ -327,6 +328,17 @@ def scout_enemy_kingdom(
     cooldown_expires = datetime.utcnow() + timedelta(minutes=SCOUT_COOLDOWN_MINUTES)
     set_cooldown(db, user.id, "scout", cooldown_expires)
     
+    # =====================================================
+    # UPDATE INTELLIGENCE STATS - Operations Attempted
+    # =====================================================
+    db.execute(sql_text("""
+        INSERT INTO player_intelligence_stats (user_id, operations_attempted)
+        VALUES (:user_id, 1)
+        ON CONFLICT (user_id) DO UPDATE SET
+            operations_attempted = player_intelligence_stats.operations_attempted + 1,
+            updated_at = NOW()
+    """), {"user_id": user.id})
+    
     # Calculate patrol coverage and success chance
     patrol_coverage, active_patrols, total_citizens = get_patrol_coverage(db, target_kingdom_id)
     success_chance = calculate_success_chance(state.intelligence, patrol_coverage)
@@ -378,6 +390,37 @@ def scout_enemy_kingdom(
     _award_home_reputation(db, state, rep_reward)
     _store_intel(db, user.id, state, kingdom, outcome)
     outcome_result = _apply_outcome(db, user, state, kingdom, outcome)
+    
+    # =====================================================
+    # UPDATE INTELLIGENCE STATS - Successful Outcomes
+    # =====================================================
+    if outcome in ("basic_intel", "military_intel", "building_intel"):
+        db.execute(sql_text("""
+            INSERT INTO player_intelligence_stats (user_id, operations_succeeded, intel_gathered)
+            VALUES (:user_id, 1, 1)
+            ON CONFLICT (user_id) DO UPDATE SET
+                operations_succeeded = player_intelligence_stats.operations_succeeded + 1,
+                intel_gathered = player_intelligence_stats.intel_gathered + 1,
+                updated_at = NOW()
+        """), {"user_id": user.id})
+    elif outcome == "disruption":
+        db.execute(sql_text("""
+            INSERT INTO player_intelligence_stats (user_id, operations_succeeded, sabotages_completed)
+            VALUES (:user_id, 1, 1)
+            ON CONFLICT (user_id) DO UPDATE SET
+                operations_succeeded = player_intelligence_stats.operations_succeeded + 1,
+                sabotages_completed = player_intelligence_stats.sabotages_completed + 1,
+                updated_at = NOW()
+        """), {"user_id": user.id})
+    elif outcome == "vault_heist":
+        db.execute(sql_text("""
+            INSERT INTO player_intelligence_stats (user_id, operations_succeeded, heists_completed)
+            VALUES (:user_id, 1, 1)
+            ON CONFLICT (user_id) DO UPDATE SET
+                operations_succeeded = player_intelligence_stats.operations_succeeded + 1,
+                heists_completed = player_intelligence_stats.heists_completed + 1,
+                updated_at = NOW()
+        """), {"user_id": user.id})
     
     # Log activity (successful scout) - to home kingdom feed
     log_activity(

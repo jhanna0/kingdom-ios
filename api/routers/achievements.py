@@ -27,57 +27,204 @@ from schemas.achievements import (
 router = APIRouter(prefix="/achievements", tags=["achievements"])
 
 
-# Category display configuration
+# Category display configuration with explicit ordering
+# Order determines how categories appear in the UI (lower = first)
 CATEGORY_CONFIG = {
-    "hunting": {"display_name": "Hunting", "icon": "scope"},
-    "economy": {"display_name": "Economy", "icon": "hammer.fill"},
-    "combat": {"display_name": "Combat", "icon": "flag.fill"},
-    "social": {"display_name": "Social", "icon": "person.2.fill"},
-    "progression": {"display_name": "Progression", "icon": "star.fill"},
-    "general": {"display_name": "General", "icon": "trophy.fill"},
+    # Core progression (most common activities)
+    "building": {"display_name": "Building", "icon": "building.2.fill", "order": 1},
+    "training": {"display_name": "Training", "icon": "figure.strengthtraining.traditional", "order": 2},
+    "gathering": {"display_name": "Gathering", "icon": "leaf.fill", "order": 3},
+    "crafting": {"display_name": "Crafting", "icon": "hammer.fill", "order": 4},
+    
+    # Activities
+    "hunting": {"display_name": "Hunting", "icon": "scope", "order": 5},
+    "fishing": {"display_name": "Fishing", "icon": "fish.fill", "order": 6},
+    "foraging": {"display_name": "Foraging", "icon": "leaf.fill", "order": 7},
+    "gardening": {"display_name": "Gardening", "icon": "leaf.fill", "order": 8},
+    
+    # Economy & Science
+    "merchant": {"display_name": "Merchant", "icon": "storefront.fill", "order": 9},
+    "science": {"display_name": "Science", "icon": "flask.fill", "order": 10},
+    
+    # PvP (more common than coups/battles)
+    "pvp": {"display_name": "PvP", "icon": "figure.fencing", "order": 11},
+    "intelligence": {"display_name": "Intelligence", "icon": "eye.fill", "order": 12},
+    
+    # Kingdom stuff (rarer)
+    "fortification": {"display_name": "Fortification", "icon": "brick.fill", "order": 13},
+    "ruler": {"display_name": "Ruler", "icon": "crown.fill", "order": 14},
+    
+    # Rare events (least common)
+    "coup": {"display_name": "Coup", "icon": "theatermasks.fill", "order": 15},
+    "battle": {"display_name": "Battle", "icon": "flag.fill", "order": 16},
+    
+    # Meta
+    "progression": {"display_name": "Progression", "icon": "star.fill", "order": 20},
+    "general": {"display_name": "General", "icon": "trophy.fill", "order": 99},
 }
 
 
 def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]:
     """
     Calculate current progress for all achievement types.
-    Aggregates from various sources: player_state, hunt_sessions, user_kingdoms, etc.
+    OPTIMIZED: Single combined query for all scalar stats to minimize DB round trips.
     """
     progress = {}
     
-    # Get player state for basic counters
+    # Get player state for basic counters (ORM query - needed for object)
     state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
     if state:
         progress["contracts_completed"] = state.contracts_completed or 0
         progress["total_conquests"] = state.total_conquests or 0
         progress["coups_won"] = state.coups_won or 0
+        progress["coups_failed"] = state.coups_failed or 0
         progress["kingdoms_ruled"] = state.kingdoms_ruled or 0
         progress["player_level"] = state.level or 1
         
-        # Calculate total skill points from all stats
         total_skills = (
-            (state.attack_power or 0) +
-            (state.defense_power or 0) +
-            (state.leadership or 0) +
-            (state.building_skill or 0) +
-            (state.intelligence or 0) +
-            (state.science or 0) +
-            (state.faith or 0) +
-            (state.philosophy or 0) +
-            (state.merchant or 0)
+            (state.attack_power or 0) + (state.defense_power or 0) +
+            (state.leadership or 0) + (state.building_skill or 0) +
+            (state.intelligence or 0) + (state.science or 0) +
+            (state.faith or 0) + (state.philosophy or 0) + (state.merchant or 0)
         )
         progress["total_skill_points"] = total_skills
     
-    # Get total check-ins from user_kingdoms
-    checkin_query = text("""
-        SELECT COALESCE(SUM(checkins_count), 0) as total_checkins
-        FROM user_kingdoms
-        WHERE user_id = :user_id
+    # =========================================================================
+    # SINGLE COMBINED QUERY FOR ALL SCALAR STATS
+    # =========================================================================
+    combined_query = text("""
+        SELECT
+            -- Checkins
+            COALESCE((SELECT SUM(checkins_count) FROM user_kingdoms WHERE user_id = :user_id), 0) as total_checkins,
+            
+            -- Foraging sessions
+            COALESCE((SELECT COUNT(*) FROM foraging_sessions WHERE user_id = :user_id AND status = 'collected'), 0) as foraging_completed,
+            
+            -- Merchant: Direct trades
+            COALESCE((SELECT COUNT(*) FROM trade_offers WHERE (sender_id = :user_id OR recipient_id = :user_id) AND status = 'accepted'), 0) as direct_trades,
+            
+            -- Merchant: Market trades  
+            COALESCE((SELECT COUNT(*) FROM market_transactions WHERE buyer_id = :user_id OR seller_id = :user_id), 0) as market_trades,
+            
+            -- Contract contributions (actions completed) - count from contract_contributions joined with unified_contracts
+            COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_property'), 0) as building_contracts,
+            COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_training'), 0) as training_contracts,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type IN ('weapon', 'armor')), 0) as items_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type = 'weapon'), 0) as weapons_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type = 'armor'), 0) as armor_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type IN ('weapon', 'armor') AND tier = 5), 0) as craft_tier_5_item,
+            
+            -- Science stats
+            COALESCE((SELECT experiments_completed FROM science_stats WHERE user_id = :user_id), 0) as experiments_completed,
+            COALESCE((SELECT total_blueprints_earned FROM science_stats WHERE user_id = :user_id), 0) as blueprints_earned,
+            
+            -- Gathering
+            COALESCE((SELECT SUM(amount_gathered) FROM daily_gathering WHERE user_id = :user_id AND resource_type = 'wood'), 0) as wood_gathered,
+            COALESCE((SELECT SUM(amount_gathered) FROM daily_gathering WHERE user_id = :user_id AND resource_type = 'iron'), 0) as iron_gathered,
+            
+            -- Fortification stats
+            COALESCE((SELECT items_sacrificed FROM player_fortification_stats WHERE user_id = :user_id), 0) as items_sacrificed,
+            COALESCE((SELECT CASE WHEN max_fortification_reached THEN 1 ELSE 0 END FROM player_fortification_stats WHERE user_id = :user_id), 0) as max_fortification,
+            
+            -- Ruler stats
+            COALESCE((SELECT COUNT(*) FROM kingdoms WHERE ruler_id = :user_id), 0) as empire_size,
+            COALESCE((SELECT SUM(total_income_collected) FROM kingdoms WHERE ruler_id = :user_id), 0) as treasury_collected,
+            
+            -- Coup stats
+            COALESCE((SELECT COUNT(*) FROM coup_events WHERE initiator_id = :user_id), 0) as coups_initiated,
+            
+            -- Duel stats
+            COALESCE((SELECT wins FROM duel_stats WHERE user_id = :user_id), 0) as duels_won,
+            COALESCE((SELECT wins + losses FROM duel_stats WHERE user_id = :user_id), 0) as duels_fought,
+            
+            -- Intelligence stats
+            COALESCE((SELECT operations_attempted FROM player_intelligence_stats WHERE user_id = :user_id), 0) as operations_attempted,
+            COALESCE((SELECT intel_gathered FROM player_intelligence_stats WHERE user_id = :user_id), 0) as intel_gathered,
+            COALESCE((SELECT sabotages_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as sabotages_completed,
+            COALESCE((SELECT heists_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as heists_completed
     """)
-    result = db.execute(checkin_query, {"user_id": user_id}).first()
-    progress["total_checkins"] = int(result.total_checkins) if result else 0
     
-    # Get hunt creature kills from optimized stats table (sum across all kingdoms)
+    combined_result = db.execute(combined_query, {"user_id": user_id}).first()
+    if combined_result:
+        progress["total_checkins"] = int(combined_result.total_checkins)
+        progress["foraging_completed"] = int(combined_result.foraging_completed)
+        progress["direct_trades"] = int(combined_result.direct_trades)
+        progress["market_trades"] = int(combined_result.market_trades)
+        progress["building_contracts"] = int(combined_result.building_contracts)
+        progress["training_contracts"] = int(combined_result.training_contracts)
+        progress["items_crafted"] = int(combined_result.items_crafted)
+        progress["weapons_crafted"] = int(combined_result.weapons_crafted)
+        progress["armor_crafted"] = int(combined_result.armor_crafted)
+        progress["craft_tier_5_item"] = int(combined_result.craft_tier_5_item)
+        progress["experiments_completed"] = int(combined_result.experiments_completed)
+        progress["blueprints_earned"] = int(combined_result.blueprints_earned)
+        progress["wood_gathered"] = int(combined_result.wood_gathered)
+        progress["iron_gathered"] = int(combined_result.iron_gathered)
+        progress["items_sacrificed"] = int(combined_result.items_sacrificed)
+        progress["max_fortification"] = int(combined_result.max_fortification)
+        progress["empire_size"] = int(combined_result.empire_size)
+        progress["treasury_collected"] = int(combined_result.treasury_collected)
+        progress["coups_initiated"] = int(combined_result.coups_initiated)
+        progress["duels_won"] = int(combined_result.duels_won)
+        progress["duels_fought"] = int(combined_result.duels_fought)
+        progress["operations_attempted"] = int(combined_result.operations_attempted)
+        progress["intel_gathered"] = int(combined_result.intel_gathered)
+        progress["sabotages_completed"] = int(combined_result.sabotages_completed)
+        progress["heists_completed"] = int(combined_result.heists_completed)
+    
+    # =========================================================================
+    # SECOND COMBINED QUERY: Battle + Garden (more complex aggregations)
+    # =========================================================================
+    complex_query = text("""
+        SELECT
+            -- Battle stats (requires JOIN)
+            COALESCE((
+                SELECT COUNT(DISTINCT bp.battle_id)
+                FROM battle_participants bp
+                JOIN battles b ON b.id = bp.battle_id
+                WHERE bp.user_id = :user_id AND b.type = 'invasion'
+            ), 0) as invasions_participated,
+            COALESCE((
+                SELECT COUNT(DISTINCT bp.battle_id)
+                FROM battle_participants bp
+                JOIN battles b ON b.id = bp.battle_id
+                WHERE bp.user_id = :user_id AND b.type = 'invasion' 
+                AND b.resolved_at IS NOT NULL AND b.attacker_victory = true AND bp.side = 'attackers'
+            ), 0) as invasions_won_attack,
+            COALESCE((
+                SELECT COUNT(DISTINCT bp.battle_id)
+                FROM battle_participants bp
+                JOIN battles b ON b.id = bp.battle_id
+                WHERE bp.user_id = :user_id AND b.type = 'invasion'
+                AND b.resolved_at IS NOT NULL AND b.attacker_victory = false AND bp.side = 'defenders'
+            ), 0) as invasions_won_defend,
+            
+            -- Garden stats
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action IN ('harvested', 'discarded') AND plant_type IS NOT NULL), 0) as plants_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower'), 0) as flowers_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
+            COALESCE((SELECT SUM(wheat_gained) FROM garden_history WHERE user_id = :user_id AND action = 'harvested'), 0) as wheat_harvested,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'weed'), 0) as weeds_cleared,
+            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
+    """)
+    
+    complex_result = db.execute(complex_query, {"user_id": user_id}).first()
+    if complex_result:
+        progress["invasions_participated"] = int(complex_result.invasions_participated)
+        progress["invasions_won_attack"] = int(complex_result.invasions_won_attack)
+        progress["invasions_won_defend"] = int(complex_result.invasions_won_defend)
+        progress["plants_grown"] = int(complex_result.plants_grown)
+        progress["flowers_grown"] = int(complex_result.flowers_grown)
+        progress["rare_flowers_grown"] = int(complex_result.rare_flowers_grown)
+        progress["wheat_harvested"] = int(complex_result.wheat_harvested)
+        progress["weeds_cleared"] = int(complex_result.weeds_cleared)
+        progress["flower_colors"] = int(complex_result.flower_colors)
+    
+    # =========================================================================
+    # ITEMIZED QUERIES (need multiple rows - can't combine)
+    # =========================================================================
+    
+    # Hunt kills by animal
     hunt_query = text("""
         SELECT animal_id, SUM(kill_count) as kill_count
         FROM player_hunt_kills
@@ -85,52 +232,37 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         GROUP BY animal_id
     """)
     hunt_results = db.execute(hunt_query, {"user_id": user_id}).fetchall()
-    
     total_hunts = 0
     for row in hunt_results:
-        animal_id = row.animal_id
         kill_count = int(row.kill_count)
         total_hunts += kill_count
-        
-        # Map animal_id to achievement type (e.g., "rabbit" -> "hunt_rabbit")
-        progress[f"hunt_{animal_id}"] = kill_count
-    
+        progress[f"hunt_{row.animal_id}"] = kill_count
     progress["hunts_completed"] = total_hunts
     
-    # Get fishing stats from optimized stats table
+    # Fish catches by fish type
     fish_query = text("""
         SELECT fish_id, catch_count
         FROM player_fish_catches
         WHERE user_id = :user_id
     """)
     fish_results = db.execute(fish_query, {"user_id": user_id}).fetchall()
-    
     total_fish = 0
-    pet_fish_count = 0
     for row in fish_results:
-        fish_id = row.fish_id
         catch_count = int(row.catch_count)
         total_fish += catch_count
-        
-        # Track pet fish separately for achievements
-        if fish_id == "pet_fish":
-            pet_fish_count = catch_count
-        
-        # Map fish_id to achievement type (e.g., "minnow" -> "catch_minnow")
-        progress[f"catch_{fish_id}"] = catch_count
-    
+        if row.fish_id == "pet_fish":
+            progress["pet_fish_caught"] = catch_count
+        progress[f"catch_{row.fish_id}"] = catch_count
     progress["fish_caught"] = total_fish
-    progress["pet_fish_caught"] = pet_fish_count
     
-    # Get foraging stats from foraging_sessions
-    foraging_query = text("""
-        SELECT COUNT(*) as total_forages
-        FROM foraging_sessions
+    # Foraging finds by item type
+    foraging_finds_query = text("""
+        SELECT item_id, find_count
+        FROM player_foraging_finds
         WHERE user_id = :user_id
-        AND status = 'collected'
     """)
-    foraging_result = db.execute(foraging_query, {"user_id": user_id}).first()
-    progress["foraging_completed"] = int(foraging_result.total_forages) if foraging_result else 0
+    for row in db.execute(foraging_finds_query, {"user_id": user_id}).fetchall():
+        progress[f"find_{row.item_id}"] = int(row.find_count)
     
     return progress
 
@@ -311,10 +443,14 @@ def get_achievements(
             categories_dict[cat] = []
         categories_dict[cat].append(ach)
     
-    # Build category response
+    # Build category response - sort by configured order (hunting, fishing, foraging first)
     categories = []
-    for cat_key, cat_achievements in sorted(categories_dict.items()):
-        cat_config = CATEGORY_CONFIG.get(cat_key, {"display_name": cat_key.title(), "icon": "star.fill"})
+    sorted_categories = sorted(
+        categories_dict.items(),
+        key=lambda x: CATEGORY_CONFIG.get(x[0], {"order": 50})["order"]
+    )
+    for cat_key, cat_achievements in sorted_categories:
+        cat_config = CATEGORY_CONFIG.get(cat_key, {"display_name": cat_key.title(), "icon": "star.fill", "order": 50})
         categories.append(AchievementCategory(
             category=cat_key,
             display_name=cat_config["display_name"],

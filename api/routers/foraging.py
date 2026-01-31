@@ -49,6 +49,25 @@ def broadcast_rare_egg(db: Session, player_id: int) -> None:
         visibility="friends"
     )
 
+
+def increment_foraging_find(db: Session, user_id: int, item_id: str) -> None:
+    """
+    Increment per-item find count for achievements.
+    Uses upsert pattern - creates row if not exists, increments if exists.
+    """
+    from sqlalchemy import text
+    
+    db.execute(
+        text("""
+            INSERT INTO player_foraging_finds (user_id, item_id, find_count, first_find_at, last_find_at)
+            VALUES (:user_id, :item_id, 1, NOW(), NOW())
+            ON CONFLICT (user_id, item_id) DO UPDATE SET
+                find_count = player_foraging_finds.find_count + 1,
+                last_find_at = NOW()
+        """),
+        {"user_id": user_id, "item_id": item_id}
+    )
+
 _manager = ForagingManager()
 
 
@@ -236,6 +255,8 @@ def collect_rewards(
                 })
                 # Broadcast to activity feed (friends can see this!)
                 broadcast_rare_egg(db, player_id)
+                # Track for achievements
+                increment_foraging_find(db, player_id, "rare_egg")
     
     # Add ALL rewards to inventory
     for reward in rewards:

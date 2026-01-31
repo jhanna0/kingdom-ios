@@ -1,12 +1,55 @@
 """
-Centralized tax collection system
+Centralized tax collection system and ruler tracking utilities.
 
 When citizens earn money from actions, a portion goes to the kingdom treasury based on tax rate.
 Tax is applied AFTER any perks or bonuses (e.g., building skill bonuses).
 """
 from sqlalchemy.orm import Session
 from db import Kingdom, PlayerState
-from typing import Tuple
+from db.models.kingdom import UserKingdom
+from datetime import datetime
+from typing import Tuple, Optional
+
+
+def update_ruler_reign_duration(
+    db: Session,
+    kingdom_id: str,
+    old_ruler_id: Optional[int],
+    ruler_started_at: Optional[datetime]
+) -> float:
+    """
+    Update the total_reign_duration_hours for a ruler who just lost power.
+    
+    Call this BEFORE changing the ruler, passing the old ruler's info.
+    
+    Args:
+        db: Database session
+        kingdom_id: Kingdom where ruler is changing
+        old_ruler_id: The user_id of the ruler being replaced (can be None)
+        ruler_started_at: When the old ruler started (from kingdom.ruler_started_at)
+    
+    Returns:
+        Hours added to the ruler's total (0 if no old ruler)
+    """
+    if not old_ruler_id or not ruler_started_at:
+        return 0.0
+    
+    # Calculate how long they ruled
+    now = datetime.utcnow()
+    reign_duration = (now - ruler_started_at).total_seconds() / 3600  # hours
+    
+    # Update their UserKingdom record
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == old_ruler_id,
+        UserKingdom.kingdom_id == kingdom_id
+    ).first()
+    
+    if user_kingdom:
+        user_kingdom.total_reign_duration_hours = (
+            (user_kingdom.total_reign_duration_hours or 0.0) + reign_duration
+        )
+    
+    return reign_duration
 
 
 def apply_kingdom_tax(
@@ -53,9 +96,10 @@ def apply_kingdom_tax(
     tax_amount = gross_income * tax_rate / 100
     net_income = gross_income - tax_amount
     
-    # Add tax to kingdom treasury
+    # Add tax to kingdom treasury and track total collected
     if tax_amount > 0:
         kingdom.treasury_gold += tax_amount
+        kingdom.total_income_collected = (kingdom.total_income_collected or 0) + int(tax_amount)
     
     return (net_income, tax_amount, tax_rate)
 

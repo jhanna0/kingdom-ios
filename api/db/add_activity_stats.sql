@@ -60,3 +60,29 @@ CREATE INDEX IF NOT EXISTS idx_fish_catches_user ON player_fish_catches(user_id)
 COMMENT ON TABLE player_fish_catches IS 'Per-fish-type catch counts per player for achievements';
 COMMENT ON COLUMN player_fish_catches.fish_id IS 'Fish type: minnow, bass, salmon, catfish, legendary_carp';
 COMMENT ON COLUMN player_fish_catches.catch_count IS 'Total successful catches of this fish type';
+
+
+-- ============================================================
+-- FORAGING STATS: Per-item-type find counts  
+-- ============================================================
+-- Incremented when a rare item is found during foraging
+-- item_id matches rare foraging items: rare_egg, (future items)
+
+CREATE TABLE IF NOT EXISTS player_foraging_finds (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id VARCHAR(50) NOT NULL,
+    find_count INTEGER NOT NULL DEFAULT 0,
+    first_find_at TIMESTAMP,
+    last_find_at TIMESTAMP,
+    PRIMARY KEY (user_id, item_id)
+);
+
+-- Index for achievement queries like "who has found the most rare eggs?"
+CREATE INDEX IF NOT EXISTS idx_foraging_finds_item_count ON player_foraging_finds(item_id, find_count DESC);
+
+-- Index for player stats lookups
+CREATE INDEX IF NOT EXISTS idx_foraging_finds_user ON player_foraging_finds(user_id);
+
+COMMENT ON TABLE player_foraging_finds IS 'Per-item-type rare find counts per player for achievements';
+COMMENT ON COLUMN player_foraging_finds.item_id IS 'Rare item type: rare_egg, (future rare foraging items)';
+COMMENT ON COLUMN player_foraging_finds.find_count IS 'Total finds of this rare item type';

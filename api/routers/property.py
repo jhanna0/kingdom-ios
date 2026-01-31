@@ -1189,6 +1189,8 @@ def fortify_property(
     db: Session = Depends(get_db)
 ):
     """Convert a weapon or armor into property fortification."""
+    from sqlalchemy import text
+    
     # Get property
     property = db.query(Property).filter(
         Property.id == property_id,
@@ -1256,6 +1258,7 @@ def fortify_property(
     
     # Apply gain (cap at 100%)
     property.fortification_percent = min(100, property.fortification_percent + gain)
+    reached_max = property.fortification_percent >= 100
     
     # Update decay timestamp to now (fresh start after conversion)
     property.fortification_last_decay_at = datetime.now(timezone.utc)
@@ -1266,6 +1269,19 @@ def fortify_property(
     
     # Consume the item
     db.delete(item)
+    
+    # =====================================================
+    # UPDATE FORTIFICATION STATS FOR ACHIEVEMENTS
+    # =====================================================
+    db.execute(text("""
+        INSERT INTO player_fortification_stats (user_id, items_sacrificed, fortification_gained, max_fortification_reached)
+        VALUES (:user_id, 1, :gain, :reached_max)
+        ON CONFLICT (user_id) DO UPDATE SET
+            items_sacrificed = player_fortification_stats.items_sacrificed + 1,
+            fortification_gained = player_fortification_stats.fortification_gained + :gain,
+            max_fortification_reached = player_fortification_stats.max_fortification_reached OR :reached_max,
+            updated_at = NOW()
+    """), {"user_id": current_user.id, "gain": gain, "reached_max": reached_max})
     
     db.commit()
     
