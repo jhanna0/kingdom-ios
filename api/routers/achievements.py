@@ -107,7 +107,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT COUNT(*) FROM market_transactions WHERE buyer_id = :user_id OR seller_id = :user_id), 0) as market_trades,
             
             -- Contract contributions (actions completed) - count from contract_contributions joined with unified_contracts
-            COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_property'), 0) as building_contracts,
+            COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'kingdom_building'), 0) as building_contracts,
             COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_training'), 0) as training_contracts,
             COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type IN ('weapon', 'armor')), 0) as items_crafted,
             COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type = 'weapon'), 0) as weapons_crafted,
@@ -550,7 +550,7 @@ def claim_achievement_reward(
     # Parse rewards
     rewards_data = tier_data["rewards"] or {}
     gold_reward = rewards_data.get("gold", 0)
-    xp_reward = rewards_data.get("experience", 0)
+    # NOTE: XP rewards disabled - achievements only grant gold
     
     # Apply kingdom tax to gold reward
     tax_amount = 0
@@ -562,20 +562,8 @@ def claim_achievement_reward(
             db, state.hometown_kingdom_id, state, gold_reward
         )
     
-    # Grant rewards (net gold after tax)
-    old_level = state.level
+    # Grant rewards (net gold after tax, no XP)
     state.gold = (state.gold or 0) + net_gold
-    state.experience = (state.experience or 0) + xp_reward
-    
-    # Check for level up (simple check - can be expanded)
-    new_level = None
-    xp_for_next_level = state.level * 100  # Simple formula
-    while state.experience >= xp_for_next_level:
-        state.level += 1
-        state.skill_points = (state.skill_points or 0) + 3
-        state.experience -= xp_for_next_level
-        xp_for_next_level = state.level * 100
-        new_level = state.level
     
     # Record the claim
     claim_insert = text("""
@@ -591,12 +579,12 @@ def claim_achievement_reward(
         message=f"Claimed {tier_data['display_name']}!",
         rewards_granted=AchievementRewards(
             gold=int(net_gold),  # Net gold after tax
-            experience=xp_reward,
+            experience=0,  # XP rewards disabled
             items=rewards_data.get("items", [])
         ),
         new_gold=int(state.gold),
         new_experience=state.experience,
-        new_level=new_level,
+        new_level=None,  # No level ups from achievements
         tax_amount=int(tax_amount) if tax_amount > 0 else None,
         tax_rate=tax_rate if tax_rate > 0 else None,
         achievement_type=tier_data["achievement_type"],
