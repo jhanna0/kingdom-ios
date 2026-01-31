@@ -215,9 +215,9 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
     activity_dict = None
     current_kingdom_name = None
     if friend_state and friendship.status == 'accepted':
-        activity_obj = _get_player_activity(db, friend_state)
-        # Convert PlayerActivity to FriendActivity format (with icon, display_text, color)
-        activity_dict = _convert_to_friend_activity(activity_obj)
+        # Parse cached activity status for icon/color (fully dynamic)
+        status_text = friend_state.current_activity_status or "Idle"
+        activity_dict = _parse_activity_status(status_text)
         if friend_state.current_kingdom_id:
             from db.models import Kingdom
             kingdom = db.query(Kingdom).filter(Kingdom.id == friend_state.current_kingdom_id).first()
