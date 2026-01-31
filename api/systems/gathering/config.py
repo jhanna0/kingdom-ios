@@ -19,6 +19,7 @@ from dataclasses import dataclass
 # RESOURCE TYPE DEFINITIONS
 # ============================================================
 # Each resource has an icon (SF Symbol) and display name
+# Resources are stored in player_inventory table (not PlayerState columns)
 
 RESOURCE_TYPES = {
     "wood": {
@@ -26,7 +27,7 @@ RESOURCE_TYPES = {
         "name": "Wood",
         "icon": "tree.fill",
         "description": "Chop trees for lumber",
-        "player_field": "wood",  # Field name on PlayerState
+        "item_id": "wood",       # Item ID in player_inventory table
         "visual_type": "tree",   # Frontend uses this to pick shape/animation
         "action_verb": "Chop",   # Frontend displays "Chop Wood"
     },
@@ -35,16 +36,16 @@ RESOURCE_TYPES = {
         "name": "Stone",
         "icon": "square.stack.3d.up.fill",
         "description": "Quarry rocks for stone",
-        "player_field": "stone",  # Field name on PlayerState
-        "visual_type": "rock",    # Frontend uses this to pick shape/animation
-        "action_verb": "Mine",    # Frontend displays "Mine Stone"
+        "item_id": "stone",      # Item ID in player_inventory table
+        "visual_type": "rock",   # Frontend uses this to pick shape/animation
+        "action_verb": "Mine",   # Frontend displays "Mine Stone"
     },
     "iron": {
         "id": "iron",
         "name": "Iron",
         "icon": "mountain.2.fill",
         "description": "Mine rocks for ore",
-        "player_field": "iron",  # Field name on PlayerState
+        "item_id": "iron",       # Item ID in player_inventory table
         "visual_type": "rock",   # Frontend uses this to pick shape/animation
         "action_verb": "Mine",   # Frontend displays "Mine Iron"
     },

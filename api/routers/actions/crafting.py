@@ -8,6 +8,7 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, PlayerItem, Property
+from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from config import DEV_MODE
 from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status
@@ -73,12 +74,22 @@ def get_crafting_costs(
             "stat_bonus": get_stat_bonus(tier)
         }
     
+    # Get iron and steel from inventory
+    iron_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "iron"
+    ).first()
+    steel_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "steel"
+    ).first()
+    
     return {
         "costs": costs,
         "player_resources": {
             "gold": int(state.gold),
-            "iron": state.iron,
-            "steel": state.steel
+            "iron": iron_inv.quantity if iron_inv else 0,
+            "steel": steel_inv.quantity if steel_inv else 0
         }
     }
 
@@ -171,6 +182,19 @@ def purchase_craft(
     steel_required = get_steel_required(tier)
     actions_required = get_actions_required(tier)
     
+    # Get iron and steel from inventory
+    iron_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "iron"
+    ).with_for_update().first()
+    steel_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "steel"
+    ).with_for_update().first()
+    
+    player_iron = iron_inv.quantity if iron_inv else 0
+    player_steel = steel_inv.quantity if steel_inv else 0
+    
     # Check resources
     if state.gold < gold_cost:
         raise HTTPException(
@@ -178,16 +202,16 @@ def purchase_craft(
             detail=f"Not enough gold. Need {gold_cost}g, have {int(state.gold)}g"
         )
     
-    if state.iron < iron_required:
+    if player_iron < iron_required:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough iron. Need {iron_required}, have {state.iron}"
+            detail=f"Not enough iron. Need {iron_required}, have {player_iron}"
         )
     
-    if state.steel < steel_required:
+    if player_steel < steel_required:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough steel. Need {steel_required}, have {state.steel}"
+            detail=f"Not enough steel. Need {steel_required}, have {player_steel}"
         )
     
     # Check if already have active crafting contract
@@ -219,8 +243,20 @@ def purchase_craft(
     
     # Spend resources
     state.gold -= gold_cost
-    state.iron -= iron_required
-    state.steel -= steel_required
+    
+    # Deduct iron from inventory
+    if iron_required > 0:
+        if iron_inv:
+            iron_inv.quantity -= iron_required
+            if iron_inv.quantity <= 0:
+                db.delete(iron_inv)
+    
+    # Deduct steel from inventory
+    if steel_required > 0:
+        if steel_inv:
+            steel_inv.quantity -= steel_required
+            if steel_inv.quantity <= 0:
+                db.delete(steel_inv)
     
     # Set activity status
     set_activity_status(state, f"Crafting T{tier} {equipment_type} 0/{actions_required}")

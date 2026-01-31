@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from db import get_db, User, PlayerState as DBPlayerState, Kingdom, Property, UserKingdom, ActionCooldown
+from db.models.inventory import PlayerInventory
 from schemas import PlayerState, PlayerStateUpdate, SyncRequest, SyncResponse
 from routers.auth import get_current_user
 from routers.alliances import are_empires_allied
@@ -255,16 +256,10 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     training_costs = get_training_costs_for_player(state)
     
     # Build DYNAMIC resources data - frontend renders without hardcoding!
-    # Maps resource keys to player state columns (gold is in state.gold, iron in state.iron, etc.)
-    # Gold is stored as float for precise tax math, but displayed as int
-    resource_column_map = {
-        "gold": int(state.gold),
-        "iron": state.iron,
-        "steel": state.steel,
-        "wood": state.wood,
-    }
+    # Gold is the only resource stored as a column (needs float precision for taxes)
+    # All other resources (iron, wood, stone, meat, etc.) use player_inventory table
     
-    # Query PlayerInventory for items like meat, sinew, etc.
+    # Query PlayerInventory for all resources
     from db.models.inventory import PlayerInventory
     inventory_items = db.query(PlayerInventory).filter(
         PlayerInventory.user_id == user.id
@@ -278,10 +273,12 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         # Skip pets - they show in the Pets card, NOT inventory
         if resource_config.get("is_pet"):
             continue
-            
-        # First check if it's a column resource (gold, iron, steel, wood)
-        # Then check if it's in the inventory table (meat, sinew, etc.)
-        amount = resource_column_map.get(resource_key, inventory_map.get(resource_key, 0))
+        
+        # Gold is in state.gold (float column), everything else from inventory
+        if resource_key == "gold":
+            amount = int(state.gold)
+        else:
+            amount = inventory_map.get(resource_key, 0)
         resources_data.append({
             "key": resource_key,
             "amount": amount,
@@ -384,10 +381,9 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         is_ruler=is_ruler,
         is_verified=user.is_verified,
         
-        # Legacy resources
-        iron=state.iron or 0,
-        steel=state.steel or 0,
-        wood=state.wood or 0,
+        # Legacy resource fields (now fetched from inventory for backwards compatibility)
+        iron=inventory_map.get("iron", 0),
+        wood=inventory_map.get("wood", 0),
         
         # Equipment (from player_items table)
         equipped_weapon=equipped["equipped_weapon"],
@@ -673,9 +669,11 @@ def reset_player_state(
     state.current_kingdom_id = None
     state.kingdoms_ruled = 0
     
-    # Reset resources
-    state.iron = 0
-    state.steel = 0
+    # Reset resources (delete from inventory)
+    db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id.in_(["iron", "wood", "stone"])
+    ).delete(synchronize_session=False)
     
     # NOTE: The following have been moved to other tables and can't be reset here:
     # - coup stats: now in coup_events table
@@ -958,8 +956,16 @@ def dev_boost(
     state.gold += 10000
     state.experience += 500
     state.skill_points += 10
-    state.iron += 100
-    state.steel += 50
+    
+    # Add iron to inventory
+    iron_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "iron"
+    ).first()
+    if iron_inv:
+        iron_inv.quantity += 100
+    else:
+        db.add(PlayerInventory(user_id=current_user.id, item_id="iron", quantity=100))
     
     # Boost reputation in current kingdom if player is checked in
     reputation_boosted = False

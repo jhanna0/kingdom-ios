@@ -86,10 +86,11 @@ class PlayerState(BaseModel):
     is_ruler: bool = False  # Computed on read
     is_verified: bool = False
     
-    # Legacy resources (new items use player_inventory table)
+    # Resources (computed from player_inventory table for backwards compatibility)
+    # These fields are populated by the API from inventory queries
     iron: int = 0
-    steel: int = 0
     wood: int = 0
+    steel: int = 0  # Legacy field for iOS compatibility
     
     # Equipment (from player_items table)
     equipped_weapon: Optional[EquipmentItem] = None
@@ -153,10 +154,8 @@ class PlayerStateUpdate(BaseModel):
     attack_debuff: Optional[int] = None
     debuff_expires_at: Optional[datetime] = None
     
-    # Legacy resources
-    iron: Optional[int] = None
-    steel: Optional[int] = None
-    wood: Optional[int] = None
+    # NOTE: Resources (iron, wood, stone) are no longer updatable via this schema
+    # They are managed through inventory operations only
     
     # Status
     is_alive: Optional[bool] = None

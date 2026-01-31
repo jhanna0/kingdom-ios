@@ -12,22 +12,20 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 
 # ===== RESOURCE DEFINITIONS - SINGLE SOURCE OF TRUTH =====
 # These define how items look in the UI (icon, color, name, etc.)
-# Storage: gold/iron/steel/wood are legacy columns in PlayerState
-#          meat/sinew/etc use the player_inventory table (proper design!)
+# Storage: gold is a column in PlayerState (currency, needs float precision for taxes)
+#          ALL other resources use the player_inventory table (proper design!)
 #
 # is_tradeable: Can be sold on the market (default True)
 # storage_type: "column" = PlayerState column, "inventory" = player_inventory table
 #
 # ORGANIZED BY ORIGIN/TYPE:
 #   0-9:   Currency
-#   10-19: Core Materials (iron, steel, wood)
+#   10-19: Core Materials (iron, steel, wood, stone)
 #   20-29: Hunting Drops (meat, sinew, fur, trinkets)
 #   30-39: Fishing
 #   40-49: Foraging (wild gathering)
 #   50-59: Farming (cultivated outputs)
 #   90-99: Special/Crafting (blueprints, etc)
-
-# I DO NOT LIKE HOW WE HAVE THIS WEIRD HAVE RESOURCE HALF IN TABLE WITHOUT FK DESIGN!
 
 RESOURCES = {
     # ===== CURRENCY (0-9) =====
@@ -43,7 +41,7 @@ RESOURCES = {
     },
 
     # ===== CORE MATERIALS (10-19) =====
-    # Basic crafting/building resources
+    # Basic crafting/building resources (now stored in player_inventory table)
     "iron": {
         "display_name": "Iron",
         "icon": "cube.fill",
@@ -52,7 +50,7 @@ RESOURCES = {
         "category": "material",
         "display_order": 10,
         "is_tradeable": True,
-        "storage_type": "column",
+        "storage_type": "inventory",
     },
     "stone": {
         "display_name": "Stone",
@@ -62,9 +60,9 @@ RESOURCES = {
         "category": "material",
         "display_order": 12,
         "is_tradeable": True,
-        "storage_type": "column",
+        "storage_type": "inventory",
     },
-        "wood": {
+    "wood": {
         "display_name": "Wood",
         "icon": "tree.fill",
         "color": "brown",
@@ -72,7 +70,7 @@ RESOURCES = {
         "category": "material",
         "display_order": 13,
         "is_tradeable": True,
-        "storage_type": "column",
+        "storage_type": "inventory",
     },
 
     # ===== HUNTING DROPS (20-29) =====
@@ -280,8 +278,8 @@ def get_all_resources():
         "categories": ["currency", "material", "consumable", "crafting", "trinket", "pet"],
         "notes": {
             "dynamic_rendering": "Frontend should render all resources from this config",
-            "storage": "gold/iron/steel/wood are PlayerState columns. meat/sinew use player_inventory table.",
-            "hunting": "Hunts drop meat + gold (equal amounts, taxed) + sinew (rare). Craft hunting bow with 10 wood + 3 sinew."
+            "storage": "gold is a PlayerState column. ALL other resources use player_inventory table.",
+            "hunting": "Hunts drop meat + gold (equal amounts, taxed) + sinew (rare). Craft hunting bow with 100 wood + 5 sinew."
         }
     }
 

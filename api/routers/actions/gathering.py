@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta, time
 
 from db import get_db, User, ActionCooldown, Kingdom, DailyGathering
+from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from systems.gathering import GatherManager, GatherConfig
 from .utils import log_activity
@@ -17,6 +18,33 @@ router = APIRouter()
 
 # Singleton manager
 _gather_manager = GatherManager()
+
+
+def get_inventory_amount(db: Session, user_id: int, item_id: str) -> int:
+    """Get amount of an item in player's inventory."""
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id == item_id
+    ).first()
+    return inv.quantity if inv else 0
+
+
+def add_inventory_amount(db: Session, user_id: int, item_id: str, amount: int):
+    """Add amount to player's inventory (creates row if needed)."""
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id == item_id
+    ).with_for_update().first()
+    
+    if inv:
+        inv.quantity += amount
+    else:
+        inv = PlayerInventory(
+            user_id=user_id,
+            item_id=item_id,
+            quantity=amount
+        )
+        db.add(inv)
 
 # 1 second cooldown to prevent scripted abuse (frontend uses 0.5s)
 GATHER_COOLDOWN_SECONDS = 1
@@ -123,7 +151,7 @@ def gather_resource(
                 "resource_type": resource_type,
                 "tier": "black",
                 "amount": 0,
-                "new_total": getattr(state, GatherConfig.get_resource(resource_type)["player_field"], 0)
+                "new_total": get_inventory_amount(db, current_user.id, resource_type)
             }
         cooldown.last_performed = now
     else:
@@ -177,7 +205,7 @@ def gather_resource(
             "resource_type": resource_type,
             "tier": "black",
             "amount": 0,
-            "new_total": getattr(state, resource_config["player_field"], 0),
+            "new_total": get_inventory_amount(db, current_user.id, resource_type),
             "exhausted": True,
             "exhausted_message": msg
         }
@@ -198,21 +226,20 @@ def gather_resource(
             "resource_type": resource_type,
             "tier": "black", 
             "amount": 0,
-            "new_total": getattr(state, resource_config["player_field"], 0),
+            "new_total": get_inventory_amount(db, current_user.id, resource_type),
             "exhausted": True,
             "exhausted_message": f"You've {resource_verb} all available {resource_type} for today. Resets in {time_str}."
         }
     
-    # Get current amount of this resource
-    player_field = resource_config["player_field"]
-    current_amount = getattr(state, player_field, 0)
+    # Get current amount of this resource from inventory
+    current_amount = get_inventory_amount(db, current_user.id, resource_type)
     
     # Execute gather roll
     result = _gather_manager.gather(resource_type, current_amount)
     
     # Add gathered resources to player's inventory AND track daily gathering
     if result.amount > 0:
-        setattr(state, player_field, result.new_total)
+        add_inventory_amount(db, current_user.id, resource_type, result.amount)
         add_gathered_amount(db, current_user.id, resource_type, result.amount)
     
     db.commit()

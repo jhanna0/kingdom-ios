@@ -71,21 +71,12 @@ def get_player_material_count(db: Session, user_id: int, material_id: str) -> in
     """Get how much of a material the player has."""
     from db.models.player_state import PlayerState
     
-    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
-    if not state:
-        return 0
-    
-    # Column-based resources
+    # Gold is the only resource still stored as a column (needs float precision for taxes)
     if material_id == "gold":
-        return int(state.gold)
-    elif material_id == "iron":
-        return state.iron
-    elif material_id == "steel":
-        return state.steel
-    elif material_id == "wood":
-        return state.wood
+        state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+        return int(state.gold) if state else 0
     
-    # Inventory-based resources
+    # All other resources use player_inventory table
     inv = db.query(PlayerInventory).filter(
         PlayerInventory.user_id == user_id,
         PlayerInventory.item_id == material_id
@@ -98,37 +89,19 @@ def deduct_material(db: Session, user_id: int, material_id: str, amount: int) ->
     """Deduct materials from player. Returns True if successful."""
     from db.models.player_state import PlayerState
     
-    state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
-    if not state:
-        return False
-    
-    # Column-based resources
+    # Gold is the only resource still stored as a column (needs float precision for taxes)
     if material_id == "gold":
-        if state.gold < amount:
+        state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
+        if not state or state.gold < amount:
             return False
         state.gold -= amount
         return True
-    elif material_id == "iron":
-        if state.iron < amount:
-            return False
-        state.iron -= amount
-        return True
-    elif material_id == "steel":
-        if state.steel < amount:
-            return False
-        state.steel -= amount
-        return True
-    elif material_id == "wood":
-        if state.wood < amount:
-            return False
-        state.wood -= amount
-        return True
     
-    # Inventory-based resources
+    # All other resources use player_inventory table
     inv = db.query(PlayerInventory).filter(
         PlayerInventory.user_id == user_id,
         PlayerInventory.item_id == material_id
-    ).first()
+    ).with_for_update().first()
     
     if not inv or inv.quantity < amount:
         return False

@@ -356,16 +356,21 @@ class MarketMatchingEngine:
         return transaction
     
     def _get_player_resource(self, state: PlayerState, item_type: str) -> int:
-        """Get player's current amount of a resource (supports both column and inventory storage)"""
+        """Get player's current amount of a resource.
+        
+        Uses storage_type from RESOURCES config:
+        - "column": Only gold (needs float precision for taxes)
+        - "inventory": All other resources (iron, steel, wood, stone, meat, etc.)
+        """
         config = RESOURCES.get(item_type)
         if not config:
             raise ValueError(f"Unknown item type: {item_type}")
         
         if config.get("storage_type") == "column":
-            # Legacy column storage (iron, steel, wood)
+            # Gold is stored as column (needs float precision for tax math)
             return getattr(state, item_type, 0)
         else:
-            # Inventory table storage (meat, sinew, etc.)
+            # All other resources use inventory table
             inv = self.db.query(PlayerInventory).filter(
                 PlayerInventory.user_id == state.user_id,
                 PlayerInventory.item_id == item_type
@@ -373,17 +378,22 @@ class MarketMatchingEngine:
             return inv.quantity if inv else 0
     
     def _modify_player_resource(self, state: PlayerState, item_type: str, delta: int):
-        """Modify player's resource amount (supports both column and inventory storage)"""
+        """Modify player's resource amount.
+        
+        Uses storage_type from RESOURCES config:
+        - "column": Only gold (needs float precision for taxes)
+        - "inventory": All other resources (iron, steel, wood, stone, meat, etc.)
+        """
         config = RESOURCES.get(item_type)
         if not config:
             raise ValueError(f"Unknown item type: {item_type}")
         
         if config.get("storage_type") == "column":
-            # Legacy column storage (iron, steel, wood)
+            # Gold is stored as column (needs float precision for tax math)
             current = getattr(state, item_type, 0)
             setattr(state, item_type, current + delta)
         else:
-            # Inventory table storage (meat, sinew, etc.)
+            # All other resources use inventory table
             inv = self.db.query(PlayerInventory).filter(
                 PlayerInventory.user_id == state.user_id,
                 PlayerInventory.item_id == item_type

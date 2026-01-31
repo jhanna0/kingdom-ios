@@ -4,9 +4,12 @@ PlayerState model - Core game state (post-migration)
 Moved to other tables:
 - action_cooldowns: All cooldowns (last_*_action, last_coup_attempt, etc.)
 - player_items: Equipment (weapons, armor)
-- player_inventory: Stackable items (meat, sinew, etc.)
+- player_inventory: Stackable items (meat, sinew, iron, steel, wood, stone, etc.)
 - unified_contracts: Training/crafting/building contracts
 - user_kingdoms: Per-kingdom reputation and check-in counts
+
+NOTE: As of the inventory refactor, ALL resources except gold are stored in player_inventory.
+Gold remains here because it needs float precision for tax calculations.
 
 TODO: These columns should be computed on read, not stored:
 - kingdoms_ruled, total_conquests, coups_won, coups_failed, total_checkins
@@ -32,14 +35,9 @@ class PlayerState(Base):
     hometown_kingdom_id = Column(String, nullable=True, index=True)
     current_kingdom_id = Column(String, nullable=True)
     
-    # Resources (legacy columns - new items use player_inventory table!)
-    # Gold stored as float for precise tax calculations; convert to int when sending to frontend
+    # Currency - gold remains as column because it needs float precision for tax calculations
+    # All other resources (iron, steel, wood, stone, etc.) are in player_inventory table
     gold = Column(Float, default=100.0)
-    iron = Column(Integer, default=0)
-    steel = Column(Integer, default=0)
-    wood = Column(Integer, default=0)
-    stone = Column(Integer, default=0)
-    # Food is tracked via player_inventory (meat, etc.) - items with is_food=True in RESOURCES
     
     # Progression
     level = Column(Integer, default=1)

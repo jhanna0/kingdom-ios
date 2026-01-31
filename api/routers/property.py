@@ -18,6 +18,7 @@ import random
 from datetime import datetime, timezone, timedelta
 
 from db import get_db, Property, User, Kingdom, UnifiedContract, ContractContribution, UserKingdom, PlayerItem
+from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso
 
@@ -581,9 +582,16 @@ def get_property_status(
                 "active_contract": active_contract
             })
     
+    # Get wood from inventory
+    wood_inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id,
+        PlayerInventory.item_id == "wood"
+    ).first()
+    player_wood = wood_inv.quantity if wood_inv else 0
+    
     return {
         "player_gold": int(state.gold),
-        "player_wood": state.wood,
+        "player_wood": player_wood,
         "player_reputation": current_kingdom_reputation,
         "player_level": state.level,
         "player_building_skill": state.building_skill,
