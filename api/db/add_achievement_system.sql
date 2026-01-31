@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS achievement_definitions (
     description VARCHAR(500),                -- e.g., "Hunt 10 rabbits"
     icon VARCHAR(100),                       -- SF Symbol name
     category VARCHAR(100) DEFAULT 'general', -- For grouping: hunting, combat, economy, etc.
+    type_display_name VARCHAR(255),          -- e.g., "Squirrel Hunting" (shared across tiers)
     
     -- Ordering and availability
     display_order INTEGER DEFAULT 0,
