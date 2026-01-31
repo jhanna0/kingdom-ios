@@ -1,5 +1,87 @@
 import SwiftUI
 
+// MARK: - Reusable Skill Grid Item (Display-only)
+
+/// Reusable skill display - used by CharacterSheet AND PlayerProfile
+struct SkillGridItem: View {
+    let icon: String
+    let name: String
+    let tier: Int
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(
+                        backgroundColor: color,
+                        cornerRadius: 10,
+                        shadowOffset: 2,
+                        borderWidth: 2
+                    )
+                
+                Text("\(tier)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+                    .brutalistBadge(
+                        backgroundColor: .black,
+                        cornerRadius: 10,
+                        shadowOffset: 1,
+                        borderWidth: 1.5
+                    )
+                    .offset(x: 5, y: -5)
+            }
+            
+            Text(name)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
+    }
+}
+
+// MARK: - Reusable Reputation Grid Item
+
+struct ReputationGridItem: View {
+    let reputation: Int
+    
+    var body: some View {
+        let tier = ReputationTier.from(reputation: reputation)
+        
+        VStack(spacing: 8) {
+            Image(systemName: tier.icon)
+                .font(.system(size: 22))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .brutalistBadge(
+                    backgroundColor: tier.color,
+                    cornerRadius: 10,
+                    shadowOffset: 2,
+                    borderWidth: 2
+                )
+            
+            Text("Reputation")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
+    }
+}
+
+// MARK: - Dynamic Skill Grid Content (for CharacterSheet with NavigationLinks)
+
 /// Dynamic skill grid that renders skills from backend data
 /// When backend adds a new skill, it automatically appears here without app update
 struct DynamicSkillGridContent: View {
@@ -68,41 +150,12 @@ struct DynamicSkillGridContent: View {
             trainingContracts: trainingContracts,
             onPurchase: { onPurchase(skill.skillType) }
         )) {
-            VStack(spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: skill.icon)
-                        .font(.system(size: 22))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .brutalistBadge(
-                            backgroundColor: SkillConfig.get(skill.skillType).color,
-                            cornerRadius: 10,
-                            shadowOffset: 2,
-                            borderWidth: 2
-                        )
-                    
-                    Text("\(skill.currentTier)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 20, height: 20)
-                        .brutalistBadge(
-                            backgroundColor: .black,
-                            cornerRadius: 10,
-                            shadowOffset: 1,
-                            borderWidth: 1.5
-                        )
-                        .offset(x: 5, y: -5)
-                }
-                
-                Text(skill.displayName)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
+            SkillGridItem(
+                icon: skill.icon,
+                name: skill.displayName,
+                tier: skill.currentTier,
+                color: SkillConfig.get(skill.skillType).color
+            )
         }
         .buttonStyle(.plain)
     }

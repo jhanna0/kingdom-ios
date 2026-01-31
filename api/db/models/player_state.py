@@ -88,6 +88,10 @@ class PlayerState(Base):
     hunting_permit_kingdom_id = Column(String, nullable=True)  # Kingdom where permit is valid
     hunting_permit_expires_at = Column(DateTime, nullable=True)  # When permit expires
     
+    # Current Activity Status (for friend list - avoids N+1 queries)
+    # Simple text like "Training attack 3/5", "Foraging", "Fishing", etc.
+    current_activity_status = Column(String, nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

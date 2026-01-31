@@ -423,6 +423,134 @@ def apply_state_update(state: DBPlayerState, update: PlayerStateUpdate) -> None:
     state.updated_at = datetime.utcnow()
 
 
+def handle_kingdom_checkin(db: Session, current_user: User, state: DBPlayerState, kingdom: Kingdom):
+    """
+    Handle player check-in to a kingdom.
+    
+    Handles:
+    - Travel fee calculation and payment
+    - Free travel for rulers, property owners, allies
+    - UserKingdom tracking
+    - Kingdom activity updates
+    
+    Returns:
+        TravelEvent if entering new kingdom, None otherwise
+    """
+    from schemas.user import TravelEvent
+    
+    travel_event = None
+    is_entering_new_kingdom = state.current_kingdom_id != kingdom.id
+    travel_fee_paid = 0
+    free_travel_reason = None
+    
+    # Charge travel fee if entering new kingdom (not ruler or property owner)
+    # Only charge if kingdom has a ruler - unclaimed kingdoms have no travel fee
+    if is_entering_new_kingdom and kingdom.travel_fee > 0 and kingdom.ruler_id is not None:
+        # Check if player is ruler (rulers don't pay)
+        is_ruler = kingdom.ruler_id == current_user.id
+        
+        # Check if player owns property in this kingdom (property owners don't pay)
+        owns_property = db.query(Property).filter(
+            Property.kingdom_id == kingdom.id,
+            Property.owner_id == current_user.id
+        ).first() is not None
+        
+        # Check if player's empire is allied with target kingdom's empire
+        home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first() if state.hometown_kingdom_id else None
+        is_allied = home_kingdom and are_empires_allied(
+            db,
+            home_kingdom.empire_id or home_kingdom.id,
+            kingdom.empire_id or kingdom.id
+        )
+        
+        if is_ruler:
+            free_travel_reason = "ruler"
+            print(f"👑 {current_user.display_name} rules {kingdom.name} - no travel fee")
+        elif owns_property:
+            free_travel_reason = "property_owner"
+            print(f"🏠 {current_user.display_name} owns property in {kingdom.name} - no travel fee")
+        elif is_allied:
+            free_travel_reason = "allied"
+            print(f"🤝 {current_user.display_name} is from allied empire - no travel fee in {kingdom.name}")
+        else:
+            # Check if player has enough gold
+            if state.gold < kingdom.travel_fee:
+                # Can't afford - deny entry
+                travel_event = TravelEvent(
+                    entered_kingdom=False,
+                    kingdom_name=kingdom.name,
+                    travel_fee_paid=0,
+                    free_travel_reason=None,
+                    denied=True,
+                    denial_reason=f"Insufficient gold. Need {kingdom.travel_fee}g to enter."
+                )
+                print(f"❌ {current_user.display_name} cannot afford {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+                return travel_event  # Return early - don't enter kingdom
+            else:
+                # Charge travel fee
+                travel_fee_paid = kingdom.travel_fee
+                state.gold -= kingdom.travel_fee
+                kingdom.treasury_gold += kingdom.travel_fee
+                print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
+                
+                # Log travel fee payment
+                log_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    action_type="travel_fee",
+                    action_category="kingdom",
+                    description=f"Paid {kingdom.travel_fee}g to enter {kingdom.name}",
+                    kingdom_id=kingdom.id,
+                    amount=kingdom.travel_fee,
+                    details={
+                        "to_kingdom": kingdom.name,
+                        "fee_paid": kingdom.travel_fee
+                    },
+                    visibility="public"
+                )
+    
+    # Update current_kingdom_id if entering a new kingdom
+    if is_entering_new_kingdom:
+        state.current_kingdom_id = kingdom.id
+        
+        # Create travel event for response
+        travel_event = TravelEvent(
+            entered_kingdom=True,
+            kingdom_name=kingdom.name,
+            travel_fee_paid=travel_fee_paid,
+            free_travel_reason=free_travel_reason
+        )
+    
+    # ALWAYS track check-in (every app load in this kingdom)
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id,
+        UserKingdom.kingdom_id == kingdom.id
+    ).first()
+    
+    if not user_kingdom:
+        user_kingdom = UserKingdom(
+            user_id=current_user.id,
+            kingdom_id=kingdom.id,
+            local_reputation=0,
+            checkins_count=1,
+            last_checkin=datetime.utcnow(),
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(user_kingdom)
+    else:
+        user_kingdom.checkins_count += 1
+        user_kingdom.last_checkin = datetime.utcnow()
+    
+    # Update kingdom activity
+    kingdom.last_activity = datetime.utcnow()
+    kingdom.checked_in_players = db.query(DBPlayerState).filter(
+        DBPlayerState.current_kingdom_id == kingdom.id
+    ).count()
+    
+    return travel_event
+
+
 # ===== Endpoints =====
 
 @router.get("/state", response_model=PlayerState)
@@ -434,8 +562,12 @@ def get_player_state(
     """
     Get current player state
     
-    Returns the complete player state for the authenticated user.
-    Use this to load player data on app launch.
+    DEPRECATED FOR APP STARTUP: Use GET /startup instead, which combines
+    city lookup and player state in a single call for faster app initialization.
+    
+    This endpoint is still useful for:
+    - Refreshing player state without city data
+    - Post-action state updates (after claiming, training, etc.)
     
     If kingdom_id provided, auto-checks in to that kingdom.
     """
@@ -446,131 +578,8 @@ def get_player_state(
     if kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
         if kingdom:
-            # Check if entering a NEW kingdom (for travel fee)
-            is_entering_new_kingdom = state.current_kingdom_id != kingdom.id
-            
-            travel_fee_paid = 0
-            free_travel_reason = None
-            
-            # Charge travel fee if entering new kingdom (not ruler or property owner)
-            # Only charge if kingdom has a ruler - unclaimed kingdoms have no travel fee
-            if is_entering_new_kingdom and kingdom.travel_fee > 0 and kingdom.ruler_id is not None:
-                # Check if player is ruler (rulers don't pay)
-                is_ruler = kingdom.ruler_id == current_user.id
-                
-                # Check if player owns property in this kingdom (property owners don't pay)
-                owns_property = db.query(Property).filter(
-                    Property.kingdom_id == kingdom.id,
-                    Property.owner_id == current_user.id
-                ).first() is not None
-                
-                # Check if player's empire is allied with target kingdom's empire
-                home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first() if state.hometown_kingdom_id else None
-                is_allied = home_kingdom and are_empires_allied(
-                    db,
-                    home_kingdom.empire_id or home_kingdom.id,
-                    kingdom.empire_id or kingdom.id
-                )
-                
-                if is_ruler:
-                    free_travel_reason = "ruler"
-                    print(f"👑 {current_user.display_name} rules {kingdom.name} - no travel fee")
-                elif owns_property:
-                    free_travel_reason = "property_owner"
-                    print(f"🏠 {current_user.display_name} owns property in {kingdom.name} - no travel fee")
-                elif is_allied:
-                    free_travel_reason = "allied"
-                    print(f"🤝 {current_user.display_name} is from allied empire - no travel fee in {kingdom.name}")
-                else:
-                    # Check if player has enough gold
-                    if state.gold < kingdom.travel_fee:
-                        # Can't afford - deny entry
-                        from schemas.user import TravelEvent
-                        travel_event = TravelEvent(
-                            entered_kingdom=False,
-                            kingdom_name=kingdom.name,
-                            travel_fee_paid=0,
-                            free_travel_reason=None,
-                            denied=True,
-                            denial_reason=f"Insufficient gold. Need {kingdom.travel_fee}g to enter."
-                        )
-                        print(f"❌ {current_user.display_name} cannot afford {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
-                        # Skip the kingdom entry logic - just return current state with denial event
-                        is_entering_new_kingdom = False
-                    else:
-                        # Charge travel fee
-                        travel_fee_paid = kingdom.travel_fee
-                        state.gold -= kingdom.travel_fee
-                        kingdom.treasury_gold += kingdom.travel_fee
-                        print(f"💰 {current_user.display_name} paid {kingdom.travel_fee}g travel fee to enter {kingdom.name}")
-                        
-                        # Log travel fee payment
-                        log_activity(
-                            db=db,
-                            user_id=current_user.id,
-                            action_type="travel_fee",
-                            action_category="kingdom",
-                            description=f"Paid {kingdom.travel_fee}g to enter {kingdom.name}",
-                            kingdom_id=kingdom.id,
-                            amount=kingdom.travel_fee,
-                            details={
-                                "to_kingdom": kingdom.name,
-                                "fee_paid": kingdom.travel_fee
-                            },
-                            visibility="public"
-                        )
-            
-            # Update current_kingdom_id if entering a new kingdom
-            if is_entering_new_kingdom:
-                state.current_kingdom_id = kingdom.id
-                
-                # Create travel event for response
-                from schemas.user import TravelEvent
-                travel_event = TravelEvent(
-                    entered_kingdom=True,
-                    kingdom_name=kingdom.name,
-                    travel_fee_paid=travel_fee_paid,
-                    free_travel_reason=free_travel_reason
-                )
-            
-            # ALWAYS track check-in (every app load in this kingdom)
-            user_kingdom = db.query(UserKingdom).filter(
-                UserKingdom.user_id == current_user.id,
-                UserKingdom.kingdom_id == kingdom.id
-            ).first()
-            
-            if not user_kingdom:
-                user_kingdom = UserKingdom(
-                    user_id=current_user.id,
-                    kingdom_id=kingdom.id,
-                    local_reputation=0,
-                    checkins_count=1,
-                    last_checkin=datetime.utcnow(),
-                    gold_earned=0,
-                    gold_spent=0
-                )
-                db.add(user_kingdom)
-            else:
-                user_kingdom.checkins_count += 1
-                user_kingdom.last_checkin = datetime.utcnow()
-            
-            # Update kingdom activity
-            kingdom.last_activity = datetime.utcnow()
-            kingdom.checked_in_players = db.query(DBPlayerState).filter(
-                DBPlayerState.current_kingdom_id == kingdom.id
-            ).count()
-            
-            # Only broadcast player arrival if entering a NEW kingdom
-            if is_entering_new_kingdom:
-                from websocket.broadcast import notify_kingdom, KingdomEvents
-                notify_kingdom(
-                    kingdom_id=kingdom.id,
-                    event_type=KingdomEvents.PLAYER_JOINED,
-                    data={
-                        "player_id": current_user.id,
-                        "player_name": current_user.display_name or f"Player {current_user.id}",
-                    }
-                )
+            # Use shared check-in logic
+            travel_event = handle_kingdom_checkin(db, current_user, state, kingdom)
             
             # Commit changes (travel fee and/or current_kingdom_id update)
             db.commit()

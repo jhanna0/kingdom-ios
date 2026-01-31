@@ -78,11 +78,11 @@ struct PlayerProfileView: View {
                 // Current Activity
                 currentActivityCard(profile)
                 
-                // Combat & Skills
-                combatSkillsCard(profile)
+                // Combat & Skills - DYNAMIC from backend!
+                ProfileSkillsCard(skills: profile.skills_data, reputation: profile.reputation)
                 
                 // Equipment
-                equipmentCard(profile)
+                ProfileEquipmentCard(equipment: profile.equipment)
                 
                 // Pets
                 ProfilePetsCard(pets: profile.pets ?? [], showEmpty: true)
@@ -194,246 +194,6 @@ struct PlayerProfileView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func combatSkillsCard(_ profile: PlayerPublicProfile) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "figure.fencing")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                Text("Combat & Skills")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
-            
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-            
-            // Skills grid - 3 rows for all skills + reputation - FULLY DYNAMIC
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    skillDisplay(
-                        icon: SkillConfig.get("attack").icon,
-                        name: SkillConfig.get("attack").displayName,
-                        value: profile.attack_power,
-                        color: SkillConfig.get("attack").color
-                    )
-                    
-                    skillDisplay(
-                        icon: SkillConfig.get("defense").icon,
-                        name: SkillConfig.get("defense").displayName,
-                        value: profile.defense_power,
-                        color: SkillConfig.get("defense").color
-                    )
-                }
-                
-                HStack(spacing: 10) {
-                    skillDisplay(
-                        icon: SkillConfig.get("leadership").icon,
-                        name: SkillConfig.get("leadership").displayName,
-                        value: profile.leadership,
-                        color: SkillConfig.get("leadership").color
-                    )
-                    
-                    skillDisplay(
-                        icon: SkillConfig.get("building").icon,
-                        name: SkillConfig.get("building").displayName,
-                        value: profile.building_skill,
-                        color: SkillConfig.get("building").color
-                    )
-                }
-                
-                HStack(spacing: 10) {
-                    skillDisplay(
-                        icon: SkillConfig.get("intelligence").icon,
-                        name: SkillConfig.get("intelligence").displayName,
-                        value: profile.intelligence,
-                        color: SkillConfig.get("intelligence").color
-                    )
-                    
-                    skillDisplay(
-                        icon: SkillConfig.get("science").icon,
-                        name: SkillConfig.get("science").displayName,
-                        value: profile.science,
-                        color: SkillConfig.get("science").color
-                    )
-                }
-                
-                HStack(spacing: 10) {
-                    skillDisplay(
-                        icon: SkillConfig.get("faith").icon,
-                        name: SkillConfig.get("faith").displayName,
-                        value: profile.faith,
-                        color: SkillConfig.get("faith").color
-                    )
-                    
-                    // Reputation display
-                    let reputationTier = ReputationTier.from(reputation: profile.reputation)
-                    VStack(spacing: 12) {
-                        Image(systemName: reputationTier.icon)
-                            .font(FontStyles.iconLarge)
-                            .foregroundColor(.white)
-                            .frame(width: 52, height: 52)
-                            .brutalistBadge(
-                                backgroundColor: reputationTier.color,
-                                cornerRadius: 12,
-                                shadowOffset: 3,
-                                borderWidth: 2
-                            )
-                        
-                        VStack(spacing: 2) {
-                            Text("Reputation")
-                                .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Text("\(profile.reputation) rep")
-                                .font(FontStyles.labelTiny)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
-                }
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func skillDisplay(icon: String, name: String, value: Int, color: Color) -> some View {
-        VStack(spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: icon)
-                    .font(FontStyles.iconLarge)
-                    .foregroundColor(.white)
-                    .frame(width: 52, height: 52)
-                    .brutalistBadge(
-                        backgroundColor: color,
-                        cornerRadius: 12,
-                        shadowOffset: 3,
-                        borderWidth: 2
-                    )
-                
-                // Tier badge
-                Text("\(value)")
-                    .font(FontStyles.labelBadge)
-                    .foregroundColor(.white)
-                    .frame(width: 22, height: 22)
-                    .brutalistBadge(
-                        backgroundColor: .black,
-                        cornerRadius: 11,
-                        shadowOffset: 1,
-                        borderWidth: 1.5
-                    )
-                    .offset(x: 6, y: -6)
-            }
-            
-            VStack(spacing: 2) {
-                Text(name)
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Text("Tier \(value)/5")
-                    .font(FontStyles.labelTiny)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
-    }
-    
-    private func equipmentCard(_ profile: PlayerPublicProfile) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "hammer.fill")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                Text("Equipment")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
-            
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-            
-            HStack(spacing: 10) {
-                equipmentDisplay(
-                    icon: "bolt.fill",
-                    name: "Weapon",
-                    tier: profile.equipment.weapon_tier,
-                    bonus: profile.equipment.weapon_attack_bonus,
-                    color: KingdomTheme.Colors.buttonDanger
-                )
-                
-                equipmentDisplay(
-                    icon: "shield.fill",
-                    name: "Armor",
-                    tier: profile.equipment.armor_tier,
-                    bonus: profile.equipment.armor_defense_bonus,
-                    color: KingdomTheme.Colors.royalBlue
-                )
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func equipmentDisplay(icon: String, name: String, tier: Int?, bonus: Int?, color: Color) -> some View {
-        VStack(spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: icon)
-                    .font(FontStyles.iconLarge)
-                    .foregroundColor(.white)
-                    .frame(width: 52, height: 52)
-                    .brutalistBadge(
-                        backgroundColor: color,
-                        cornerRadius: 12,
-                        shadowOffset: 3,
-                        borderWidth: 2
-                    )
-                
-                // Tier badge
-                if let tier = tier {
-                    Text("\(tier)")
-                        .font(FontStyles.labelBadge)
-                        .foregroundColor(.white)
-                        .frame(width: 22, height: 22)
-                        .brutalistBadge(
-                            backgroundColor: .black,
-                            cornerRadius: 11,
-                            shadowOffset: 1,
-                            borderWidth: 1.5
-                        )
-                        .offset(x: 6, y: -6)
-                }
-            }
-            
-            VStack(spacing: 2) {
-                Text(name)
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                if let bonus = bonus {
-                    Text("+\(bonus)")
-                        .font(FontStyles.labelBold)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                } else {
-                    Text("Not equipped")
-                        .font(FontStyles.labelTiny)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
-    }
-    
     private func achievementsCard(_ profile: PlayerPublicProfile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Achievements")
@@ -498,18 +258,6 @@ struct PlayerProfileView: View {
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
     }
     
-    private func activityColor(_ colorName: String) -> Color {
-        switch colorName {
-        case "blue": return .blue
-        case "green": return .green
-        case "purple": return .purple
-        case "orange": return .orange
-        case "yellow": return .yellow
-        case "red": return .red
-        default: return .gray
-        }
-    }
-    
     private func loadProfile() async {
         await MainActor.run {
             isLoading = true
@@ -532,6 +280,176 @@ struct PlayerProfileView: View {
     }
 }
 
+// MARK: - Profile Skills Card (Dynamic from backend, uses shared SkillGridItem)
+
+struct ProfileSkillsCard: View {
+    let skills: [PlayerPublicProfile.SkillData]
+    let reputation: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "figure.fencing")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Combat & Skills")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Dynamic skills grid - 4 columns like CharacterSheet, uses SAME SkillGridItem!
+            let sortedSkills = skills.sorted { $0.display_order < $1.display_order }
+            
+            VStack(spacing: 10) {
+                ForEach(0..<rowCount(for: sortedSkills), id: \.self) { rowIndex in
+                    skillRow(at: rowIndex, skills: sortedSkills)
+                }
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    private func rowCount(for skills: [PlayerPublicProfile.SkillData]) -> Int {
+        (skills.count + 4) / 4  // +4 to account for reputation slot
+    }
+    
+    @ViewBuilder
+    private func skillRow(at rowIndex: Int, skills: [PlayerPublicProfile.SkillData]) -> some View {
+        let indices = (0..<4).map { rowIndex * 4 + $0 }
+        
+        HStack(spacing: 10) {
+            ForEach(indices, id: \.self) { index in
+                if index < skills.count {
+                    // Use the SAME SkillGridItem from DynamicSkillGridContent!
+                    SkillGridItem(
+                        icon: skills[index].icon,
+                        name: skills[index].display_name,
+                        tier: skills[index].current_tier,
+                        color: SkillConfig.get(skills[index].skill_type).color
+                    )
+                } else if index == skills.count {
+                    // Reputation after last skill - uses SAME ReputationGridItem!
+                    ReputationGridItem(reputation: reputation)
+                } else {
+                    Spacer()
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Profile Equipment Card
+
+struct ProfileEquipmentCard: View {
+    let equipment: PlayerEquipmentData
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "hammer.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Equipment")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            HStack(spacing: 10) {
+                ProfileEquipmentItem(
+                    icon: "bolt.fill",
+                    name: "Weapon",
+                    tier: equipment.weapon_tier,
+                    bonus: equipment.weapon_attack_bonus,
+                    color: KingdomTheme.Colors.buttonDanger
+                )
+                
+                ProfileEquipmentItem(
+                    icon: "shield.fill",
+                    name: "Armor",
+                    tier: equipment.armor_tier,
+                    bonus: equipment.armor_defense_bonus,
+                    color: KingdomTheme.Colors.royalBlue
+                )
+            }
+        }
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+}
+
+// MARK: - Profile Equipment Item
+
+struct ProfileEquipmentItem: View {
+    let icon: String
+    let name: String
+    let tier: Int?
+    let bonus: Int?
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 26))
+                    .foregroundColor(.white)
+                    .frame(width: 52, height: 52)
+                    .brutalistBadge(
+                        backgroundColor: color,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                // Tier badge
+                if let tier = tier {
+                    Text("\(tier)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 22, height: 22)
+                        .brutalistBadge(
+                            backgroundColor: .black,
+                            cornerRadius: 11,
+                            shadowOffset: 1,
+                            borderWidth: 1.5
+                        )
+                        .offset(x: 6, y: -6)
+                }
+            }
+            
+            VStack(spacing: 2) {
+                Text(name)
+                    .font(FontStyles.bodyMediumBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                if let bonus = bonus {
+                    Text("+\(bonus)")
+                        .font(FontStyles.labelBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                } else {
+                    Text("Not equipped")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 12)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -539,6 +457,3 @@ struct PlayerProfileView: View {
         PlayerProfileView(userId: 1)
     }
 }
-
-
-

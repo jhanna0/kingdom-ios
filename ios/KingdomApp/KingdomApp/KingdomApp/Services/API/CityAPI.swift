@@ -5,7 +5,21 @@ import CoreLocation
 class CityAPI {
     private let client = APIClient.shared
     
-    // MARK: - FAST Loading (Two-Step)
+    // MARK: - FAST Startup (Single Call)
+    
+    /// FASTEST: Single call for app initialization
+    /// Combines: /cities/current + /player/state + last_login update
+    /// Use this on app launch to minimize round trips
+    func fetchStartup(lat: Double, lon: Double) async throws -> StartupResponse {
+        let request = client.request(
+            endpoint: "/startup?lat=\(lat)&lon=\(lon)"
+        )
+        let response: StartupResponse = try await client.execute(request)
+        print("✅ Startup: \(response.city.name) + player state loaded")
+        return response
+    }
+    
+    // MARK: - FAST Loading (Two-Step) [DEPRECATED - use fetchStartup instead]
     
     /// Step 1: Get ONLY the city the user is in (< 2 seconds)
     /// Call this FIRST to unblock the UI immediately

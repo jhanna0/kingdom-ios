@@ -532,3 +532,8 @@ def log_activity(
     )
     db.add(activity)
     return activity
+
+
+def set_activity_status(state, status: Optional[str] = None):
+    """Set player's activity status. Pass None to clear."""
+    state.current_activity_status = status

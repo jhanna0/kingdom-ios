@@ -1,5 +1,17 @@
 import Foundation
 
+// MARK: - Startup Response (Combined endpoint)
+
+/// Combined response from /game/startup - replaces separate calls to:
+/// - /cities/current
+/// - /player/state?kingdom_id=X
+/// - /auth/me (last_login update)
+struct StartupResponse: Codable {
+    let city: CityBoundaryResponse
+    let player: APIPlayerState
+    let server_time: String
+}
+
 // MARK: - Travel Event
 
 struct TravelEvent: Codable, Equatable {

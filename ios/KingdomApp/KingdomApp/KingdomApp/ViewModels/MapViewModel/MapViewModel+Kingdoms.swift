@@ -5,8 +5,8 @@ import CoreLocation
 // MARK: - Kingdom Loading & Refreshing
 extension MapViewModel {
     
-    /// Load real town data from backend API - TWO STEP for speed
-    /// Step 1: Load current city FAST (< 2s) - unblock UI (with retry)
+    /// Load real town data from backend API - SINGLE CALL for speed
+    /// Step 1: Load current city + player state in ONE call (< 2s) - unblock UI (with retry)
     /// Step 2: Load neighbors in background
     func loadRealTowns(around location: CLLocationCoordinate2D) {
         guard !isLoading else { return }
@@ -16,9 +16,9 @@ extension MapViewModel {
         errorMessage = nil
         
         Task {
-            // STEP 1: Get current city with retry logic (up to 5 attempts)
+            // STEP 1: Get current city + player state in ONE call (with retry)
             let maxRetries = 5
-            var currentCity: CityBoundaryResponse?
+            var startupResponse: StartupResponse?
             var lastError: Error?
             
             for attempt in 1...maxRetries {
@@ -27,10 +27,11 @@ extension MapViewModel {
                         await MainActor.run {
                             loadingStatus = "Finding your kingdom... (attempt \(attempt)/\(maxRetries))"
                         }
-                        print("🔄 Retrying current city load (attempt \(attempt)/\(maxRetries))")
+                        print("🔄 Retrying startup load (attempt \(attempt)/\(maxRetries))")
                     }
                     
-                    currentCity = try await apiService.city.fetchCurrentCity(
+                    // Single combined call: city + player state + last_login update
+                    startupResponse = try await apiService.city.fetchStartup(
                         lat: location.latitude,
                         lon: location.longitude
                     )
@@ -48,8 +49,8 @@ extension MapViewModel {
                 }
             }
             
-            // Check if we successfully loaded the current city
-            guard let city = currentCity else {
+            // Check if we successfully loaded startup data
+            guard let startup = startupResponse else {
                 // Failed after all retries
                 await MainActor.run {
                     let errorDescription = lastError?.localizedDescription ?? "Unknown error"
@@ -57,15 +58,15 @@ extension MapViewModel {
                     if errorDescription.contains("No city found") {
                         loadingStatus = ""
                         errorMessage = "No kingdoms discovered at this location. The royal cartographers have not yet mapped this region. Try a major city or move to a different area."
-                        print("❌ Failed to load current city after \(maxRetries) attempts: \(errorDescription)")
+                        print("❌ Failed to load startup after \(maxRetries) attempts: \(errorDescription)")
                     } else if errorDescription.contains("network") || errorDescription.contains("internet") {
                         loadingStatus = "Connection to royal archives lost..."
                         errorMessage = "Cannot reach the kingdom servers. Check your internet connection and try again."
-                        print("❌ Network error loading current city after \(maxRetries) attempts: \(errorDescription)")
+                        print("❌ Network error loading startup after \(maxRetries) attempts: \(errorDescription)")
                     } else {
                         loadingStatus = "The royal cartographers have failed..."
                         errorMessage = "Error loading kingdom after \(maxRetries) attempts: \(errorDescription)"
-                        print("❌ Failed to load current city after \(maxRetries) attempts: \(errorDescription)")
+                        print("❌ Failed to load startup after \(maxRetries) attempts: \(errorDescription)")
                     }
                     
                     isLoading = false
@@ -73,8 +74,8 @@ extension MapViewModel {
                 return
             }
             
-            // Convert to Kingdom and show immediately
-            let kingdom = convertCityToKingdom(city, index: 0)
+            // Convert to Kingdom and update player state
+            let kingdom = convertCityToKingdom(startup.city, index: 0)
             
             await MainActor.run {
                 if let kingdom = kingdom {
@@ -83,38 +84,27 @@ extension MapViewModel {
                     print("✅ Current city loaded: \(kingdom.name)")
                 }
                 
+                // Update player state from combined response (already checked in!)
+                player.updateFromAPIState(startup.player)
+                latestTravelEvent = startup.player.travel_event
+                
+                // Set currentKingdomInside so checkKingdomLocation doesn't duplicate
+                if let kingdom = kingdom {
+                    currentKingdomInside = kingdoms.first { $0.id == kingdom.id }
+                }
+                
+                // NOW we can check for coups - hometownKingdomId is set
+                updateActiveCoupFromKingdoms()
+                print("✅ Auto-checked in via startup endpoint")
+                
                 // UI IS NOW READY - user can interact
                 isLoading = false
                 loadingStatus = "Loading nearby kingdoms...\n(New areas take longer to map the first time)"
             }
             
-            // SEQUENTIAL: Load player state FIRST (sets hometownKingdomId), 
-            // THEN check for coups - fixes race condition
+            // Refresh kingdom data for any additional details
             if let kingdom = kingdom {
-                do {
-                    let updatedState = try await apiService.loadPlayerState(kingdomId: kingdom.id)
-                    
-                    await MainActor.run {
-                        player.updateFromAPIState(updatedState)
-                        latestTravelEvent = updatedState.travel_event
-                        
-                        // Set currentKingdomInside so checkKingdomLocation doesn't duplicate
-                        currentKingdomInside = kingdoms.first { $0.id == kingdom.id }
-                        
-                        // NOW we can check for coups - hometownKingdomId is set
-                        updateActiveCoupFromKingdoms()
-                        print("✅ Auto-checked in to \(kingdom.name)")
-                    }
-                    
-                    // Refresh kingdom data
-                    await refreshKingdom(id: kingdom.id)
-                } catch {
-                    print("⚠️ Failed to load player state: \(error.localizedDescription)")
-                    // Still try to update coup state with what we have
-                    await MainActor.run {
-                        updateActiveCoupFromKingdoms()
-                    }
-                }
+                await refreshKingdom(id: kingdom.id)
             }
             
             // STEP 2: Load neighbors in background with retry (can be slower)

@@ -122,17 +122,27 @@ struct PlayerPublicProfile: Codable, Identifiable {
     let level: Int
     let reputation: Int
     
-    // Combat stats
-    let attack_power: Int
-    let defense_power: Int
-    let leadership: Int
-    let building_skill: Int
-    let intelligence: Int
-    let science: Int
-    let faith: Int
+    // Dynamic skills data - renders without hardcoding!
+    let skills_data: [SkillData]
     
     // Equipment
     let equipment: PlayerEquipmentData
+    
+    // Skill data structure (matches backend)
+    struct SkillData: Codable, Identifiable {
+        let skill_type: String
+        let display_name: String
+        let icon: String
+        let category: String
+        let description: String
+        let current_tier: Int
+        let max_tier: Int
+        let training_cost: Int
+        let current_benefits: [String]
+        let display_order: Int
+        
+        var id: String { skill_type }
+    }
     
     // Pets
     let pets: [PetData]?
@@ -151,8 +161,13 @@ struct PlayerPublicProfile: Codable, Identifiable {
     let last_login: String?
     let created_at: String
     
+    // Helper to get skill value by type
+    func skillTier(for skillType: String) -> Int {
+        skills_data.first { $0.skill_type == skillType }?.current_tier ?? 0
+    }
+    
     var totalCombatPower: Int {
-        attack_power + defense_power + (equipment.weapon_attack_bonus ?? 0) + (equipment.armor_defense_bonus ?? 0)
+        skillTier(for: "attack") + skillTier(for: "defense") + (equipment.weapon_attack_bonus ?? 0) + (equipment.armor_defense_bonus ?? 0)
     }
 }
 

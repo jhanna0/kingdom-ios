@@ -84,7 +84,9 @@ struct FriendCard: View {
         case "blue": return KingdomTheme.Colors.buttonPrimary
         case "orange": return KingdomTheme.Colors.buttonWarning
         case "red": return KingdomTheme.Colors.buttonDanger
-        case "yellow": return KingdomTheme.Colors.inkMedium
+        case "purple": return KingdomTheme.Colors.royalPurple
+        case "yellow": return KingdomTheme.Colors.imperialGold
+        case "gray": return KingdomTheme.Colors.inkLight
         default: return KingdomTheme.Colors.inkMedium
         }
     }

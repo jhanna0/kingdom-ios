@@ -66,14 +66,8 @@ class PlayerPublicProfile(BaseModel):
     level: int
     reputation: int
     
-    # Combat stats
-    attack_power: int
-    defense_power: int
-    leadership: int
-    building_skill: int
-    intelligence: int
-    science: int
-    faith: int
+    # Dynamic skills data - frontend renders without hardcoding!
+    skills_data: list = []
     
     # Equipment
     equipment: PlayerEquipment

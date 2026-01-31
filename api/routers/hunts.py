@@ -24,6 +24,7 @@ from db import get_db
 from db.models import User, PlayerState, PlayerInventory, Kingdom
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
+from routers.actions.utils import set_activity_status
 from systems.hunting import HuntManager, HuntConfig, HuntPhase
 from systems.hunting.config import HUNTING_PERMIT_COST, HUNTING_PERMIT_DURATION_MINUTES, MEAT_MARKET_VALUE
 from systems.hunting.hunt_manager import get_hunt_probability_preview, HuntStatus
@@ -133,6 +134,10 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
         # Add rare drops (sinew, etc)
         for item_id in items_earned:
             add_to_inventory(db, player_id, item_id, 1)
+        
+        # Clear activity status (hunt ended)
+        if player_state:
+            set_activity_status(player_state, None)
     
     db.commit()
 
@@ -614,6 +619,10 @@ def create_hunt(
         creator_stats=stats,
     )
     
+    # Set activity status
+    set_activity_status(player_state, "Hunting - waiting for party")
+    db.commit()
+    
     hunt_dict = session.to_dict()
     
     # Broadcast to kingdom that a hunt is available
@@ -680,6 +689,10 @@ def join_hunt(
             hunt=session.to_dict(),
         )
     
+    # Set activity status
+    if player_state:
+        set_activity_status(player_state, "Hunting - waiting for party")
+    
     # Save to database
     manager.save_hunt(db, session)
     
@@ -724,12 +737,23 @@ def leave_hunt(
     # Remove participant
     session.remove_participant(user.id)
     
+    # Clear activity status
+    player_state = db.query(PlayerState).filter(PlayerState.user_id == user.id).first()
+    if player_state:
+        set_activity_status(player_state, None)
+    
     # If no participants left or creator left, cancel the hunt
     if len(session.participants) == 0 or session.created_by == user.id:
         session.status = HuntStatus.CANCELLED
+        # Clear activity for any remaining participants
+        for pid in session.participants.keys():
+            ps = db.query(PlayerState).filter(PlayerState.user_id == int(pid)).first()
+            if ps:
+                set_activity_status(ps, None)
     
     # Save to database
     manager.save_hunt(db, session)
+    db.commit()
     
     return HuntResponse(
         success=True,
@@ -813,6 +837,13 @@ def start_hunt(
             message="Cannot start hunt",
             hunt=session.to_dict(),
         )
+    
+    # Update activity status for all participants
+    for pid in session.participants.keys():
+        ps = db.query(PlayerState).filter(PlayerState.user_id == int(pid)).first()
+        if ps:
+            set_activity_status(ps, "Hunting")
+    db.commit()
     
     hunt_dict = session.to_dict()
     

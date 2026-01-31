@@ -1,18 +1,24 @@
 """
 Game endpoints - Kingdoms, check-ins, conquests
+
+FAST STARTUP:
+- GET /startup - Combined endpoint for app init (replaces /cities/current + /player/state + /auth/me)
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 import uuid
 
 from db import get_db, User, PlayerState, Kingdom, UserKingdom, CityBoundary
 from db.models.kingdom_event import KingdomEvent
-from schemas import CheckInRequest, CheckInResponse, CheckInRewards
+from schemas import CheckInRequest, CheckInResponse, CheckInRewards, CityBoundaryResponse
+from schemas.user import PlayerState as PlayerStateSchema, TravelEvent
 from routers.auth import get_current_user, get_current_user_optional
 from routers.actions.utils import format_datetime_iso
+from routers.player import player_state_to_response, handle_kingdom_checkin, get_or_create_player_state
+from services import city_service
 from config import DEV_MODE
 
 
@@ -91,6 +97,72 @@ def _get_or_create_user_kingdom(db: Session, user_id: int, kingdom_id: str) -> U
         db.refresh(user_kingdom)
     
     return user_kingdom
+
+
+# ===== FAST STARTUP ENDPOINT =====
+# GET /startup - Combines: /cities/current + /player/state + /auth/me last_login update
+# One round-trip instead of three!
+
+@router.get("/startup")
+async def get_startup_data(
+    lat: float,
+    lon: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    FAST STARTUP - Single endpoint for app initialization.
+    
+    Replaces the sequential calls to:
+    1. GET /cities/current (get current city)
+    2. GET /player/state?kingdom_id=X (check-in + player data)
+    3. GET /auth/me (updates last_login)
+    
+    Takes lat/lon, returns everything needed to start the app:
+    - Current city with full boundary and kingdom data
+    - Player state with check-in handled
+    - Updates last_login for online status
+    
+    This is THE call to make on app launch after authentication.
+    """
+    from services import city_service
+    
+    # 1. Update last_login (what /auth/me does)
+    current_user.last_login = datetime.utcnow()
+    
+    # 2. Get current city (what /cities/current does)
+    city = await city_service.get_current_city(db, lat, lon, current_user)
+    
+    if not city:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No city found at this location"
+        )
+    
+    # 3. Get or create player state
+    state = get_or_create_player_state(db, current_user)
+    
+    # 4. Handle check-in if entering a kingdom (what /player/state does)
+    travel_event = None
+    kingdom_id = city.osm_id  # The city's OSM ID is the kingdom ID
+    
+    kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+    if kingdom:
+        # Use existing check-in logic
+        travel_event = handle_kingdom_checkin(db, current_user, state, kingdom)
+    
+    # 5. Commit all changes (last_login + check-in)
+    db.commit()
+    
+    # 6. Build player state response (what /player/state returns)
+    player_state = player_state_to_response(current_user, state, db, travel_event)
+    
+    # 7. Return combined response
+    return {
+        "city": city,
+        "player": player_state,
+        "server_time": format_datetime_iso(datetime.utcnow())
+    }
 
 
 # ===== Kingdom Endpoints =====

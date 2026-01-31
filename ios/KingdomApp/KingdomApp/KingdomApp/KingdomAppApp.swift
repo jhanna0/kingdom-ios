@@ -212,6 +212,7 @@ struct LocationRequiredView: View {
 }
 
 struct AuthenticatedView: View {
+    @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var appInit: AppInitService
     @StateObject private var viewModel = MapViewModel()
     @StateObject private var locationManager = LocationManager()
@@ -238,6 +239,13 @@ struct AuthenticatedView: View {
     
     var body: some View {
         mainContent
+            .onAppear {
+                // Sync player name/id immediately from AuthManager's already-loaded user data
+                // This avoids showing "Player" default before /player/state loads
+                if let user = authManager.currentUser {
+                    viewModel.syncFromUser(user)
+                }
+            }
             .onReceive(locationManager.$currentLocation) { location in
                 if let location = location {
                     viewModel.updateUserLocation(location)

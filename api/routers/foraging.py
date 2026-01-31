@@ -25,7 +25,7 @@ from db.models.inventory import PlayerInventory
 from db.models.player_state import PlayerState
 from db.models.foraging_session import ForagingSession as ForagingSessionDB
 from routers.auth import get_current_user
-from routers.actions.utils import log_activity
+from routers.actions.utils import log_activity, set_activity_status
 from systems.foraging.foraging_manager import ForagingManager
 from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG, ROUND1_WIN_CONFIG, ROUND2_WIN_CONFIG
 
@@ -139,6 +139,7 @@ def start_foraging(
         }
     
     # Store
+    expires_at = ForagingSessionDB.default_expiry()
     db_session = ForagingSessionDB(
         session_id=session.session_id,
         user_id=player_id,
@@ -149,9 +150,14 @@ def start_foraging(
         round1_won=session.round1.is_winner,
         round2_won=session.round2.is_winner if session.round2 else False,
         has_rare_drop=session.round2.has_rare_drop if session.round2 else False,
-        expires_at=ForagingSessionDB.default_expiry(),
+        expires_at=expires_at,
     )
     db.add(db_session)
+    
+    # Update activity status
+    if state:
+        set_activity_status(state, "Foraging")
+    
     db.commit()
     
     return {
@@ -255,6 +261,12 @@ def collect_rewards(
     # Mark session as collected
     db_session.status = 'collected'
     db_session.collected_at = datetime.utcnow()
+    
+    # Clear activity status
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    if state:
+        set_activity_status(state, None)
+    
     db.commit()
     
     # Return result
@@ -284,6 +296,12 @@ def end_foraging(
     
     if db_session:
         db_session.status = 'cancelled'
+        
+        # Clear activity status
+        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        if state:
+            set_activity_status(state, None)
+        
         db.commit()
     
     return {"success": True}

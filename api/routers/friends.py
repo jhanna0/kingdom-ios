@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_, and_, func, desc
 from typing import List
 from datetime import datetime, timedelta
 
 from db.base import get_db
-from db.models import User, Friend, PlayerState, ActionCooldown
+from db.models import User, Friend, PlayerState
 from schemas.friend import (
     FriendRequest,
     FriendResponse,
@@ -15,7 +15,6 @@ from schemas.friend import (
     SearchUsersResponse
 )
 from routers.auth import get_current_user
-from routers.players import _get_player_activity
 from routers.actions.utils import format_datetime_iso
 
 
@@ -49,8 +48,70 @@ class FriendsDashboardResponse(BaseModel):
 
 # ===== Helper Functions =====
 
+def _parse_activity_status(status_text: str) -> dict:
+    """
+    Parse activity status string and return icon/color/display_text.
+    
+    Status formats:
+    - "Training attack 2/5" → training with skill type
+    - "Crafting T3 weapon 2/7" → crafting with equipment type
+    - "Fishing", "Foraging", "Patrolling", "Researching", "Hunting" → simple activities
+    - "Hunting - waiting for party" → hunting lobby
+    - "Idle" or empty → idle
+    """
+    if not status_text or status_text.lower() == 'idle':
+        return {'icon': 'circle', 'display_text': 'Idle', 'color': 'gray'}
+    
+    status_lower = status_text.lower()
+    
+    # Skill icons/colors for training
+    skill_icons = {
+        'attack': ('bolt.fill', 'red'),
+        'defense': ('shield.fill', 'blue'),
+        'leadership': ('crown.fill', 'purple'),
+        'building': ('hammer.fill', 'orange'),
+        'intelligence': ('eye.fill', 'green'),
+        'science': ('flask.fill', 'blue'),
+        'faith': ('hands.sparkles.fill', 'purple')
+    }
+    
+    # Check for training (e.g., "Training attack 2/5")
+    if status_lower.startswith('training'):
+        for skill, (icon, color) in skill_icons.items():
+            if skill in status_lower:
+                return {'icon': icon, 'display_text': status_text, 'color': color}
+        # Generic training
+        return {'icon': 'figure.strengthtraining.traditional', 'display_text': status_text, 'color': 'purple'}
+    
+    # Check for crafting (e.g., "Crafting T3 weapon 2/7")
+    if status_lower.startswith('crafting'):
+        if 'weapon' in status_lower:
+            return {'icon': 'hammer.fill', 'display_text': status_text, 'color': 'red'}
+        elif 'armor' in status_lower:
+            return {'icon': 'shield.checkerboard', 'display_text': status_text, 'color': 'blue'}
+        return {'icon': 'hammer.circle.fill', 'display_text': status_text, 'color': 'orange'}
+    
+    # Simple activity mappings
+    activity_config = {
+        'fishing': ('fish.fill', 'blue'),
+        'foraging': ('leaf.fill', 'green'),
+        'patrolling': ('figure.walk', 'green'),
+        'researching': ('flask.fill', 'blue'),
+        'hunting': ('pawprint.fill', 'orange'),
+        'scouting': ('eye.fill', 'yellow'),
+        'working': ('hammer.fill', 'blue'),
+    }
+    
+    for activity, (icon, color) in activity_config.items():
+        if activity in status_lower:
+            return {'icon': icon, 'display_text': status_text, 'color': color}
+    
+    # Unknown activity - return as-is with default styling
+    return {'icon': 'circle', 'display_text': status_text, 'color': 'gray'}
+
+
 def _convert_to_friend_activity(activity) -> dict:
-    """Convert PlayerActivity to FriendActivity format for iOS"""
+    """Convert PlayerActivity to FriendActivity format for iOS (legacy helper)"""
     # Get the activity type
     activity_type = activity.type if hasattr(activity, 'type') else 'idle'
     
@@ -138,30 +199,17 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
     # Get friend's player state for activity
     friend_state = db.query(PlayerState).filter(PlayerState.user_id == friend_user_id).first()
     
-    # Check if online (active in last 10 minutes) by checking most recent action from action_cooldowns
+    # Check if online (active in last 10 minutes) using User.last_login
     is_online = False
     last_seen = None
     
-    # Get most recent action from action_cooldowns table
-    most_recent_action = db.query(ActionCooldown).filter(
-        ActionCooldown.user_id == friend_user_id
-    ).order_by(ActionCooldown.last_performed.desc()).first()
-    
-    if most_recent_action:
-        last_action = most_recent_action.last_performed
-        if isinstance(last_action, str):
-            last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
-        time_since_action = datetime.utcnow() - last_action
-        is_online = time_since_action < timedelta(minutes=10)
-        last_seen = format_datetime_iso(last_action)
-    elif friend_state and friend_state.updated_at:
-        # Fallback to player_state updated_at if no actions recorded
-        last_action = friend_state.updated_at
-        if isinstance(last_action, str):
-            last_action = datetime.fromisoformat(last_action.replace('Z', '+00:00'))
-        time_since_action = datetime.utcnow() - last_action
-        is_online = time_since_action < timedelta(minutes=10)
-        last_seen = format_datetime_iso(last_action)
+    if friend_user.last_login:
+        last_login = friend_user.last_login
+        if isinstance(last_login, str):
+            last_login = datetime.fromisoformat(last_login.replace('Z', '+00:00'))
+        time_since_login = datetime.utcnow() - last_login
+        is_online = time_since_login < timedelta(minutes=10)
+        last_seen = format_datetime_iso(last_login)
     
     # Get activity data
     activity_dict = None
@@ -258,7 +306,7 @@ def get_friends_dashboard(
     """
     user_id = current_user.id
     
-    # ===== FRIENDS =====
+    # ===== FRIENDS (BATCH LOADED) =====
     friendships = db.query(Friend).filter(
         or_(
             Friend.user_id == user_id,
@@ -266,12 +314,85 @@ def get_friends_dashboard(
         )
     ).all()
     
+    # Collect all friend user IDs for batch loading
+    all_friend_user_ids = []
+    for f in friendships:
+        fid = f.friend_user_id if f.user_id == user_id else f.user_id
+        all_friend_user_ids.append(fid)
+    
+    # Batch load all users, states, and kingdoms (3 queries instead of 4N)
+    users_by_id = {}
+    states_by_user_id = {}
+    kingdoms_by_id = {}
+    
+    if all_friend_user_ids:
+        # Load users (has last_login for online status)
+        users = db.query(User).filter(User.id.in_(all_friend_user_ids)).all()
+        users_by_id = {u.id: u for u in users}
+        
+        # Load player states
+        states = db.query(PlayerState).filter(PlayerState.user_id.in_(all_friend_user_ids)).all()
+        states_by_user_id = {s.user_id: s for s in states}
+        
+        # Load kingdoms for states that have current_kingdom_id
+        kingdom_ids = [s.current_kingdom_id for s in states if s.current_kingdom_id]
+        if kingdom_ids:
+            from db.models import Kingdom
+            kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(kingdom_ids)).all()
+            kingdoms_by_id = {k.id: k for k in kingdoms}
+    
     friends = []
     pending_received = []
     pending_sent = []
     
     for friendship in friendships:
-        friend_response = _get_friend_response(db, friendship, user_id)
+        friend_user_id = friendship.friend_user_id if friendship.user_id == user_id else friendship.user_id
+        friend_user = users_by_id.get(friend_user_id)
+        if not friend_user:
+            continue
+        
+        friend_state = states_by_user_id.get(friend_user_id)
+        
+        # Check online status from User.last_login (updated on every app load)
+        is_online = False
+        last_seen = None
+        if friend_user.last_login:
+            last_login = friend_user.last_login
+            if isinstance(last_login, str):
+                last_login = datetime.fromisoformat(last_login.replace('Z', '+00:00'))
+            time_since_login = datetime.utcnow() - last_login
+            is_online = time_since_login < timedelta(minutes=10)
+            last_seen = format_datetime_iso(last_login)
+        
+        # Get activity and kingdom from batch-loaded/cached data (no extra queries!)
+        activity_dict = None
+        current_kingdom_name = None
+        if friend_state and friendship.status == 'accepted':
+            # Parse cached activity status for icon/color (fully dynamic)
+            status_text = friend_state.current_activity_status or "Idle"
+            activity_dict = _parse_activity_status(status_text)
+            
+            if friend_state.current_kingdom_id:
+                kingdom = kingdoms_by_id.get(friend_state.current_kingdom_id)
+                if kingdom:
+                    current_kingdom_name = kingdom.name
+        
+        friend_response = FriendResponse(
+            id=friendship.id,
+            user_id=friendship.user_id,
+            friend_user_id=friend_user_id,
+            friend_username=friend_user.display_name,
+            friend_display_name=friend_user.display_name,
+            status=friendship.status,
+            created_at=format_datetime_iso(friendship.created_at),
+            updated_at=format_datetime_iso(friendship.updated_at),
+            is_online=is_online if friendship.status == 'accepted' else None,
+            level=friend_state.level if friend_state and friendship.status == 'accepted' else None,
+            current_kingdom_id=friend_state.current_kingdom_id if friend_state and friendship.status == 'accepted' else None,
+            current_kingdom_name=current_kingdom_name,
+            last_seen=last_seen if friendship.status == 'accepted' else None,
+            activity=activity_dict if friendship.status == 'accepted' else None
+        )
         
         if friendship.status == 'accepted':
             friends.append(friend_response)
@@ -372,14 +493,8 @@ def get_friends_dashboard(
         pending_alliances_received = [_alliance_to_response(a).model_dump() for a in received]
     
     # ===== FRIEND ACTIVITY =====
-    from routers.activity import (
-        _get_contract_activities,
-        _get_coup_activities,
-        _get_invasion_activities,
-        _get_property_activities,
-        _get_training_activities,
-        _get_action_log_activities
-    )
+    # Fast path: query PlayerActivityLog directly with batch IN clause
+    from db.models.activity_log import PlayerActivityLog
     
     # Get friend IDs
     friend_ids = []
@@ -390,39 +505,45 @@ def get_friends_dashboard(
     
     # Include self
     all_user_ids = friend_ids + [user_id]
-    all_activities = []
     
-    for uid in all_user_ids:
-        the_user = db.query(User).filter(User.id == uid).first()
-        if not the_user:
-            continue
-        
-        user_state = db.query(PlayerState).filter(PlayerState.user_id == uid).first()
-        if not user_state:
-            continue
-        
-        user_activities = []
-        user_activities.extend(_get_contract_activities(db, uid, 20))
-        user_activities.extend(_get_coup_activities(db, uid, 20))
-        user_activities.extend(_get_invasion_activities(db, uid, 20))
-        user_activities.extend(_get_property_activities(db, uid, 20))
-        user_activities.extend(_get_training_activities(db, uid, user_state, 10))
-        user_activities.extend(_get_action_log_activities(db, uid, 20, exclude_types=["travel_fee"]))
-        
-        for activity in user_activities:
-            activity.username = the_user.display_name
-            activity.display_name = the_user.display_name
-            activity.user_level = user_state.level
-        
-        all_activities.extend(user_activities)
-    
-    # Filter to last 7 days
+    # Single query for all activities (uses composite index on user_id, created_at)
     cutoff = datetime.utcnow() - timedelta(days=7)
-    all_activities = [a for a in all_activities if a.created_at >= cutoff]
-    all_activities.sort(key=lambda x: x.created_at, reverse=True)
-    all_activities = all_activities[:50]
+    activity_logs = db.query(PlayerActivityLog).filter(
+        PlayerActivityLog.user_id.in_(all_user_ids),
+        PlayerActivityLog.created_at >= cutoff,
+        ~PlayerActivityLog.action_type.in_(["travel_fee"])  # Exclude noise
+    ).order_by(desc(PlayerActivityLog.created_at)).limit(50).all()
     
-    friend_activities = [a.model_dump() for a in all_activities]
+    # Batch load user info for activities (1 query instead of N)
+    activity_user_ids = list(set(log.user_id for log in activity_logs))
+    users_map = {}
+    states_map = {}
+    if activity_user_ids:
+        users = db.query(User).filter(User.id.in_(activity_user_ids)).all()
+        users_map = {u.id: u for u in users}
+        states = db.query(PlayerState).filter(PlayerState.user_id.in_(activity_user_ids)).all()
+        states_map = {s.user_id: s for s in states}
+    
+    friend_activities = []
+    for log in activity_logs:
+        user = users_map.get(log.user_id)
+        user_state = states_map.get(log.user_id)
+        friend_activities.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "username": user.display_name if user else "Unknown",
+            "display_name": user.display_name if user else "Unknown",
+            "user_level": user_state.level if user_state else 1,
+            "action_type": log.action_type,
+            "action_category": log.action_category,
+            "description": log.description,
+            "kingdom_id": log.kingdom_id,
+            "kingdom_name": log.kingdom_name,
+            "amount": log.amount,
+            "visibility": log.visibility,
+            "details": log.details or {},
+            "created_at": format_datetime_iso(log.created_at)
+        })
     
     return FriendsDashboardResponse(
         success=True,

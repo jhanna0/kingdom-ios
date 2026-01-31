@@ -30,8 +30,12 @@ async def get_current_city(
     """
     FAST - Get ONLY the city the user is currently in.
     
-    Call this FIRST to unblock the frontend immediately (< 2 seconds).
-    Then call /cities/neighbors to get surrounding cities.
+    DEPRECATED FOR APP STARTUP: Use GET /startup instead, which combines
+    this endpoint with /player/state in a single call for faster app initialization.
+    
+    This endpoint is still useful for:
+    - Getting city data without player state
+    - Unauthenticated city lookups
     
     Returns:
     - The single city containing the user's location

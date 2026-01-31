@@ -63,7 +63,7 @@ class MapViewModel: ObservableObject {
     
     // MARK: - Initialization
     init() {
-        // Initialize player - Backend is source of truth!
+        // Initialize player - will be synced with user data via syncFromUser()
         self.player = Player()
         self.playerResources = PlayerResources()
         
@@ -88,8 +88,8 @@ class MapViewModel: ObservableObject {
         
         print("📱 MapViewModel initialized")
         
-        // Player ID sync happens in /player/state via updateFromAPIState()
-        // No separate /auth/me call needed
+        // Full player state loaded from /player/state via updateFromAPIState()
+        // Call syncFromUser() to set initial name/id from AuthManager
         
         // Monitor war state changes for music
         setupWarStateMonitoring()
@@ -226,8 +226,19 @@ class MapViewModel: ObservableObject {
     
     // MARK: - Player Sync
     
-    // NOTE: Player ID sync now happens in /player/state via player.updateFromAPIState()
-    // No separate /auth/me call needed - removed duplicate call
+    /// Sync player name/id from AuthManager's already-loaded user data
+    /// Call this immediately after MapViewModel is created to avoid showing "Player" default
+    func syncFromUser(_ user: UserData) {
+        player.playerId = user.id
+        player.name = user.display_name
+        player.gold = user.gold
+        player.level = user.level
+        player.experience = user.experience
+        player.reputation = user.reputation
+        print("✅ Synced player from AuthManager: \(user.display_name) (id: \(user.id))")
+    }
+    
+    // NOTE: Full player state loaded from /player/state via player.updateFromAPIState() - removed duplicate call
     
     /// Sync ruled kingdoms - now deprecated, use backend data only
     /// The /notifications/updates endpoint provides the kingdoms array which is source of truth

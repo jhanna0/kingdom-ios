@@ -21,7 +21,7 @@ from db import get_db
 from db.models import PlayerState, User
 from db.models.inventory import PlayerInventory
 from db.models.fishing_session import FishingSession as FishingSessionDB
-from routers.actions.utils import log_activity
+from routers.actions.utils import log_activity, set_activity_status
 from routers.auth import get_current_user
 from systems.fishing import FishingManager, FishingSession
 from systems.fishing.config import (
@@ -229,6 +229,7 @@ def start_fishing(
     
     # Store in database
     now = datetime.utcnow()
+    expires_at = FishingSessionDB.default_expiry()
     db_session = FishingSessionDB(
         fishing_id=session.session_id,
         created_by=player_id,
@@ -238,9 +239,15 @@ def start_fishing(
         created_at=now,
         started_at=now,
         updated_at=now,
-        expires_at=FishingSessionDB.default_expiry(),
+        expires_at=expires_at,
     )
     db.add(db_session)
+    
+    # Update activity status
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    if state:
+        set_activity_status(state, "Fishing")
+    
     db.commit()
     
     return {
@@ -440,6 +447,12 @@ def end_fishing(
     db_session.status = 'collected'
     db_session.completed_at = now
     db_session.updated_at = now
+    
+    # Clear activity status
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    if state:
+        set_activity_status(state, None)
+    
     db.commit()
     
     return {

@@ -25,6 +25,7 @@ from db.models.science_stats import ScienceStats
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
+from routers.actions.utils import set_activity_status
 from systems.science.science_manager import ScienceManager, ScienceSession
 from systems.science.config import (
     SKILL_CONFIG,
@@ -154,15 +155,20 @@ def start_science(
     )
     
     # Store in database (includes all pre-calc'd answers!)
+    expires_at = ScienceSessionDB.default_expiry()
     db_session = ScienceSessionDB(
         session_id=session.session_id,
         user_id=player_id,
         status='active',
         session_data=session.to_db_dict(),  # Full data with hidden answers
         current_streak=0,
-        expires_at=ScienceSessionDB.default_expiry(),
+        expires_at=expires_at,
     )
     db.add(db_session)
+    
+    # Update activity status
+    set_activity_status(state, "Researching")
+    
     db.commit()
     
     return {
@@ -351,6 +357,11 @@ def collect_rewards(
     if session.has_won_max:
         stats.perfect_games = (stats.perfect_games or 0) + 1
     
+    # Clear activity status
+    state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+    if state:
+        set_activity_status(state, None)
+    
     db.commit()
     
     # Update rewards list to show net gold (after tax)
@@ -405,6 +416,12 @@ def end_science(
     
     if db_session:
         db_session.status = 'cancelled'
+        
+        # Clear activity status
+        state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        if state:
+            set_activity_status(state, None)
+        
         db.commit()
     
     return {"success": True}

@@ -596,6 +596,10 @@ def get_player_profile(
     from routers.resources import get_player_pets
     pets = get_player_pets(db, user.id)
     
+    # Generate dynamic skills data - frontend renders without hardcoding!
+    from routers.tiers import get_skills_data_for_player
+    skills_data = get_skills_data_for_player(state)
+    
     return PlayerPublicProfile(
         id=user.id,
         display_name=user.display_name,
@@ -607,13 +611,7 @@ def get_player_profile(
         ruled_kingdom_name=ruled_kingdom_name,
         level=state.level,
         reputation=reputation,
-        attack_power=state.attack_power,
-        defense_power=state.defense_power,
-        leadership=state.leadership,
-        building_skill=state.building_skill,
-        intelligence=state.intelligence,
-        science=state.science,
-        faith=state.faith,
+        skills_data=skills_data,
         equipment=equipment,
         pets=pets,
         total_checkins=total_checkins,

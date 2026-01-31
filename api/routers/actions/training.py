@@ -11,7 +11,7 @@ import random
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, calculate_training_cooldown, set_cooldown, check_and_deduct_food_cost
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, calculate_training_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -249,6 +249,9 @@ def purchase_training(
     # Increment training counter (no gold spent yet)
     state.total_training_purchases = (state.total_training_purchases or 0) + 1
     
+    # Update activity status
+    set_activity_status(state, f"Training {training_type} 0/{actions_required}")
+    
     db.commit()
     db.refresh(contract)
     
@@ -419,6 +422,12 @@ def work_on_training(
         bonus_xp = 25
         xp_earned += bonus_xp
         state.experience += bonus_xp
+        
+        # Clear activity status (training complete)
+        set_activity_status(state, None)
+    else:
+        # Update training progress
+        set_activity_status(state, f"Training {contract.type} {new_actions_completed}/{contract.actions_required}")
     
     # Check for level up
     xp_needed = 100 * (2 ** (state.level - 1))
