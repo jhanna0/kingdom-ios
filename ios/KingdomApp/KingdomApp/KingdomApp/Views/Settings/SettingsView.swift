@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var notificationsEnabled = false
     @State private var showLogoutConfirmation = false
     @State private var isCheckingNotifications = true
+    @State private var isClearingCache = false
+    @State private var cacheCleared = false
     
     var body: some View {
         ScrollView {
@@ -151,25 +153,48 @@ struct SettingsView: View {
                     
                     // Clear Cache Button
                     Button {
+                        guard !isClearingCache else { return }
                         Task {
+                            isClearingCache = true
+                            cacheCleared = false
                             try? await TierManager.shared.forceRefresh()
+                            isClearingCache = false
+                            cacheCleared = true
+                            
+                            // Reset success indicator after a delay
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            cacheCleared = false
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Image(systemName: cacheCleared ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
                                 .font(FontStyles.iconSmall)
-                            Text("Clear Cache & Refresh")
+                                .foregroundColor(cacheCleared ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkMedium)
+                                .rotationEffect(.degrees(isClearingCache ? 360 : 0))
+                                .animation(isClearingCache ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isClearingCache)
+                            
+                            Text(cacheCleared ? "Cache Cleared!" : "Clear Cache & Refresh")
                                 .font(FontStyles.bodyMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .foregroundColor(cacheCleared ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkDark)
                             
                             Spacer()
                             
-                            Image(systemName: "chevron.right")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                            if isClearingCache {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.loadingTint))
+                            } else if cacheCleared {
+                                Image(systemName: "checkmark")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                            }
                         }
                         .padding()
                     }
+                    .disabled(isClearingCache)
                     .brutalistCard(
                         backgroundColor: KingdomTheme.Colors.parchmentLight,
                         cornerRadius: 12

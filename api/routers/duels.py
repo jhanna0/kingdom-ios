@@ -170,6 +170,7 @@ def get_my_stats(
     return StatsResponse(success=True, stats={
         "user_id": user.id, "wins": 0, "losses": 0, "draws": 0,
         "total_matches": 0, "win_rate": 0.0, "win_streak": 0, "best_win_streak": 0,
+        "total_gold_won": 0, "total_gold_lost": 0, "last_duel_at": None,
     })
 
 
