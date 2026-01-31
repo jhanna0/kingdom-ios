@@ -146,6 +146,7 @@ struct AttackStyleConfig: Codable, Identifiable {
     let id: String  // balanced, aggressive, precise, power, guard, feint
     let name: String
     let description: String
+    let bullets: [String]?  // Server-provided bullet points (use these!)
     let icon: String  // SF Symbol name
     
     // Modifiers (for display to user)
@@ -158,7 +159,7 @@ struct AttackStyleConfig: Codable, Identifiable {
     let winsTies: Bool
     
     enum CodingKeys: String, CodingKey {
-        case id, name, description, icon
+        case id, name, description, bullets, icon
         case rollBonus = "roll_bonus"
         case hitChanceMod = "hit_chance_mod"
         case critRateMod = "crit_rate_mod"
@@ -168,8 +169,13 @@ struct AttackStyleConfig: Codable, Identifiable {
         case winsTies = "wins_ties"
     }
     
-    /// Human-readable summary of the style's effects
+    /// Human-readable summary of the style's effects - USE SERVER BULLETS
     var effectsSummary: [String] {
+        // Use server-provided bullets (dumb renderer principle)
+        if let bullets = bullets, !bullets.isEmpty {
+            return bullets
+        }
+        // Fallback for old servers that don't send bullets
         var effects: [String] = []
         if rollBonus != 0 {
             effects.append(rollBonus > 0 ? "+\(rollBonus) roll" : "\(rollBonus) roll")

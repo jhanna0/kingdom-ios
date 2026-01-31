@@ -1,7 +1,7 @@
 """
 Activity Log Schemas
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -27,6 +27,14 @@ class ActivityLogEntry(BaseModel):
 
     class Config:
         from_attributes = True
+    
+    @field_serializer('created_at')
+    def serialize_datetime(self, dt: datetime) -> str:
+        """Serialize datetime for iOS TimeFormatter.parseISO"""
+        if dt is None:
+            return None
+        # Output without Z suffix to match iOS parseISO format
+        return dt.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
 
 
 class PlayerActivityResponse(BaseModel):

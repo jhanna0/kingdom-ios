@@ -33,6 +33,31 @@ struct RoundResultData {
     let opponentRolls: [RollDisplay]
     // NEW: tiebreaker data for animation
     let tiebreaker: TiebreakerDisplay?
+    
+    // MATCH COMPLETION (integrated victory/defeat)
+    let isMatchComplete: Bool
+    let didWinMatch: Bool?
+    let wagerGold: Int?
+    
+    init(pushAmount: Double, outcome: String, myBestOutcome: String, oppBestOutcome: String,
+         myStyle: String, oppStyle: String, roundNumber: Int, parried: Bool,
+         myRolls: [RollDisplay], opponentRolls: [RollDisplay], tiebreaker: TiebreakerDisplay?,
+         isMatchComplete: Bool = false, didWinMatch: Bool? = nil, wagerGold: Int? = nil) {
+        self.pushAmount = pushAmount
+        self.outcome = outcome
+        self.myBestOutcome = myBestOutcome
+        self.oppBestOutcome = oppBestOutcome
+        self.myStyle = myStyle
+        self.oppStyle = oppStyle
+        self.roundNumber = roundNumber
+        self.parried = parried
+        self.myRolls = myRolls
+        self.opponentRolls = opponentRolls
+        self.tiebreaker = tiebreaker
+        self.isMatchComplete = isMatchComplete
+        self.didWinMatch = didWinMatch
+        self.wagerGold = wagerGold
+    }
 }
 
 // MARK: - Round Result Popup
@@ -44,6 +69,7 @@ struct RoundResultPopup: View {
     let opponentName: String
     let gameConfig: DuelGameConfig?
     let onDismiss: () -> Void
+    var onMatchComplete: (() -> Void)? = nil  // Called when match ends (instead of onDismiss)
     
     // Animation phases
     @State private var phase: AnimationPhase = .initial
@@ -62,6 +88,7 @@ struct RoundResultPopup: View {
         case showingTiebreaker   // Feint tiebreaker - flips last rolls to show numbers
         case showingResult
         case showingPush
+        case showingMatchResult  // Victory/defeat section (only if match complete)
         case complete
     }
     
@@ -121,24 +148,35 @@ struct RoundResultPopup: View {
                     .transition(.scale.combined(with: .opacity))
                 }
                 
+                // MATCH RESULT (only if this round ended the match)
+                if data.isMatchComplete && phase.rawValue >= AnimationPhase.showingMatchResult.rawValue {
+                    matchResultSection
+                        .transition(.scale.combined(with: .opacity))
+                }
+                
                 // Continue button (only when complete)
                 if phase == .complete {
-                    Button(action: onDismiss) {
-                        Text("CONTINUE")
-                            .font(.system(size: 14, weight: .black))
-                            .foregroundColor(KingdomTheme.Colors.parchment)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
-                                        .fill(Color.black)
-                                        .offset(x: 3, y: 3)
-                                    RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
-                                        .fill(resultColor)
-                                        .overlay(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall).stroke(Color.black, lineWidth: 2))
-                                }
-                            )
+                    Button(action: handleDismiss) {
+                        HStack {
+                            Text(data.isMatchComplete ? "RETURN TO ARENA" : "CONTINUE")
+                            if data.isMatchComplete {
+                                Image(systemName: "arrow.right")
+                            }
+                        }
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundColor(KingdomTheme.Colors.parchment)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                    .fill(Color.black)
+                                    .offset(x: 3, y: 3)
+                                RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall)
+                                    .fill(data.isMatchComplete ? matchResultColor : resultColor)
+                                    .overlay(RoundedRectangle(cornerRadius: KingdomTheme.Brutalist.cornerRadiusSmall).stroke(Color.black, lineWidth: 2))
+                            }
+                        )
                     }
                     .padding(.horizontal, 16)
                     .transition(.opacity)
@@ -416,6 +454,98 @@ struct RoundResultPopup: View {
         return iWon ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
     }
     
+    private var matchResultColor: Color {
+        guard let didWin = data.didWinMatch else { return KingdomTheme.Colors.buttonSecondary }
+        return didWin ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
+    }
+    
+    private func handleDismiss() {
+        if data.isMatchComplete, let onMatchComplete = onMatchComplete {
+            onMatchComplete()
+        } else {
+            onDismiss()
+        }
+    }
+    
+    // MARK: - Match Result Section
+    
+    private var matchResultSection: some View {
+        let didWin = data.didWinMatch ?? false
+        let wager = data.wagerGold ?? 0
+        
+        return VStack(spacing: 12) {
+            // Divider with flair
+            HStack(spacing: 8) {
+                Rectangle()
+                    .fill(matchResultColor.opacity(0.4))
+                    .frame(height: 2)
+                Text("MATCH OVER")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundColor(matchResultColor)
+                Rectangle()
+                    .fill(matchResultColor.opacity(0.4))
+                    .frame(height: 2)
+            }
+            .padding(.top, 8)
+            
+            // Trophy/Shield with glow
+            ZStack {
+                Circle()
+                    .fill(matchResultColor.opacity(0.25))
+                    .frame(width: 80, height: 80)
+                    .blur(radius: 15)
+                
+                Image(systemName: didWin ? "trophy.fill" : "xmark.shield.fill")
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundColor(matchResultColor)
+                    .frame(width: 64, height: 64)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black)
+                                .offset(x: 2, y: 2)
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(matchResultColor, lineWidth: 3)
+                                )
+                        }
+                    )
+            }
+            .scaleEffect(showMatchResultScale ? 1.0 : 0.5)
+            .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showMatchResultScale)
+            
+            // Victory/Defeat text
+            Text(didWin ? "VICTORY!" : "DEFEAT")
+                .font(.system(size: 24, weight: .black, design: .serif))
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            // Gold spoils
+            HStack(spacing: 6) {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(didWin ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonDanger)
+                
+                Text(didWin ? "+\(wager) gold" : "-\(wager) gold")
+                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .foregroundColor(didWin ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonDanger)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(didWin ? KingdomTheme.Colors.imperialGold.opacity(0.12) : KingdomTheme.Colors.buttonDanger.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(didWin ? KingdomTheme.Colors.imperialGold.opacity(0.3) : KingdomTheme.Colors.buttonDanger.opacity(0.3), lineWidth: 2)
+                    )
+            )
+        }
+    }
+    
+    @State private var showMatchResultScale: Bool = false
+    
     private func styleChip(style: String, color: Color) -> some View {
         let icon = gameConfig?.attackStyles?.first(where: { $0.id == style })?.icon ?? "equal.circle.fill"
         let name = gameConfig?.attackStyles?.first(where: { $0.id == style })?.name ?? style.capitalized
@@ -526,8 +656,21 @@ struct RoundResultPopup: View {
             }
         }
         
-        // Phase 5: Complete - show button
-        DispatchQueue.main.asyncAfter(deadline: .now() + tiebreakerEndTime + 1.4) {
+        var finalPhaseTime = tiebreakerEndTime + 1.4
+        
+        // Phase 5: Show match result (if match is complete)
+        if data.isMatchComplete {
+            DispatchQueue.main.asyncAfter(deadline: .now() + tiebreakerEndTime + 1.6) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    phase = .showingMatchResult
+                    showMatchResultScale = true
+                }
+            }
+            finalPhaseTime = tiebreakerEndTime + 2.8  // Extra time for match result to breathe
+        }
+        
+        // Phase 6: Complete - show button
+        DispatchQueue.main.asyncAfter(deadline: .now() + finalPhaseTime) {
             withAnimation(.easeOut(duration: 0.3)) {
                 phase = .complete
             }
@@ -545,7 +688,8 @@ extension RoundResultPopup.AnimationPhase: Comparable {
         case .showingTiebreaker: return 3
         case .showingResult: return 4
         case .showingPush: return 5
-        case .complete: return 6
+        case .showingMatchResult: return 6
+        case .complete: return 7
         }
     }
     

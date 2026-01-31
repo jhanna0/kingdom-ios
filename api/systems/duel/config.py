@@ -125,6 +125,7 @@ STYLE_MODIFIERS = {
         "opponent_hit_mult": 1.0,  # Multiplier on opponent's hit chance
         "tie_advantage": False,    # Win ties if True
         "description": "No modifiers",
+        "bullets": ["No modifiers"],
         "icon": "equal.circle.fill",
     },
     
@@ -138,6 +139,7 @@ STYLE_MODIFIERS = {
         "opponent_hit_mult": 1.0,
         "tie_advantage": False,
         "description": "+1 roll, -20% hit chance",
+        "bullets": ["+1 roll", "-20% hit"],
         "icon": "flame.fill",
     },
     
@@ -151,6 +153,7 @@ STYLE_MODIFIERS = {
         "opponent_hit_mult": 1.0,
         "tie_advantage": False,
         "description": "+20% hit chance, -50% crit rate",
+        "bullets": ["+20% hit", "-50% crit rate"],
         "icon": "scope",
     },
     
@@ -164,6 +167,7 @@ STYLE_MODIFIERS = {
         "opponent_hit_mult": 1.0,
         "tie_advantage": False,
         "description": "Win: 1.25x push. Lose: enemy 1.2x push",
+        "bullets": ["+25% push if win", "Enemy +20% if lose"],
         "icon": "bolt.fill",
     },
     
@@ -178,6 +182,7 @@ STYLE_MODIFIERS = {
         "opponent_hit_mult": 0.80, # Opponent is 20% less accurate
         "tie_advantage": False,
         "description": "-1 roll, opponent -20% hit chance",
+        "bullets": ["-1 roll", "Enemy -20% hit"],
         "icon": "shield.fill",
     },
     
@@ -190,7 +195,8 @@ STYLE_MODIFIERS = {
         "push_mult_lose": 1.25,    # Opponent pushes 25% harder if you lose
         "opponent_hit_mult": 1.0,
         "tie_advantage": True,     # Wins outcome ties
-        "description": "Wins ties (better roll breaks feint vs feint). +25% push if you lose.",
+        "description": "Win ties (better roll breaks feint vs feint). +25% push if you lose.",
+        "bullets": ["Win ties", "Enemy +25% if lose"],
         "icon": "arrow.triangle.branch",
     },
 }
@@ -206,6 +212,7 @@ def get_all_styles_config() -> list:
             "id": style,
             "name": style.replace("_", " ").title(),
             "description": STYLE_MODIFIERS[style]["description"],
+            "bullets": STYLE_MODIFIERS[style]["bullets"],  # Server controls bullet text
             "icon": STYLE_MODIFIERS[style]["icon"],
             # Include key modifiers for UI display
             "roll_bonus": STYLE_MODIFIERS[style]["roll_bonus"],

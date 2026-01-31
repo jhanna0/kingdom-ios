@@ -542,7 +542,8 @@ def get_friends_dashboard(
             "amount": log.amount,
             "visibility": log.visibility,
             "details": log.details or {},
-            "created_at": format_datetime_iso(log.created_at)
+            # TODO: Using wrong format here. Should use format_datetime_iso once iOS TimeFormatter.parseISO supports Z suffix
+            "created_at": log.created_at.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
         })
     
     return FriendsDashboardResponse(

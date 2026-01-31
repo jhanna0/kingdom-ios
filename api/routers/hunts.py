@@ -113,23 +113,24 @@ def apply_hunt_rewards(db: Session, hunt: dict) -> None:
         meat_earned = participant.get("meat_earned", 0)
         items_earned = participant.get("items_earned", [])
         
+        # Get player state (needed for gold and activity status)
+        player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        
         # Add meat to inventory
         if meat_earned > 0:
             add_to_inventory(db, player_id, "meat", meat_earned)
         
         # Add gold based on meat earned (with tax)
-        if meat_earned > 0:
-            player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
-            if player_state:
-                gold_value = float(meat_earned) * MEAT_MARKET_VALUE
-                net_gold, tax_amount, tax_rate = apply_kingdom_tax(
-                    db, kingdom_id, player_state, gold_value
-                )
-                gold_earned = int(net_gold) if net_gold >= 1 else 1
-                player_state.gold += gold_earned
-                # Store gold earned in participant data for response
-                participant["gold_earned"] = gold_earned
-                participant["gold_tax"] = int(tax_amount)
+        if meat_earned > 0 and player_state:
+            gold_value = float(meat_earned) * MEAT_MARKET_VALUE
+            net_gold, tax_amount, tax_rate = apply_kingdom_tax(
+                db, kingdom_id, player_state, gold_value
+            )
+            gold_earned = int(net_gold) if net_gold >= 1 else 1
+            player_state.gold += gold_earned
+            # Store gold earned in participant data for response
+            participant["gold_earned"] = gold_earned
+            participant["gold_tax"] = int(tax_amount)
         
         # Add rare drops (sinew, etc)
         for item_id in items_earned:

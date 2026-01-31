@@ -4,6 +4,7 @@ import Foundation
 struct TimeFormatter {
     
     /// Parse ISO 8601 date string from backend (e.g. "2025-12-30T01:33:19.756588")
+    /// TODO: Using wrong format here. Should support Z suffix (e.g. "2025-12-30T01:33:19Z") to match format_datetime_iso from backend
     static func parseISO(_ isoString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.timeZone = TimeZone(identifier: "UTC")

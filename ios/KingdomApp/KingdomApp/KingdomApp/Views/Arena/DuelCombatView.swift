@@ -166,7 +166,8 @@ struct DuelCombatView: View {
             }
             
             // Show result overlay only after animations/queue complete
-            if currentMatch.isComplete, let winner = currentMatch.winnerPerspective, !viewModel.isAnimating {
+            // Skip if match already ended via round popup (integrated victory/defeat)
+            if currentMatch.isComplete, let winner = currentMatch.winnerPerspective, !viewModel.isAnimating, !viewModel.matchEndedViaRoundPopup {
                 resultOverlay(winner: winner)
             }
             
@@ -192,6 +193,7 @@ struct DuelCombatView: View {
             }
             
             // Round result popup (shows head-to-head comparison)
+            // If match complete, this popup also shows victory/defeat integrated
             if viewModel.showRoundResult, let data = viewModel.roundResultData {
                 RoundResultPopup(
                     data: data,
@@ -204,6 +206,15 @@ struct DuelCombatView: View {
                         withAnimation(.easeOut(duration: 0.2)) {
                             viewModel.showRoundResult = false
                         }
+                    },
+                    onMatchComplete: {
+                        // Match ended - dismiss popup and navigate back to arena
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            viewModel.showRoundResult = false
+                            viewModel.matchEndedViaRoundPopup = true
+                        }
+                        onComplete()
+                        dismiss()
                     }
                 )
                 .transition(.scale.combined(with: .opacity))
@@ -2273,6 +2284,7 @@ class DuelCombatViewModel: ObservableObject {
     // Round result popup (controlled by event queue)
     @Published var showRoundResult: Bool = false
     @Published var roundResultData: RoundResultData? = nil
+    @Published var matchEndedViaRoundPopup: Bool = false  // Skip separate result overlay if match ended in round popup
     
     // Style reveal popup (shows both styles after round resolution)
     @Published var showStyleReveal: Bool = false
@@ -2511,6 +2523,11 @@ class DuelCombatViewModel: ObservableObject {
             // Don't show style reveal animation again after round resolution
             // yourPushAmount comes from backend with correct sign (positive=won, negative=lost)
             
+            // Check if this round ended the match
+            let isMatchComplete = event.match?.isComplete == true
+            let didWinMatch = event.match?.winnerPerspective?.didIWin
+            let wagerGold = event.match?.wagerGold
+            
             // Build round result data for the popup - includes rolls for clear display
             let roundResult = RoundResultData(
                 pushAmount: yourPushAmount,
@@ -2523,7 +2540,10 @@ class DuelCombatViewModel: ObservableObject {
                 parried: parried,
                 myRolls: myRolls,
                 opponentRolls: oppRolls,
-                tiebreaker: tiebreakerDisplay
+                tiebreaker: tiebreakerDisplay,
+                isMatchComplete: isMatchComplete,
+                didWinMatch: didWinMatch,
+                wagerGold: wagerGold
             )
             
             // NOTE: rolls is nil - we don't want the confusing one-by-one animation
