@@ -136,7 +136,7 @@ struct TownHallView: View {
                         TownHallActivityCard(
                             icon: "trophy.fill",
                             title: "Hunt Leaderboard",
-                            description: "Top hunters and creatures killed",
+                            description: "Top hunters by total kills",
                             color: KingdomTheme.Colors.buttonWarning,
                             badge: nil
                         )

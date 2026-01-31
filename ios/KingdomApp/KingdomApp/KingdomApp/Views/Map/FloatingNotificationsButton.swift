@@ -15,12 +15,6 @@ struct FloatingNotificationsButton: View {
                     showNotifications = true
                 }) {
                     ZStack {
-                        // Brutalist offset shadow
-                        Circle()
-                            .fill(Color.black)
-                            .frame(width: 60, height: 60)
-                            .offset(x: 4, y: 4)
-                        
                         // Main button
                         Circle()
                             .fill(KingdomTheme.Colors.inkMedium)
@@ -34,26 +28,16 @@ struct FloatingNotificationsButton: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                         
-                        // Simple dot indicator centered on top-right of circle border
+                        // Simple dot indicator
                         if hasUnread {
-                            ZStack {
-                                // Dot shadow
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 16, height: 16)
-                                    .offset(x: 2, y: 2)
-                                
-                                Circle()
-                                    .fill(KingdomTheme.Colors.buttonDanger)
-                                    .frame(width: 16, height: 16)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.black, lineWidth: 2)
-                                    )
-                            }
-                            // Position at 45° on the circle border (radius 30)
-                            // cos(45°) ≈ 0.707, so offset ≈ 21
-                            .offset(x: 21, y: -21)
+                            Circle()
+                                .fill(KingdomTheme.Colors.buttonDanger)
+                                .frame(width: 16, height: 16)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                                .offset(x: 21, y: -21)
                         }
                     }
                     .frame(width: 60, height: 60)
@@ -73,4 +57,3 @@ struct FloatingNotificationsButton: View {
         FloatingNotificationsButton(showNotifications: .constant(false), hasUnread: true)
     }
 }
-
