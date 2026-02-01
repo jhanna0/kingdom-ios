@@ -163,9 +163,9 @@ struct ActionIconHelper {
         case "farm", "farming":
             return KingdomTheme.Colors.buttonSuccess // Green
         case "work", "build", "building":
-            return KingdomTheme.Colors.royalPurple // Purple for building
+            return KingdomTheme.Colors.buttonWarning // Orange for building
         case "building_complete":
-            return KingdomTheme.Colors.royalPurple // Purple for building
+            return KingdomTheme.Colors.buttonWarning // Orange for building
         case "patrol":
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "scout", "scouting":

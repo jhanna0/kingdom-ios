@@ -598,8 +598,8 @@ def get_activity_icon_color(action_type: str) -> tuple[str, str]:
         "training": ("figure.strengthtraining.traditional", "buttonPrimary"),
         "training_complete": ("star.fill", "imperialGold"),
         # Building
-        "building": ("hammer.fill", "royalPurple"),
-        "building_complete": ("building.2.fill", "royalPurple"),
+        "building": ("hammer.fill", "buttonWarning"),
+        "building_complete": ("building.2.fill", "buttonWarning"),
         # Crafting
         "crafting": ("wrench.and.screwdriver.fill", "buttonWarning"),
         "crafting_complete": ("checkmark.seal.fill", "buttonWarning"),
