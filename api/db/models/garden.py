@@ -2,7 +2,7 @@
 Garden System - Personal garden slots for planting, watering, and harvesting
 
 Players can have up to 6 garden slots, each with its own plant status.
-Plants must be watered every 8 hours for 4 cycles to grow.
+Plants must be watered every 4 hours for 4 cycles to grow.
 """
 from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Enum as SQLEnum
 from datetime import datetime

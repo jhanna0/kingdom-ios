@@ -1,7 +1,7 @@
 """
 GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 2 property (House)
 =====================================================================================
-Plant seeds → Water within 16 hours (available after 4h) for 4 cycles → Harvest!
+Plant seeds → Water within 20 hours (available after 4h) for 4 cycles → Harvest!
 Results: Weeds (common), Flowers (keep forever), Wheat (1-2 harvest)
 
 ALL LOGIC IS SERVER-SIDE! Frontend is a dumb renderer.
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/garden", tags=["garden"])
 GARDEN_CONFIG = {
     "max_slots": 6,
     "min_watering_hours": 4,  # Can water after this many hours
-    "death_timer_hours": 16,  # Plant dies after this many hours without water
+    "death_timer_hours": 20,  # Plant dies after this many hours without water
     "watering_cycles_required": 4,  # Water this many times to grow
     "seed_item_id": "wheat_seed",  # Item consumed when planting
     

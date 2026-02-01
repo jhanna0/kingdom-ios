@@ -1654,14 +1654,84 @@ class HuntManager:
 # PROBABILITY PREVIEW (for UI)
 # ============================================================
 
-def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
+def get_tracking_item_bonus(db, user_id: int) -> float:
+    """
+    Standalone function to get tracking hit chance bonus from items.
+    Lucky Rabbit's Foot gives +10% tracking hit chance.
+    
+    Returns:
+        Float bonus to add to base hit chance (e.g., 0.10 for +10%)
+    """
+    from db.models.inventory import PlayerInventory
+    from routers.resources import RESOURCES
+    
+    # Get item IDs that have tracking bonus
+    bonus_items = {
+        item_id: config.get("tracking_hit_chance_bonus", 0)
+        for item_id, config in RESOURCES.items()
+        if config.get("tracking_hit_chance_bonus", 0) > 0
+    }
+    
+    if not bonus_items:
+        return 0.0
+    
+    # Query only for those items
+    owned = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id.in_(bonus_items.keys()),
+        PlayerInventory.quantity > 0
+    ).all()
+    
+    return sum(bonus_items[entry.item_id] for entry in owned)
+
+
+def get_strike_item_bonus(db, user_id: int) -> float:
+    """
+    Standalone function to get strike hit chance bonus from items.
+    Hunting Bow gives +10% strike hit chance.
+    
+    Returns:
+        Float bonus to add to base hit chance (e.g., 0.10 for +10%)
+    """
+    from db.models.player_item import PlayerItem
+    from routers.workshop import CRAFTABLE_ITEMS
+    
+    total_bonus = 0.0
+    
+    # Check crafted items (hunting_bow, etc.) from player_items table
+    # These are equipped items from the workshop
+    equipped_items = db.query(PlayerItem).filter(
+        PlayerItem.user_id == user_id,
+        PlayerItem.is_equipped == True
+    ).all()
+    
+    for item in equipped_items:
+        item_config = CRAFTABLE_ITEMS.get(item.item_id, {})
+        bonus = item_config.get("strike_hit_chance_bonus", 0)
+        if bonus > 0:
+            total_bonus += bonus
+    
+    return total_bonus
+
+
+def get_hunt_probability_preview(player_stats: Dict[str, int], db=None, user_id: int = None) -> dict:
     """
     Generate a probability preview for the hunt UI.
     
     NEW SYSTEM: Shows player their stat value = number of rolls,
-    and the flat hit chance per roll.
+    and the flat hit chance per roll (including item bonuses like Lucky Rabbit's Foot).
+    
+    Args:
+        player_stats: Dict of stat_name -> stat_value
+        db: Optional database session for checking item bonuses
+        user_id: Optional user ID for checking item bonuses
     """
-    hit_chance_percent = int(ROLL_HIT_CHANCE * 100)
+    # Get item bonuses if db and user_id are provided
+    tracking_bonus = 0.0
+    strike_bonus = 0.0
+    if db is not None and user_id is not None:
+        tracking_bonus = get_tracking_item_bonus(db, user_id)
+        strike_bonus = get_strike_item_bonus(db, user_id)
     
     phases = {}
     for phase, config in PHASE_CONFIG.items():
@@ -1672,9 +1742,18 @@ def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
         stat_value = player_stats.get(stat_name, 0)
         max_rolls = 1 + stat_value  # 1 + skill_level = number of rolls
         
+        # Calculate effective hit chance including item bonuses
+        effective_hit_chance = ROLL_HIT_CHANCE
+        if phase == HuntPhase.TRACK:
+            effective_hit_chance += tracking_bonus
+        elif phase == HuntPhase.STRIKE:
+            effective_hit_chance += strike_bonus
+        
+        hit_chance_percent = int(effective_hit_chance * 100)
+        
         # Calculate probability of at least one success
         # P(at least 1) = 1 - P(all fail) = 1 - (1 - hit_chance)^rolls
-        prob_all_fail = (1 - ROLL_HIT_CHANCE) ** max_rolls
+        prob_all_fail = (1 - effective_hit_chance) ** max_rolls
         prob_at_least_one = 1 - prob_all_fail
         
         phases[phase.value] = {
@@ -1692,9 +1771,12 @@ def get_hunt_probability_preview(player_stats: Dict[str, int]) -> dict:
             "phase_color": config.get("phase_color", "inkMedium"),
         }
     
+    # Base hit chance for display (without bonuses)
+    base_hit_chance_percent = int(ROLL_HIT_CHANCE * 100)
+    
     return {
         "phases": phases,
-        "hit_chance_per_roll": hit_chance_percent,
+        "hit_chance_per_roll": base_hit_chance_percent,
         "animals": [
             {
                 "id": animal_id,

@@ -258,9 +258,10 @@ def get_hunt_preview(
     """
     Get hunt probability preview based on player's stats.
     Shows chances for each phase and potential animals.
+    Includes item bonuses like Lucky Rabbit's Foot (+10% tracking).
     """
     stats = get_player_stats(db, user.id)
-    preview = get_hunt_probability_preview(stats)
+    preview = get_hunt_probability_preview(stats, db=db, user_id=user.id)
     
     return {
         "player_stats": stats,
