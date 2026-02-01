@@ -20,6 +20,10 @@ class ActivityLogEntry(BaseModel):
     visibility: str = 'friends'
     created_at: datetime
     
+    # Display info (icon and color for frontend)
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    
     # Optional user info (for friend activity feeds)
     username: Optional[str] = None
     display_name: Optional[str] = None

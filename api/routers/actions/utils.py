@@ -589,3 +589,39 @@ def log_activity(
 def set_activity_status(state, status: Optional[str] = None):
     """Set player's activity status. Pass None to clear."""
     state.current_activity_status = status
+
+
+def get_activity_icon_color(action_type: str) -> tuple[str, str]:
+    """Get icon and color for an action type. Returns (icon, color)."""
+    mapping = {
+        # Training
+        "training": ("figure.strengthtraining.traditional", "buttonPrimary"),
+        "training_complete": ("star.fill", "imperialGold"),
+        # Building
+        "building": ("hammer.fill", "royalPurple"),
+        "building_complete": ("building.2.fill", "royalPurple"),
+        # Crafting
+        "crafting": ("wrench.and.screwdriver.fill", "buttonWarning"),
+        "crafting_complete": ("checkmark.seal.fill", "buttonWarning"),
+        # Property
+        "property": ("house.fill", "buttonSuccess"),
+        "property_complete": ("house.fill", "buttonSuccess"),
+        # Foraging & Garden
+        "foraging_find": ("sparkles", "imperialGold"),
+        "rare_loot": ("sparkles", "imperialGold"),
+        "harvest": ("leaf.fill", "buttonSuccess"),
+        # Achievements
+        "achievement": ("trophy.fill", "imperialGold"),
+        # Combat/PvP
+        "hunt_kill": ("scope", "buttonWarning"),
+        "fish_catch": ("fish.fill", "buttonPrimary"),
+        "scout": ("magnifyingglass", "buttonWarning"),
+        "sabotage": ("flame.fill", "buttonDanger"),
+        "invasion": ("shield.lefthalf.filled", "buttonDanger"),
+        "battle": ("flame.fill", "buttonDanger"),
+        # Other
+        "patrol": ("eye.fill", "buttonPrimary"),
+        "checkin": ("location.circle.fill", "buttonSuccess"),
+        "travel_fee": ("g.circle.fill", "imperialGold"),
+    }
+    return mapping.get(action_type, ("circle.fill", "inkMedium"))

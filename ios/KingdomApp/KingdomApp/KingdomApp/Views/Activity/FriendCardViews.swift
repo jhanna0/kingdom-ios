@@ -258,3 +258,30 @@ struct AllTradeHistoryView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
+
+// MARK: - All Friend Activity View
+
+struct AllFriendActivityView: View {
+    let activities: [ActivityLogEntry]
+    
+    var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.small) {
+                    ForEach(activities) { activity in
+                        ActivityCard(activity: activity, showUser: true)
+                    }
+                }
+                .padding(.vertical)
+            }
+        }
+        .navigationTitle("Friend Activity")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+    }
+}
