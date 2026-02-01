@@ -291,16 +291,19 @@ def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 
     return max(1, reduced_actions)
 
 
-def check_player_can_afford(state, resource_costs: list) -> dict:
-    """Check if player can afford all resource costs"""
+def check_player_can_afford(db: Session, user_id: int, resource_costs: list) -> dict:
+    """Check if player can afford all resource costs (from inventory)"""
+    from routers.actions.utils import get_inventory_map
+    
     results = {"can_afford": True, "missing": []}
+    inventory_map = get_inventory_map(db, user_id)
     
     for cost in resource_costs:
         resource_id = cost["resource"]
         required = cost["amount"]
         
-        # Get player's amount of this resource
-        player_amount = getattr(state, resource_id, 0) or 0
+        # Get player's amount from inventory
+        player_amount = inventory_map.get(resource_id, 0)
         
         has_enough = player_amount >= required
         cost["player_has"] = player_amount
@@ -316,13 +319,14 @@ def check_player_can_afford(state, resource_costs: list) -> dict:
     return results
 
 
-def deduct_resource_costs(state, resource_costs: list):
-    """Deduct resources from player state"""
+def deduct_resource_costs(db: Session, user_id: int, resource_costs: list):
+    """Deduct resources from player inventory"""
+    from routers.actions.utils import deduct_inventory_amount
+    
     for cost in resource_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        current = getattr(state, resource_id, 0) or 0
-        setattr(state, resource_id, current - amount)
+        deduct_inventory_amount(db, user_id, resource_id, amount)
 
 
 def get_available_rooms(tier: int) -> list:

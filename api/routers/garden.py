@@ -19,7 +19,7 @@ from db.models.garden_history import GardenHistory
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.resources import RESOURCES
-from routers.actions.utils import format_datetime_iso
+from routers.actions.utils import format_datetime_iso, log_activity
 
 router = APIRouter(prefix="/garden", tags=["garden"])
 
@@ -606,6 +606,19 @@ def harvest_plant(
         wheat_gained=wheat_amount
     )
     db.add(history)
+    
+    # Log to activity feed
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="harvest",
+        action_category="gardening",
+        description=f"Harvested {wheat_amount} wheat from the garden!",
+        kingdom_id=None,
+        amount=wheat_amount,
+        details={"item": "wheat", "amount": wheat_amount},
+        visibility="friends"
+    )
     
     # Clear the slot
     slot.status = PlantStatus.EMPTY

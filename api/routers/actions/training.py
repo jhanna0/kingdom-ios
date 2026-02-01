@@ -11,7 +11,7 @@ import random
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, calculate_training_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, calculate_training_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status, log_activity
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -425,7 +425,32 @@ def work_on_training(
         
         # Clear activity status (training complete)
         set_activity_status(state, None)
+        
+        # Log to activity feed - training complete!
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="training_complete",
+            action_category="training",
+            description=f"Leveled up {stat_name} to {new_value}!",
+            kingdom_id=state.current_kingdom_id,
+            amount=new_value,
+            details={"skill": contract.type, "new_level": new_value},
+            visibility="friends"
+        )
     else:
+        # Log training progress to activity feed
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="training",
+            action_category="training",
+            description=f"Training {contract.type.capitalize()} ({new_actions_completed}/{contract.actions_required})",
+            kingdom_id=state.current_kingdom_id,
+            amount=None,
+            details={"skill": contract.type, "progress": f"{new_actions_completed}/{contract.actions_required}"},
+            visibility="friends"
+        )
         # Update training progress
         set_activity_status(state, f"Training {contract.type} {new_actions_completed}/{contract.actions_required}")
     

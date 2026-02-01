@@ -11,10 +11,9 @@ struct MapHUD: View {
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
     
-    // Get home kingdom name
+    // Get home kingdom name - use direct property from backend (always available)
     private var homeKingdomName: String? {
-        guard let homeKingdomId = viewModel.player.hometownKingdomId else { return nil }
-        return viewModel.kingdoms.first(where: { $0.id == homeKingdomId })?.name
+        return viewModel.player.hometownKingdomName
     }
     
     var body: some View {

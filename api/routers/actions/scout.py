@@ -7,7 +7,7 @@ Simple roll-based system:
 1. Player scouts in enemy territory
 2. Success chance = base_success[tier] - (patrol_coverage × coverage_impact)
 3. If successful, roll for outcome based on tier
-4. If failed, caught - lose gold + reputation
+4. If failed, caught - small rep penalty only
 
 Patrol coverage = active_patrols / kingdom_citizens (ratio-based, scales with kingdom size)
 """
@@ -34,8 +34,7 @@ router = APIRouter()
 # TUNABLE CONSTANTS - Adjust these to balance the game!
 # ============================================================
 
-# Cost and cooldown
-SCOUT_COST_GOLD = 20
+# Cooldown
 SCOUT_COOLDOWN_MINUTES = 30
 
 # Base success chance by intelligence tier (T1-T5)
@@ -64,7 +63,7 @@ MIN_CITIZENS_FOR_COVERAGE = 5
 INTEL_EXPIRY_HOURS = 1
 
 # Caught penalties
-CAUGHT_REP_LOSS_TARGET = 10    # Rep lost in target kingdom when caught
+CAUGHT_REP_LOSS_TARGET = 5     # Rep lost in target kingdom when caught
 
 # Success rewards
 SUCCESS_REP_REWARD = 10        # Rep gained at home for successful scout (flat)
@@ -243,7 +242,7 @@ def scout_enemy_kingdom(
     Requirements:
     - Must be checked into an enemy kingdom (not your hometown)
     - Intelligence T1+ required
-    - Costs gold + food
+    - Costs food only
     - 30 minute cooldown
     
     Success chance: base_success[tier] - (patrol_coverage × multiplier)
@@ -289,13 +288,6 @@ def scout_enemy_kingdom(
             detail=f"Intelligence T1+ required (you have T{state.intelligence})"
         )
     
-    # Check gold
-    if state.gold < SCOUT_COST_GOLD:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Need {SCOUT_COST_GOLD}g (have {int(state.gold)}g)"
-        )
-    
     # Check cooldown
     cooldown_check = check_cooldown_from_table(db, user.id, "scout", SCOUT_COOLDOWN_MINUTES)
     if not cooldown_check["ready"]:
@@ -321,9 +313,6 @@ def scout_enemy_kingdom(
     ):
         raise HTTPException(status_code=400, detail="Cannot spy on allies!")
     
-    # Deduct gold (paid upfront)
-    state.gold -= SCOUT_COST_GOLD
-    
     # Set cooldown
     cooldown_expires = datetime.utcnow() + timedelta(minutes=SCOUT_COOLDOWN_MINUTES)
     set_cooldown(db, user.id, "scout", cooldown_expires)
@@ -348,15 +337,14 @@ def scout_enemy_kingdom(
     success = roll < success_chance
     
     if not success:
-        # CAUGHT! Apply penalties (silently - no broadcast)
+        # CAUGHT! Small rep penalty in target kingdom
         _apply_caught_penalties(db, user, state)
         db.commit()
         
         return {
             "success": False,
             "caught": True,
-            "message": f"Caught by {kingdom.name}'s patrols! Lost {SCOUT_COST_GOLD}g and {CAUGHT_REP_LOSS_TARGET} reputation.",
-            "gold_spent": SCOUT_COST_GOLD,
+            "message": f"Caught by {kingdom.name}'s patrols! Lost {CAUGHT_REP_LOSS_TARGET} rep.",
             "food_spent": food_result["food_cost"],
             "reputation_lost": CAUGHT_REP_LOSS_TARGET,
             "success_chance": round(success_chance * 100, 1),
@@ -378,8 +366,7 @@ def scout_enemy_kingdom(
         return {
             "success": False,
             "caught": True,
-            "message": f"The enemy patrol was too strong. Lost {CAUGHT_REP_LOSS_TARGET} reputation in {kingdom.name}.",
-            "gold_spent": SCOUT_COST_GOLD,
+            "message": f"The enemy patrol was too strong. Lost {CAUGHT_REP_LOSS_TARGET} rep in {kingdom.name}.",
             "food_spent": food_result["food_cost"],
             "reputation_lost": CAUGHT_REP_LOSS_TARGET,
             "intelligence_tier": state.intelligence,
@@ -454,7 +441,6 @@ def scout_enemy_kingdom(
         "caught": False,
         "message": outcome_result["message"],
         "outcome": outcome_result,
-        "gold_spent": SCOUT_COST_GOLD,
         "food_spent": food_result["food_cost"],
         "reputation_gained": rep_reward,
         "intel_expires_hours": INTEL_EXPIRY_HOURS,
@@ -647,7 +633,6 @@ def _award_home_reputation(db: Session, state: PlayerState, rep_amount: int):
 def get_scout_config():
     """Get scout configuration for frontend display."""
     return {
-        "cost_gold": SCOUT_COST_GOLD,
         "cooldown_minutes": SCOUT_COOLDOWN_MINUTES,
         "base_success_by_tier": {f"T{k}": f"{int(v*100)}%" for k, v in BASE_SUCCESS_BY_TIER.items()},
         "patrol_coverage_multiplier": PATROL_COVERAGE_MULTIPLIER,

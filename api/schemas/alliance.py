@@ -20,6 +20,8 @@ class AllianceResponse(BaseModel):
     id: int
     initiator_empire_id: str
     target_empire_id: str
+    initiator_empire_name: Optional[str] = None
+    target_empire_name: Optional[str] = None
     initiator_ruler_id: int
     target_ruler_id: Optional[int] = None
     initiator_ruler_name: str

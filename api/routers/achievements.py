@@ -13,6 +13,7 @@ from db.models.user import User
 from db.models.player_state import PlayerState
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
+from routers.actions.utils import log_activity
 from schemas.achievements import (
     Achievement,
     AchievementTier,
@@ -571,6 +572,19 @@ def claim_achievement_reward(
         VALUES (:user_id, :tier_id, NOW())
     """)
     db.execute(claim_insert, {"user_id": user.id, "tier_id": tier_id})
+    
+    # Log achievement to activity feed
+    log_activity(
+        db=db,
+        user_id=user.id,
+        action_type="achievement",
+        action_category="achievement",
+        description=f"Earned: {tier_data['display_name']}!",
+        kingdom_id=state.hometown_kingdom_id,
+        amount=int(net_gold) if net_gold > 0 else None,
+        details={"achievement": tier_data["achievement_type"], "tier": tier_data["tier"], "display_name": tier_data["display_name"]},
+        visibility="friends"
+    )
     
     db.commit()
     

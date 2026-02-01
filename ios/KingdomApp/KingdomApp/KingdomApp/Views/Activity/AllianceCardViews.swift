@@ -111,7 +111,8 @@ struct ActiveAllianceCard: View {
     
     var otherEmpireName: String {
         // Show the other party's name (not ours)
-        alliance.targetRulerName ?? alliance.initiatorRulerName
+        // Prefer ruler name, fall back to empire name
+        alliance.targetRulerName ?? alliance.targetEmpireName ?? alliance.initiatorRulerName
     }
     
     var body: some View {
@@ -156,6 +157,11 @@ struct ActiveAllianceCard: View {
 struct PendingAllianceSentCard: View {
     let alliance: AllianceResponse
     
+    /// Display name: prefer ruler name if accepted, otherwise show empire name
+    var displayName: String {
+        alliance.targetRulerName ?? alliance.targetEmpireName ?? "Unknown"
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "paperplane.fill")
@@ -165,7 +171,7 @@ struct PendingAllianceSentCard: View {
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(alliance.targetRulerName ?? "Unknown")
+                Text(displayName)
                     .font(FontStyles.bodySmall)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 

@@ -35,12 +35,14 @@ struct APIPlayerState: Codable {
     
     // Territory
     let hometown_kingdom_id: String?
+    let hometown_kingdom_name: String?
     let current_kingdom_id: String?
     let current_kingdom_name: String?
     let travel_event: TravelEvent?
     
     // Progression
     let gold: Int
+    let food: Int?  // Total food (meat + berries + other is_food resources)
     let level: Int
     let experience: Int
     let skill_points: Int

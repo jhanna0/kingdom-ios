@@ -16,7 +16,8 @@ from .utils import (
     check_and_set_slot_cooldown_atomic, 
     format_datetime_iso,
     set_cooldown,
-    check_and_deduct_food_cost
+    check_and_deduct_food_cost,
+    log_activity
 )
 from .constants import WORK_BASE_COOLDOWN
 from .tax_utils import apply_kingdom_tax_with_bonus
@@ -70,10 +71,14 @@ def work_on_contract(
     # Get per-action costs for this building tier (DYNAMIC from BUILDING_TYPES)
     from routers.tiers import get_building_per_action_costs
     from routers.resources import RESOURCES
+    from .utils import get_inventory_map
     
     building_type = contract.type.lower()  # e.g., "wall"
     building_tier = contract.tier or 1  # The tier being built
     per_action_costs = get_building_per_action_costs(building_type, building_tier)
+    
+    # Get player's inventory for resource checking
+    inventory_map = get_inventory_map(db, current_user.id)
     
     # Enrich with display info and check affordability
     enriched_costs = []
@@ -81,7 +86,7 @@ def work_on_contract(
     for cost in per_action_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        player_amount = getattr(state, resource_id, 0) or 0
+        player_amount = inventory_map.get(resource_id, 0)
         resource_info = RESOURCES.get(resource_id, {})
         
         enriched_costs.append({
@@ -152,17 +157,18 @@ def work_on_contract(
             detail="Contract already has all required actions"
         )
     
-    # DEDUCT PER-ACTION RESOURCES
+    # DEDUCT PER-ACTION RESOURCES (from inventory)
+    from .utils import deduct_inventory_amount
+    
     resources_required = []
     for cost in per_action_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        current = getattr(state, resource_id, 0) or 0
-        setattr(state, resource_id, current - amount)
+        new_total = deduct_inventory_amount(db, current_user.id, resource_id, amount)
         resources_required.append({
             "resource": resource_id,
             "amount": amount,
-            "new_total": current - amount
+            "new_total": new_total
         })
     
     # Add contribution
@@ -200,7 +206,36 @@ def work_on_contract(
             building_attr = f"{contract.type.lower()}_level"
             if hasattr(kingdom, building_attr):
                 current_level = getattr(kingdom, building_attr, 0)
-                setattr(kingdom, building_attr, current_level + 1)
+                new_level = current_level + 1
+                setattr(kingdom, building_attr, new_level)
+                
+                # Log to activity feed - completed building construction
+                log_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    action_type="building_complete",
+                    action_category="building",
+                    description=f"Helped complete {contract.type} L{new_level} in {kingdom.name}!",
+                    kingdom_id=contract.kingdom_id,
+                    amount=new_level,
+                    details={"building": contract.type, "level": new_level, "kingdom": kingdom.name},
+                    visibility="friends"
+                )
+    else:
+        # Log building work to activity feed
+        kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
+        kingdom_name = kingdom.name if kingdom else "Unknown"
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="building",
+            action_category="building",
+            description=f"Working on {contract.type} in {kingdom_name} ({new_actions_completed}/{contract.actions_required})",
+            kingdom_id=contract.kingdom_id,
+            amount=int(net_income) if net_income else None,
+            details={"building": contract.type, "progress": f"{new_actions_completed}/{contract.actions_required}"},
+            visibility="friends"
+        )
     
     # Building skill: Chance to refund cooldown (values from tiers.py)
     from routers.tiers import get_building_refund_chance
@@ -349,9 +384,13 @@ def work_on_property_upgrade(
     # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
+    from .utils import get_inventory_map
     
     from_tier = (contract.tier or 1) - 1
     per_action_costs = get_property_per_action_costs(contract.tier or 1)
+    
+    # Get player's inventory for resource checking
+    inventory_map = get_inventory_map(db, current_user.id)
     
     # Enrich with display info and check affordability
     enriched_costs = []
@@ -359,7 +398,7 @@ def work_on_property_upgrade(
     for cost in per_action_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        player_amount = getattr(state, resource_id, 0) or 0
+        player_amount = inventory_map.get(resource_id, 0)
         resource_info = RESOURCES.get(resource_id, {})
         
         enriched_costs.append({
@@ -440,17 +479,18 @@ def work_on_property_upgrade(
             if kingdom:
                 kingdom.treasury_gold += tax_amount
     
-    # DEDUCT PER-ACTION RESOURCES
+    # DEDUCT PER-ACTION RESOURCES (from inventory)
+    from .utils import deduct_inventory_amount
+    
     resources_required = []
     for cost in per_action_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        current = getattr(state, resource_id, 0) or 0
-        setattr(state, resource_id, current - amount)
+        new_total = deduct_inventory_amount(db, current_user.id, resource_id, amount)
         resources_required.append({
             "resource": resource_id,
             "amount": amount,
-            "new_total": current - amount
+            "new_total": new_total
         })
     
     # Add contribution
@@ -474,6 +514,36 @@ def work_on_property_upgrade(
             property.tier = contract.tier
             if contract.tier > 1:
                 property.last_upgraded = datetime.utcnow()
+            
+            # Log property completion to activity feed
+            from routers.tiers import PROPERTY_TIERS
+            tier_name = PROPERTY_TIERS.get(contract.tier, {}).get("name", f"T{contract.tier}")
+            log_activity(
+                db=db,
+                user_id=current_user.id,
+                action_type="property_complete",
+                action_category="property",
+                description=f"Built {tier_name} in {contract.kingdom_name}!",
+                kingdom_id=contract.kingdom_id,
+                amount=contract.tier,
+                details={"tier": contract.tier, "kingdom": contract.kingdom_name},
+                visibility="friends"
+            )
+    else:
+        # Log property work to activity feed
+        from routers.tiers import PROPERTY_TIERS
+        tier_name = PROPERTY_TIERS.get(contract.tier, {}).get("name", f"T{contract.tier}")
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="property",
+            action_category="property",
+            description=f"Building {tier_name} ({new_actions_completed}/{contract.actions_required})",
+            kingdom_id=contract.kingdom_id,
+            amount=None,
+            details={"tier": contract.tier, "progress": f"{new_actions_completed}/{contract.actions_required}"},
+            visibility="friends"
+        )
     
     db.commit()
     

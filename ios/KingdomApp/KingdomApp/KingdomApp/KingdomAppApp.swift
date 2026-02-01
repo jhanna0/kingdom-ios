@@ -289,6 +289,12 @@ struct AuthenticatedView: View {
                 loadAchievementsBadge: loadAchievementsBadge,
                 loadWeatherForKingdom: loadWeatherForKingdom
             ))
+            .onChange(of: showAchievements) { _, isShowing in
+                // Clear badge count locally when opening achievements sheet
+                if isShowing {
+                    claimableAchievements = 0
+                }
+            }
     }
     
     // MARK: - Main Content
@@ -529,12 +535,18 @@ private struct SheetModifiers: ViewModifier {
                     onDismiss: { showMyKingdoms = false }
                 )
             }
-            .sheet(isPresented: $showActions) {
+            .sheet(isPresented: $showActions, onDismiss: {
+                // Refresh player data when actions sheet closes (gold may have changed)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 NavigationStack {
                     ActionsView(viewModel: viewModel)
                 }
             }
-            .sheet(isPresented: $showProperties) {
+            .sheet(isPresented: $showProperties, onDismiss: {
+                // Refresh player data when properties sheet closes (gold may have changed)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
             }
             .sheet(isPresented: $showCharacterSheet) {
@@ -560,7 +572,10 @@ private struct SheetModifiers: ViewModifier {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(item: $kingdomToShow) { kingdom in
+            .sheet(item: $kingdomToShow, onDismiss: {
+                // Refresh player data when kingdom sheet closes (hunts/actions may have changed gold)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) { kingdom in
                 NavigationStack {
                     KingdomDetailView(
                         kingdomId: kingdom.id,
@@ -578,7 +593,10 @@ private struct SheetModifiers: ViewModifier {
                     }
                 }
             }
-            .sheet(isPresented: $showActivity) {
+            .sheet(isPresented: $showActivity, onDismiss: {
+                // Refresh player data when activity sheet closes (trades may have changed gold)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 FriendsView()
             }
             .sheet(isPresented: $showNotifications) {

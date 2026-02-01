@@ -324,11 +324,25 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         if kingdom:
             current_kingdom_name = kingdom.name
     
+    # Get hometown kingdom name
+    hometown_kingdom_name = None
+    if state.hometown_kingdom_id:
+        hometown_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+        if hometown_kingdom:
+            hometown_kingdom_name = hometown_kingdom.name
+    
     # Compute total_checkins from user_kingdoms table
     from sqlalchemy import func
     total_checkins = db.query(func.sum(UserKingdom.checkins_count)).filter(
         UserKingdom.user_id == user.id
     ).scalar() or 0
+    
+    # Calculate total food (sum of all resources with is_food=True)
+    total_food = sum(
+        inventory_map.get(resource_key, 0)
+        for resource_key, config in RESOURCES.items()
+        if config.get("is_food")
+    )
     
     return PlayerState(
         id=user.id,
@@ -338,11 +352,13 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         
         # Territory
         hometown_kingdom_id=state.hometown_kingdom_id,
+        hometown_kingdom_name=hometown_kingdom_name,
         current_kingdom_id=state.current_kingdom_id,
         current_kingdom_name=current_kingdom_name,
         
         # Progression
         gold=state.gold,
+        food=total_food,
         level=state.level,
         experience=state.experience,
         skill_points=state.skill_points,

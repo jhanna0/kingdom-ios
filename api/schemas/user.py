@@ -43,11 +43,13 @@ class PlayerState(BaseModel):
     
     # Territory
     hometown_kingdom_id: Optional[str] = None
+    hometown_kingdom_name: Optional[str] = None  # Computed on read
     current_kingdom_id: Optional[str] = None
     current_kingdom_name: Optional[str] = None  # Computed on read
     
     # Progression
     gold: int = 100
+    food: int = 0  # Total food (meat + berries + other is_food resources)
     level: int = 1
     experience: int = 0
     skill_points: int = 0
