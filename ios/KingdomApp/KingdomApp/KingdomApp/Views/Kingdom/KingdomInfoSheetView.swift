@@ -21,6 +21,8 @@ struct KingdomInfoSheetView: View {
     @State var activeBuildingAction: BuildingClickAction?
     // Catchup state - for buildings that need catch-up work
     @State var catchupBuilding: BuildingMetadata?
+    // Permit state - for visitors who need to buy a permit
+    @State var permitBuilding: BuildingMetadata?
     // Exhausted state - for buildings that have hit daily limit
     @State var showExhaustedAlert = false
     @State var exhaustedMessage = ""
@@ -104,6 +106,23 @@ struct KingdomInfoSheetView: View {
                     onDismiss: { catchupBuilding = nil },
                     onComplete: {
                         // Refresh kingdom data after completing catchup
+                        Task {
+                            await viewModel.refreshKingdomData()
+                        }
+                    }
+                )
+            }
+        }
+        // Permit purchase view for visitors
+        .fullScreenCover(item: $permitBuilding) { building in
+            NavigationStack {
+                BuildingPermitView(
+                    building: building,
+                    kingdom: kingdom,
+                    onDismiss: { permitBuilding = nil },
+                    onPurchased: {
+                        // Refresh kingdom data after purchasing permit
+                        permitBuilding = nil
                         Task {
                             await viewModel.refreshKingdomData()
                         }

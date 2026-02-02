@@ -51,6 +51,10 @@ extension KingdomInfoSheetView {
         let isClickable = isPlayerInside && building.isClickable
         // Check if player needs to complete catch-up work
         let needsCatchup = building.needsCatchup && isPlayerInside
+        // Check if player needs a permit (visiting and not allied)
+        let needsPermit = isPlayerInside && (building.permit?.showBuyPermit ?? false)
+        let hasValidPermit = building.permit?.hasValidPermit ?? false
+        let permitBlocked = isPlayerInside && (building.permit?.needsPermit == true && !hasValidPermit && !(building.permit?.canBuyPermit ?? false))
         
         let content = HStack(spacing: 10) {
             // Icon with level badge - brutalist style
@@ -93,12 +97,48 @@ extension KingdomInfoSheetView {
                             .background(KingdomTheme.Colors.buttonWarning)
                             .cornerRadius(4)
                     }
+                    
+                    // Show permit badge if player needs to buy one
+                    if needsPermit {
+                        if let permit = building.permit {
+                            Text("\(permit.permitCost)g")
+                                .font(.system(size: 8, weight: .black))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(KingdomTheme.Colors.gold)
+                                .cornerRadius(4)
+                        }
+                    } else if hasValidPermit, let permit = building.permit {
+                        Text("\(permit.permitMinutesRemaining)m")
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(KingdomTheme.Colors.buttonSuccess)
+                            .cornerRadius(4)
+                    }
                 }
                 
                 if needsCatchup, let catchup = building.catchup {
                     Text("\(catchup.actionsCompleted)/\(catchup.actionsRequired) actions to unlock")
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                        .lineLimit(1)
+                } else if permitBlocked, let permit = building.permit {
+                    Text(permit.reason)
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                        .lineLimit(1)
+                } else if needsPermit, let permit = building.permit {
+                    Text("Permit: \(permit.permitCost)g for \(permit.permitDurationMinutes)m")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.gold)
+                        .lineLimit(1)
+                } else if hasValidPermit, let permit = building.permit {
+                    Text("Permit active • \(permit.permitMinutesRemaining)m remaining")
+                        .font(FontStyles.labelTiny)
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                         .lineLimit(1)
                 } else {
                     Text(building.description)
@@ -110,25 +150,43 @@ extension KingdomInfoSheetView {
             
             Spacer()
             
-            // Chevron for clickable buildings or catchup
-            if isClickable || needsCatchup {
-                Image(systemName: needsCatchup ? "hammer.fill" : "chevron.right")
+            // Chevron/icon for clickable buildings
+            if needsCatchup {
+                Image(systemName: "hammer.fill")
                     .font(FontStyles.iconMini)
-                    .foregroundColor(needsCatchup ? KingdomTheme.Colors.buttonWarning : KingdomTheme.Colors.inkMedium)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+            } else if needsPermit {
+                Image(systemName: "ticket.fill")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.gold)
+            } else if isClickable || hasValidPermit {
+                Image(systemName: "chevron.right")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
         }
         .padding(10)
         .background(isBuilt ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(needsCatchup ? KingdomTheme.Colors.buttonWarning : Color.black, lineWidth: needsCatchup ? 2 : 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(
+            needsCatchup ? KingdomTheme.Colors.buttonWarning :
+            needsPermit ? KingdomTheme.Colors.gold :
+            Color.black,
+            lineWidth: needsCatchup || needsPermit ? 2 : 1.5
+        ))
         
-        // Handle click: catchup takes priority, then check exhaustion, then normal action
+        // Handle click: catchup takes priority, then permit, then check exhaustion, then normal action
         if needsCatchup {
             Button {
                 catchupBuilding = building
             } label: { content }
             .buttonStyle(.plain)
-        } else if isClickable, let clickAction = building.clickAction {
+        } else if needsPermit {
+            Button {
+                permitBuilding = building
+            } label: { content }
+            .buttonStyle(.plain)
+        } else if (isClickable || hasValidPermit), let clickAction = building.clickAction {
             Button {
                 // Check if building is exhausted (daily limit reached)
                 if clickAction.exhausted, let message = clickAction.exhaustedMessage {

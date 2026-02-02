@@ -48,6 +48,37 @@ struct BuildingCatchupInfo: Hashable {
     }
 }
 
+// Permit info for visitors accessing buildings in foreign kingdoms
+struct BuildingPermitInfo: Hashable {
+    let canAccess: Bool  // Final verdict - can they use this building?
+    let reason: String  // Human-readable explanation
+    let isHometown: Bool  // Is this their hometown?
+    let isAllied: Bool  // Are they allied/same empire?
+    let needsPermit: Bool  // Do they need to buy a permit?
+    let hasValidPermit: Bool  // Do they have an active permit?
+    let permitExpiresAt: Date?  // When permit expires
+    let permitMinutesRemaining: Int  // Minutes left on permit
+    let hometownHasBuilding: Bool  // Does their hometown have this building?
+    let hometownBuildingLevel: Int  // Level of building in hometown
+    let hasActiveCatchup: Bool  // Do they have incomplete expansion?
+    let canBuyPermit: Bool  // Are they eligible to buy a permit?
+    let permitCost: Int  // Cost in gold
+    let permitDurationMinutes: Int  // Duration of permit
+    
+    /// Whether the player should see "Buy Permit" option
+    var showBuyPermit: Bool {
+        needsPermit && !hasValidPermit && canBuyPermit
+    }
+    
+    /// Formatted permit expiry
+    var permitExpiryText: String {
+        if permitMinutesRemaining > 0 {
+            return "\(permitMinutesRemaining)m remaining"
+        }
+        return "Expired"
+    }
+}
+
 // DYNAMIC Building metadata from backend - includes upgrade costs and tier info
 // Constructed manually from API response - not decoded directly
 struct BuildingMetadata: Hashable, Identifiable {
@@ -69,6 +100,10 @@ struct BuildingMetadata: Hashable, Identifiable {
     // Catch-up info - for players who joined after building was constructed
     // If needsCatchup is true, player must complete catch-up work before using
     let catchup: BuildingCatchupInfo?
+    
+    // Permit info - for visitors accessing buildings in foreign kingdoms
+    // Only present for permit-required buildings (lumbermill, mine, market, townhall)
+    let permit: BuildingPermitInfo?
 
     // Current tier info
     let tierName: String  // Name of current tier (e.g. "Stone Wall")

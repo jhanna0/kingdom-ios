@@ -41,6 +41,24 @@ struct APIBuildingCatchupInfo: Codable {
     let actions_remaining: Int  // Remaining catch-up actions
 }
 
+/// Permit info for visitors accessing buildings in foreign kingdoms
+struct APIBuildingPermitInfo: Codable {
+    let can_access: Bool  // Final verdict - can they use this building?
+    let reason: String  // Human-readable explanation
+    let is_hometown: Bool  // Is this their hometown?
+    let is_allied: Bool  // Are they allied/same empire?
+    let needs_permit: Bool  // Do they need to buy a permit?
+    let has_valid_permit: Bool  // Do they have an active permit?
+    let permit_expires_at: String?  // ISO timestamp when permit expires
+    let permit_minutes_remaining: Int  // Minutes left on permit
+    let hometown_has_building: Bool  // Does their hometown have this building?
+    let hometown_building_level: Int  // Level of building in hometown
+    let has_active_catchup: Bool  // Do they have incomplete expansion?
+    let can_buy_permit: Bool  // Are they eligible to buy a permit?
+    let permit_cost: Int  // Cost in gold
+    let permit_duration_minutes: Int  // Duration of permit
+}
+
 /// DYNAMIC Building data from backend - includes metadata, upgrade costs, and tier info
 /// Frontend iterates this array - NO HARDCODING required!
 struct APIBuildingData: Codable {
@@ -61,6 +79,10 @@ struct APIBuildingData: Codable {
     // Catch-up info - for players who joined after building was constructed
     // If needs_catchup is true, player must complete catch-up work before using
     let catchup: APIBuildingCatchupInfo?
+    
+    // Permit info - for visitors accessing buildings in foreign kingdoms
+    // Only present for permit-required buildings (lumbermill, mine, market, townhall)
+    let permit: APIBuildingPermitInfo?
     
     // Current tier info
     let tier_name: String  // Name of current tier (e.g. "Stone Wall")
