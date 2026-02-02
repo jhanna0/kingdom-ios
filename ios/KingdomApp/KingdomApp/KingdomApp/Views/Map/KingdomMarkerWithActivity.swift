@@ -6,6 +6,7 @@ struct KingdomMarkerWithActivity: View {
     let kingdom: Kingdom
     let homeKingdomId: String?
     let playerId: Int
+    var markerScale: CGFloat = 1.0  // Scale factor based on territory size
     
     // Flying icons state
     @State private var flyingIcons: [FlyingIconData] = []
@@ -110,7 +111,8 @@ struct KingdomMarkerWithActivity: View {
             KingdomMarker(
                 kingdom: kingdom,
                 homeKingdomId: homeKingdomId,
-                playerId: playerId
+                playerId: playerId,
+                markerScale: markerScale
             )
         }
         .onAppear {

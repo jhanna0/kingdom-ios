@@ -93,7 +93,6 @@ class SampleData {
                             color: color
                         ) {
                             kingdoms.append(kingdom)
-                            print("🏰 \(placeName) - \(boundary.count) boundary points")
                         }
                         
                         if kingdoms.count >= 15 { break }

@@ -148,6 +148,7 @@ class KingdomData(BaseModel):
     can_form_alliance: bool = False  # Backend determines if current user can form alliance with this kingdom
     is_allied: bool = False  # True if this kingdom is allied with any of user's kingdoms
     is_enemy: bool = False  # True if this kingdom is at war with any of user's kingdoms
+    is_empire: bool = False  # True if this kingdom is ruled by the current user (part of their empire)
     alliance_info: Optional[AllianceInfo] = None  # Details about alliance if is_allied is True
     allies: List[str] = []  # Kingdom IDs of allied kingdoms
     enemies: List[str] = []  # Kingdom IDs of enemy kingdoms

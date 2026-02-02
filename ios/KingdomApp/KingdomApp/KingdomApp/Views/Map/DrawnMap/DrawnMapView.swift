@@ -13,6 +13,9 @@ struct DrawnMapView: View {
         return state
     }()
     
+    @State private var visibleOrder: [String] = []  // Order markers were added
+    @State private var lastZoom: CGFloat = 0.3
+    
     /// Pixels per degree of lat/lon for coordinate conversion
     private let baseScale: CGFloat = 6000.0
     
@@ -69,16 +72,26 @@ struct DrawnMapView: View {
     }
     
     private func kingdomMarkers(in geometry: GeometryProxy) -> some View {
-        ForEach(viewModel.kingdoms) { kingdom in
+        let visibleIds = getVisibleKingdomIds(in: geometry)
+        
+        return ForEach(viewModel.kingdoms) { kingdom in
             if let position = coordinateToPoint(kingdom.territory.center) {
-                KingdomMarkerWithActivity(kingdom: kingdom, homeKingdomId: viewModel.player.hometownKingdomId, playerId: viewModel.player.playerId)
+                let isVisible = visibleIds.contains(kingdom.id)
+                KingdomMarkerWithActivity(
+                    kingdom: kingdom,
+                    homeKingdomId: viewModel.player.hometownKingdomId,
+                    playerId: viewModel.player.playerId,
+                    markerScale: KingdomMarker.calculateScale(for: kingdom.territory.radiusMeters)
+                )
+                    .opacity(isVisible ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.25), value: isVisible)
+                    .allowsHitTesting(isVisible)
                     .position(
                         x: geometry.size.width / 2 + position.x * transform.scale + transform.offset.width,
                         y: geometry.size.height / 2 + position.y * transform.scale + transform.offset.height
                     )
                     .onTapGesture {
-                        // Only allow taps when not actively panning/zooming
-                        guard !transform.isGestureActive else { return }
+                        guard isVisible, !transform.isGestureActive else { return }
                         
                         kingdomForInfoSheet = kingdom
                         if !kingdom.hasBoundaryCached {
@@ -89,6 +102,73 @@ struct DrawnMapView: View {
                     }
             }
         }
+    }
+    
+    /// Get IDs of kingdoms that should be visible (not overlapping on screen)
+    private func getVisibleKingdomIds(in geometry: GeometryProxy) -> Set<String> {
+        let zoomingOut = transform.scale < lastZoom - 0.01
+        
+        // Helper to get screen position
+        func screenPos(for id: String) -> CGPoint? {
+            guard let kingdom = viewModel.kingdoms.first(where: { $0.id == id }),
+                  let mapPos = coordinateToPoint(kingdom.territory.center) else { return nil }
+            return CGPoint(
+                x: geometry.size.width / 2 + mapPos.x * transform.scale + transform.offset.width,
+                y: geometry.size.height / 2 + mapPos.y * transform.scale + transform.offset.height
+            )
+        }
+        
+        // Check if position overlaps any in list
+        func overlaps(_ pos: CGPoint, _ positions: [CGPoint]) -> Bool {
+            positions.contains { hypot(pos.x - $0.x, pos.y - $0.y) < 60 }
+        }
+        
+        var newOrder = visibleOrder
+        
+        if zoomingOut {
+            // ZOOMING OUT: Pop from end until no overlaps
+            while newOrder.count > 1 {
+                // Check if last item overlaps any earlier item
+                guard let lastPos = screenPos(for: newOrder.last!) else {
+                    newOrder.removeLast()
+                    continue
+                }
+                
+                let earlierPositions = newOrder.dropLast().compactMap { screenPos(for: $0) }
+                if overlaps(lastPos, earlierPositions) {
+                    newOrder.removeLast()  // Pop it
+                } else {
+                    break  // No overlap, stop popping
+                }
+            }
+        } else {
+            // ZOOMING IN or STABLE: Keep existing, try to add new ones
+            // Sorted: largest first, home always first
+            let sorted = viewModel.kingdoms.sorted { k1, k2 in
+                let isHome1 = k1.id == viewModel.player.hometownKingdomId
+                let isHome2 = k2.id == viewModel.player.hometownKingdomId
+                if isHome1 != isHome2 { return isHome1 }
+                return k1.territory.radiusMeters > k2.territory.radiusMeters
+            }
+            
+            for kingdom in sorted {
+                guard !newOrder.contains(kingdom.id) else { continue }
+                guard let pos = screenPos(for: kingdom.id) else { continue }
+                
+                let existingPositions = newOrder.compactMap { screenPos(for: $0) }
+                if !overlaps(pos, existingPositions) {
+                    newOrder.append(kingdom.id)  // Add to end
+                }
+            }
+        }
+        
+        // Update state
+        DispatchQueue.main.async {
+            self.visibleOrder = newOrder
+            self.lastZoom = self.transform.scale
+        }
+        
+        return Set(newOrder)
     }
     
     // MARK: - Drawing Functions
@@ -127,7 +207,8 @@ struct DrawnMapView: View {
             isPlayer: isHomeKingdom,
             isEnemy: kingdom.isEnemy,
             isAllied: kingdom.isAllied,
-            isAtWar: isHomeKingdom && kingdom.isAtWar
+            isAtWar: isHomeKingdom && kingdom.isAtWar,
+            isPartOfEmpire: kingdom.isEmpire
         )
     }
     

@@ -983,8 +983,7 @@ def _apply_battle_outcome_bulk(
                 ruler_name=initiator.display_name,
                 empire_id=kingdom.empire_id or kingdom.id,
                 event_type='coup' if battle.is_coup else 'invasion',
-                started_at=now,
-                battle_id=battle.id
+                started_at=now
             )
             db.add(new_history)
     

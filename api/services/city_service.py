@@ -27,6 +27,131 @@ from osm_service import (
 from routers.tiers import BUILDING_TYPES
 
 
+# Toggle boundary simplification on/off
+# TODO: Once we find an algorithm we like, store simplified_boundary in CityBoundary table
+#       and return that instead of computing on every request. Add a column like:
+#       simplified_boundary_geojson = Column(JSONB)  # Pre-computed simplified version
+SIMPLIFY_BOUNDARIES = True
+SIMPLIFY_TARGET_POINTS = 250
+
+
+def _triangle_area(p1: List[float], p2: List[float], p3: List[float]) -> float:
+    """Calculate area of triangle formed by three points using cross product."""
+    return abs((p2[0] - p1[0]) * (p3[1] - p1[1]) - (p3[0] - p1[0]) * (p2[1] - p1[1])) / 2
+
+
+def simplify_boundary(coords: List[List[float]], target_points: int = SIMPLIFY_TARGET_POINTS) -> List[List[float]]:
+    """
+    Simplify polygon using Visvalingam-Whyatt algorithm.
+    
+    Unlike Douglas-Peucker, this algorithm:
+    - Works by area rather than distance (better for polygons)
+    - Removes points progressively from least important to most
+    - Doesn't create self-intersections or weird loops
+    
+    Args:
+        coords: List of [lat, lon] coordinate pairs (closed polygon)
+        target_points: Target number of points to keep (default from SIMPLIFY_TARGET_POINTS)
+        
+    Returns:
+        Simplified list of [lat, lon] coordinate pairs
+    """
+    # Skip if disabled or already small enough
+    if not SIMPLIFY_BOUNDARIES or not coords or len(coords) <= target_points:
+        return coords
+    
+    try:
+        original_count = len(coords)
+        
+        # Work with a copy, ensure it's closed
+        points = [list(c) for c in coords]
+        if points[0] != points[-1]:
+            points.append(list(points[0]))
+        
+        # For closed polygon, we work with all but the closing point
+        # (we'll add it back at the end)
+        working = points[:-1]
+        n = len(working)
+        
+        if n <= target_points:
+            return coords
+        
+        # Calculate initial areas for each point
+        # Area = triangle formed with previous and next point
+        areas = []
+        for i in range(n):
+            prev_idx = (i - 1) % n
+            next_idx = (i + 1) % n
+            area = _triangle_area(working[prev_idx], working[i], working[next_idx])
+            areas.append(area)
+        
+        # Track which points are still active
+        active = [True] * n
+        points_remaining = n
+        
+        # Remove points until we reach target
+        while points_remaining > target_points:
+            # Find point with minimum area (least important)
+            min_area = float('inf')
+            min_idx = -1
+            
+            for i in range(n):
+                if active[i] and areas[i] < min_area:
+                    min_area = areas[i]
+                    min_idx = i
+            
+            if min_idx == -1:
+                break
+            
+            # Remove this point
+            active[min_idx] = False
+            points_remaining -= 1
+            
+            # Update areas of neighboring points
+            # Find previous active point
+            prev_idx = (min_idx - 1) % n
+            while not active[prev_idx] and prev_idx != min_idx:
+                prev_idx = (prev_idx - 1) % n
+            
+            # Find next active point
+            next_idx = (min_idx + 1) % n
+            while not active[next_idx] and next_idx != min_idx:
+                next_idx = (next_idx + 1) % n
+            
+            # Update their areas
+            if active[prev_idx]:
+                prev_prev = (prev_idx - 1) % n
+                while not active[prev_prev] and prev_prev != prev_idx:
+                    prev_prev = (prev_prev - 1) % n
+                if active[prev_prev]:
+                    areas[prev_idx] = _triangle_area(working[prev_prev], working[prev_idx], working[next_idx])
+            
+            if active[next_idx]:
+                next_next = (next_idx + 1) % n
+                while not active[next_next] and next_next != next_idx:
+                    next_next = (next_next + 1) % n
+                if active[next_next]:
+                    areas[next_idx] = _triangle_area(working[prev_idx], working[next_idx], working[next_next])
+        
+        # Build result from active points
+        result = [working[i] for i in range(n) if active[i]]
+        
+        # Close the polygon
+        if result and result[0] != result[-1]:
+            result.append(result[0])
+        
+        new_count = len(result)
+        if new_count < original_count:
+            reduction = 100 - (new_count / original_count * 100)
+            print(f"   📐 Simplified boundary: {original_count} → {new_count} points ({reduction:.0f}% reduction)")
+        
+        return result
+        
+    except Exception as e:
+        print(f"   ⚠️ Boundary simplification failed: {e}")
+        return coords
+
+
 def get_buildings_for_kingdom(
     db: Session, 
     kingdom: Kingdom, 
@@ -240,9 +365,15 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     
     # Get user's kingdoms for relationship checking
     user_kingdom_ids = set()
+    user_empire_id = None  # User's empire ID (from hometown kingdom)
     if current_user:
         user_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).all()
         user_kingdom_ids = {k.id for k in user_kingdoms}
+        # Get user's empire_id from their hometown kingdom
+        if user_hometown_kingdom_id:
+            hometown_kingdom = db.query(Kingdom).filter(Kingdom.id == user_hometown_kingdom_id).first()
+            if hometown_kingdom:
+                user_empire_id = hometown_kingdom.empire_id
     
     # Batch fetch ruler names
     ruler_ids = [k.ruler_id for k in kingdoms if k.ruler_id]
@@ -514,6 +645,11 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                 import traceback
                 traceback.print_exc()
         
+        # Is this kingdom part of the current user's empire?
+        is_empire = False
+        if user_empire_id and kingdom.empire_id:
+            is_empire = kingdom.empire_id == user_empire_id
+        
         result[kingdom.id] = KingdomData(
             id=kingdom.id,
             ruler_id=kingdom.ruler_id,
@@ -529,6 +665,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
             can_form_alliance=can_interact and not is_allied,  # Can't form if already allied
             is_allied=is_allied,
             is_enemy=is_enemy,
+            is_empire=is_empire,  # True if this kingdom is ruled by current user
             alliance_info=AllianceInfo(**alliance_info) if alliance_info else None,
             allies=list(kingdom.allies) if kingdom.allies else [],
             enemies=list(kingdom.enemies) if kingdom.enemies else [],
@@ -612,7 +749,7 @@ async def get_current_city(
             admin_level=city.admin_level,
             center_lat=city.center_lat,
             center_lon=city.center_lon,
-            boundary=boundary,
+            boundary=simplify_boundary(boundary),
             radius_meters=city.radius_meters,
             cached=True,
             is_current=True,
@@ -647,7 +784,7 @@ async def get_current_city(
             admin_level=cached.admin_level,
             center_lat=cached.center_lat,
             center_lon=cached.center_lon,
-            boundary=cached.boundary_geojson.get("coordinates", []),
+            boundary=simplify_boundary(cached.boundary_geojson.get("coordinates", [])),
             radius_meters=cached.radius_meters,
             cached=True,
             is_current=True,
@@ -719,7 +856,7 @@ async def get_current_city(
         admin_level=boundary_data["admin_level"],
         center_lat=boundary_data["center_lat"],
         center_lon=boundary_data["center_lon"],
-        boundary=boundary_data["boundary"],
+        boundary=simplify_boundary(boundary_data["boundary"]),
         radius_meters=boundary_data["radius_meters"],
         cached=False,
         is_current=True,
@@ -847,6 +984,69 @@ async def get_neighbor_cities(
     neighbor_ids = neighbor_ids[:20]
     print(f"   🎯 {len(neighbor_ids)} neighbors ({boundary_count} boundary, {radius_count} radius-filtered)")
     
+    # EMPIRE EXPANSION: Also load neighbors of any empire kingdoms in the initial results
+    # AND the current city if it's part of the empire
+    if current_user:
+        from db.models import PlayerState
+        player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
+        print(f"   👑 Empire check: player_state={player_state is not None}, hometown={player_state.hometown_kingdom_id if player_state else None}")
+        
+        if player_state and player_state.hometown_kingdom_id:
+            hometown = db.query(Kingdom).filter(Kingdom.id == player_state.hometown_kingdom_id).first()
+            print(f"   👑 Hometown kingdom: {hometown.id if hometown else None}, empire_id={hometown.empire_id if hometown else None}")
+            
+            if hometown:
+                # Use empire_id if set, otherwise hometown id IS the empire (capital)
+                user_empire_id = hometown.empire_id or hometown.id
+                print(f"   👑 User empire_id: {user_empire_id}")
+                initial_osm_ids = {n["osm_id"] for n in neighbor_ids}
+                
+                # Also check if CURRENT city is part of empire
+                empire_ids_to_expand = []
+                if current_city:
+                    current_kingdom = db.query(Kingdom).filter(Kingdom.id == current_city.osm_id).first()
+                    if current_kingdom:
+                        k_empire = current_kingdom.empire_id or current_kingdom.id
+                        if k_empire == user_empire_id:
+                            empire_ids_to_expand.append(current_city.osm_id)
+                            print(f"   👑 Current city {current_city.name} is part of empire!")
+                
+                # Batch query: find which neighbors are empire kingdoms  
+                neighbor_kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(initial_osm_ids)).all()
+                for k in neighbor_kingdoms:
+                    k_empire = k.empire_id or k.id
+                    if k_empire == user_empire_id:
+                        empire_ids_to_expand.append(k.id)
+                
+                print(f"   👑 Empire kingdoms to expand: {empire_ids_to_expand}")
+                
+                if empire_ids_to_expand:
+                    print(f"   👑 Found {len(empire_ids_to_expand)} empire kingdoms, expanding...")
+                    
+                    # Get cached neighbors for each empire kingdom
+                    empire_cities = db.query(CityBoundary).filter(CityBoundary.osm_id.in_(empire_ids_to_expand)).all()
+                    for empire_city in empire_cities:
+                        # Fetch neighbors from OSM if not cached
+                        if not empire_city.neighbor_ids:
+                            print(f"   👑 Fetching neighbors for {empire_city.name} from OSM...")
+                            emp_candidates, _ = await fetch_nearby_city_candidates(
+                                empire_city.center_lat, 
+                                empire_city.center_lon
+                            )
+                            if emp_candidates:
+                                empire_city.neighbor_ids = emp_candidates
+                                empire_city.neighbors_updated_at = datetime.utcnow()
+                                db.commit()
+                                print(f"   👑 Cached {len(emp_candidates)} neighbors for {empire_city.name}")
+                        
+                        if empire_city.neighbor_ids:
+                            for emp_neighbor in empire_city.neighbor_ids:
+                                if emp_neighbor["osm_id"] not in initial_osm_ids:
+                                    neighbor_ids.append(emp_neighbor)
+                                    initial_osm_ids.add(emp_neighbor["osm_id"])
+                    
+                    print(f"   👑 Expanded to {len(neighbor_ids)} total neighbors")
+    
     # Check which ones we have cached
     osm_ids = [n["osm_id"] for n in neighbor_ids]
     cached_by_id = {c.osm_id: c for c in db.query(CityBoundary).filter(CityBoundary.osm_id.in_(osm_ids)).all()}
@@ -898,7 +1098,7 @@ async def get_neighbor_cities(
             admin_level=city.admin_level,
             center_lat=city.center_lat,
             center_lon=city.center_lon,
-            boundary=city.boundary_geojson.get("coordinates", []),
+            boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
             radius_meters=city.radius_meters,
             cached=True,
             is_current=False,
@@ -938,7 +1138,7 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
         return BoundaryResponse(
             osm_id=cached.osm_id,
             name=cached.name,
-            boundary=cached.boundary_geojson.get("coordinates", []),
+            boundary=simplify_boundary(cached.boundary_geojson.get("coordinates", [])),
             radius_meters=cached.radius_meters,
             from_cache=True
         )
@@ -983,7 +1183,7 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
     return BoundaryResponse(
         osm_id=osm_id,
         name=boundary_data["name"],
-        boundary=boundary_data["boundary"],
+        boundary=simplify_boundary(boundary_data["boundary"]),
         radius_meters=boundary_data["radius_meters"],
         from_cache=False
     )
@@ -1083,7 +1283,7 @@ async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[Bou
             result.append(BoundaryResponse(
                 osm_id=city.osm_id,
                 name=city.name,
-                boundary=city.boundary_geojson.get("coordinates", []),
+                boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
                 radius_meters=city.radius_meters,
                 from_cache=(osm_id in cached_by_id and osm_id not in missing_ids)
             ))
@@ -1119,7 +1319,7 @@ def get_city_by_id(db: Session, osm_id: str) -> Optional[CityBoundaryResponse]:
         admin_level=city.admin_level,
         center_lat=city.center_lat,
         center_lon=city.center_lon,
-        boundary=city.boundary_geojson.get("coordinates", []),
+        boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
         radius_meters=city.radius_meters,
         cached=True,
         kingdom=kingdoms.get(osm_id)
