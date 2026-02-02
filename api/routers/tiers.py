@@ -60,8 +60,8 @@ TRAINING_GOLD_BASE = 25          # Base gold per action
 TRAINING_GOLD_PER_TIER = 25      # Additional gold per target tier
 TRAINING_GOLD_PER_POINT = 6      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
-TRAINING_ACTIONS_PER_TIER = 10   # Extra actions per current tier level (specializing is hard)
-TRAINING_ACTIONS_PER_POINT = 2   # Extra actions per total skill point owned (diversifying is easy)
+TRAINING_ACTIONS_PER_TIER = 12   # Extra actions per current tier level (specializing is hard)
+TRAINING_ACTIONS_PER_POINT = 2.5 # Extra actions per total skill point owned (diversifying costs more)
 TRAINING_MIN_ACTIONS = 10         # Floor (never fewer than this)
 TRAINING_MAX_ACTIONS = 500       # Cap (never more than this)
 
@@ -102,7 +102,7 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
     - 0→1, 7th skill (tier=0, points=6): 10 + 0 + 12 = 22 actions
     - 4→5, with 9 total points: 10 + 40 + 18 = 68 actions
     """
-    actions = (
+    actions = int(
         TRAINING_BASE_ACTIONS 
         + (current_tier * TRAINING_ACTIONS_PER_TIER) 
         + (total_skill_points * TRAINING_ACTIONS_PER_POINT)
@@ -492,7 +492,7 @@ REPUTATION_TIERS = {
     },
     2: {
         "name": "Resident",
-        "requirement": 300,
+        "requirement": 500,
         "icon": "house.fill",
         "abilities": [
             "Buy property in cities",
@@ -612,13 +612,13 @@ SKILLS = {
         "stat_attribute": "intelligence",
         "icon": "eye.fill",
         "category": "espionage",
-        "description": "Improves sabotage and scouting",
+        "description": "Unlocks scout abilities and improves success chance",
         "benefits": {
-            1: ["-2% detection when sabotaging", "+2% catch chance when patrolling"],
-            2: ["-4% detection when sabotaging", "+4% catch chance when patrolling"],
-            3: ["-6% detection when sabotaging", "+6% catch chance when patrolling"],
-            4: ["-8% detection when sabotaging", "+8% catch chance when patrolling"],
-            5: ["-10% detection when sabotaging", "+10% catch chance when patrolling", "Vault Heist: Steal 10% of enemy vault (1000g cost)"]
+            1: ["Unlocks Infiltrate action", "Chance to Gather Basic Intel: Reveal population & citizen count"],
+            2: ["+10% scout success", "Chance to Gather Military Intel: Reveal attack/defense/walls"],
+            3: ["+22% scout success", "Chance to Gather Building Intel: Reveal all building levels"],
+            4: ["+35% scout success", "Chance to Cause Disruption: Delay enemy contracts by 10%"],
+            5: ["+50% scout success", "Chance to Vault Heist: Steal 10% of enemy vault gold"]
         }
     },
     "science": {
@@ -1055,7 +1055,7 @@ def get_property_tiers():
         "notes": {
             "pay_per_action": "Gold is paid per action, not upfront. Tax added on top at action time.",
             "actions": "Base actions required, reduced by Building skill (up to 50% reduction)",
-            "reputation_required": "50+ reputation required to purchase land in a kingdom"
+            "reputation_required": "500 reputation required to purchase land in a kingdom"
         }
     }
 

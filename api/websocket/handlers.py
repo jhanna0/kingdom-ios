@@ -26,6 +26,11 @@ logger.setLevel(logging.INFO)
 
 def get_endpoint_url(event: dict) -> str:
     """Extract the WebSocket API endpoint URL from the event"""
+    # Use env var (same as broadcast.py) - required for custom domains
+    endpoint = os.environ.get('WEBSOCKET_API_ENDPOINT')
+    if endpoint:
+        return endpoint
+    # Fallback for local dev
     domain = event['requestContext']['domainName']
     stage = event['requestContext']['stage']
     return f"https://{domain}/{stage}"

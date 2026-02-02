@@ -607,14 +607,26 @@ def create_hunt(
             hunt=None,
         )
     
-    # Check if player already has an active hunt
+    # Check if player already has an active hunt - auto-abandon it
     existing = manager.get_active_hunt_for_player(db, user.id)
     if existing:
-        return HuntResponse(
-            success=False,
-            message="You already have an active hunt",
-            hunt=existing.to_dict(),
-        )
+        # Remove participant
+        existing.remove_participant(user.id)
+        
+        # Clear activity status
+        set_activity_status(player_state, None)
+        
+        # If no participants left or creator left, cancel the hunt
+        if len(existing.participants) == 0 or existing.created_by == user.id:
+            existing.status = HuntStatus.CANCELLED
+            # Clear activity for any remaining participants
+            for pid in existing.participants.keys():
+                ps = db.query(PlayerState).filter(PlayerState.user_id == int(pid)).first()
+                if ps:
+                    set_activity_status(ps, None)
+        
+        # Save to database
+        manager.save_hunt(db, existing)
     
     # Get player stats
     stats = get_player_stats(db, user.id)

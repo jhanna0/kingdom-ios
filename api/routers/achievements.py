@@ -579,7 +579,7 @@ def claim_achievement_reward(
         user_id=user.id,
         action_type="achievement",
         action_category="achievement",
-        description=f"Earned: {tier_data['display_name']}!",
+        description=f"Earned {tier_data['display_name']}!",
         kingdom_id=state.hometown_kingdom_id,
         amount=int(net_gold) if net_gold > 0 else None,
         details={"achievement": tier_data["achievement_type"], "tier": tier_data["tier"], "display_name": tier_data["display_name"]},

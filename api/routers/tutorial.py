@@ -146,7 +146,8 @@ Skills unlock new content and give your character powerful perks.
 
 **Cost:** Based on your TOTAL skill points across all skills. Every skill you train makes the next one more expensive. Therefore, it's very difficult to max an account. Pick the build path you think is best.
 
-**Tip:** Education buildings reduce actions needed.
+**Tips:** Different skills increase your success rate in activities. Check the screen for which skills are used.
+Education buildings reduce actions needed.
 """
     ),
     TutorialSection(

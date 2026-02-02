@@ -54,12 +54,17 @@ def broadcast_seed_find(db: Session, player_id: int, amount: int) -> None:
     """Broadcast seed find to activity feed."""
     from routers.resources import RESOURCES
     seed = RESOURCES.get("wheat_seed", {"display_name": "Wheat Seed", "icon": "leaf.fill"})
+    # Use "a seed" for 1, "X seeds" for multiple
+    if amount == 1:
+        amount_text = f"a {seed['display_name']}"
+    else:
+        amount_text = f"{amount} {seed['display_name']}s"
     log_activity(
         db=db,
         user_id=player_id,
         action_type="foraging_find",
         action_category="foraging",
-        description=f"Found {amount} {seed['display_name']}{'s' if amount > 1 else ''} while foraging! 🌱",
+        description=f"Found {amount_text} while foraging! 🌱",
         kingdom_id=None,
         amount=amount,
         details={"item_id": "wheat_seed", "item_name": seed["display_name"], "amount": amount},

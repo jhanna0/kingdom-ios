@@ -54,16 +54,14 @@ def _build_reward_config() -> Dict[int, dict]:
             # Final round = blueprint
             config[streak] = {
                 "gold": 0,
-                "gold_per_science_tier": 0,
                 "blueprint": 1,
                 "message": "EUREKA! A breakthrough discovery!",
             }
         else:
             # Earlier rounds = gold (scales up)
-            base_gold = 4 * streak  # 5, 10, 15, 20...
+            base_gold = 4 * streak  # 4, 8, 12...
             config[streak] = {
                 "gold": base_gold,
-                "gold_per_science_tier": streak,  # +1, +2, +3... per science level
                 "blueprint": 0,
                 "message": "A promising result!" if streak == 1 else "Your hypothesis was correct!",
             }
@@ -141,7 +139,7 @@ def get_reward_for_streak(streak: int, science_level: int = 0) -> dict:
     
     Args:
         streak: Number of correct guesses (1, 2, or 3)
-        science_level: Player's science skill level
+        science_level: Player's science skill level (for future use)
     
     Returns:
         Dict with gold, blueprint, and message
@@ -150,11 +148,9 @@ def get_reward_for_streak(streak: int, science_level: int = 0) -> dict:
         return {"gold": 0, "blueprint": 0, "message": "No reward"}
     
     config = REWARD_CONFIG[streak]
-    base_gold = config["gold"]
-    bonus_gold = config["gold_per_science_tier"] * science_level
     
     return {
-        "gold": base_gold + bonus_gold,
+        "gold": config["gold"],
         "blueprint": config["blueprint"],
         "message": config["message"],
     }
@@ -177,11 +173,8 @@ def get_science_probabilities(science_level: int = 0) -> dict:
 
 
 def calculate_gold_reward(streak: int, science_level: int = 0) -> int:
-    """Calculate total gold reward including science bonus."""
+    """Calculate gold reward for a streak. science_level reserved for future use."""
     if streak not in REWARD_CONFIG:
         return 0
     
-    config = REWARD_CONFIG[streak]
-    base = config["gold"]
-    bonus = config["gold_per_science_tier"] * science_level
-    return base + bonus
+    return REWARD_CONFIG[streak]["gold"]

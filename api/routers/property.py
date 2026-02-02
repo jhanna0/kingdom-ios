@@ -541,7 +541,7 @@ def get_property_status(
     
     # Purchase validation flags
     # NOTE: With pay-per-action system, no upfront gold required to start
-    meets_reputation_requirement = current_kingdom_reputation >= 50
+    meets_reputation_requirement = current_kingdom_reputation >= 500
     can_purchase = (
         current_kingdom is not None 
         and not already_owns_property_in_current_kingdom
