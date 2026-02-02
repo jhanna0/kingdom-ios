@@ -228,6 +228,12 @@ class APIClient: ObservableObject {
             
             // Check for critical server errors (5xx) - wait for retry
             if httpResponse.statusCode >= 500 {
+                let endpoint = request.url?.path ?? "unknown"
+                print("🚨 500 ERROR on endpoint: \(endpoint)")
+                print("🚨 Full URL: \(request.url?.absoluteString ?? "unknown")")
+                if let body = String(data: data, encoding: .utf8) {
+                    print("🚨 Response body: \(body)")
+                }
                 let message = userFriendlyMessage(for: NSError(domain: "", code: 0), statusCode: httpResponse.statusCode)
                 await waitForRetry(message: message)
                 continue // Retry the request
@@ -343,6 +349,12 @@ class APIClient: ObservableObject {
             
             // Check for critical server errors (5xx) - wait for retry
             if httpResponse.statusCode >= 500 {
+                let endpoint = request.url?.path ?? "unknown"
+                print("🚨 500 ERROR on endpoint: \(endpoint)")
+                print("🚨 Full URL: \(request.url?.absoluteString ?? "unknown")")
+                if let body = String(data: data, encoding: .utf8) {
+                    print("🚨 Response body: \(body)")
+                }
                 let message = userFriendlyMessage(for: NSError(domain: "", code: 0), statusCode: httpResponse.statusCode)
                 await waitForRetry(message: message)
                 continue // Retry the request

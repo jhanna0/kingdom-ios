@@ -291,16 +291,19 @@ def calculate_upgrade_actions_required(current_tier: int, building_skill: int = 
     return max(1, reduced_actions)
 
 
-def check_player_can_afford(state, resource_costs: list) -> dict:
-    """Check if player can afford all resource costs"""
+def check_player_can_afford(db: Session, user_id: int, resource_costs: list) -> dict:
+    """Check if player can afford all resource costs (from inventory)"""
+    from routers.actions.utils import get_inventory_map
+    
     results = {"can_afford": True, "missing": []}
+    inventory_map = get_inventory_map(db, user_id)
     
     for cost in resource_costs:
         resource_id = cost["resource"]
         required = cost["amount"]
         
-        # Get player's amount of this resource
-        player_amount = getattr(state, resource_id, 0) or 0
+        # Get player's amount from inventory
+        player_amount = inventory_map.get(resource_id, 0)
         
         has_enough = player_amount >= required
         cost["player_has"] = player_amount
@@ -316,13 +319,14 @@ def check_player_can_afford(state, resource_costs: list) -> dict:
     return results
 
 
-def deduct_resource_costs(state, resource_costs: list):
-    """Deduct resources from player state"""
+def deduct_resource_costs(db: Session, user_id: int, resource_costs: list):
+    """Deduct resources from player inventory"""
+    from routers.actions.utils import deduct_inventory_amount
+    
     for cost in resource_costs:
         resource_id = cost["resource"]
         amount = cost["amount"]
-        current = getattr(state, resource_id, 0) or 0
-        setattr(state, resource_id, current - amount)
+        deduct_inventory_amount(db, user_id, resource_id, amount)
 
 
 def get_available_rooms(tier: int) -> list:
@@ -1189,6 +1193,8 @@ def fortify_property(
     db: Session = Depends(get_db)
 ):
     """Convert a weapon or armor into property fortification."""
+    from sqlalchemy import text
+    
     # Get property
     property = db.query(Property).filter(
         Property.id == property_id,
@@ -1256,6 +1262,7 @@ def fortify_property(
     
     # Apply gain (cap at 100%)
     property.fortification_percent = min(100, property.fortification_percent + gain)
+    reached_max = property.fortification_percent >= 100
     
     # Update decay timestamp to now (fresh start after conversion)
     property.fortification_last_decay_at = datetime.now(timezone.utc)
@@ -1266,6 +1273,19 @@ def fortify_property(
     
     # Consume the item
     db.delete(item)
+    
+    # =====================================================
+    # UPDATE FORTIFICATION STATS FOR ACHIEVEMENTS
+    # =====================================================
+    db.execute(text("""
+        INSERT INTO player_fortification_stats (user_id, items_sacrificed, fortification_gained, max_fortification_reached)
+        VALUES (:user_id, 1, :gain, :reached_max)
+        ON CONFLICT (user_id) DO UPDATE SET
+            items_sacrificed = player_fortification_stats.items_sacrificed + 1,
+            fortification_gained = player_fortification_stats.fortification_gained + :gain,
+            max_fortification_reached = player_fortification_stats.max_fortification_reached OR :reached_max,
+            updated_at = NOW()
+    """), {"user_id": current_user.id, "gain": gain, "reached_max": reached_max})
     
     db.commit()
     

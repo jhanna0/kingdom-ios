@@ -8,8 +8,10 @@ struct ActionIconHelper {
         switch actionType.lowercased() {
         case "farm", "farming":
             return "leaf.fill"
-        case "work", "build":
+        case "work", "build", "building":
             return "hammer.fill"
+        case "building_complete":
+            return "building.2.fill"
         case "patrol":
             return "eye.fill"
         case "scout", "scouting":
@@ -20,24 +22,40 @@ struct ActionIconHelper {
             return "banknote.fill"
         case "training", "train":
             return "figure.strengthtraining.traditional"
+        case "training_complete":
+            return "star.fill"
         case "craft", "crafting", "workshop_craft":
             return "wrench.and.screwdriver.fill"
+        case "crafting_complete":
+            return "checkmark.seal.fill"
         case "vote":
             return "checkmark.seal.fill"
         case "invasion":
             return "shield.lefthalf.filled"
         case "battle", "fighting", "fight":
             return "flame.fill"
-        case "property_purchase":
+        case "property", "property_purchase":
             return "house.fill"
-        case "property_upgrade":
-            return "arrow.up.forward.app.fill"
+        case "property_complete", "property_upgrade":
+            return "house.fill"
         case "travel":
             return "figure.walk"
         case "checkin":
             return "location.circle.fill"
         case "kingdom_visits":
             return "map.fill"
+        case "achievement":
+            return "trophy.fill"
+        case "harvest":
+            return "leaf.fill"
+        case "foraging_find", "rare_loot":
+            return "sparkles"
+        case "hunt_kill", "hunt":
+            return "scope"
+        case "fish_catch", "fish", "fishing":
+            return "fish.fill"
+        case "travel_fee":
+            return "g.circle.fill"
         default:
             return "circle.fill"
         }
@@ -144,8 +162,10 @@ struct ActionIconHelper {
         switch actionType.lowercased() {
         case "farm", "farming":
             return KingdomTheme.Colors.buttonSuccess // Green
-        case "work", "build":
-            return KingdomTheme.Colors.inkMedium // Gold
+        case "work", "build", "building":
+            return KingdomTheme.Colors.buttonWarning // Orange for building
+        case "building_complete":
+            return KingdomTheme.Colors.buttonWarning // Orange for building
         case "patrol":
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "scout", "scouting":
@@ -156,7 +176,11 @@ struct ActionIconHelper {
             return Color.purple // Purple for high-tier intelligence action
         case "training", "train":
             return KingdomTheme.Colors.buttonPrimary // Blue
+        case "training_complete":
+            return KingdomTheme.Colors.imperialGold // Gold for level up!
         case "craft", "crafting", "workshop_craft":
+            return KingdomTheme.Colors.buttonWarning // Orange
+        case "crafting_complete":
             return KingdomTheme.Colors.buttonWarning // Orange
         case "vote":
             return KingdomTheme.Colors.buttonPrimary // Blue
@@ -164,16 +188,28 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.buttonDanger // Red
         case "battle", "fighting", "fight":
             return KingdomTheme.Colors.buttonDanger // Red for battles
-        case "property_purchase":
+        case "property", "property_purchase":
             return KingdomTheme.Colors.buttonSuccess // Green
-        case "property_upgrade":
-            return KingdomTheme.Colors.buttonWarning // Orange
+        case "property_complete", "property_upgrade":
+            return KingdomTheme.Colors.buttonSuccess // Green
         case "travel":
             return KingdomTheme.Colors.buttonPrimary // Blue
         case "checkin":
             return KingdomTheme.Colors.buttonSuccess // Green
         case "kingdom_visits":
             return KingdomTheme.Colors.royalPurple // Purple for travel
+        case "achievement":
+            return KingdomTheme.Colors.imperialGold // Gold for achievements
+        case "harvest":
+            return KingdomTheme.Colors.buttonSuccess // Green for gardening
+        case "foraging_find", "rare_loot":
+            return KingdomTheme.Colors.imperialGold // Gold for rare finds
+        case "hunt_kill", "hunt":
+            return KingdomTheme.Colors.buttonWarning // Orange for hunts
+        case "fish_catch", "fish", "fishing":
+            return KingdomTheme.Colors.buttonPrimary // Blue for fishing
+        case "travel_fee":
+            return KingdomTheme.Colors.imperialGold // Gold for fees
         default:
             return KingdomTheme.Colors.inkMedium
         }

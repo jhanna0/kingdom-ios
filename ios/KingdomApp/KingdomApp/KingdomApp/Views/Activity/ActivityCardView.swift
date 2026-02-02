@@ -53,31 +53,9 @@ struct ActivityCard: View {
                 }
                 
                 Spacer()
-                
-            // Amount
-                if let amount = activity.amount {
-                HStack(spacing: 4) {
-                    // Show minus for spending (travel_fee), plus for earning
-                    let prefix = activity.actionType == "travel_fee" ? "-" : "+"
-                    Text("\(prefix)\(amount)")
-                            .font(FontStyles.headingSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    
-                    // Show R for reputation (patrol) or G for gold
-                    if activity.actionType == "patrol" {
-                        Image(systemName: "r.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.royalPurple)
-                    } else {
-                        Image(systemName: "g.circle.fill")
-                            .font(FontStyles.iconMini)
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
-                    }
-                }
-            }
         }
         .padding()
-        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
     }
 }

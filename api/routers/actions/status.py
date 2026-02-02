@@ -34,7 +34,7 @@ from .constants import (
     PATROL_REPUTATION_REWARD,
     SCOUT_COOLDOWN,
 )
-from .scout import SCOUT_COST_GOLD, OUTCOMES_BY_TIER, OUTCOME_DESCRIPTIONS
+from .scout import OUTCOMES_BY_TIER, OUTCOME_DESCRIPTIONS
 
 
 router = APIRouter()
@@ -194,6 +194,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
     """Get property contracts from unified_contracts table for status endpoint"""
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
+    from db.models.inventory import PlayerInventory
     
     # Rulers don't pay tax
     effective_tax_rate = 0 if is_ruler else current_tax_rate
@@ -203,6 +204,12 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         UnifiedContract.type == 'property',
         UnifiedContract.completed_at.is_(None)  # Active contracts only
     ).all()
+    
+    # Pre-fetch inventory items for resource checking (wood, etc.)
+    inventory_items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id
+    ).all()
+    inventory_map = {item.item_id: item.quantity for item in inventory_items}
     
     result = []
     for contract in contracts:
@@ -222,7 +229,8 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         can_afford = True
         for cost in raw_per_action:
             resource_info = RESOURCES.get(cost["resource"], {})
-            player_has = getattr(player_state, cost["resource"], 0) or 0
+            # Check inventory for resources like wood (not player_state)
+            player_has = inventory_map.get(cost["resource"], 0)
             has_enough = player_has >= cost["amount"]
             if not has_enough:
                 can_afford = False
@@ -604,7 +612,6 @@ def get_action_status(
             "theme_color": "royalEmerald",
             "display_order": 5,
             "endpoint": "/actions/scout",
-            "cost": SCOUT_COST_GOLD,
             "intelligence_tier": intel_tier,
             "current_outcomes": current_outcomes,
             "locked_outcomes": locked_outcomes,

@@ -270,12 +270,21 @@ def get_active_alliances_for_empire(db: Session, empire_id: str) -> List[dict]:
     return result
 
 
-def _alliance_to_response(alliance: Alliance) -> AllianceResponse:
+def _alliance_to_response(alliance: Alliance, db: Session = None) -> AllianceResponse:
     """Convert Alliance model to response schema"""
+    # Look up empire names if db session is provided
+    initiator_empire_name = None
+    target_empire_name = None
+    if db:
+        initiator_empire_name = _get_empire_name(db, alliance.initiator_empire_id)
+        target_empire_name = _get_empire_name(db, alliance.target_empire_id)
+    
     return AllianceResponse(
         id=alliance.id,
         initiator_empire_id=alliance.initiator_empire_id,
         target_empire_id=alliance.target_empire_id,
+        initiator_empire_name=initiator_empire_name,
+        target_empire_name=target_empire_name,
         initiator_ruler_id=alliance.initiator_ruler_id,
         target_ruler_id=alliance.target_ruler_id,
         initiator_ruler_name=alliance.initiator_ruler_name,
@@ -543,7 +552,7 @@ def get_active_alliances(
     ).order_by(Alliance.expires_at.asc()).all()
     
     return AllianceListResponse(
-        alliances=[_alliance_to_response(a) for a in alliances],
+        alliances=[_alliance_to_response(a, db) for a in alliances],
         count=len(alliances)
     )
 
@@ -581,8 +590,8 @@ def get_pending_alliances(
     ).all()
     
     return PendingAlliancesResponse(
-        sent=[_alliance_to_response(a) for a in sent],
-        received=[_alliance_to_response(a) for a in received],
+        sent=[_alliance_to_response(a, db) for a in sent],
+        received=[_alliance_to_response(a, db) for a in received],
         sent_count=len(sent),
         received_count=len(received)
     )
@@ -602,7 +611,7 @@ def get_alliance(
             detail="Alliance not found"
         )
     
-    return _alliance_to_response(alliance)
+    return _alliance_to_response(alliance, db)
 
 
 

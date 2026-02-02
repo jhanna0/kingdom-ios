@@ -236,6 +236,8 @@ struct AuthenticatedView: View {
     @State private var showWeatherToast = false
     @State private var currentWeather: WeatherData?
     @State private var showCoupView = false
+    @State private var showAchievements = false
+    @State private var claimableAchievements: Int = 0
     
     var body: some View {
         mainContent
@@ -268,6 +270,7 @@ struct AuthenticatedView: View {
                 kingdomForInfoSheet: $kingdomForInfoSheet,
                 kingdomToShow: $kingdomToShow,
                 showCoupView: $showCoupView,
+                showAchievements: $showAchievements,
                 viewModel: viewModel
             ))
             .modifier(EventHandlers(
@@ -283,8 +286,15 @@ struct AuthenticatedView: View {
                 currentWeather: $currentWeather,
                 syncRuledKingdomsToPlayer: syncRuledKingdomsToPlayer,
                 loadNotificationBadge: loadNotificationBadge,
+                loadAchievementsBadge: loadAchievementsBadge,
                 loadWeatherForKingdom: loadWeatherForKingdom
             ))
+            .onChange(of: showAchievements) { _, isShowing in
+                // Clear badge count locally when opening achievements sheet
+                if isShowing {
+                    claimableAchievements = 0
+                }
+            }
     }
     
     // MARK: - Main Content
@@ -329,6 +339,11 @@ struct AuthenticatedView: View {
             )
             
             coupBadgeOverlay
+            
+            FloatingAchievementsButton(
+                showAchievements: $showAchievements,
+                claimableCount: claimableAchievements
+            )
             
             FloatingNotificationsButton(
                 showNotifications: $showNotifications,
@@ -458,6 +473,17 @@ struct AuthenticatedView: View {
         }
     }
     
+    private func loadAchievementsBadge() async {
+        do {
+            let summary = try await AchievementsAPI().getSummary()
+            await MainActor.run {
+                claimableAchievements = summary.claimable_count
+            }
+        } catch {
+            print("❌ Failed to load achievements badge: \(error)")
+        }
+    }
+    
     /// Sync ruled kingdoms from AppInitService to player (backend is SOURCE OF TRUTH)
     private func syncRuledKingdomsToPlayer() {
         let kingdoms = appInit.ruledKingdoms.map { (id: $0.id, name: $0.name) }
@@ -497,6 +523,7 @@ private struct SheetModifiers: ViewModifier {
     @Binding var kingdomForInfoSheet: Kingdom?
     @Binding var kingdomToShow: Kingdom?
     @Binding var showCoupView: Bool
+    @Binding var showAchievements: Bool
     @ObservedObject var viewModel: MapViewModel
     
     func body(content: Content) -> some View {
@@ -508,12 +535,18 @@ private struct SheetModifiers: ViewModifier {
                     onDismiss: { showMyKingdoms = false }
                 )
             }
-            .sheet(isPresented: $showActions) {
+            .sheet(isPresented: $showActions, onDismiss: {
+                // Refresh player data when actions sheet closes (gold may have changed)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 NavigationStack {
                     ActionsView(viewModel: viewModel)
                 }
             }
-            .sheet(isPresented: $showProperties) {
+            .sheet(isPresented: $showProperties, onDismiss: {
+                // Refresh player data when properties sheet closes (gold may have changed)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 MyPropertiesView(player: viewModel.player, currentKingdom: viewModel.currentKingdomInside)
             }
             .sheet(isPresented: $showCharacterSheet) {
@@ -539,7 +572,10 @@ private struct SheetModifiers: ViewModifier {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(item: $kingdomToShow) { kingdom in
+            .sheet(item: $kingdomToShow, onDismiss: {
+                // Refresh player data when kingdom sheet closes (hunts/actions may have changed gold)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) { kingdom in
                 NavigationStack {
                     KingdomDetailView(
                         kingdomId: kingdom.id,
@@ -557,11 +593,17 @@ private struct SheetModifiers: ViewModifier {
                     }
                 }
             }
-            .sheet(isPresented: $showActivity) {
+            .sheet(isPresented: $showActivity, onDismiss: {
+                // Refresh player data when activity sheet closes (trades may have changed gold)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
                 FriendsView()
             }
             .sheet(isPresented: $showNotifications) {
                 NotificationsSheet()
+            }
+            .sheet(isPresented: $showAchievements) {
+                AchievementDiaryView()
             }
             .fullScreenCover(isPresented: $showCoupView) {
                 // Show battle from current kingdom first, then home kingdom
@@ -588,6 +630,7 @@ private struct EventHandlers: ViewModifier {
     
     let syncRuledKingdomsToPlayer: () -> Void
     let loadNotificationBadge: () async -> Void
+    let loadAchievementsBadge: () async -> Void
     let loadWeatherForKingdom: (String) async -> Void
     
     func body(content: Content) -> some View {
@@ -599,10 +642,12 @@ private struct EventHandlers: ViewModifier {
                 // Run independent startup tasks in PARALLEL for speed
                 async let initTask: () = appInit.initialize()  // /tiers + /notifications/updates
                 async let badgeTask: () = loadNotificationBadge()  // /notifications/summary
+                async let achievementTask: () = loadAchievementsBadge()  // /achievements/summary
                 
-                // Wait for both to complete
+                // Wait for all to complete
                 await initTask
                 await badgeTask
+                await achievementTask
                 
                 // These must run AFTER appInit completes (depends on ruledKingdoms)
                 syncRuledKingdomsToPlayer()

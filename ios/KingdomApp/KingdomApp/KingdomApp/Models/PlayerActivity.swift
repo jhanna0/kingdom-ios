@@ -19,6 +19,10 @@ struct ActivityLogEntry: Codable, Identifiable {
     let displayName: String?
     let userLevel: Int?
     
+    // Display info from backend
+    let iconName: String?
+    let colorName: String?
+    
     enum CodingKeys: String, CodingKey {
         case id, description, amount, visibility, username, details
         case userId = "user_id"
@@ -29,6 +33,8 @@ struct ActivityLogEntry: Codable, Identifiable {
         case createdAt = "created_at"
         case displayName = "display_name"
         case userLevel = "user_level"
+        case iconName = "icon"
+        case colorName = "color"
     }
 }
 
@@ -56,62 +62,22 @@ struct PlayerActivityResponse: Codable {
 
 extension ActivityLogEntry {
     var icon: String {
-        // For travel fees, show gold coin icon
-        if actionType == "travel_fee" {
-            return "g.circle.fill"
+        // Use backend icon if provided
+        if let backendIcon = iconName, !backendIcon.isEmpty {
+            return backendIcon
         }
         
-        // For training, use the specific skill icon if available
-        if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
-            if let trainingType = details?.trainingType {
-                return SkillConfig.get(trainingType).icon
-            }
-        }
-        
-        // For crafting, use equipment-specific icons
-        if actionType.lowercased() == "craft" || actionType.lowercased() == "crafting" {
-            if let equipmentType = details?.equipmentType {
-                switch equipmentType {
-                case "weapon":
-                    return "bolt.fill"
-                case "armor":
-                    return "shield.fill"
-                default:
-                    break
-                }
-            }
-        }
-        
+        // Fallback to local mapping
         return ActionIconHelper.icon(for: actionType)
     }
     
     var color: Color {
-        // For travel fees, use gold color
-        if actionType == "travel_fee" {
-            return KingdomTheme.Colors.imperialGold
+        // Use backend color if provided
+        if let backendColor = colorName, !backendColor.isEmpty {
+            return KingdomTheme.Colors.color(fromThemeName: backendColor)
         }
         
-        // For training, use the specific skill color if available
-        if actionType.lowercased() == "train" || actionType.lowercased() == "training" {
-            if let trainingType = details?.trainingType {
-                return SkillConfig.get(trainingType).color
-            }
-        }
-        
-        // For crafting, use equipment-specific colors
-        if actionType.lowercased() == "craft" || actionType.lowercased() == "crafting" {
-            if let equipmentType = details?.equipmentType {
-                switch equipmentType {
-                case "weapon":
-                    return KingdomTheme.Colors.buttonDanger
-                case "armor":
-                    return KingdomTheme.Colors.royalBlue
-                default:
-                    break
-                }
-            }
-        }
-        
+        // Fallback to local mapping
         return ActionIconHelper.actionColor(for: actionType)
     }
     

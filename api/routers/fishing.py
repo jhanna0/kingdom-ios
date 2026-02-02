@@ -148,6 +148,25 @@ def broadcast_rare_loot(db: Session, player_id: int) -> None:
     )
 
 
+def increment_fish_catch(db: Session, user_id: int, fish_id: str) -> None:
+    """
+    Increment per-fish catch count for achievements.
+    Uses upsert pattern - creates row if not exists, increments if exists.
+    """
+    from sqlalchemy import text
+    
+    db.execute(
+        text("""
+            INSERT INTO player_fish_catches (user_id, fish_id, catch_count, first_catch_at, last_catch_at)
+            VALUES (:user_id, :fish_id, 1, NOW(), NOW())
+            ON CONFLICT (user_id, fish_id) DO UPDATE SET
+                catch_count = player_fish_catches.catch_count + 1,
+                last_catch_at = NOW()
+        """),
+        {"user_id": user_id, "fish_id": fish_id}
+    )
+
+
 # ============================================================
 # ENDPOINTS
 # ============================================================
@@ -357,11 +376,17 @@ def reel_in(
     if not session.current_fish:
         raise HTTPException(status_code=400, detail="No fish on the line. Cast first!")
     
+    # Save fish_id before reel clears it (needed for stats tracking)
+    fish_id = session.current_fish
+    
     # Execute reel with all rolls pre-calculated
     result = _manager.execute_reel(session, stats["defense"])
     
     # If caught, add meat to inventory immediately (streak bonus already applied in manager)
     if result.outcome == "caught":
+        # Track per-fish catch stats for achievements
+        increment_fish_catch(db, user_id=player_id, fish_id=fish_id)
+        
         meat_earned = result.outcome_display.get("meat_earned", 0)
         if meat_earned > 0:
             meat_entry = db.query(PlayerInventory).filter(

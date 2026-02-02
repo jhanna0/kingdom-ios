@@ -117,20 +117,20 @@ extension FriendsView {
                 
                 // View All button if more than 5 friends
                 if viewModel.friends.count > 5 {
-                    NavigationLink(destination: AllFriendsView(friends: viewModel.friends)) {
-                        HStack(spacing: 6) {
-                            Text("All Friends")
-                                .font(FontStyles.headingSmall)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(FontStyles.iconSmall)
-                        }
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: .infinity)
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                NavigationLink(destination: AllFriendsView(friends: viewModel.friends)) {
+                    HStack(spacing: 6) {
+                        Text("All Friends")
+                            .font(FontStyles.headingSmall)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(FontStyles.iconSmall)
                     }
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                }
                     .buttonStyle(.plain)
                     .padding(.horizontal)
                 }
@@ -207,15 +207,29 @@ extension FriendsView {
             .padding(.horizontal)
             
             ForEach(viewModel.friendActivities.prefix(5)) { activity in
-                    ActivityCard(activity: activity, showUser: true)
-                }
+                ActivityCard(activity: activity, showUser: true)
+            }
             
             if viewModel.friendActivities.count > 5 {
-                Text("+ \(viewModel.friendActivities.count - 5) more activities")
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                NavigationLink(destination: AllFriendActivityView(activities: viewModel.friendActivities)) {
+                    HStack(spacing: 6) {
+                        Text("More Activity")
+                            .font(FontStyles.headingSmall)
+                        Spacer()
+                        Text("\(viewModel.friendActivities.count)")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Image(systemName: "chevron.right")
+                            .font(FontStyles.iconSmall)
+                    }
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
             }
         }
     }
@@ -370,7 +384,7 @@ extension FriendsView {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
-                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal)

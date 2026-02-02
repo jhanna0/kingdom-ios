@@ -1,7 +1,7 @@
 """
 GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 2 property (House)
 =====================================================================================
-Plant seeds → Water within 16 hours (available after 4h) for 4 cycles → Harvest!
+Plant seeds → Water within 20 hours (available after 4h) for 4 cycles → Harvest!
 Results: Weeds (common), Flowers (keep forever), Wheat (1-2 harvest)
 
 ALL LOGIC IS SERVER-SIDE! Frontend is a dumb renderer.
@@ -19,7 +19,7 @@ from db.models.garden_history import GardenHistory
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.resources import RESOURCES
-from routers.actions.utils import format_datetime_iso
+from routers.actions.utils import format_datetime_iso, log_activity
 
 router = APIRouter(prefix="/garden", tags=["garden"])
 
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/garden", tags=["garden"])
 GARDEN_CONFIG = {
     "max_slots": 6,
     "min_watering_hours": 4,  # Can water after this many hours
-    "death_timer_hours": 16,  # Plant dies after this many hours without water
+    "death_timer_hours": 20,  # Plant dies after this many hours without water
     "watering_cycles_required": 4,  # Water this many times to grow
     "seed_item_id": "wheat_seed",  # Item consumed when planting
     
@@ -606,6 +606,19 @@ def harvest_plant(
         wheat_gained=wheat_amount
     )
     db.add(history)
+    
+    # Log to activity feed
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="harvest",
+        action_category="gardening",
+        description=f"Harvested {wheat_amount} wheat from the garden!",
+        kingdom_id=None,
+        amount=wheat_amount,
+        details={"item": "wheat", "amount": wheat_amount},
+        visibility="friends"
+    )
     
     # Clear the slot
     slot.status = PlantStatus.EMPTY

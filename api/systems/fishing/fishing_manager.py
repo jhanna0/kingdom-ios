@@ -97,6 +97,9 @@ class FishingSession:
     fish_caught: int = 0
     pet_fish_dropped: bool = False
     
+    # Per-fish-type catch counts for achievements
+    fish_catches: Dict[str, int] = field(default_factory=dict)
+    
     # Current state
     current_fish: Optional[str] = None  # Fish on the line (after cast)
     
@@ -111,6 +114,7 @@ class FishingSession:
             "session_id": self.session_id,
             "total_meat": self.total_meat,
             "fish_caught": self.fish_caught,
+            "fish_catches": self.fish_catches,
             "pet_fish_dropped": self.pet_fish_dropped,
             "current_fish": self.current_fish,
             "current_fish_data": get_fish_with_loot_preview(self.current_fish) if self.current_fish else None,

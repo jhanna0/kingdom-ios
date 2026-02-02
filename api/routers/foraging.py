@@ -49,6 +49,42 @@ def broadcast_rare_egg(db: Session, player_id: int) -> None:
         visibility="friends"
     )
 
+
+def broadcast_seed_find(db: Session, player_id: int, amount: int) -> None:
+    """Broadcast seed find to activity feed."""
+    from routers.resources import RESOURCES
+    seed = RESOURCES.get("wheat_seed", {"display_name": "Wheat Seed", "icon": "leaf.fill"})
+    log_activity(
+        db=db,
+        user_id=player_id,
+        action_type="foraging_find",
+        action_category="foraging",
+        description=f"Found {amount} {seed['display_name']}{'s' if amount > 1 else ''} while foraging! 🌱",
+        kingdom_id=None,
+        amount=amount,
+        details={"item_id": "wheat_seed", "item_name": seed["display_name"], "amount": amount},
+        visibility="friends"
+    )
+
+
+def increment_foraging_find(db: Session, user_id: int, item_id: str) -> None:
+    """
+    Increment per-item find count for achievements.
+    Uses upsert pattern - creates row if not exists, increments if exists.
+    """
+    from sqlalchemy import text
+    
+    db.execute(
+        text("""
+            INSERT INTO player_foraging_finds (user_id, item_id, find_count, first_find_at, last_find_at)
+            VALUES (:user_id, :item_id, 1, NOW(), NOW())
+            ON CONFLICT (user_id, item_id) DO UPDATE SET
+                find_count = player_foraging_finds.find_count + 1,
+                last_find_at = NOW()
+        """),
+        {"user_id": user_id, "item_id": item_id}
+    )
+
 _manager = ForagingManager()
 
 
@@ -217,12 +253,16 @@ def collect_rewards(
     if round2:
         if round2.get("is_winner") and round2.get("reward_amount", 0) > 0:
             reward_config = round2.get("reward_config", {})
+            seed_amount = round2.get("reward_amount")
             rewards.append({
                 "round": 2,
                 "item": reward_config.get("item"),
-                "amount": round2.get("reward_amount"),
+                "amount": seed_amount,
                 "display_name": reward_config.get("display_name"),
             })
+            # Broadcast seed find to activity feed
+            if reward_config.get("item") == "wheat_seed":
+                broadcast_seed_find(db, player_id, seed_amount)
         
         # Check for rare drops in round 2 rewards array
         for r in round2.get("rewards", []):
@@ -236,6 +276,8 @@ def collect_rewards(
                 })
                 # Broadcast to activity feed (friends can see this!)
                 broadcast_rare_egg(db, player_id)
+                # Track for achievements
+                increment_foraging_find(db, player_id, "rare_egg")
     
     # Add ALL rewards to inventory
     for reward in rewards:

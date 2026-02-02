@@ -26,7 +26,7 @@ from typing import Dict, List, Optional
 HUNT_LOBBY_TIMEOUT_SECONDS = 120       # Max time to wait in lobby
 HUNT_PHASE_DURATION_SECONDS = 12       # How long each phase lasts (for UI drama & roll reveals)
 HUNT_RESULTS_DISPLAY_SECONDS = 15      # How long to show final results
-HUNT_COOLDOWN_MINUTES = 30             # Cooldown between hunts
+HUNT_COOLDOWN_MINUTES = 30             # Cooldown between hunts #deprecated- ignore
 
 MIN_PARTY_SIZE = 1                     # Solo hunting allowed
 MAX_PARTY_SIZE = 5                     # Maximum hunters

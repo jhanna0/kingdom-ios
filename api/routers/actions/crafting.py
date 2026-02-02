@@ -11,7 +11,7 @@ from db import get_db, User, Kingdom, UnifiedContract, ContractContribution, Pla
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status, log_activity
 from .constants import WORK_BASE_COOLDOWN, TRAINING_COOLDOWN
 
 
@@ -399,9 +399,35 @@ def work_on_craft(
         
         # Clear activity status (crafting complete)
         set_activity_status(state, None)
+        
+        # Log crafting completion to activity feed
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="crafting_complete",
+            action_category="crafting",
+            description=f"Crafted T{contract.tier} {contract.type}!",
+            kingdom_id=state.current_kingdom_id,
+            amount=contract.tier,
+            details={"equipment": contract.type, "tier": contract.tier, "stat_bonus": stat_bonus},
+            visibility="friends"
+        )
     else:
         # Update crafting progress
         set_activity_status(state, f"Crafting T{contract.tier} {contract.type} {new_actions_completed}/{contract.actions_required}")
+        
+        # Log crafting progress to activity feed
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="crafting",
+            action_category="crafting",
+            description=f"Crafting T{contract.tier} {contract.type} ({new_actions_completed}/{contract.actions_required})",
+            kingdom_id=state.current_kingdom_id,
+            amount=None,
+            details={"equipment": contract.type, "tier": contract.tier, "progress": f"{new_actions_completed}/{contract.actions_required}"},
+            visibility="friends"
+        )
     
     # Check for level up
     xp_needed = 100 * (2 ** (state.level - 1))

@@ -1,6 +1,7 @@
 import Foundation
 import MapKit
 import CoreLocation
+import Combine
 
 // MARK: - Kingdom Loading & Refreshing
 extension MapViewModel {
@@ -467,6 +468,8 @@ extension MapViewModel {
             await MainActor.run {
                 // Use the full sync method to update ALL player fields
                 player.updateFromAPIState(apiPlayerState)
+                // Notify observers that nested player data changed (fixes HUD not updating)
+                objectWillChange.send()
                 print("✅ Refreshed player state - Gold: \(apiPlayerState.gold)")
             }
         } catch {

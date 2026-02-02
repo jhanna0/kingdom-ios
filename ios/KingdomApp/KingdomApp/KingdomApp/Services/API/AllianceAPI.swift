@@ -89,6 +89,8 @@ struct AllianceResponse: Codable, Identifiable {
     let id: Int
     let initiatorEmpireId: String
     let targetEmpireId: String
+    let initiatorEmpireName: String?
+    let targetEmpireName: String?
     let initiatorRulerId: Int
     let targetRulerId: Int?
     let initiatorRulerName: String
@@ -106,6 +108,8 @@ struct AllianceResponse: Codable, Identifiable {
         case id, status
         case initiatorEmpireId = "initiator_empire_id"
         case targetEmpireId = "target_empire_id"
+        case initiatorEmpireName = "initiator_empire_name"
+        case targetEmpireName = "target_empire_name"
         case initiatorRulerId = "initiator_ruler_id"
         case targetRulerId = "target_ruler_id"
         case initiatorRulerName = "initiator_ruler_name"

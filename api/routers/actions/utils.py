@@ -494,6 +494,58 @@ def get_inventory(db: Session, user_id: int) -> list:
     return inventory
 
 
+def get_inventory_amount(db: Session, user_id: int, item_id: str) -> int:
+    """Get amount of a specific item in player's inventory."""
+    from db.models.inventory import PlayerInventory
+    
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id == item_id
+    ).first()
+    return inv.quantity if inv else 0
+
+
+def deduct_inventory_amount(db: Session, user_id: int, item_id: str, amount: int) -> int:
+    """Deduct amount from player's inventory. Returns new total.
+    
+    Creates row with 0 if doesn't exist (shouldn't happen in practice).
+    Does NOT validate if player has enough - caller should check first.
+    """
+    from db.models.inventory import PlayerInventory
+    
+    inv = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id,
+        PlayerInventory.item_id == item_id
+    ).with_for_update().first()
+    
+    if inv:
+        inv.quantity = max(0, inv.quantity - amount)
+        return inv.quantity
+    else:
+        # Shouldn't happen - create with 0
+        inv = PlayerInventory(
+            user_id=user_id,
+            item_id=item_id,
+            quantity=0
+        )
+        db.add(inv)
+        return 0
+
+
+def get_inventory_map(db: Session, user_id: int) -> dict:
+    """Get all inventory items as a dict {item_id: quantity}.
+    
+    Useful for bulk checking affordability.
+    """
+    from db.models.inventory import PlayerInventory
+    
+    items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == user_id
+    ).all()
+    
+    return {item.item_id: item.quantity for item in items}
+
+
 def is_patrolling(db: Session, user_id: int) -> bool:
     """Check if a user is currently on patrol"""
     cooldown = get_cooldown(db, user_id, "patrol")
@@ -537,3 +589,39 @@ def log_activity(
 def set_activity_status(state, status: Optional[str] = None):
     """Set player's activity status. Pass None to clear."""
     state.current_activity_status = status
+
+
+def get_activity_icon_color(action_type: str) -> tuple[str, str]:
+    """Get icon and color for an action type. Returns (icon, color)."""
+    mapping = {
+        # Training
+        "training": ("figure.strengthtraining.traditional", "buttonPrimary"),
+        "training_complete": ("star.fill", "imperialGold"),
+        # Building
+        "building": ("hammer.fill", "buttonWarning"),
+        "building_complete": ("building.2.fill", "buttonWarning"),
+        # Crafting
+        "crafting": ("wrench.and.screwdriver.fill", "buttonWarning"),
+        "crafting_complete": ("checkmark.seal.fill", "buttonWarning"),
+        # Property
+        "property": ("house.fill", "buttonSuccess"),
+        "property_complete": ("house.fill", "buttonSuccess"),
+        # Foraging & Garden
+        "foraging_find": ("sparkles", "imperialGold"),
+        "rare_loot": ("sparkles", "imperialGold"),
+        "harvest": ("leaf.fill", "buttonSuccess"),
+        # Achievements
+        "achievement": ("trophy.fill", "imperialGold"),
+        # Combat/PvP
+        "hunt_kill": ("scope", "buttonWarning"),
+        "fish_catch": ("fish.fill", "buttonPrimary"),
+        "scout": ("magnifyingglass", "buttonWarning"),
+        "sabotage": ("flame.fill", "buttonDanger"),
+        "invasion": ("shield.lefthalf.filled", "buttonDanger"),
+        "battle": ("flame.fill", "buttonDanger"),
+        # Other
+        "patrol": ("eye.fill", "buttonPrimary"),
+        "checkin": ("location.circle.fill", "buttonSuccess"),
+        "travel_fee": ("g.circle.fill", "imperialGold"),
+    }
+    return mapping.get(action_type, ("circle.fill", "inkMedium"))

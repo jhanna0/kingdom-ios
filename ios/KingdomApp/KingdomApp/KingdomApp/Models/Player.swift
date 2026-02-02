@@ -11,6 +11,7 @@ class Player: ObservableObject {
     // Status
     @Published var isAlive: Bool = true
     @Published var gold: Int = 100  // Starting gold
+    @Published var food: Int = 0   // Total food (meat + berries + other food items)
     
     // Location & Check-in
     @Published var currentKingdom: String?  // Kingdom player is currently in (ID)
@@ -20,6 +21,7 @@ class Player: ObservableObject {
     
     // Player History & Home
     @Published var hometownKingdomId: String?  // Their hometown (set on first check-in) - used for royal blue territory color
+    @Published var hometownKingdomName: String?  // Their hometown name (from backend)
     @Published var checkInHistory: [String: Int] = [:]  // kingdomId -> total check-ins
     
     // Power & Territory - ALL VALUES FROM BACKEND ONLY
@@ -698,6 +700,7 @@ class Player: ObservableObject {
         
         // Core Stats
         gold = apiState.gold
+        food = apiState.food ?? 0
         level = apiState.level
         experience = apiState.experience
         skillPoints = apiState.skill_points
@@ -726,6 +729,7 @@ class Player: ObservableObject {
         currentKingdom = apiState.current_kingdom_id
         currentKingdomName = apiState.current_kingdom_name
         hometownKingdomId = apiState.hometown_kingdom_id
+        hometownKingdomName = apiState.hometown_kingdom_name
         // Note: fiefs_ruled is now computed in backend from kingdoms table
         isRuler = apiState.is_ruler
         

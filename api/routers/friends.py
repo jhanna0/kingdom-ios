@@ -15,7 +15,7 @@ from schemas.friend import (
     SearchUsersResponse
 )
 from routers.auth import get_current_user
-from routers.actions.utils import format_datetime_iso
+from routers.actions.utils import format_datetime_iso, get_activity_icon_color
 
 
 router = APIRouter(prefix="/friends", tags=["friends"])
@@ -489,8 +489,8 @@ def get_friends_dashboard(
             Alliance.target_empire_id == my_empire_id
         ).all()
         
-        pending_alliances_sent = [_alliance_to_response(a).model_dump() for a in sent]
-        pending_alliances_received = [_alliance_to_response(a).model_dump() for a in received]
+        pending_alliances_sent = [_alliance_to_response(a, db).model_dump() for a in sent]
+        pending_alliances_received = [_alliance_to_response(a, db).model_dump() for a in received]
     
     # ===== FRIEND ACTIVITY =====
     # Fast path: query PlayerActivityLog directly with batch IN clause
@@ -528,6 +528,7 @@ def get_friends_dashboard(
     for log in activity_logs:
         user = users_map.get(log.user_id)
         user_state = states_map.get(log.user_id)
+        icon, color = get_activity_icon_color(log.action_type)
         friend_activities.append({
             "id": log.id,
             "user_id": log.user_id,
@@ -542,6 +543,8 @@ def get_friends_dashboard(
             "amount": log.amount,
             "visibility": log.visibility,
             "details": log.details or {},
+            "icon": icon,
+            "color": color,
             # TODO: Using wrong format here. Should use format_datetime_iso once iOS TimeFormatter.parseISO supports Z suffix
             "created_at": log.created_at.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
         })
