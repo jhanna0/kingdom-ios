@@ -142,6 +142,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     // Relationship to player (from backend)
     var isAllied: Bool  // True if allied with any of player's kingdoms
     var isEnemy: Bool  // True if at war with any of player's kingdoms
+    var isEmpire: Bool  // True if this kingdom is part of current user's empire
     var allianceInfo: KingdomAllianceInfo?  // Details about alliance if isAllied is true
     var activeAlliances: [ActiveAlliance] = []  // All active alliances (only populated for player's hometown)
     
@@ -233,7 +234,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         hasher.combine(id)
     }
     
-    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false, canStageCoup: Bool = false, coupIneligibilityReason: String? = nil, isAtWar: Bool = false) {
+    init?(name: String, rulerName: String = "Unclaimed", rulerId: Int? = nil, territory: Territory, color: KingdomColor, canClaim: Bool = false, canDeclareWar: Bool = false, canFormAlliance: Bool = false, isAllied: Bool = false, isEnemy: Bool = false, isEmpire: Bool = false, canStageCoup: Bool = false, coupIneligibilityReason: String? = nil, isAtWar: Bool = false) {
         // Use OSM ID as Kingdom ID to match backend
         guard let osmId = territory.osmId else {
             print("⚠️ Skipping kingdom '\(name)' - no OSM ID")
@@ -250,6 +251,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         self.canFormAlliance = canFormAlliance
         self.isAllied = isAllied
         self.isEnemy = isEnemy
+        self.isEmpire = isEmpire
         self.canStageCoup = canStageCoup
         self.coupIneligibilityReason = coupIneligibilityReason
         self.isAtWar = isAtWar  // Backend is source of truth!
