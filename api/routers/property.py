@@ -641,10 +641,10 @@ def purchase_land(
     ).first()
     current_reputation = user_kingdom.local_reputation if user_kingdom else 0
     
-    if current_reputation < 50:
+    if current_reputation < 500:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Need 50+ reputation in {request.kingdom_name}. Current: {current_reputation}"
+            detail=f"Need 500+ reputation in {request.kingdom_name}. Current: {current_reputation}"
         )
     
     # Check if player already owns property in this kingdom

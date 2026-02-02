@@ -551,9 +551,11 @@ def get_action_status(
     # Patrol count determines if the incident triggers
     intel_tier = state.intelligence
     
-    # Check if we're in allied territory (can't scout allies)
-    is_in_allied_territory = False
-    if state.current_kingdom_id and state.hometown_kingdom_id and state.current_kingdom_id != state.hometown_kingdom_id:
+    # Check if we're in friendly territory (same empire or allied - can farm/patrol, but can't scout)
+    # "Friendly" = home kingdom, same empire, or allied empire
+    is_home_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
+    is_in_allied_territory = False  # Same empire or allied
+    if state.current_kingdom_id and state.hometown_kingdom_id and not is_home_kingdom:
         home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
         current_kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         if home_kingdom and current_kingdom:
@@ -562,6 +564,8 @@ def get_action_status(
                 home_kingdom.empire_id or home_kingdom.id,
                 current_kingdom.empire_id or current_kingdom.id
             )
+    # Friendly = home OR same empire/allied
+    is_friendly_territory = is_home_kingdom or is_in_allied_territory
     
     # Build outcome list dynamically from OUTCOMES_BY_TIER
     available_outcomes = OUTCOMES_BY_TIER.get(intel_tier, []) if intel_tier >= 1 else []
@@ -1078,6 +1082,13 @@ def get_action_status(
             action_key for action_key, action_data in actions.items()
             if action_data.get("slot") == slot_id and (action_data.get("endpoint") or action_data.get("handler"))
         ]
+        
+        # Dynamic location: if slot has allow_in_friendly and we're in friendly (non-home) territory,
+        # set location to "any" so frontend shows it in enemy slots too
+        slot_location = slot_def["location"]
+        if slot_def.get("allow_in_friendly", False) and is_friendly_territory and not is_home_kingdom:
+            slot_location = "any"  # Show in both home and enemy views
+        
         slots.append({
             "id": slot_id,
             "display_name": slot_def["display_name"],
@@ -1085,7 +1096,7 @@ def get_action_status(
             "color_theme": slot_def["color_theme"],
             "display_order": slot_def["display_order"],
             "description": slot_def["description"],
-            "location": slot_def["location"],
+            "location": slot_location,  # Dynamic based on territory
             "content_type": slot_def["content_type"],  # Tells frontend which renderer to use
             "actions": slot_actions,
         })
@@ -1101,6 +1112,9 @@ def get_action_status(
         "slots": slots,  # NEW: Full slot metadata for frontend rendering (no hardcoding!)
         "global_cooldown": slot_cooldowns.get("building", {"ready": True, "seconds_remaining": 0}),  # For old clients
         "actions": actions,  # DYNAMIC ACTION LIST
+        # Territory context for slot filtering
+        "is_home_kingdom": is_home_kingdom,  # In player's hometown
+        "is_friendly_territory": is_friendly_territory,  # Home OR same empire OR allied (can farm/patrol)
         # Food system - actions cost food based on cooldown (0.5 food per minute)
         "player_food_total": player_food_total,
         "food_cost_per_minute": 0.4,  # For frontend to calculate costs dynamically (minutes / 2.5)
