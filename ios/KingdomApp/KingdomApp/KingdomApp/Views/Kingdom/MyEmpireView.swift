@@ -443,7 +443,6 @@ struct MyEmpireView: View {
         case "treasury":
             NavigationLink(destination: TreasuryManagementView(
                 kingdom: kingdom,
-                allKingdoms: empireData?.kingdoms ?? [],
                 player: player,
                 uiConfig: config,
                 onComplete: { Task { await loadEmpireData() } }

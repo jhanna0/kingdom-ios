@@ -1,38 +1,22 @@
 import SwiftUI
 
-/// Simplified treasury management - just pick FROM and TO
-enum GoldLocation: Hashable {
-    case personal
-    case kingdom(String) // kingdom ID
-}
-
+/// Treasury management - backend provides FROM/TO options
 struct TreasuryManagementView: View {
     let kingdom: EmpireKingdomSummary
-    let allKingdoms: [EmpireKingdomSummary]
     @ObservedObject var player: Player
     let uiConfig: EmpireUIConfig
     let onComplete: () -> Void
     
-    @State private var fromLocation: GoldLocation = .kingdom("") // Will be set to current kingdom
-    @State private var toLocation: GoldLocation = .personal
+    @State private var selectedFrom: TreasuryLocationOption?
+    @State private var selectedTo: TreasuryLocationOption?
     @State private var amount: String = "0"
     @State private var isLoading = false
     @State private var resultMessage: String?
     @State private var isError = false
     
-    // All kingdoms for selectors
-    var otherKingdoms: [EmpireKingdomSummary] {
-        allKingdoms.filter { $0.id != kingdom.id }
-    }
-    
-    // Available balance based on FROM selection
+    // Available balance from selected FROM option
     private var availableBalance: Int {
-        switch fromLocation {
-        case .personal:
-            return player.gold
-        case .kingdom(let id):
-            return allKingdoms.first { $0.id == id }?.treasuryGold ?? 0
-        }
+        selectedFrom?.balance ?? 0
     }
     
     var body: some View {
@@ -40,6 +24,9 @@ struct TreasuryManagementView: View {
             VStack(spacing: KingdomTheme.Spacing.large) {
                 // Balances Header
                 balancesHeader
+                
+                // Intel warning
+                intelWarning
                 
                 // FROM selector
                 fromSelector
@@ -70,9 +57,9 @@ struct TreasuryManagementView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .onAppear {
-            // Default: from treasury to personal (withdraw)
-            fromLocation = .kingdom(kingdom.id)
-            toLocation = .personal
+            // Default to first options from backend
+            selectedFrom = kingdom.treasuryFromOptions.first
+            selectedTo = kingdom.treasuryToOptions.first { $0.id != selectedFrom?.id }
         }
     }
     
@@ -119,6 +106,30 @@ struct TreasuryManagementView: View {
         .padding(.top)
     }
     
+    // MARK: - Intel Warning
+    
+    private var intelWarning: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "eye.fill")
+                .font(FontStyles.iconSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            Text("Treasury movements can be exposed during intelligence operations")
+                .font(FontStyles.labelSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(KingdomTheme.Colors.parchmentLight)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(KingdomTheme.Colors.inkLight, lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+    
     // MARK: - FROM Selector
     
     private var fromSelector: some View {
@@ -128,25 +139,16 @@ struct TreasuryManagementView: View {
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             VStack(spacing: KingdomTheme.Spacing.small) {
-                // Personal gold option
-                locationButton(
-                    location: .personal,
-                    icon: "person.fill",
-                    label: "Your Gold",
-                    balance: player.gold,
-                    isSelected: fromLocation == .personal,
-                    isFrom: true
-                )
-                
-                // Current kingdom treasury
-                locationButton(
-                    location: .kingdom(kingdom.id),
-                    icon: "building.columns.fill",
-                    label: kingdom.name,
-                    balance: kingdom.treasuryGold,
-                    isSelected: fromLocation == .kingdom(kingdom.id),
-                    isFrom: true
-                )
+                ForEach(kingdom.treasuryFromOptions) { option in
+                    optionButton(option: option, isSelected: selectedFrom?.id == option.id) {
+                        selectedFrom = option
+                        // Auto-switch TO if it conflicts
+                        if selectedTo?.id == option.id {
+                            selectedTo = kingdom.treasuryToOptions.first { $0.id != option.id }
+                        }
+                        resultMessage = nil
+                    }
+                }
             }
         }
         .padding(.horizontal)
@@ -161,88 +163,48 @@ struct TreasuryManagementView: View {
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             VStack(spacing: KingdomTheme.Spacing.small) {
-                // Personal gold option (disabled if FROM is personal)
-                locationButton(
-                    location: .personal,
-                    icon: "person.fill",
-                    label: "Your Gold",
-                    balance: player.gold,
-                    isSelected: toLocation == .personal,
-                    isFrom: false,
-                    isDisabled: fromLocation == .personal
-                )
-                
-                // Current kingdom treasury (disabled if FROM is this treasury)
-                locationButton(
-                    location: .kingdom(kingdom.id),
-                    icon: "building.columns.fill",
-                    label: kingdom.name,
-                    balance: kingdom.treasuryGold,
-                    isSelected: toLocation == .kingdom(kingdom.id),
-                    isFrom: false,
-                    isDisabled: fromLocation == .kingdom(kingdom.id)
-                )
-                
-                // Other kingdoms (for transfers)
-                ForEach(otherKingdoms) { otherKingdom in
-                    locationButton(
-                        location: .kingdom(otherKingdom.id),
-                        icon: "building.columns",
-                        label: otherKingdom.name,
-                        balance: otherKingdom.treasuryGold,
-                        isSelected: toLocation == .kingdom(otherKingdom.id),
-                        isFrom: false,
-                        isDisabled: fromLocation == .personal // Can only transfer from treasury
-                    )
+                ForEach(kingdom.treasuryToOptions) { option in
+                    let isDisabled = option.id == selectedFrom?.id
+                    optionButton(option: option, isSelected: selectedTo?.id == option.id, isDisabled: isDisabled) {
+                        selectedTo = option
+                        resultMessage = nil
+                    }
                 }
             }
         }
         .padding(.horizontal)
     }
     
-    // MARK: - Location Button
+    // MARK: - Option Button
     
-    private func locationButton(
-        location: GoldLocation,
-        icon: String,
-        label: String,
-        balance: Int,
+    private func optionButton(
+        option: TreasuryLocationOption,
         isSelected: Bool,
-        isFrom: Bool,
-        isDisabled: Bool = false
+        isDisabled: Bool = false,
+        action: @escaping () -> Void
     ) -> some View {
         Button(action: {
             withAnimation(.easeInOut(duration: 0.15)) {
-                if isFrom {
-                    fromLocation = location
-                    // Auto-adjust TO if it conflicts
-                    if toLocation == location {
-                        toLocation = location == .personal ? .kingdom(kingdom.id) : .personal
-                    }
-                } else {
-                    toLocation = location
-                }
-                resultMessage = nil
+                action()
             }
         }) {
             HStack(spacing: 12) {
-                // Radio indicator - show dash for disabled
                 Image(systemName: isDisabled ? "minus.circle" : (isSelected ? "checkmark.circle.fill" : "circle"))
                     .font(FontStyles.iconMedium)
                     .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : (isSelected ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight))
                 
-                Image(systemName: icon)
+                Image(systemName: option.icon)
                     .font(FontStyles.iconSmall)
                     .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkMedium)
                 
-                Text(label)
+                Text(option.label)
                     .font(FontStyles.bodyMedium)
                     .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkDark)
                     .lineLimit(1)
                 
                 Spacer()
                 
-                Text("\(balance) gold")
+                Text("\(option.balance) gold")
                     .font(FontStyles.labelMedium)
                     .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkMedium)
             }
@@ -334,28 +296,26 @@ struct TreasuryManagementView: View {
     // MARK: - Submit Button
     
     private var actionLabel: String {
-        switch (fromLocation, toLocation) {
-        case (.personal, .kingdom(let id)) where id == kingdom.id:
+        guard let from = selectedFrom, let to = selectedTo else { return "Move Gold" }
+        
+        if from.type == "personal" && to.type == "current_kingdom" {
             return "Deposit"
-        case (.kingdom(let id), .personal) where id == kingdom.id:
+        } else if from.type == "current_kingdom" && to.type == "personal" {
             return "Withdraw"
-        case (.kingdom, .kingdom):
+        } else {
             return "Transfer"
-        default:
-            return "Move Gold"
         }
     }
     
     private var actionIcon: String {
-        switch (fromLocation, toLocation) {
-        case (.personal, .kingdom):
+        guard let from = selectedFrom else { return "arrow.right.circle.fill" }
+        
+        if from.type == "personal" {
             return "arrow.up.circle.fill"
-        case (.kingdom, .personal):
+        } else if selectedTo?.type == "personal" {
             return "arrow.down.circle.fill"
-        case (.kingdom, .kingdom):
+        } else {
             return "arrow.left.arrow.right.circle.fill"
-        default:
-            return "arrow.right.circle.fill"
         }
     }
     
@@ -367,24 +327,25 @@ struct TreasuryManagementView: View {
                         .tint(.white)
                 } else {
                     Image(systemName: actionIcon)
-                        .font(FontStyles.iconMedium)
+                        .font(FontStyles.iconSmall)
                 }
                 Text(isLoading ? "Processing..." : actionLabel)
-                    .font(FontStyles.bodyMediumBold)
+                    .font(FontStyles.labelBold)
             }
             .frame(maxWidth: .infinity)
-            .padding()
+            .padding(.vertical, 12)
             .foregroundColor(.white)
         }
-        .brutalistBadge(backgroundColor: isValidInput ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight, cornerRadius: 12)
+        .brutalistBadge(backgroundColor: Color(red: 0.2, green: 0.6, blue: 0.3).opacity(isValidInput ? 1.0 : 0.4), cornerRadius: 10)
         .disabled(!isValidInput || isLoading)
         .padding(.horizontal)
     }
     
     private var isValidInput: Bool {
+        guard let from = selectedFrom, let to = selectedTo else { return false }
         guard let amountValue = Int(amount), amountValue > 0 else { return false }
-        guard amountValue <= availableBalance else { return false }
-        guard fromLocation != toLocation else { return false }
+        guard amountValue <= from.balance else { return false }
+        guard from.id != to.id else { return false }
         return true
     }
     
@@ -411,44 +372,45 @@ struct TreasuryManagementView: View {
     
     @MainActor
     private func performAction() async {
+        guard let from = selectedFrom, let to = selectedTo else { return }
         guard let amountValue = Int(amount), amountValue > 0 else { return }
         
         isLoading = true
         resultMessage = nil
         
         do {
-            switch (fromLocation, toLocation) {
-            case (.kingdom(let fromId), .personal) where fromId == kingdom.id:
-                // Withdraw from current kingdom treasury to personal
+            // Determine action based on from/to types
+            if from.type == "current_kingdom" && to.type == "personal" {
+                // Withdraw
                 let response = try await APIClient.shared.withdrawFromTreasury(kingdomId: kingdom.id, amount: amountValue)
                 resultMessage = response.message
                 isError = false
                 player.gold = response.personalGoldNew
                 
-            case (.personal, .kingdom(let toId)) where toId == kingdom.id:
-                // Deposit from personal to current kingdom treasury
+            } else if from.type == "personal" && to.type == "current_kingdom" {
+                // Deposit
                 let response = try await APIClient.shared.depositToTreasury(kingdomId: kingdom.id, amount: amountValue)
                 resultMessage = response.message
                 isError = false
                 player.gold = response.personalGoldRemaining
                 
-            case (.kingdom(let fromId), .kingdom(let toId)) where fromId == kingdom.id:
-                // Transfer from current kingdom to another kingdom
+            } else if from.type == "current_kingdom" && (to.type == "other_kingdom" || to.type == "current_kingdom") {
+                // Transfer between kingdoms
                 let response = try await APIClient.shared.transferFunds(
-                    sourceKingdomId: kingdom.id,
-                    targetKingdomId: toId,
+                    sourceKingdomId: from.id,
+                    targetKingdomId: to.id,
                     amount: amountValue
                 )
                 resultMessage = response.message
                 isError = false
                 
-            default:
+            } else {
                 resultMessage = "Invalid transfer"
                 isError = true
             }
             
             // Clear amount on success
-            amount = ""
+            amount = "0"
             
             // Delay then close and refresh
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds

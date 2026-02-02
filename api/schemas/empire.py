@@ -33,6 +33,15 @@ class TreasuryActionConfig(BaseModel):
     requires_multiple_kingdoms: bool = False
 
 
+class TreasuryLocationOption(BaseModel):
+    """A FROM/TO option in treasury management - fully populated by backend"""
+    id: str  # "personal" or kingdom ID
+    type: str  # "personal", "current_kingdom", "other_kingdom"
+    label: str
+    icon: str
+    balance: int
+
+
 class SectionConfig(BaseModel):
     """Configuration for a UI section"""
     title: str
@@ -109,6 +118,10 @@ class EmpireKingdomSummary(BaseModel):
     vault_level: int
     is_capital: bool  # True if this is the empire capital (original kingdom)
     ruler_started_at: Optional[datetime] = None
+    
+    # Treasury management options - backend decides what's available
+    treasury_from_options: List[TreasuryLocationOption] = []
+    treasury_to_options: List[TreasuryLocationOption] = []
 
 
 class ActiveWarSummary(BaseModel):

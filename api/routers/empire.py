@@ -36,6 +36,7 @@ from schemas.empire import (
     StatConfig,
     TreasuryActionConfig,
     SectionConfig,
+    TreasuryLocationOption,
 )
 
 
@@ -141,7 +142,11 @@ EMPIRE_UI_CONFIG = {
         {"id": "manage", "label": "Manage", "icon": "gearshape.fill", "color": "buttonPrimary"},
     ],
     
-    # Treasury management actions
+    # Treasury location toggles
+    "treasury_allow_personal": False,  # Allow withdraw/deposit to ruler's personal gold
+    "treasury_allow_transfers": True,   # Allow transfers between kingdom treasuries
+    
+    # Treasury management actions (legacy, kept for reference)
     "treasury_actions": [
         {
             "id": "withdraw",
@@ -240,7 +245,7 @@ def _build_ui_config() -> dict:
         "kingdom_stats": cfg["kingdom_stats"],
         "kingdom_actions": cfg["kingdom_actions"],
         
-        # Treasury management
+        # Treasury management (options are now per-kingdom in kingdom summaries)
         "treasury_actions": cfg["treasury_actions"],
         "quick_amounts": cfg["quick_amounts"],
         "quick_max_label": cfg["quick_max_label"],
@@ -408,9 +413,57 @@ async def get_my_empire(
     total_treasury = sum(int(k.treasury_gold or 0) for k in kingdoms)
     total_subjects = sum(k.checked_in_players or 0 for k in kingdoms)
     
-    # Build kingdom summaries
+    # Build kingdom summaries with treasury options
+    cfg = EMPIRE_UI_CONFIG
     kingdom_summaries = []
     for k in kingdoms:
+        # Build FROM options for this kingdom
+        from_options = []
+        if cfg["treasury_allow_personal"]:
+            from_options.append(TreasuryLocationOption(
+                id="personal",
+                type="personal",
+                label="Your Gold",
+                icon="person.fill",
+                balance=state.gold or 0,
+            ))
+        from_options.append(TreasuryLocationOption(
+            id=k.id,
+            type="current_kingdom",
+            label=k.name,
+            icon="building.columns.fill",
+            balance=int(k.treasury_gold or 0),
+        ))
+        
+        # Build TO options for this kingdom
+        to_options = []
+        if cfg["treasury_allow_personal"]:
+            to_options.append(TreasuryLocationOption(
+                id="personal",
+                type="personal",
+                label="Your Gold",
+                icon="person.fill",
+                balance=state.gold or 0,
+            ))
+        to_options.append(TreasuryLocationOption(
+            id=k.id,
+            type="current_kingdom",
+            label=k.name,
+            icon="building.columns.fill",
+            balance=int(k.treasury_gold or 0),
+        ))
+        # Add other kingdoms as TO options
+        if cfg["treasury_allow_transfers"]:
+            for other in kingdoms:
+                if other.id != k.id:
+                    to_options.append(TreasuryLocationOption(
+                        id=other.id,
+                        type="other_kingdom",
+                        label=other.name,
+                        icon="building.columns",
+                        balance=int(other.treasury_gold or 0),
+                    ))
+        
         kingdom_summaries.append(EmpireKingdomSummary(
             id=k.id,
             name=k.name,
@@ -422,6 +475,8 @@ async def get_my_empire(
             vault_level=k.get_building_level("vault") or k.vault_level or 0,
             is_capital=(k.id == empire_id),
             ruler_started_at=k.ruler_started_at,
+            treasury_from_options=from_options,
+            treasury_to_options=to_options,
         ))
     
     # Sort: capital first, then by treasury

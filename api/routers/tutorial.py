@@ -60,6 +60,12 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 - **Coup** the ruler if you don't like how things are run
 
 **Reputation is earned per kingdom**. Switching kingdoms resets it to 0. This prevents randoms from switching to your kingdom and couping.
+
+**How to switch hometowns**
+1. Travel to the kingdom you want to make your new home
+2. Open your **Character** sheet
+3. A **Hometown** switch card will appear at the bottom of the page
+4. You may only do this once per 60 days
 """
 
     ),

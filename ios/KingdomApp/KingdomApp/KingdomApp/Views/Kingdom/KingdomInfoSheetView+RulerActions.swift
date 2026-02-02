@@ -31,27 +31,23 @@ extension KingdomInfoSheetView {
             
             // My Empire button - always visible if player is a ruler
             if player.isRuler {
-                HStack(spacing: 10) {
-                    Button(action: onViewAllKingdoms) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(KingdomTheme.Colors.imperialGold)
-                            Text("My Empire")
-                                .font(FontStyles.labelBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(KingdomTheme.Colors.inkLight)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(KingdomTheme.Colors.parchmentLight)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                Button(action: onViewAllKingdoms) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        Text("My Empire")
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
-                    
-                    Spacer()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(KingdomTheme.Colors.parchmentLight)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
                 }
                 .padding(.horizontal)
             }

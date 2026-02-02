@@ -25,6 +25,14 @@ struct TreasuryDepositRequest: Codable {
 
 // MARK: - Response Models
 
+struct TreasuryLocationOption: Codable, Identifiable, Hashable {
+    let id: String
+    let type: String  // "personal", "current_kingdom", "other_kingdom"
+    let label: String
+    let icon: String
+    let balance: Int
+}
+
 struct EmpireKingdomSummary: Codable, Identifiable {
     let id: String
     let name: String
@@ -36,6 +44,8 @@ struct EmpireKingdomSummary: Codable, Identifiable {
     let vaultLevel: Int
     let isCapital: Bool
     let rulerStartedAt: String?
+    let treasuryFromOptions: [TreasuryLocationOption]
+    let treasuryToOptions: [TreasuryLocationOption]
     
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -47,6 +57,8 @@ struct EmpireKingdomSummary: Codable, Identifiable {
         case vaultLevel = "vault_level"
         case isCapital = "is_capital"
         case rulerStartedAt = "ruler_started_at"
+        case treasuryFromOptions = "treasury_from_options"
+        case treasuryToOptions = "treasury_to_options"
     }
 }
 
@@ -202,7 +214,13 @@ struct EmpireUIConfig: Codable {
     let kingdomActions: [KingdomActionConfig]
     
     // Treasury management
+    let treasuryAllowPersonal: Bool?
+    let treasuryAllowTransfers: Bool?
     let treasuryActions: [TreasuryActionConfig]
+    
+    // Convenience getters with defaults
+    var allowPersonalGold: Bool { treasuryAllowPersonal ?? true }
+    var allowTransfers: Bool { treasuryAllowTransfers ?? true }
     let quickAmounts: [Int]
     let quickMaxLabel: String
     
@@ -235,6 +253,8 @@ struct EmpireUIConfig: Codable {
         case kingdomsCapitalColor = "kingdoms_capital_color"
         case kingdomStats = "kingdom_stats"
         case kingdomActions = "kingdom_actions"
+        case treasuryAllowPersonal = "treasury_allow_personal"
+        case treasuryAllowTransfers = "treasury_allow_transfers"
         case treasuryActions = "treasury_actions"
         case quickAmounts = "quick_amounts"
         case quickMaxLabel = "quick_max_label"
