@@ -57,8 +57,8 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
 # Actions formula: BASE + (current_tier × PER_TIER) + (total_points × PER_POINT)
 
 TRAINING_GOLD_BASE = 25          # Base gold per action
-TRAINING_GOLD_PER_TIER = 25      # Additional gold per target tier
-TRAINING_GOLD_PER_POINT = 6      # Additional gold per total skill point owned
+TRAINING_GOLD_PER_TIER = 22      # Additional gold per target tier
+TRAINING_GOLD_PER_POINT = 5      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
 TRAINING_ACTIONS_PER_TIER = 12   # Extra actions per current tier level (specializing is hard)
 TRAINING_ACTIONS_PER_POINT = 2.5 # Extra actions per total skill point owned (diversifying costs more)
