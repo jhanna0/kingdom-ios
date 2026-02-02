@@ -8,9 +8,6 @@ struct MyEmpireView: View {
     @State private var empireData: EmpireOverviewResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedKingdomId: String?
-    @State private var showTreasuryManagement = false
-    @State private var selectedTreasuryKingdom: EmpireKingdomSummary?
     
     var body: some View {
         NavigationStack {
@@ -39,28 +36,6 @@ struct MyEmpireView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(FontStyles.iconSmall)
                     }
-                }
-            }
-            .sheet(item: $selectedTreasuryKingdom) { kingdom in
-                if let config = empireData?.uiConfig {
-                    TreasuryManagementView(
-                        kingdom: kingdom,
-                        allKingdoms: empireData?.kingdoms ?? [],
-                        player: player,
-                        uiConfig: config,
-                        onComplete: {
-                            selectedTreasuryKingdom = nil
-                            Task { await loadEmpireData() }
-                        }
-                    )
-                }
-            }
-            .sheet(isPresented: Binding(
-                get: { selectedKingdomId != nil },
-                set: { if !$0 { selectedKingdomId = nil } }
-            )) {
-                if let kingdomId = selectedKingdomId {
-                    KingdomDetailView(kingdomId: kingdomId, player: player, viewModel: viewModel)
                 }
             }
         }
@@ -192,7 +167,7 @@ struct MyEmpireView: View {
     private func statsRow(_ empire: EmpireOverviewResponse, config: EmpireUIConfig) -> some View {
         VStack(spacing: KingdomTheme.Spacing.medium) {
             // First row: treasury + personal gold
-            HStack(spacing: KingdomTheme.Spacing.large) {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.large) {
                 ForEach(config.stats.prefix(2), id: \.id) { stat in
                     statItem(stat: stat, value: getValue(for: stat.id, from: empire))
                 }
@@ -203,7 +178,7 @@ struct MyEmpireView: View {
                 .frame(height: 2)
             
             // Second row: rest of stats
-            HStack(spacing: KingdomTheme.Spacing.large) {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.large) {
                 ForEach(config.stats.dropFirst(2), id: \.id) { stat in
                     let value = getValue(for: stat.id, from: empire)
                     let isInactive = stat.id == "active_wars" && value == 0
@@ -232,16 +207,20 @@ struct MyEmpireView: View {
             Image(systemName: stat.icon)
                 .font(FontStyles.iconMedium)
                 .foregroundColor(useInactiveColor ? stat.swiftColorInactive : stat.swiftColor)
+                .frame(height: 24, alignment: .center)
             
             Text("\(value)\(stat.suffix ?? "")")
                 .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
+                .frame(height: 24, alignment: .center)
             
             Text(stat.label)
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .lineLimit(1)
+                .frame(height: 18, alignment: .center)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
     
     // MARK: - Active Wars Section
@@ -306,7 +285,7 @@ struct MyEmpireView: View {
     private func alliancesSection(_ alliances: [EmpireAllianceSummary], config: EmpireUIConfig) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
-                Image(systemName: config.alliancesSection.icon)
+                Image(systemName: "person.2.fill")
                     .font(FontStyles.iconMedium)
                     .foregroundColor(config.alliancesSection.swiftColor)
                 
@@ -332,7 +311,7 @@ struct MyEmpireView: View {
     
     private func allianceCard(_ alliance: EmpireAllianceSummary, config: EmpireUIConfig) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: config.alliancesAllyIcon)
+            Image(systemName: "link")
                 .font(FontStyles.iconMedium)
                 .foregroundColor(.white)
                 .frame(width: 40, height: 40)
@@ -370,6 +349,7 @@ struct MyEmpireView: View {
                 Spacer()
             }
             .padding(.horizontal)
+            .padding(.top, KingdomTheme.Spacing.small)
             
             ForEach(kingdoms) { kingdom in
                 empireKingdomCard(kingdom, config: config)
@@ -378,7 +358,7 @@ struct MyEmpireView: View {
     }
     
     private func empireKingdomCard(_ kingdom: EmpireKingdomSummary, config: EmpireUIConfig) -> some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Header
             HStack {
                 if kingdom.isCapital {
@@ -407,44 +387,91 @@ struct MyEmpireView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Stats - from config
-            HStack(spacing: KingdomTheme.Spacing.large) {
+            // Stats - from config (equal width columns)
+            HStack(alignment: .top, spacing: 0) {
                 ForEach(config.kingdomStats, id: \.id) { stat in
                     kingdomStatItem(
-                        icon: stat.icon,
-                        value: getKingdomValue(for: stat.id, from: kingdom) + (stat.suffix ?? ""),
+                        icon: getStatIcon(for: stat),
+                        value: getKingdomValue(for: stat.id, from: kingdom),
+                        suffix: getStatSuffix(for: stat),
                         label: stat.label
                     )
                 }
             }
+            .padding(.vertical, 8)
             
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Actions - from config
+            // Actions - NavigationLinks
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 ForEach(config.kingdomActions, id: \.id) { action in
-                    Button(action: { handleKingdomAction(action.id, kingdom: kingdom) }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: action.icon)
-                                .font(FontStyles.iconSmall)
-                            Text(action.label)
-                                .font(FontStyles.labelMedium)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                    }
-                    .brutalistBadge(backgroundColor: action.swiftColor, cornerRadius: 8)
+                    kingdomActionLink(action: action, kingdom: kingdom, config: config)
                 }
                 
                 Spacer()
             }
+            .padding(.top, 4)
         }
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
+    }
+    
+    /// Get icon for stat - override percent to something better
+    private func getStatIcon(for stat: StatConfig) -> String {
+        // If the icon is "percent" which doesn't exist, use a better alternative
+        if stat.icon == "percent" {
+            return "slider.horizontal.3"
+        }
+        return stat.icon
+    }
+    
+    /// Get suffix for stat - skip % suffix if we're showing tax (icon already implies it)
+    private func getStatSuffix(for stat: StatConfig) -> String? {
+        // Don't show % suffix for tax_rate since label says "Tax"
+        if stat.id == "tax_rate" {
+            return "%"
+        }
+        return stat.suffix
+    }
+    
+    @ViewBuilder
+    private func kingdomActionLink(action: KingdomActionConfig, kingdom: EmpireKingdomSummary, config: EmpireUIConfig) -> some View {
+        switch action.id {
+        case "treasury":
+            NavigationLink(destination: TreasuryManagementView(
+                kingdom: kingdom,
+                allKingdoms: empireData?.kingdoms ?? [],
+                player: player,
+                uiConfig: config,
+                onComplete: { Task { await loadEmpireData() } }
+            )) {
+                actionButtonContent(action: action)
+            }
+            .buttonStyle(PlainButtonStyle())
+        case "manage":
+            NavigationLink(destination: KingdomDetailView(kingdomId: kingdom.id, player: player, viewModel: viewModel)) {
+                actionButtonContent(action: action)
+            }
+            .buttonStyle(PlainButtonStyle())
+        default:
+            EmptyView()
+        }
+    }
+    
+    private func actionButtonContent(action: KingdomActionConfig) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: action.icon)
+                .font(FontStyles.iconSmall)
+            Text(action.label)
+                .font(FontStyles.labelMedium)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .brutalistBadge(backgroundColor: action.swiftColor, cornerRadius: 8)
     }
     
     private func getKingdomValue(for statId: String, from kingdom: EmpireKingdomSummary) -> String {
@@ -456,32 +483,25 @@ struct MyEmpireView: View {
         }
     }
     
-    private func handleKingdomAction(_ actionId: String, kingdom: EmpireKingdomSummary) {
-        switch actionId {
-        case "treasury":
-            selectedTreasuryKingdom = kingdom
-        case "manage":
-            selectedKingdomId = kingdom.id
-        default:
-            break
-        }
-    }
-    
-    private func kingdomStatItem(icon: String, value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Text(value)
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
+    private func kingdomStatItem(icon: String, value: String, suffix: String?, label: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(FontStyles.iconSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .frame(height: 24, alignment: .center)
+            
+            Text(value + (suffix ?? ""))
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .frame(height: 24, alignment: .center)
+            
             Text(label)
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .lineLimit(1)
+                .frame(height: 18, alignment: .center)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
     
     // MARK: - Data Loading

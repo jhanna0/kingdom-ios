@@ -8,80 +8,53 @@ extension KingdomInfoSheetView {
     
     @ViewBuilder
     var rulerActionsSection: some View {
-        if isPlayerInside && kingdom.rulerId == player.playerId {
-            // Player is ruler of this kingdom
-            HStack(spacing: 10) {
-                Button(action: onViewKingdom) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.imperialGold)
-                        Text("Manage")
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(KingdomTheme.Colors.parchmentLight)
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+        VStack(spacing: 10) {
+            // Contextual status for this kingdom (shown first)
+            if kingdom.canClaim {
+                claimKingdomButton
+                    .padding(.horizontal)
+            } else if isPlayerInside && kingdom.rulerId != player.playerId {
+                // Inside but someone else rules it
+                HStack(spacing: 6) {
+                    Image(systemName: "figure.walk")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Text("You are here")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-                
-                Button(action: onViewAllKingdoms) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "map.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
-                        Text("My Empire")
-                            .font(FontStyles.labelBold)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.inkLight)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(KingdomTheme.Colors.parchmentLight)
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal)
-        } else if kingdom.canClaim {
-            // Backend says we can claim!
-            claimKingdomButton
+                .frame(maxWidth: .infinity)
+                .padding(KingdomTheme.Spacing.small)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
                 .padding(.horizontal)
-        } else if isPlayerInside {
-            // Already present but someone else rules it
-            HStack(spacing: 6) {
-                Image(systemName: "figure.walk")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                Text("You are here")
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
-            .frame(maxWidth: .infinity)
-            .padding(KingdomTheme.Spacing.small)
-            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
-            .padding(.horizontal)
-        } else {
-            // Not inside this kingdom
-            HStack(spacing: 6) {
-                Image(systemName: "location.circle")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
-                Text("You must travel here first")
-                    .font(FontStyles.labelMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+            
+            // My Empire button - always visible if player is a ruler
+            if player.isRuler {
+                HStack(spacing: 10) {
+                    Button(action: onViewAllKingdoms) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            Text("My Empire")
+                                .font(FontStyles.labelBold)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.inkLight)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(KingdomTheme.Colors.parchmentLight)
+                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal)
             }
-            .padding(KingdomTheme.Spacing.small)
-            .padding(.horizontal)
         }
     }
     

@@ -1,7 +1,11 @@
 import SwiftUI
 
-/// Treasury management view for rulers - SERVER-DRIVEN UI
-/// All icons, colors, labels, action definitions come from backend config
+/// Simplified treasury management - just pick FROM and TO
+enum GoldLocation: Hashable {
+    case personal
+    case kingdom(String) // kingdom ID
+}
+
 struct TreasuryManagementView: View {
     let kingdom: EmpireKingdomSummary
     let allKingdoms: [EmpireKingdomSummary]
@@ -9,174 +13,243 @@ struct TreasuryManagementView: View {
     let uiConfig: EmpireUIConfig
     let onComplete: () -> Void
     
-    @Environment(\.dismiss) var dismiss
-    
-    @State private var selectedActionId: String = "withdraw"
-    @State private var amount: String = ""
-    @State private var selectedTargetKingdomId: String?
+    @State private var fromLocation: GoldLocation = .kingdom("") // Will be set to current kingdom
+    @State private var toLocation: GoldLocation = .personal
+    @State private var amount: String = "0"
     @State private var isLoading = false
     @State private var resultMessage: String?
     @State private var isError = false
     
-    // Get selected action config from server config
-    private var selectedAction: TreasuryActionConfig? {
-        uiConfig.treasuryActions.first { $0.id == selectedActionId }
-    }
-    
-    // Other kingdoms for transfer target
+    // All kingdoms for selectors
     var otherKingdoms: [EmpireKingdomSummary] {
         allKingdoms.filter { $0.id != kingdom.id }
     }
     
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: KingdomTheme.Spacing.large) {
-                    // Kingdom Info Header
-                    kingdomHeader
-                    
-                    // Action Selector - from config
-                    actionSelector
-                    
-                    // Amount Input
-                    amountInput
-                    
-                    // Transfer Target (if transfer selected and requires it)
-                    if selectedAction?.requiresMultipleKingdoms == true {
-                        transferTargetSelector
-                    }
-                    
-                    // Quick Amount Buttons - from config
-                    quickAmountButtons
-                    
-                    // Submit Button
-                    submitButton
-                    
-                    // Result Message
-                    if let message = resultMessage {
-                        resultCard(message: message, isError: isError)
-                    }
-                }
-                .padding(.bottom, KingdomTheme.Spacing.xLarge)
-            }
-            .background(KingdomTheme.Colors.parchment)
-            .navigationTitle("Treasury")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") { dismiss() }
-                }
-            }
-        }
-        .onAppear {
-            // Default to first action
-            if let first = uiConfig.treasuryActions.first {
-                selectedActionId = first.id
-            }
-            // Default transfer target to first other kingdom
-            if selectedTargetKingdomId == nil, let first = otherKingdoms.first {
-                selectedTargetKingdomId = first.id
-            }
+    // Available balance based on FROM selection
+    private var availableBalance: Int {
+        switch fromLocation {
+        case .personal:
+            return player.gold
+        case .kingdom(let id):
+            return allKingdoms.first { $0.id == id }?.treasuryGold ?? 0
         }
     }
     
-    // MARK: - Kingdom Header
-    
-    private var kingdomHeader: some View {
-        VStack(spacing: KingdomTheme.Spacing.medium) {
-            Image(systemName: "building.columns.fill")
-                .font(FontStyles.iconExtraLarge)
-                .foregroundColor(.white)
-                .frame(width: 60, height: 60)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 16, shadowOffset: 3, borderWidth: 3)
-            
-            Text(kingdom.name)
-                .font(FontStyles.displaySmall)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            HStack(spacing: KingdomTheme.Spacing.large) {
-                VStack(spacing: 2) {
-                    Text("\(kingdom.treasuryGold)")
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    Text("Treasury")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
+    var body: some View {
+        ScrollView {
+            VStack(spacing: KingdomTheme.Spacing.large) {
+                // Balances Header
+                balancesHeader
                 
-                Rectangle()
-                    .fill(Color.black)
-                    .frame(width: 2, height: 30)
+                // FROM selector
+                fromSelector
                 
-                VStack(spacing: 2) {
-                    Text("\(player.gold)")
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    Text("Your Gold")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                // TO selector
+                toSelector
+                
+                // Amount Input
+                amountInput
+                
+                // Quick Amount Buttons
+                quickAmountButtons
+                
+                // Submit Button
+                submitButton
+                
+                // Result Message
+                if let message = resultMessage {
+                    resultCard(message: message, isError: isError)
                 }
             }
+            .padding(.bottom, KingdomTheme.Spacing.xLarge)
+        }
+        .background(KingdomTheme.Colors.parchment)
+        .navigationTitle("Move Gold")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+        .onAppear {
+            // Default: from treasury to personal (withdraw)
+            fromLocation = .kingdom(kingdom.id)
+            toLocation = .personal
+        }
+    }
+    
+    // MARK: - Balances Header
+    
+    private var balancesHeader: some View {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            // Personal Gold
+            VStack(spacing: 4) {
+                Image(systemName: "person.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                Text("\(player.gold)")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                Text("Your Gold")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .frame(maxWidth: .infinity)
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(width: 2, height: 40)
+            
+            // Current Kingdom Treasury
+            VStack(spacing: 4) {
+                Image(systemName: "building.columns.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.imperialGold)
+                Text("\(kingdom.treasuryGold)")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                Text(kingdom.name)
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
         }
         .padding()
-        .frame(maxWidth: .infinity)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
         .padding(.top)
     }
     
-    // MARK: - Action Selector - SERVER DRIVEN
+    // MARK: - FROM Selector
     
-    private var actionSelector: some View {
+    private var fromSelector: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-            Text("Action")
+            Text("From")
                 .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal)
             
-            HStack(spacing: KingdomTheme.Spacing.small) {
-                ForEach(uiConfig.treasuryActions) { action in
-                    // Skip transfer if only one kingdom
-                    if action.requiresMultipleKingdoms && otherKingdoms.isEmpty {
-                        EmptyView()
-                    } else {
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedActionId = action.id
-                                resultMessage = nil
-                            }
-                        }) {
-                            VStack(spacing: 4) {
-                                Image(systemName: action.icon)
-                                    .font(FontStyles.iconMedium)
-                                Text(action.label)
-                                    .font(FontStyles.labelMedium)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .foregroundColor(selectedActionId == action.id ? .white : KingdomTheme.Colors.inkMedium)
-                        }
-                        .brutalistBadge(
-                            backgroundColor: selectedActionId == action.id ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.parchmentLight,
-                            cornerRadius: 10,
-                            shadowOffset: selectedActionId == action.id ? 3 : 1,
-                            borderWidth: 2
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal)
-            
-            if let action = selectedAction {
-                Text(action.description)
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .padding(.horizontal)
+            VStack(spacing: KingdomTheme.Spacing.small) {
+                // Personal gold option
+                locationButton(
+                    location: .personal,
+                    icon: "person.fill",
+                    label: "Your Gold",
+                    balance: player.gold,
+                    isSelected: fromLocation == .personal,
+                    isFrom: true
+                )
+                
+                // Current kingdom treasury
+                locationButton(
+                    location: .kingdom(kingdom.id),
+                    icon: "building.columns.fill",
+                    label: kingdom.name,
+                    balance: kingdom.treasuryGold,
+                    isSelected: fromLocation == .kingdom(kingdom.id),
+                    isFrom: true
+                )
             }
         }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - TO Selector
+    
+    private var toSelector: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            Text("To")
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            
+            VStack(spacing: KingdomTheme.Spacing.small) {
+                // Personal gold option (disabled if FROM is personal)
+                locationButton(
+                    location: .personal,
+                    icon: "person.fill",
+                    label: "Your Gold",
+                    balance: player.gold,
+                    isSelected: toLocation == .personal,
+                    isFrom: false,
+                    isDisabled: fromLocation == .personal
+                )
+                
+                // Current kingdom treasury (disabled if FROM is this treasury)
+                locationButton(
+                    location: .kingdom(kingdom.id),
+                    icon: "building.columns.fill",
+                    label: kingdom.name,
+                    balance: kingdom.treasuryGold,
+                    isSelected: toLocation == .kingdom(kingdom.id),
+                    isFrom: false,
+                    isDisabled: fromLocation == .kingdom(kingdom.id)
+                )
+                
+                // Other kingdoms (for transfers)
+                ForEach(otherKingdoms) { otherKingdom in
+                    locationButton(
+                        location: .kingdom(otherKingdom.id),
+                        icon: "building.columns",
+                        label: otherKingdom.name,
+                        balance: otherKingdom.treasuryGold,
+                        isSelected: toLocation == .kingdom(otherKingdom.id),
+                        isFrom: false,
+                        isDisabled: fromLocation == .personal // Can only transfer from treasury
+                    )
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Location Button
+    
+    private func locationButton(
+        location: GoldLocation,
+        icon: String,
+        label: String,
+        balance: Int,
+        isSelected: Bool,
+        isFrom: Bool,
+        isDisabled: Bool = false
+    ) -> some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if isFrom {
+                    fromLocation = location
+                    // Auto-adjust TO if it conflicts
+                    if toLocation == location {
+                        toLocation = location == .personal ? .kingdom(kingdom.id) : .personal
+                    }
+                } else {
+                    toLocation = location
+                }
+                resultMessage = nil
+            }
+        }) {
+            HStack(spacing: 12) {
+                // Radio indicator - show dash for disabled
+                Image(systemName: isDisabled ? "minus.circle" : (isSelected ? "checkmark.circle.fill" : "circle"))
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : (isSelected ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight))
+                
+                Image(systemName: icon)
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkMedium)
+                
+                Text(label)
+                    .font(FontStyles.bodyMedium)
+                    .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkDark)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Text("\(balance) gold")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(isDisabled ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.inkMedium)
+            }
+            .padding(12)
+        }
+        .brutalistCard(backgroundColor: isSelected ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
+        .disabled(isDisabled)
     }
     
     // MARK: - Amount Input
@@ -196,9 +269,18 @@ struct TreasuryManagementView: View {
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .keyboardType(.numberPad)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                            .fontWeight(.semibold)
+                        }
+                    }
                 
-                if !amount.isEmpty {
-                    Button(action: { amount = "" }) {
+                if amount != "0" && !amount.isEmpty {
+                    Button(action: { amount = "0" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(KingdomTheme.Colors.inkLight)
                     }
@@ -207,71 +289,13 @@ struct TreasuryManagementView: View {
             .padding()
             .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
             
-            // Show max available
-            Text(maxAvailableText)
-                .font(FontStyles.labelSmall)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
+            // Show max available from source
+
         }
         .padding(.horizontal)
     }
     
-    private var maxAvailableText: String {
-        guard let action = selectedAction else { return "" }
-        
-        switch action.source {
-        case "treasury":
-            return "Available: \(kingdom.treasuryGold) gold"
-        case "personal":
-            return "Available: \(player.gold) gold"
-        default:
-            return ""
-        }
-    }
-    
-    // MARK: - Transfer Target Selector
-    
-    private var transferTargetSelector: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
-            Text("Transfer To")
-                .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            if otherKingdoms.isEmpty {
-                Text(uiConfig.transferNoKingdomsMessage)
-                    .font(FontStyles.bodyMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            } else {
-                ForEach(otherKingdoms) { targetKingdom in
-                    Button(action: {
-                        selectedTargetKingdomId = targetKingdom.id
-                    }) {
-                        HStack {
-                            Image(systemName: selectedTargetKingdomId == targetKingdom.id ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(selectedTargetKingdomId == targetKingdom.id ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight)
-                            
-                            Text(targetKingdom.name)
-                                .font(FontStyles.bodyMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            Spacer()
-                            
-                            Text("\(targetKingdom.treasuryGold) gold")
-                                .font(FontStyles.labelMedium)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        }
-                        .padding()
-                    }
-                    .brutalistCard(backgroundColor: selectedTargetKingdomId == targetKingdom.id ? KingdomTheme.Colors.parchment : KingdomTheme.Colors.parchmentLight)
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Quick Amount Buttons - SERVER DRIVEN
+    // MARK: - Quick Amount Buttons
     
     private var quickAmountButtons: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
@@ -293,8 +317,8 @@ struct TreasuryManagementView: View {
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8)
                 }
                 
-                // Max button with label from config
-                Button(action: { amount = "\(maxAmount)" }) {
+                // Max button
+                Button(action: { amount = "\(availableBalance)" }) {
                     Text(uiConfig.quickMaxLabel)
                         .font(FontStyles.labelBold)
                         .foregroundColor(.white)
@@ -307,20 +331,33 @@ struct TreasuryManagementView: View {
         }
     }
     
-    private var maxAmount: Int {
-        guard let action = selectedAction else { return 0 }
-        
-        switch action.source {
-        case "treasury":
-            return kingdom.treasuryGold
-        case "personal":
-            return player.gold
+    // MARK: - Submit Button
+    
+    private var actionLabel: String {
+        switch (fromLocation, toLocation) {
+        case (.personal, .kingdom(let id)) where id == kingdom.id:
+            return "Deposit"
+        case (.kingdom(let id), .personal) where id == kingdom.id:
+            return "Withdraw"
+        case (.kingdom, .kingdom):
+            return "Transfer"
         default:
-            return 0
+            return "Move Gold"
         }
     }
     
-    // MARK: - Submit Button
+    private var actionIcon: String {
+        switch (fromLocation, toLocation) {
+        case (.personal, .kingdom):
+            return "arrow.up.circle.fill"
+        case (.kingdom, .personal):
+            return "arrow.down.circle.fill"
+        case (.kingdom, .kingdom):
+            return "arrow.left.arrow.right.circle.fill"
+        default:
+            return "arrow.right.circle.fill"
+        }
+    }
     
     private var submitButton: some View {
         Button(action: { Task { await performAction() } }) {
@@ -328,37 +365,27 @@ struct TreasuryManagementView: View {
                 if isLoading {
                     ProgressView()
                         .tint(.white)
-                } else if let action = selectedAction {
-                    Image(systemName: action.icon)
+                } else {
+                    Image(systemName: actionIcon)
                         .font(FontStyles.iconMedium)
                 }
-                Text(isLoading ? "Processing..." : (selectedAction?.label ?? "Submit"))
+                Text(isLoading ? "Processing..." : actionLabel)
                     .font(FontStyles.bodyMediumBold)
             }
             .frame(maxWidth: .infinity)
             .padding()
             .foregroundColor(.white)
         }
-        .brutalistBadge(backgroundColor: isValidInput ? uiConfig.color("buttonSuccess") : KingdomTheme.Colors.inkLight, cornerRadius: 12)
+        .brutalistBadge(backgroundColor: isValidInput ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.inkLight, cornerRadius: 12)
         .disabled(!isValidInput || isLoading)
         .padding(.horizontal)
     }
     
     private var isValidInput: Bool {
         guard let amountValue = Int(amount), amountValue > 0 else { return false }
-        guard let action = selectedAction else { return false }
-        
-        switch action.source {
-        case "treasury":
-            if action.requiresMultipleKingdoms {
-                return amountValue <= kingdom.treasuryGold && selectedTargetKingdomId != nil && !otherKingdoms.isEmpty
-            }
-            return amountValue <= kingdom.treasuryGold
-        case "personal":
-            return amountValue <= player.gold
-        default:
-            return false
-        }
+        guard amountValue <= availableBalance else { return false }
+        guard fromLocation != toLocation else { return false }
+        return true
     }
     
     // MARK: - Result Card
@@ -367,7 +394,7 @@ struct TreasuryManagementView: View {
         HStack(spacing: 12) {
             Image(systemName: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .font(FontStyles.iconMedium)
-                .foregroundColor(isError ? uiConfig.color("royalCrimson") : uiConfig.color("buttonSuccess"))
+                .foregroundColor(isError ? KingdomTheme.Colors.royalCrimson : KingdomTheme.Colors.buttonSuccess)
             
             Text(message)
                 .font(FontStyles.bodyMedium)
@@ -376,7 +403,7 @@ struct TreasuryManagementView: View {
             Spacer()
         }
         .padding()
-        .brutalistCard(backgroundColor: isError ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
     }
     
@@ -385,37 +412,38 @@ struct TreasuryManagementView: View {
     @MainActor
     private func performAction() async {
         guard let amountValue = Int(amount), amountValue > 0 else { return }
-        guard let action = selectedAction else { return }
         
         isLoading = true
         resultMessage = nil
         
         do {
-            switch action.id {
-            case "withdraw":
+            switch (fromLocation, toLocation) {
+            case (.kingdom(let fromId), .personal) where fromId == kingdom.id:
+                // Withdraw from current kingdom treasury to personal
                 let response = try await APIClient.shared.withdrawFromTreasury(kingdomId: kingdom.id, amount: amountValue)
                 resultMessage = response.message
                 isError = false
                 player.gold = response.personalGoldNew
                 
-            case "deposit":
+            case (.personal, .kingdom(let toId)) where toId == kingdom.id:
+                // Deposit from personal to current kingdom treasury
                 let response = try await APIClient.shared.depositToTreasury(kingdomId: kingdom.id, amount: amountValue)
                 resultMessage = response.message
                 isError = false
                 player.gold = response.personalGoldRemaining
                 
-            case "transfer":
-                guard let targetId = selectedTargetKingdomId else { return }
+            case (.kingdom(let fromId), .kingdom(let toId)) where fromId == kingdom.id:
+                // Transfer from current kingdom to another kingdom
                 let response = try await APIClient.shared.transferFunds(
                     sourceKingdomId: kingdom.id,
-                    targetKingdomId: targetId,
+                    targetKingdomId: toId,
                     amount: amountValue
                 )
                 resultMessage = response.message
                 isError = false
                 
             default:
-                resultMessage = "Unknown action"
+                resultMessage = "Invalid transfer"
                 isError = true
             }
             

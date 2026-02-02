@@ -75,7 +75,7 @@ EMPIRE_UI_CONFIG = {
         },
         {
             "id": "total_subjects",
-            "label": "Total Subjects",
+            "label": "Total Citizens",
             "icon": "person.3.fill",
             "color": "inkMedium",
             "format": "number",
@@ -91,8 +91,8 @@ EMPIRE_UI_CONFIG = {
         {
             "id": "alliance_count",
             "label": "Alliances",
-            "icon": "handshake.fill",
-            "color": "royalPurple",
+            "icon": "person.2.fill",
+            "color": "inkMedium",
             "format": "number",
         },
     ],
@@ -111,10 +111,10 @@ EMPIRE_UI_CONFIG = {
         },
         "alliances": {
             "title": "Alliances",
-            "icon": "handshake.fill",
+            "icon": "person.2.fill",
             "color": "royalPurple",
             "empty_message": None,
-            "ally_icon": "shield.checkered",
+            "ally_icon": "link",
             "days_label": "days remaining",
             "kingdoms_label": "kingdoms",
         },
@@ -131,7 +131,7 @@ EMPIRE_UI_CONFIG = {
     # Kingdom card stats
     "kingdom_stats": [
         {"id": "treasury", "icon": "building.columns.fill", "label": "Treasury", "color": "inkMedium", "format": "number"},
-        {"id": "subjects", "icon": "person.3.fill", "label": "Subjects", "color": "inkMedium", "format": "number"},
+        {"id": "subjects", "icon": "person.3.fill", "label": "Citizens", "color": "inkMedium", "format": "number"},
         {"id": "tax_rate", "icon": "percent", "label": "Tax", "color": "inkMedium", "format": "number", "suffix": "%"},
     ],
     
