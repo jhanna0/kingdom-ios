@@ -214,12 +214,12 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             ), 0) as invasions_won_defend,
             
             -- Garden stats
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action IN ('harvested', 'discarded') AND plant_type IS NOT NULL), 0) as plants_grown,
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower'), 0) as flowers_grown,
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type IS NOT NULL), 0) as plants_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower'), 0) as flowers_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
             COALESCE((SELECT SUM(wheat_gained) FROM garden_history WHERE user_id = :user_id AND action = 'harvested'), 0) as wheat_harvested,
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'weed'), 0) as weeds_cleared,
-            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
+            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
     """)
     
     complex_result = db.execute(complex_query, {"user_id": user_id}).first()
