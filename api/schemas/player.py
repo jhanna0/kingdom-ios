@@ -46,6 +46,30 @@ class PlayerEquipment(BaseModel):
     armor_defense_bonus: Optional[int] = None
 
 
+class PlayerAchievement(BaseModel):
+    """A claimed achievement for display on profile"""
+    id: int  # achievement_definitions.id
+    achievement_type: str
+    tier: int
+    display_name: str
+    icon: Optional[str] = None
+    category: str
+    color: str = "inkMedium"  # Theme color name for badge display
+    claimed_at: Optional[datetime] = None
+    
+    @field_serializer('claimed_at')
+    def serialize_claimed_at(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_with_z(dt)
+
+
+class AchievementGroup(BaseModel):
+    """Achievements grouped by category for profile display"""
+    category: str
+    display_name: str
+    icon: str
+    achievements: list[PlayerAchievement]
+
+
 class PlayerPublicProfile(BaseModel):
     """Public profile for any player - visible to others"""
     # Identity
@@ -75,7 +99,10 @@ class PlayerPublicProfile(BaseModel):
     # Pets
     pets: list = []  # Pet companions owned by this player
     
-    # Achievements
+    # Claimed achievements grouped by category (for profile display)
+    achievement_groups: list[AchievementGroup] = []
+    
+    # Achievement stats
     total_checkins: int
     total_conquests: int
     kingdoms_ruled: int

@@ -17,8 +17,11 @@ from schemas.player import (
     PlayersInKingdomResponse, 
     ActivePlayersResponse,
     PlayerActivity,
-    PlayerEquipment
+    PlayerEquipment,
+    PlayerAchievement,
+    AchievementGroup
 )
+from sqlalchemy import text
 
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -261,6 +264,23 @@ def _is_player_online(user: User) -> bool:
     if not user.last_login:
         return False
     return user.last_login > datetime.utcnow() - timedelta(minutes=10)
+
+
+def _has_membership(db: Session, user_id: int) -> bool:
+    """
+    Check if user has active membership.
+    Membership controls visibility of achievements and pets on public profile.
+    
+    TODO: Implement actual membership check when membership table exists.
+    For now, returns True to show all data.
+    """
+    # Future: query membership table
+    # membership = db.query(Membership).filter(
+    #     Membership.user_id == user_id,
+    #     Membership.expires_at > datetime.utcnow()
+    # ).first()
+    # return membership is not None
+    return True
 
 
 @router.get("/in-kingdom/{kingdom_id}", response_model=PlayersInKingdomResponse)
@@ -592,13 +612,74 @@ def get_player_profile(
         KingdomHistory.event_type.in_(['coup', 'invasion', 'reconquest'])
     ).scalar() or 0
     
-    # Get pets
-    from routers.resources import get_player_pets
-    pets = get_player_pets(db, user.id)
-    
     # Generate dynamic skills data - frontend renders without hardcoding!
     from routers.tiers import get_skills_data_for_player
     skills_data = get_skills_data_for_player(state)
+    
+    # Check if this is own profile or if target user has membership
+    # Pets and achievements are only shown publicly for members
+    is_own_profile = user.id == current_user.id
+    show_premium_content = is_own_profile or _has_membership(db, user.id)
+    
+    # Get pets (only if own profile or has membership)
+    pets = []
+    if show_premium_content:
+        from routers.resources import get_player_pets
+        pets = get_player_pets(db, user.id)
+    
+    # Get claimed achievements for profile display (only if own profile or has membership)
+    achievement_groups = []
+    if show_premium_content:
+        from routers.achievements import CATEGORY_CONFIG
+        
+        achievements_query = text("""
+            SELECT DISTINCT ON (ad.achievement_type)
+                ad.id,
+                ad.achievement_type,
+                ad.tier,
+                ad.display_name,
+                ad.icon,
+                ad.category,
+                pac.claimed_at
+            FROM player_achievement_claims pac
+            JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
+            WHERE pac.user_id = :user_id
+            ORDER BY ad.achievement_type, ad.tier DESC
+        """)
+        achievements_result = db.execute(achievements_query, {"user_id": user.id}).fetchall()
+        
+        # Group achievements by category
+        from collections import defaultdict
+        achievements_by_category = defaultdict(list)
+        for row in achievements_result:
+            achievements_by_category[row.category].append(
+                PlayerAchievement(
+                    id=row.id,
+                    achievement_type=row.achievement_type,
+                    tier=row.tier,
+                    display_name=row.display_name,
+                    icon=row.icon,
+                    category=row.category,
+                    color=CATEGORY_CONFIG.get(row.category, {}).get("color", "inkMedium"),
+                    claimed_at=row.claimed_at
+                )
+            )
+        
+        # Build sorted category groups
+        sorted_categories = sorted(
+            achievements_by_category.keys(),
+            key=lambda c: CATEGORY_CONFIG.get(c, {}).get("order", 999)
+        )
+        for cat in sorted_categories:
+            cat_config = CATEGORY_CONFIG.get(cat, {"display_name": cat.title(), "icon": "star.fill"})
+            achievement_groups.append(
+                AchievementGroup(
+                    category=cat,
+                    display_name=cat_config["display_name"],
+                    icon=cat_config["icon"],
+                    achievements=achievements_by_category[cat]
+                )
+            )
     
     return PlayerPublicProfile(
         id=user.id,
@@ -614,6 +695,7 @@ def get_player_profile(
         skills_data=skills_data,
         equipment=equipment,
         pets=pets,
+        achievement_groups=achievement_groups,
         total_checkins=total_checkins,
         total_conquests=total_conquests,
         kingdoms_ruled=kingdoms_ruled,

@@ -16,6 +16,8 @@ struct CharacterSheetView: View {
     @State private var isLoadingActivities = true
     @State private var relocationStatus: RelocationStatusResponse?
     @State private var isLoadingRelocationStatus = false
+    @State private var achievementGroups: [AchievementGroup] = []
+    @State private var isLoadingAchievements = true
     
     var body: some View {
         ScrollView {
@@ -42,6 +44,12 @@ struct CharacterSheetView: View {
                 // Equipment section
                 EquipmentInfoCard(player: player)
                 
+                // Earned Achievements/Titles section
+                EarnedTitlesCard(
+                    groups: achievementGroups,
+                    isLoading: isLoadingAchievements
+                )
+
                 // Pets section
                 PetsCard(pets: player.pets, showEmpty: true)
                 
@@ -92,9 +100,10 @@ struct CharacterSheetView: View {
             await loadTrainingContracts()
             await loadMyActivities()
             await loadRelocationStatus()
+            await loadEarnedAchievements()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-        .navigationTitle("Character Sheet")
+        .navigationTitle("My Character")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -174,6 +183,27 @@ struct CharacterSheetView: View {
                 isLoadingRelocationStatus = false
             }
             print("❌ Failed to load relocation status: \(error)")
+        }
+    }
+    
+    private func loadEarnedAchievements() async {
+        await MainActor.run {
+            isLoadingAchievements = true
+        }
+        
+        do {
+            // Fetch own profile to get achievements
+            let profile = try await KingdomAPIService.shared.player.getPlayerProfile(userId: player.playerId)
+            
+            await MainActor.run {
+                achievementGroups = profile.achievement_groups ?? []
+                isLoadingAchievements = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingAchievements = false
+            }
+            print("❌ Failed to load achievements: \(error)")
         }
     }
     

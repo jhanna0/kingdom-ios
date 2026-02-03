@@ -81,13 +81,17 @@ struct PlayerProfileView: View {
                 // Combat & Skills - DYNAMIC from backend!
                 ProfileSkillsCard(skills: profile.skills_data, reputation: profile.reputation)
                 
-                // Equipment
-                ProfileEquipmentCard(equipment: profile.equipment)
+                // Pets (only shown if user has membership - backend controls this)
+                if let pets = profile.pets, !pets.isEmpty {
+                    ProfilePetsCard(pets: pets, showEmpty: false)
+                }
                 
-                // Pets
-                ProfilePetsCard(pets: profile.pets ?? [], showEmpty: true)
+                // Earned Achievements (only shown if user has membership - backend controls this)
+                if let groups = profile.achievement_groups, !groups.isEmpty {
+                    EarnedTitlesCard(groups: groups)
+                }
                 
-                // Achievements
+                // Achievement Stats
                 achievementsCard(profile)
                 
                 // Actions (Trade button)
@@ -196,9 +200,19 @@ struct PlayerProfileView: View {
     
     private func achievementsCard(_ profile: PlayerPublicProfile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Achievements")
-                .font(FontStyles.headingMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("Statistics")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
             
             VStack(spacing: 8) {
                 achievementRow(
