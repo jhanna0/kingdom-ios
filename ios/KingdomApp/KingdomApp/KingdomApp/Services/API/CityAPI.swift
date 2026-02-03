@@ -131,6 +131,7 @@ class CityAPI {
             kingdom.activeCitizens = kingdomData.active_citizens ?? 0
             kingdom.isAllied = kingdomData.is_allied
             kingdom.isEnemy = kingdomData.is_enemy
+            kingdom.isEmpire = kingdomData.is_empire ?? false
             
             // Parse allies and enemies arrays into Sets
             kingdom.allies = Set(kingdomData.allies ?? [])

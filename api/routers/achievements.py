@@ -30,38 +30,40 @@ router = APIRouter(prefix="/achievements", tags=["achievements"])
 
 # Category display configuration with explicit ordering
 # Order determines how categories appear in the UI (lower = first)
+# Using intervals of 10 to allow easy insertion without renumbering
 CATEGORY_CONFIG = {
     # Core progression (most common activities)
-    "building": {"display_name": "Building", "icon": "building.2.fill", "order": 1},
-    "training": {"display_name": "Training", "icon": "figure.strengthtraining.traditional", "order": 2},
-    "gathering": {"display_name": "Gathering", "icon": "leaf.fill", "order": 3},
-    "crafting": {"display_name": "Crafting", "icon": "hammer.fill", "order": 4},
+    "building": {"display_name": "Building", "icon": "building.2.fill", "order": 10},
+    "training": {"display_name": "Training", "icon": "figure.strengthtraining.traditional", "order": 20},
+    "gathering": {"display_name": "Gathering", "icon": "leaf.fill", "order": 30},
+    "crafting": {"display_name": "Crafting", "icon": "hammer.fill", "order": 40},
+    "exploration": {"display_name": "Exploration", "icon": "map.fill", "order": 50},
+    "properties": {"display_name": "Properties", "icon": "house.fill", "order": 55},
     
     # Activities
-    "hunting": {"display_name": "Hunting", "icon": "scope", "order": 5},
-    "fishing": {"display_name": "Fishing", "icon": "fish.fill", "order": 6},
-    "foraging": {"display_name": "Foraging", "icon": "leaf.fill", "order": 7},
-    "gardening": {"display_name": "Gardening", "icon": "leaf.fill", "order": 8},
+    "hunting": {"display_name": "Hunting", "icon": "scope", "order": 60},
+    "fishing": {"display_name": "Fishing", "icon": "fish.fill", "order": 70},
+    "foraging": {"display_name": "Foraging", "icon": "leaf.fill", "order": 80},
+    "gardening": {"display_name": "Gardening", "icon": "leaf.fill", "order": 90},
     
     # Economy & Science
-    "merchant": {"display_name": "Merchant", "icon": "storefront.fill", "order": 9},
-    "science": {"display_name": "Science", "icon": "flask.fill", "order": 10},
+    "merchant": {"display_name": "Merchant", "icon": "storefront.fill", "order": 100},
+    "science": {"display_name": "Science", "icon": "flask.fill", "order": 110},
     
     # PvP (more common than coups/battles)
-    "pvp": {"display_name": "PvP", "icon": "figure.fencing", "order": 11},
-    "intelligence": {"display_name": "Intelligence", "icon": "eye.fill", "order": 12},
+    "pvp": {"display_name": "PvP", "icon": "figure.fencing", "order": 120},
+    "intelligence": {"display_name": "Intelligence", "icon": "eye.fill", "order": 130},
     
     # Kingdom stuff (rarer)
-    "fortification": {"display_name": "Fortification", "icon": "brick.fill", "order": 13},
-    "ruler": {"display_name": "Ruler", "icon": "crown.fill", "order": 14},
+    "ruler": {"display_name": "Ruler", "icon": "crown.fill", "order": 150},
     
     # Rare events (least common)
-    "coup": {"display_name": "Coup", "icon": "theatermasks.fill", "order": 15},
-    "battle": {"display_name": "Battle", "icon": "flag.fill", "order": 16},
+    "coup": {"display_name": "Coup", "icon": "theatermasks.fill", "order": 160},
+    "battle": {"display_name": "Battle", "icon": "flag.fill", "order": 170},
     
     # Meta
-    "progression": {"display_name": "Progression", "icon": "star.fill", "order": 20},
-    "general": {"display_name": "General", "icon": "trophy.fill", "order": 99},
+    "progression": {"display_name": "Progression", "icon": "star.fill", "order": 200},
+    "general": {"display_name": "General", "icon": "trophy.fill", "order": 999},
 }
 
 
@@ -142,7 +144,15 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT operations_attempted FROM player_intelligence_stats WHERE user_id = :user_id), 0) as operations_attempted,
             COALESCE((SELECT intel_gathered FROM player_intelligence_stats WHERE user_id = :user_id), 0) as intel_gathered,
             COALESCE((SELECT sabotages_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as sabotages_completed,
-            COALESCE((SELECT heists_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as heists_completed
+            COALESCE((SELECT heists_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as heists_completed,
+            
+            -- Exploration stats (only count kingdoms that have a ruler)
+            COALESCE((SELECT COUNT(DISTINCT uk.kingdom_id) FROM user_kingdoms uk
+                      JOIN kingdoms k ON k.id = uk.kingdom_id
+                      WHERE uk.user_id = :user_id AND k.ruler_id IS NOT NULL), 0) as kingdoms_visited,
+            
+            -- Properties stats
+            COALESCE((SELECT COUNT(DISTINCT kingdom_id) FROM properties WHERE owner_id = :user_id), 0) as kingdoms_with_properties
     """)
     
     combined_result = db.execute(combined_query, {"user_id": user_id}).first()
@@ -172,6 +182,8 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["intel_gathered"] = int(combined_result.intel_gathered)
         progress["sabotages_completed"] = int(combined_result.sabotages_completed)
         progress["heists_completed"] = int(combined_result.heists_completed)
+        progress["kingdoms_visited"] = int(combined_result.kingdoms_visited)
+        progress["kingdoms_with_properties"] = int(combined_result.kingdoms_with_properties)
     
     # =========================================================================
     # SECOND COMBINED QUERY: Battle + Garden (more complex aggregations)
@@ -579,7 +591,7 @@ def claim_achievement_reward(
         user_id=user.id,
         action_type="achievement",
         action_category="achievement",
-        description=f"Earned: {tier_data['display_name']}!",
+        description=f"Earned {tier_data['display_name']}!",
         kingdom_id=state.hometown_kingdom_id,
         amount=int(net_gold) if net_gold > 0 else None,
         details={"achievement": tier_data["achievement_type"], "tier": tier_data["tier"], "display_name": tier_data["display_name"]},

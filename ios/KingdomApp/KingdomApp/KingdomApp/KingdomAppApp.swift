@@ -528,11 +528,13 @@ private struct SheetModifiers: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $showMyKingdoms) {
-                MyKingdomsSheet(
+            .sheet(isPresented: $showMyKingdoms, onDismiss: {
+                // Refresh player data when empire sheet closes (treasury operations may have changed gold)
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) {
+                MyEmpireView(
                     player: viewModel.player,
-                    viewModel: viewModel,
-                    onDismiss: { showMyKingdoms = false }
+                    viewModel: viewModel
                 )
             }
             .sheet(isPresented: $showActions, onDismiss: {

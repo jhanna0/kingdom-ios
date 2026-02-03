@@ -344,7 +344,7 @@ def scout_enemy_kingdom(
         return {
             "success": False,
             "caught": True,
-            "message": f"Caught by {kingdom.name}'s patrols! Lost {CAUGHT_REP_LOSS_TARGET} rep.",
+            "message": f"Caught by {kingdom.name}'s patrols! -{CAUGHT_REP_LOSS_TARGET} rep in {kingdom.name}.",
             "food_spent": food_result["food_cost"],
             "reputation_lost": CAUGHT_REP_LOSS_TARGET,
             "success_chance": round(success_chance * 100, 1),
@@ -366,7 +366,7 @@ def scout_enemy_kingdom(
         return {
             "success": False,
             "caught": True,
-            "message": f"The enemy patrol was too strong. Lost {CAUGHT_REP_LOSS_TARGET} rep in {kingdom.name}.",
+            "message": f"The enemy patrol was too strong. -{CAUGHT_REP_LOSS_TARGET} rep in {kingdom.name}.",
             "food_spent": food_result["food_cost"],
             "reputation_lost": CAUGHT_REP_LOSS_TARGET,
             "intelligence_tier": state.intelligence,
@@ -436,13 +436,17 @@ def scout_enemy_kingdom(
     
     db.commit()
     
+    # Build success message with hometown rep gain
+    success_message = f"{outcome_result['message']} +{rep_reward} rep in {home_kingdom.name}."
+    
     return {
         "success": True,
         "caught": False,
-        "message": outcome_result["message"],
+        "message": success_message,
         "outcome": outcome_result,
         "food_spent": food_result["food_cost"],
         "reputation_gained": rep_reward,
+        "hometown_kingdom_name": home_kingdom.name,
         "intel_expires_hours": INTEL_EXPIRY_HOURS,
         "success_chance": round(success_chance * 100, 1),
         "roll": round(roll * 100, 1),

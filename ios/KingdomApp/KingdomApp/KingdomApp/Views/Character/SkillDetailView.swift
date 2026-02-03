@@ -321,10 +321,9 @@ struct SkillDetailView: View {
         }
     }
     
-    /// Total skill points across all skills
+    /// Total skill points across all skills (from server-driven skillsData)
     private var totalSkillPoints: Int {
-        return player.attackPower + player.defensePower + player.leadership + 
-               player.buildingSkill + player.intelligence + player.science + player.faith
+        return player.skillsData.reduce(0) { $0 + $1.currentTier }
     }
     
     /// Gold cost per action based on this skill's target tier

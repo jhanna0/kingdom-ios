@@ -20,13 +20,13 @@ def get_kingdom_event_notifications(
     """Get kingdom event notifications for the user's relevant kingdoms."""
     
     # Get relevant kingdom IDs
+    # Only hometown and ruled kingdoms - NOT current_kingdom_id
+    # Players shouldn't see events from kingdoms they're just visiting
+    # (otherwise spies would see the "Intelligence Operation Detected" alert they caused!)
     relevant_kingdom_ids = set()
     
     if state.hometown_kingdom_id:
         relevant_kingdom_ids.add(state.hometown_kingdom_id)
-    
-    if state.current_kingdom_id:
-        relevant_kingdom_ids.add(state.current_kingdom_id)
     
     ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
     for k in ruled_kingdoms:
@@ -69,11 +69,10 @@ def get_unread_kingdom_events_count(
         return 0
     
     # Get relevant kingdom IDs (same as get_kingdom_event_notifications)
+    # Only hometown and ruled kingdoms - NOT current_kingdom_id
     relevant_kingdom_ids = set()
     if state.hometown_kingdom_id:
         relevant_kingdom_ids.add(state.hometown_kingdom_id)
-    if state.current_kingdom_id:
-        relevant_kingdom_ids.add(state.current_kingdom_id)
     ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
     for k in ruled_kingdoms:
         relevant_kingdom_ids.add(k.id)

@@ -580,19 +580,43 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
     type_display_name = EXCLUDED.type_display_name;
 
 -- =====================================================
--- FORTIFICATION ACHIEVEMENTS
+-- PROPERTIES ACHIEVEMENTS
 -- =====================================================
 
--- Items Sacrificed
+-- Kingdoms with Properties (Monopoly)
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('items_sacrificed', 1, 10, '{"gold": 75}', 'Proud Homeowner I', 'Convert 10 items to fortify', 'house.fill', 'fortification', 500, 'Items converted for fortification'),
-    ('items_sacrificed', 2, 25, '{"gold": 150}', 'Proud Homeowner II', 'Convert 25 items to fortify', 'house.fill', 'fortification', 501, 'Items converted for fortification'),
-    ('items_sacrificed', 3, 50, '{"gold": 300}', 'Proud Homeowner III', 'Convert 50 items to fortify', 'house.fill', 'fortification', 502, 'Items converted for fortification'),
-    ('items_sacrificed', 4, 100, '{"gold": 600}', 'Proud Homeowner IV', 'Convert 100 items to fortify', 'house.fill', 'fortification', 503, 'Items converted for fortification'),
-    ('items_sacrificed', 5, 250, '{"gold": 1500}', 'Proud Homeowner V', 'Convert 250 items to fortify', 'house.fill', 'fortification', 504, 'Items converted for fortification'),
-    ('items_sacrificed', 6, 500, '{"gold": 3000}', 'Proud Homeowner VI', 'Convert 500 items to fortify', 'house.fill', 'fortification', 505, 'Items converted for fortification')
+    ('kingdoms_with_properties', 1, 1, '{"gold": 50}', 'Monopoly I', 'Own property in 1 kingdom', 'house.fill', 'properties', 960, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 2, 2, '{"gold": 100}', 'Monopoly II', 'Own property in 2 kingdoms', 'house.fill', 'properties', 961, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 3, 3, '{"gold": 200}', 'Monopoly III', 'Own property in 3 kingdoms', 'house.fill', 'properties', 962, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 4, 4, '{"gold": 300}', 'Monopoly IV', 'Own property in 4 kingdoms', 'house.fill', 'properties', 963, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 5, 5, '{"gold": 500}', 'Monopoly V', 'Own property in 5 kingdoms', 'house.fill', 'properties', 964, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 6, 6, '{"gold": 750}', 'Monopoly VI', 'Own property in 6 kingdoms', 'house.fill', 'properties', 965, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 7, 7, '{"gold": 1000}', 'Monopoly VII', 'Own property in 7 kingdoms', 'house.fill', 'properties', 966, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 8, 8, '{"gold": 1500}', 'Monopoly VIII', 'Own property in 8 kingdoms', 'house.fill', 'properties', 967, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 9, 9, '{"gold": 2000}', 'Monopoly IX', 'Own property in 9 kingdoms', 'house.fill', 'properties', 968, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 10, 10, '{"gold": 3000}', 'Monopoly X', 'Own property in 10 kingdoms', 'house.fill', 'properties', 969, 'Kingdoms with properties')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- Items Sacrificed (Fortification)
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('items_sacrificed', 1, 10, '{"gold": 75}', 'Proud Homeowner I', 'Convert 10 items to fortify', 'brick.fill', 'properties', 970, 'Items converted for fortification'),
+    ('items_sacrificed', 2, 25, '{"gold": 150}', 'Proud Homeowner II', 'Convert 25 items to fortify', 'brick.fill', 'properties', 971, 'Items converted for fortification'),
+    ('items_sacrificed', 3, 50, '{"gold": 300}', 'Proud Homeowner III', 'Convert 50 items to fortify', 'brick.fill', 'properties', 972, 'Items converted for fortification'),
+    ('items_sacrificed', 4, 100, '{"gold": 600}', 'Proud Homeowner IV', 'Convert 100 items to fortify', 'brick.fill', 'properties', 973, 'Items converted for fortification'),
+    ('items_sacrificed', 5, 250, '{"gold": 1500}', 'Proud Homeowner V', 'Convert 250 items to fortify', 'brick.fill', 'properties', 974, 'Items converted for fortification'),
+    ('items_sacrificed', 6, 500, '{"gold": 3000}', 'Proud Homeowner VI', 'Convert 500 items to fortify', 'brick.fill', 'properties', 975, 'Items converted for fortification')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -607,7 +631,7 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('max_fortification', 1, 1, '{"gold": 250}', 'Fortress Builder I', 'Reach 100% fortification on property', 'building.columns.fill', 'fortification', 510, 'Properties at max fortification')
+    ('max_fortification', 1, 1, '{"gold": 250}', 'Fortress Builder I', 'Reach 100% fortification on property', 'building.columns.fill', 'properties', 980, 'Properties at max fortification')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -1002,6 +1026,30 @@ VALUES
     ('flower_colors', 1, 3, '{"gold": 100}', 'Color Collector I', 'Collect 3 different flower colors', 'paintpalette.fill', 'gardening', 900, 'Unique flower colors'),
     ('flower_colors', 2, 6, '{"gold": 250}', 'Color Collector II', 'Collect 6 different flower colors', 'paintpalette.fill', 'gardening', 901, 'Unique flower colors'),
     ('flower_colors', 3, 10, '{"gold": 500}', 'Rainbow Garden', 'Collect all 10 flower colors', 'paintpalette.fill', 'gardening', 902, 'Unique flower colors')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- =====================================================
+-- EXPLORATION ACHIEVEMENTS
+-- =====================================================
+
+-- Kingdoms Visited (World Traveler)
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('kingdoms_visited', 1, 5, '{"gold": 50}', 'World Traveler I', 'Visit 5 different kingdoms', 'map.fill', 'exploration', 950, 'Kingdoms visited'),
+    ('kingdoms_visited', 2, 10, '{"gold": 100}', 'World Traveler II', 'Visit 10 different kingdoms', 'map.fill', 'exploration', 951, 'Kingdoms visited'),
+    ('kingdoms_visited', 3, 25, '{"gold": 250}', 'World Traveler III', 'Visit 25 different kingdoms', 'map.fill', 'exploration', 952, 'Kingdoms visited'),
+    ('kingdoms_visited', 4, 50, '{"gold": 500}', 'World Traveler IV', 'Visit 50 different kingdoms', 'map.fill', 'exploration', 953, 'Kingdoms visited'),
+    ('kingdoms_visited', 5, 100, '{"gold": 1000}', 'World Traveler V', 'Visit 100 different kingdoms', 'map.fill', 'exploration', 954, 'Kingdoms visited'),
+    ('kingdoms_visited', 6, 250, '{"gold": 2500}', 'Globe Trotter', 'Visit 250 different kingdoms', 'map.fill', 'exploration', 955, 'Kingdoms visited')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,

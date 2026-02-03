@@ -154,7 +154,7 @@ extension MapViewModel {
                     updateActiveCoupFromKingdoms()
                     
                     let withBoundary = kingdoms.filter { $0.hasBoundaryCached }.count
-                    print("✅ Total: \(kingdoms.count) kingdoms (\(withBoundary) with boundaries)")
+                    // print("✅ Total: \(kingdoms.count) kingdoms (\(withBoundary) with boundaries)")
                     loadingStatus = ""
                 }
                 
@@ -292,6 +292,7 @@ extension MapViewModel {
             // Alliance data
             kingdom.isAllied = kingdomData.is_allied
             kingdom.isEnemy = kingdomData.is_enemy
+            kingdom.isEmpire = kingdomData.is_empire ?? false
             kingdom.allies = Set(kingdomData.allies ?? [])
             kingdom.enemies = Set(kingdomData.enemies ?? [])
             
@@ -487,12 +488,10 @@ extension MapViewModel {
         
         // Skip if already has boundary
         guard !kingdoms[index].hasBoundaryCached else {
-            print("✅ Kingdom \(kingdomId) already has boundary")
             return
         }
         
         do {
-            print("🌐 Lazy-loading boundary for \(kingdoms[index].name)...")
             let boundaryResponse = try await apiService.city.fetchBoundary(osmId: kingdomId)
             
             // Convert to CLLocationCoordinate2D array
@@ -524,7 +523,6 @@ extension MapViewModel {
         var missingIds = missing.map { $0.id }
         
         if missingIds.isEmpty {
-            print("✅ All boundaries already loaded")
             return
         }
         
@@ -533,15 +531,12 @@ extension MapViewModel {
             loadingStatus = "Mapping new areas... (this may take a moment)"
         }
         
-        print("🌐 Batch loading \(missingIds.count) missing boundaries in parallel...")
-        
         let maxRetries = 5
         var attempt = 0
         
         // Retry loop - keep trying until all boundaries are loaded or max retries reached
         while !missingIds.isEmpty && attempt < maxRetries {
             attempt += 1
-            print("📍 Attempt \(attempt)/\(maxRetries) - \(missingIds.count) boundaries remaining")
             
             await MainActor.run {
                 if attempt > 1 {
@@ -564,7 +559,6 @@ extension MapViewModel {
                         
                         // Skip if no boundary returned (failed fetch)
                         if boundaryResponse.boundary.isEmpty {
-                            print("⚠️ No boundary for \(kingdoms[index].name)")
                             continue
                         }
                         
@@ -584,9 +578,6 @@ extension MapViewModel {
                             currentKingdomInside = kingdoms[index]
                         }
                     }
-                    
-                    let loaded = boundaryResponses.filter { !$0.boundary.isEmpty }.count
-                    print("✅ Batch attempt \(attempt): \(loaded)/\(missingIds.count) boundaries loaded")
                 }
                 
                 // Remove successfully loaded IDs from missing list
@@ -594,16 +585,12 @@ extension MapViewModel {
                 
                 // If we still have missing boundaries, wait a bit before retrying
                 if !missingIds.isEmpty && attempt < maxRetries {
-                    print("⏳ Waiting 2 seconds before retry...")
                     try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                 }
                 
             } catch {
-                print("❌ Batch attempt \(attempt) failed: \(error)")
-                
                 // Wait before retrying on error
                 if attempt < maxRetries {
-                    print("⏳ Waiting 3 seconds before retry...")
                     try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
                 }
             }
@@ -612,12 +599,8 @@ extension MapViewModel {
         await MainActor.run {
             loadingStatus = ""
             
-            // Check if we successfully loaded everything
-            if missingIds.isEmpty {
-                print("🎉 All boundaries successfully loaded after \(attempt) attempt(s)")
-            } else {
-                // Only show error if we failed after all retries
-                print("⚠️ Failed to load \(missingIds.count) boundaries after \(maxRetries) attempts")
+            // Show error only if we failed after all retries
+            if !missingIds.isEmpty {
                 errorMessage = "Failed to map some areas after \(maxRetries) attempts. The royal cartographers need more time."
             }
         }

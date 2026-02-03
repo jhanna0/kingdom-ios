@@ -277,7 +277,8 @@ SLOT_DEFINITIONS = {
         "color_theme": "buttonSuccess",
         "display_order": 3,
         "description": "Gather resources and earn gold",
-        "location": "home",  # Home kingdom only
+        "location": "home",  # Base location for backwards compat
+        "allow_in_friendly": True,  # Also allowed in same empire + allied kingdoms
         "content_type": "actions",  # Generic action cards
     },
     "security": {
@@ -287,7 +288,8 @@ SLOT_DEFINITIONS = {
         "color_theme": "buttonPrimary",
         "display_order": 4,
         "description": "Protect your kingdom from threats",
-        "location": "home",  # Home kingdom only
+        "location": "home",  # Base location for backwards compat
+        "allow_in_friendly": True,  # Also allowed in same empire + allied kingdoms
         "content_type": "actions",
     },
     "intelligence": {
@@ -354,13 +356,35 @@ def get_all_slot_definitions() -> list:
     )
 
 
-def get_slots_for_location(location: str) -> list:
-    """Get slots available for a specific location (home, enemy, any)"""
+def get_slots_for_location(location: str, is_friendly: bool = False) -> list:
+    """Get slots available for a specific location.
+    
+    Args:
+        location: "home", "enemy", or "any"
+        is_friendly: True if current location is friendly (same empire or allied)
+                    Used for slots with allow_in_friendly=True
+    
+    Location types in slot definitions:
+        - "home": Only in home kingdom (unless allow_in_friendly=True)
+        - "enemy": Only in enemy territory
+        - "any": Everywhere
+        
+    Special field:
+        - allow_in_friendly: If True, "home" slots also appear in friendly territory
+    """
     result = []
     for slot in get_all_slot_definitions():
         slot_location = slot.get("location", "any")
-        if slot_location == "any" or slot_location == location:
+        allow_in_friendly = slot.get("allow_in_friendly", False)
+        
+        if slot_location == "any":
             result.append(slot)
+        elif slot_location == location:
+            result.append(slot)
+        elif slot_location == "home" and allow_in_friendly and is_friendly:
+            # "home" slots with allow_in_friendly also appear in friendly territory
+            result.append(slot)
+    
     return result
 
 

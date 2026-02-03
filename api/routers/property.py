@@ -541,7 +541,7 @@ def get_property_status(
     
     # Purchase validation flags
     # NOTE: With pay-per-action system, no upfront gold required to start
-    meets_reputation_requirement = current_kingdom_reputation >= 50
+    meets_reputation_requirement = current_kingdom_reputation >= 500
     can_purchase = (
         current_kingdom is not None 
         and not already_owns_property_in_current_kingdom
@@ -641,10 +641,10 @@ def purchase_land(
     ).first()
     current_reputation = user_kingdom.local_reputation if user_kingdom else 0
     
-    if current_reputation < 50:
+    if current_reputation < 500:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Need 50+ reputation in {request.kingdom_name}. Current: {current_reputation}"
+            detail=f"Need 500+ reputation in {request.kingdom_name}. Current: {current_reputation}"
         )
     
     # Check if player already owns property in this kingdom

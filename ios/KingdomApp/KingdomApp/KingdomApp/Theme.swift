@@ -132,8 +132,9 @@ struct KingdomTheme {
         
         /// Get territory color for a kingdom based on relationship and hash
         /// - isAtWar: true if the player's kingdom has an active coup or invasion
-        static func territoryColor(kingdomId: String, isPlayer: Bool, isEnemy: Bool, isAllied: Bool, isAtWar: Bool = false) -> Color {
-            if isPlayer {
+        /// - isPartOfEmpire: true if this kingdom is ruled by the current player (part of their empire)
+        static func territoryColor(kingdomId: String, isPlayer: Bool, isEnemy: Bool, isAllied: Bool, isAtWar: Bool = false, isPartOfEmpire: Bool = false) -> Color {
+            if isPlayer || isPartOfEmpire {
                 return isAtWar ? territoryPlayerAtWar : territoryPlayer
             } else if isEnemy {
                 return territoryEnemy

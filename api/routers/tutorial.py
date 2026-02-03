@@ -60,6 +60,12 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 - **Coup** the ruler if you don't like how things are run
 
 **Reputation is earned per kingdom**. Switching kingdoms resets it to 0. This prevents randoms from switching to your kingdom and couping.
+
+**How to switch hometowns**
+1. Travel to the kingdom you want to make your new home
+2. Open your **Character** sheet
+3. A **Hometown** switch card will appear at the bottom of the page
+4. You may only do this once per 60 days
 """
 
     ),
@@ -146,7 +152,8 @@ Skills unlock new content and give your character powerful perks.
 
 **Cost:** Based on your TOTAL skill points across all skills. Every skill you train makes the next one more expensive. Therefore, it's very difficult to max an account. Pick the build path you think is best.
 
-**Tip:** Education buildings reduce actions needed.
+**Tips:** Different skills increase your success rate in activities. Check the screen for which skills are used.
+Education buildings reduce actions needed.
 """
     ),
     TutorialSection(

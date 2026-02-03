@@ -25,7 +25,7 @@ from db.models.science_stats import ScienceStats
 from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from routers.actions.tax_utils import apply_kingdom_tax
-from routers.actions.utils import set_activity_status
+from routers.actions.utils import set_activity_status, log_activity
 from systems.science.science_manager import ScienceManager, ScienceSession
 from systems.science.config import (
     SKILL_CONFIG,
@@ -41,6 +41,22 @@ from systems.science.config import (
 router = APIRouter(prefix="/science", tags=["science"])
 
 _manager = ScienceManager()
+
+
+def broadcast_blueprint_find(db: Session, player_id: int) -> None:
+    """Broadcast blueprint discovery to activity feed."""
+    from systems.science.config import BLUEPRINT_CONFIG
+    log_activity(
+        db=db,
+        user_id=player_id,
+        action_type="science_discovery",
+        action_category="science",
+        description=f"Discovered a {BLUEPRINT_CONFIG['display_name']}! 📜",
+        kingdom_id=None,
+        amount=1,
+        details={"item_id": "blueprint", "item_name": BLUEPRINT_CONFIG["display_name"]},
+        visibility="friends"
+    )
 
 
 def _get_player_blueprints(db: Session, player_id: int) -> int:
@@ -317,6 +333,9 @@ def collect_rewards(
                 quantity=blueprint
             )
             db.add(inv)
+        
+        # Broadcast blueprint discovery to activity feed
+        broadcast_blueprint_find(db, player_id)
     
     # Update session status
     db_session.status = 'collected'

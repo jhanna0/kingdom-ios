@@ -4,6 +4,8 @@ Authentication service - Handles user auth, JWT tokens, password hashing
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+import uuid
+import random
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -136,13 +138,35 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
     
     # Sanitize and validate display name
     # If "User" is sent (iOS default when Apple doesn't provide name), generate unique placeholder
-    import uuid
     display_name = apple_data.display_name
+    generated_name = False
     if not display_name or display_name == "User":
-        display_name = f"Player{uuid.uuid4().hex[:8]}"
+        # Generate fun medieval-style name like "Player123 the Brave"
+        # Max 20 chars: "Player" (6) + number (1-4) + " the " (5) + adjective (4-5)
+        adjectives = ["Brave", "Wise", "Great", "Noble", "Bold", "True", "Just", "Fair", "Good", "Kind"]
+        
+        # Try up to 10 times to find a unique name
+        for _ in range(10):
+            number = random.randint(1, 9999)
+            adjective = random.choice(adjectives)
+            candidate = f"Player{number} the {adjective}"
+            
+            # Check if this name is already taken
+            existing = db.query(User).filter(
+                func.lower(User.display_name) == func.lower(candidate)
+            ).first()
+            if not existing:
+                display_name = candidate
+                generated_name = True
+                break
+        else:
+            # Fallback to UUID-based name if all attempts collide (extremely unlikely)
+            display_name = f"Player{uuid.uuid4().hex[:8]}"
+            generated_name = True
+    
     print(f"📝 [SIGNUP] Creating new user with display_name: {display_name}")
     
-    if display_name != "Player":  # Don't validate default name
+    if not generated_name:  # Only validate user-provided names, not generated ones
         display_name = sanitize_username(display_name)
         is_valid, error_msg = validate_username(display_name)
         if not is_valid:
@@ -152,16 +176,17 @@ def create_user_with_apple(db: Session, apple_data: AppleSignIn) -> User:
                 detail=error_msg
             )
     
-    # Check if display name is already taken (globally unique, case-insensitive)
-    existing_display_name = db.query(User).filter(
-        func.lower(User.display_name) == func.lower(display_name)
-    ).first()
-    if existing_display_name:
-        print(f"❌ [SIGNUP] Display name already taken: {display_name}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Display name '{display_name}' is already taken"
-        )
+        # Check if display name is already taken (globally unique, case-insensitive)
+        # Skip for generated names since we already checked during generation
+        existing_display_name = db.query(User).filter(
+            func.lower(User.display_name) == func.lower(display_name)
+        ).first()
+        if existing_display_name:
+            print(f"❌ [SIGNUP] Display name already taken: {display_name}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Display name '{display_name}' is already taken"
+            )
     
     # SECURITY: Block if device already has an account
     if apple_data.device_id:

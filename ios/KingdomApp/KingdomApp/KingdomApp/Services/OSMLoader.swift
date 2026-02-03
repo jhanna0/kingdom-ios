@@ -129,7 +129,6 @@ class OSMLoader {
                 let boundary = buildCompleteBoundary(from: waySegments)
                 
                 if boundary.count < 10 {
-                    print("    ⚠️ \(name): only \(boundary.count) points after joining, skipping")
                     continue
                 }
                 
