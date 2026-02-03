@@ -55,7 +55,7 @@ RESOURCES = {
     "stone": {
         "display_name": "Stone",
         "icon": "cube.fill",
-        "color": "parchmentDark",
+        "color": "imperialGold",
         "description": "Quarried stone for building walls and structures",
         "category": "material",
         "display_order": 12,

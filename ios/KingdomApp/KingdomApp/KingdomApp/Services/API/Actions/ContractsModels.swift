@@ -34,10 +34,13 @@ struct PerActionResourceCost: Codable {
     let amount: Int
     let displayName: String
     let icon: String
+    let color: String?  // Theme color name from backend (e.g., "brown", "gray")
+    let canAfford: Bool?  // Per-resource affordability (nil = assume true for backwards compat)
     
     enum CodingKeys: String, CodingKey {
-        case resource, amount, icon
+        case resource, amount, icon, color
         case displayName = "display_name"
+        case canAfford = "can_afford"
     }
 }
 

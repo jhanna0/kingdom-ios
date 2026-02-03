@@ -10,7 +10,7 @@ struct MyPropertiesView: View {
     @ObservedObject var player: Player
     var currentKingdom: Kingdom?
     @State private var property: Property?
-    @State private var activeContract: PropertyAPI.PropertyUpgradeContract?
+    @State private var activeContracts: [PropertyAPI.PropertyUpgradeContract] = []
     @State private var availableRooms: [PropertyAPI.PropertyRoom] = []
     @State private var upgradeStatus: PropertyAPI.PropertyUpgradeStatus?
     @State private var isLoading = true
@@ -39,7 +39,7 @@ struct MyPropertiesView: View {
                         } else {
                             maxLevelSection
                         }
-                    } else if activeContract != nil {
+                    } else if !activeContracts.isEmpty {
                         // Building property (tier 0 or no property yet, but contract exists)
                         constructionOnlyView
                     } else {
@@ -388,12 +388,9 @@ struct MyPropertiesView: View {
         let nextTier = property.tier + 1
         let options = TierManager.shared.propertyTierOptions(nextTier)
         
-        // Get the option_id being built (if any)
-        let buildingOptionId = activeContract?.option_id
-        
         // Show a card for each option - either progress or build button
         ForEach(options, id: \.id) { option in
-            if let contract = activeContract, buildingOptionId == option.id {
+            if let contract = activeContracts.first(where: { $0.option_id == option.id }) {
                 // This option is being built - show progress
                 upgradeProgressCard(property: property, contract: contract, option: option)
             } else {
@@ -770,7 +767,7 @@ struct MyPropertiesView: View {
     
     private var constructionOnlyView: some View {
         VStack(spacing: KingdomTheme.Spacing.large) {
-            if let contract = activeContract {
+            if let contract = activeContracts.first {
                 // Header
                 VStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: tierIcon(contract.to_tier))
@@ -968,8 +965,8 @@ struct MyPropertiesView: View {
                         availableRooms = []
                     }
                     
-                    // Get active contract
-                    activeContract = status.property_upgrade_contracts?.first { $0.status == "in_progress" }
+                    // Get all active contracts
+                    activeContracts = status.property_upgrade_contracts?.filter { $0.status == "in_progress" } ?? []
                     
                     isLoading = false
                 }

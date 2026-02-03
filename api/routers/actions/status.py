@@ -239,7 +239,9 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
                 "resource": cost["resource"],
                 "amount": cost["amount"],
                 "display_name": resource_info.get("display_name", cost["resource"].capitalize()),
-                "icon": resource_info.get("icon", "questionmark.circle")
+                "icon": resource_info.get("icon", "questionmark.circle"),
+                "color": resource_info.get("color", "inkMedium"),
+                "can_afford": has_enough  # Per-resource affordability
             })
         
         # Get gold per action for pay-per-action system

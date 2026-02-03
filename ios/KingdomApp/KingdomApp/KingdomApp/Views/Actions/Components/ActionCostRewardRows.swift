@@ -63,7 +63,7 @@ struct ActionCostRow: View {
         HStack(spacing: 4) {
             Image(systemName: cost.icon)
                 .font(FontStyles.iconMini)
-                .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                .foregroundColor(cost.canAfford ? cost.color : .red)
             Text("\(cost.amount)")
                 .font(FontStyles.labelBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -163,7 +163,7 @@ struct ActionCostRewardRow: View {
                 HStack(spacing: 3) {
                     Image(systemName: cost.icon)
                         .font(FontStyles.iconMini)
-                        .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                        .foregroundColor(cost.canAfford ? cost.color : .red)
                     Text("\(cost.amount)")
                         .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -348,7 +348,7 @@ struct ActionCostRowWithTax: View {
         HStack(spacing: 4) {
             Image(systemName: cost.icon)
                 .font(FontStyles.iconMini)
-                .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                .foregroundColor(cost.canAfford ? cost.color : .red)
             Text("\(cost.amount)")
                 .font(FontStyles.labelBold)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -433,7 +433,7 @@ struct ActionCostRewardRowWithTax: View {
                 HStack(spacing: 3) {
                     Image(systemName: cost.icon)
                         .font(FontStyles.iconMini)
-                        .foregroundColor(cost.canAfford ? KingdomTheme.Colors.inkMedium : .red)
+                        .foregroundColor(cost.canAfford ? cost.color : .red)
                     Text("\(cost.amount)")
                         .font(FontStyles.labelBold)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -538,11 +538,24 @@ extension PropertyUpgradeContract {
         // Per-action resource costs (wood, iron, etc.)
         if let costs = perActionCosts {
             for cost in costs {
+                // Use resource color from backend, fall back to TierManager lookup, then default
+                let resourceColor: Color
+                if let colorName = cost.color {
+                    resourceColor = KingdomTheme.Colors.color(fromThemeName: colorName)
+                } else if let info = TierManager.shared.resourceInfo(cost.resource) {
+                    resourceColor = KingdomTheme.Colors.color(fromThemeName: info.colorName)
+                } else {
+                    resourceColor = KingdomTheme.Colors.inkMedium
+                }
+                
+                // Per-resource affordability: use backend's per-resource check, fall back to overall
+                let canAffordThis = cost.canAfford ?? canAfford ?? true
+                
                 items.append(CostItem(
                     icon: cost.icon,
                     amount: cost.amount,
-                    color: KingdomTheme.Colors.buttonWarning,
-                    canAfford: canAfford ?? true
+                    color: resourceColor,
+                    canAfford: canAffordThis
                 ))
             }
         }

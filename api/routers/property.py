@@ -245,7 +245,8 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
             "resource": resource_id,
             "amount": amount,
             "display_name": resource_info.get("display_name", resource_id.capitalize()),
-            "icon": resource_info.get("icon", "questionmark.circle")
+            "icon": resource_info.get("icon", "questionmark.circle"),
+            "color": resource_info.get("color", "inkMedium")
         }
     
     per_action_costs = [enrich_cost(c) for c in base_per_action]

@@ -93,7 +93,8 @@ def work_on_contract(
             "resource": resource_id,
             "amount": amount,
             "display_name": resource_info.get("display_name", resource_id.capitalize()),
-            "icon": resource_info.get("icon", "questionmark.circle")
+            "icon": resource_info.get("icon", "questionmark.circle"),
+            "color": resource_info.get("color", "inkMedium")
         })
         
         if player_amount < amount:
@@ -404,7 +405,8 @@ def work_on_property_upgrade(
             "resource": resource_id,
             "amount": amount,
             "display_name": resource_info.get("display_name", resource_id.capitalize()),
-            "icon": resource_info.get("icon", "questionmark.circle")
+            "icon": resource_info.get("icon", "questionmark.circle"),
+            "color": resource_info.get("color", "inkMedium")
         })
         
         if player_amount < amount:
