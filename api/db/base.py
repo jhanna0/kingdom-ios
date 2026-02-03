@@ -42,8 +42,8 @@ DATABASE_URL = get_database_url()
 # Create engine with Lambda-optimized settings
 engine = create_engine(
     DATABASE_URL,
-    pool_size=10,  # Small pool for Lambda
-    max_overflow=10,  # No overflow connections
+    pool_size=1,  # Small pool for Lambda
+    max_overflow=0,  # No overflow connections
     pool_pre_ping=True,  # Verify connection before using
     pool_recycle=3600,  # Recycle connections after 1 hour
     connect_args={
