@@ -221,8 +221,9 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         target_parts = contract.target_id.split("|") if contract.target_id else []
         property_id = target_parts[0] if target_parts else contract.target_id
         
-        # Get per-action costs from tier config (dynamically calculated)
-        raw_per_action = get_property_per_action_costs(contract.tier or 1)
+        # Get per-action costs for this specific option
+        from routers.tiers import get_property_option_per_action_costs
+        raw_per_action = get_property_option_per_action_costs(contract.tier, contract.option_id) if contract.tier else []
         
         # Enrich with display info and check affordability
         per_action_costs = []
@@ -248,6 +249,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
         can_afford_gold = player_state.gold >= gold_cost_with_tax
         
+        # Look up option name for display
+        from routers.property import get_option_name
+        option_name = get_option_name(contract.tier, contract.option_id) if contract.tier and contract.option_id else None
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": property_id,
@@ -255,7 +260,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "kingdom_name": contract.kingdom_name,
             "from_tier": (contract.tier or 1) - 1,
             "to_tier": contract.tier or 1,
-            "target_tier_name": get_tier_name(contract.tier or 1),
+            "target_tier_name": option_name or get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)

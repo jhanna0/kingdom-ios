@@ -383,13 +383,33 @@ struct MyPropertiesView: View {
     
     // MARK: - Unified Upgrade Section
     
+    @ViewBuilder
     private func upgradeSection(property: Property) -> some View {
-        let nextTierName = TierManager.shared.propertyTierName(property.tier + 1)
+        let nextTier = property.tier + 1
+        let options = TierManager.shared.propertyTierOptions(nextTier)
         
-        return VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            // Header: Icon + Title/Description (ActionCard pattern)
+        // Get the option_id being built (if any)
+        let buildingOptionId = activeContract?.option_id
+        
+        // Show a card for each option - either progress or build button
+        ForEach(options, id: \.id) { option in
+            if let contract = activeContract, buildingOptionId == option.id {
+                // This option is being built - show progress
+                upgradeProgressCard(property: property, contract: contract, option: option)
+            } else {
+                // This option is not being built - show build button
+                optionUpgradeCard(property: property, option: option)
+            }
+        }
+    }
+    
+    // MARK: - Option Upgrade Card (same style as original)
+    
+    private func optionUpgradeCard(property: Property, option: PropertyTierOption) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Header: Icon + Title/Description
             HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
-                Image(systemName: tierIcon(property.tier + 1))
+                Image(systemName: option.icon)
                     .font(FontStyles.iconLarge)
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
@@ -401,11 +421,11 @@ struct MyPropertiesView: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(nextTierName)
+                    Text(option.name)
                         .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text(TierManager.shared.propertyTierDescription(property.tier + 1))
+                    Text(option.description)
                         .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
@@ -413,35 +433,127 @@ struct MyPropertiesView: View {
                 Spacer()
             }
             
-            // Cost table - matching SkillDetailView format
-            if let status = upgradeStatus {
-                upgradeCostTable(status: status, fromTier: property.tier, toTier: property.tier + 1)
+            // Cost table
+            if let actions = option.baseActionsRequired, let goldPerAction = option.goldPerAction {
+                optionCostTable(option: option, actions: actions, goldPerAction: goldPerAction)
             }
             
-            // Button or progress
-            if let contract = activeContract {
-                constructionProgressView(contract: contract)
-            } else if let status = upgradeStatus {
-                Button(action: purchaseUpgrade) {
-                    HStack(spacing: 8) {
-                        if isPurchasingUpgrade {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Image(systemName: "hammer.fill")
-                            Text("Upgrade")
-                        }
+            // Build button
+            Button(action: { purchaseUpgrade(optionId: option.id) }) {
+                HStack(spacing: 8) {
+                    if isPurchasingUpgrade {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "hammer.fill")
+                        Text("Build \(option.name)")
                     }
                 }
-                .buttonStyle(.brutalist(
-                    backgroundColor: status.can_afford ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
-                    foregroundColor: .white,
-                    fullWidth: true
-                ))
-                .disabled(!status.can_afford || isPurchasingUpgrade)
+            }
+            .buttonStyle(.brutalist(
+                backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                foregroundColor: .white,
+                fullWidth: true
+            ))
+            .disabled(isPurchasingUpgrade)
+            
+            // View all tiers link
+            NavigationLink(value: PropertyDestination.tiers(property)) {
+                Text("View all tiers →")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    // MARK: - Option Cost Table
+    
+    @ViewBuilder
+    private func optionCostTable(option: PropertyTierOption, actions: Int, goldPerAction: Double) -> some View {
+        let perActionCosts = option.perActionCosts
+        
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 0) {
+                // Header
+                HStack(spacing: 16) {
+                    Text("Build")
+                        .frame(width: 80, alignment: .leading)
+                    Text("Actions")
+                        .frame(width: 60, alignment: .center)
+                    Text("Gold/Act")
+                        .frame(width: 70, alignment: .center)
+                    ForEach(perActionCosts, id: \.resource) { cost in
+                        Text("\(TierManager.shared.resourceInfo(cost.resource)?.displayName ?? cost.resource)/Act")
+                            .frame(width: 70, alignment: .center)
+                    }
+                }
+                .font(FontStyles.labelBold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                
+                Divider().overlay(Color.black.opacity(0.1))
+                
+                // Values
+                HStack(spacing: 16) {
+                    Text(option.name)
+                        .frame(width: 80, alignment: .leading)
+                    Text("\(actions)")
+                        .frame(width: 60, alignment: .center)
+                    Text("\(Int(goldPerAction))g")
+                        .frame(width: 70, alignment: .center)
+                    ForEach(perActionCosts, id: \.resource) { cost in
+                        Text("\(cost.amount)")
+                            .frame(width: 70, alignment: .center)
+                    }
+                }
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+        }
+        .background(Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black, lineWidth: 2))
+    }
+    
+    // MARK: - Upgrade Progress Card
+    
+    private func upgradeProgressCard(property: Property, contract: PropertyAPI.PropertyUpgradeContract, option: PropertyTierOption) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Header - use option icon/name
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: option.icon)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(option.name)
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("In progress...")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
             }
             
-            // Optional: View all tiers link (kept away from button/progress)
+            constructionProgressView(contract: contract)
+            
             NavigationLink(value: PropertyDestination.tiers(property)) {
                 Text("View all tiers →")
                     .font(FontStyles.labelMedium)
@@ -879,7 +991,7 @@ struct MyPropertiesView: View {
         }
     }
     
-    private func purchaseUpgrade() {
+    private func purchaseUpgrade(optionId: String? = nil) {
         guard let prop = property else { return }
         
         Task {
@@ -888,7 +1000,7 @@ struct MyPropertiesView: View {
             }
             
             do {
-                _ = try await propertyAPI.purchasePropertyUpgrade(propertyId: prop.id)
+                _ = try await propertyAPI.purchasePropertyUpgrade(propertyId: prop.id, optionId: optionId)
                 
                 // Refresh player state
                 let playerState = try await KingdomAPIService.shared.player.loadState()

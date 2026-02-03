@@ -137,42 +137,116 @@ def calculate_property_actions(tier: int) -> int:
 # Add new tiers here and they'll appear in iOS automatically!
 # NOTE: gold_cost and base_actions are now calculated dynamically from params above
 # per_action_costs: Resources required PER WORK ACTION (wood, iron, etc.)
+#
+# MULTI-OPTION SUPPORT:
+# Each tier can have an "options" array for multiple buildable rooms at that level.
+# - Legacy fields (name, icon, description, benefits) are kept for backwards compatibility
+# - New iOS apps should iterate through "options" to show all available rooms
+# - The first option in the array is the "default" (used by legacy clients)
 
 PROPERTY_TIERS = {
     1: {
+        # Legacy fields (backwards compatibility)
         "name": "Land",
         "icon": "square.dashed",
         "description": "Cleared land with travel benefits",
         "benefits": ["Free travel to this kingdom"],
         "per_action_costs": [],  # No resource cost for clearing land
+        # Multi-option support: array of buildable options at this level
+        "options": [
+            {
+                "id": "land",
+                "name": "Land",
+                "icon": "square.dashed",
+                "description": "Cleared land with travel benefits",
+                "benefits": ["Free travel to this kingdom"],
+                "resource_ratios": [],
+            }
+        ]
     },
     2: {
+        # Legacy fields (backwards compatibility)
         "name": "House",
         "icon": "house.fill",
         "description": "A comfy home with garden",
         "benefits": ["All Land benefits", "A comfy home with garden"],
         "resource_ratios": [{"resource": "wood", "ratio": 1.0}],  # 100% wood
+        # Multi-option support
+        "options": [
+            {
+                "id": "house",
+                "name": "House",
+                "icon": "house.fill",
+                "description": "A comfy home with garden",
+                "benefits": ["All Land benefits", "A comfy home with garden"],
+                "resource_ratios": [{"resource": "wood", "ratio": 1.0}],
+            }
+        ]
     },
     3: {
-        "name": "Workshop",
+        # Legacy fields (backwards compatibility - uses first option)
+        "name": "Workshop & Kitchen",
         "icon": "hammer.fill",
         "description": "Crafting workshop",
-        "benefits": ["All House benefits", "Allows crafting of weapons and armor"],
+        "benefits": ["All House benefits", "Unlocks crafting of weapons and armor", "Unlocks cooking and baking"],
         "resource_ratios": [{"resource": "wood", "ratio": 0.6}, {"resource": "iron", "ratio": 0.4}],
+        # Multi-option support: multiple rooms available at tier 3!
+        "options": [
+            {
+                "id": "workshop",
+                "name": "Workshop",
+                "icon": "hammer.fill",
+                "description": "Crafting workshop",
+                "benefits": ["All House benefits", "Unlocks crafting of weapons and armor"],
+                "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
+            },
+            {
+                "id": "kitchen",
+                "name": "Kitchen",
+                "icon": "fork.knife",
+                "description": "Cook meals for buffs",
+                "benefits": ["All House benefits", "Unlocks cooking and baking"],
+                "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "stone", "ratio": 0.5}],
+            }
+        ]
     },
     4: {
+        # Legacy fields (backwards compatibility)
         "name": "Beautiful Property",
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
         "resource_ratios": [{"resource": "wood", "ratio": 0.55}, {"resource": "iron", "ratio": 0.45}],
+        # Multi-option support
+        "options": [
+            {
+                "id": "beautiful_property",
+                "name": "Beautiful Property",
+                "icon": "building.columns.fill",
+                "description": "Animals & Gardens",
+                "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
+                "resource_ratios": [{"resource": "wood", "ratio": 0.55}, {"resource": "iron", "ratio": 0.45}],
+            }
+        ]
     },
     5: {
+        # Legacy fields (backwards compatibility)
         "name": "Defensive Walls",
         "icon": "shield.fill",
         "description": "Grand estate",
         "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
         "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
+        # Multi-option support
+        "options": [
+            {
+                "id": "defensive_walls",
+                "name": "Defensive Walls",
+                "icon": "shield.fill",
+                "description": "Grand estate",
+                "benefits": ["All Beautiful Property benefits", "50% less chance property gets destroyed in invasion"],
+                "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
+            }
+        ]
     }
 }
 
@@ -987,13 +1061,56 @@ def get_all_tiers(
         )
     total_skill_points = get_total_skill_points(state)
     
+    # Build property tiers with calculated costs (matches /tiers/properties format)
+    property_tiers_with_costs = {}
+    for tier in range(1, 6):
+        info = PROPERTY_TIERS[tier]
+        gold_per_action = calculate_property_gold_per_action(tier)
+        base_actions = calculate_property_actions(tier)
+        total_gold = int(gold_per_action * base_actions)
+        
+        # Build options array with calculated costs
+        options = []
+        for opt in info.get("options", []):
+            ratios = opt.get("resource_ratios", [])
+            opt_per_action_costs = [
+                {"resource": r["resource"], "amount": int(gold_per_action * r["ratio"])}
+                for r in ratios
+            ] if ratios else []
+            
+            options.append({
+                "id": opt.get("id", f"tier_{tier}"),
+                "name": opt.get("name", info["name"]),
+                "icon": opt.get("icon", info.get("icon", "house.fill")),
+                "description": opt.get("description", info["description"]),
+                "benefits": opt.get("benefits", info["benefits"]),
+                "gold_per_action": gold_per_action,
+                "base_actions_required": base_actions,
+                "total_gold_cost": total_gold,
+                "per_action_costs": opt_per_action_costs,
+            })
+        
+        property_tiers_with_costs[str(tier)] = {
+            # Legacy fields (backwards compatibility)
+            "name": info["name"],
+            "icon": info.get("icon", "house.fill"),
+            "description": info["description"],
+            "benefits": info["benefits"],
+            "gold_per_action": gold_per_action,
+            "base_actions_required": base_actions,
+            "total_gold_cost": total_gold,
+            "per_action_costs": get_property_per_action_costs(tier),
+            # NEW: Multiple options at this tier
+            "options": options,
+        }
+    
     return {
         "resources": {
             "types": RESOURCES  # Import from resources.py
         },
         "properties": {
             "max_tier": get_property_max_tier(),
-            "tiers": {str(k): v for k, v in PROPERTY_TIERS.items()}
+            "tiers": property_tiers_with_costs
         },
         "skills": {
             "max_tier": 10,
@@ -1027,9 +1144,52 @@ def get_all_tiers(
     }
 
 
+def get_property_option_per_action_costs(tier: int, option_id: str = None) -> list:
+    """Get per-action resource costs for a specific option at a tier.
+    
+    If option_id is None, returns costs for the first/default option.
+    """
+    tier_data = PROPERTY_TIERS.get(tier, {})
+    options = tier_data.get("options", [])
+    
+    if not options:
+        # Fallback to legacy resource_ratios
+        ratios = tier_data.get("resource_ratios", [])
+        if not ratios:
+            return []
+        gold_per_action = calculate_property_gold_per_action(tier)
+        return [
+            {"resource": r["resource"], "amount": int(gold_per_action * r["ratio"])}
+            for r in ratios
+        ]
+    
+    # Find the requested option or use first
+    target_option = options[0]
+    if option_id:
+        for opt in options:
+            if opt.get("id") == option_id:
+                target_option = opt
+                break
+    
+    ratios = target_option.get("resource_ratios", [])
+    if not ratios:
+        return []
+    
+    gold_per_action = calculate_property_gold_per_action(tier)
+    return [
+        {"resource": r["resource"], "amount": int(gold_per_action * r["ratio"])}
+        for r in ratios
+    ]
+
+
 @router.get("/properties")
 def get_property_tiers():
-    """Get property tier info with costs - ALL VALUES FROM centralized config"""
+    """Get property tier info with costs - ALL VALUES FROM centralized config
+    
+    Returns:
+        - Legacy fields (name, icon, etc.) for backwards compatibility
+        - NEW: "options" array for each tier with all buildable rooms at that level
+    """
     tiers_dict = {}
     for tier in range(1, 6):
         info = PROPERTY_TIERS[tier]
@@ -1037,7 +1197,30 @@ def get_property_tiers():
         base_actions = calculate_property_actions(tier)
         total_gold = int(gold_per_action * base_actions)
         
+        # Build options array with calculated costs
+        options = []
+        for opt in info.get("options", []):
+            # Calculate per-action costs for this specific option
+            ratios = opt.get("resource_ratios", [])
+            opt_per_action_costs = [
+                {"resource": r["resource"], "amount": int(gold_per_action * r["ratio"])}
+                for r in ratios
+            ] if ratios else []
+            
+            options.append({
+                "id": opt.get("id", f"tier_{tier}"),
+                "name": opt.get("name", info["name"]),
+                "icon": opt.get("icon", info.get("icon", "house.fill")),
+                "description": opt.get("description", info["description"]),
+                "benefits": opt.get("benefits", info["benefits"]),
+                "gold_per_action": gold_per_action,
+                "base_actions_required": base_actions,
+                "total_gold_cost": total_gold,
+                "per_action_costs": opt_per_action_costs,
+            })
+        
         tiers_dict[str(tier)] = {
+            # Legacy fields (backwards compatibility)
             "tier": tier,
             "name": info["name"],
             "icon": info.get("icon", "house.fill"),
@@ -1047,6 +1230,8 @@ def get_property_tiers():
             "base_actions_required": base_actions,
             "total_gold_cost": total_gold,
             "per_action_costs": get_property_per_action_costs(tier),
+            # NEW: Multiple options at this tier (for new UI)
+            "options": options,
         }
     
     return {
@@ -1055,7 +1240,8 @@ def get_property_tiers():
         "notes": {
             "pay_per_action": "Gold is paid per action, not upfront. Tax added on top at action time.",
             "actions": "Base actions required, reduced by Building skill (up to 50% reduction)",
-            "reputation_required": "500 reputation required to purchase land in a kingdom"
+            "reputation_required": "500 reputation required to purchase land in a kingdom",
+            "multi_option": "Each tier may have multiple buildable options. Use 'options' array for new UI."
         }
     }
 

@@ -158,6 +158,7 @@ class PropertyAPI {
         let status: String
         let started_at: String
         let per_action_costs: [ResourceCost]?  // Resources consumed per work action
+        let option_id: String?  // Which specific room/option is being built
     }
     
     struct CurrentKingdomInfo: Codable {
@@ -183,8 +184,13 @@ class PropertyAPI {
     
     // MARK: - Upgrade Property (Purchase Contract)
     
-    func purchasePropertyUpgrade(propertyId: String) async throws -> PropertyUpgradeResponse {
-        let request = client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST")
+    func purchasePropertyUpgrade(propertyId: String, optionId: String? = nil) async throws -> PropertyUpgradeResponse {
+        let request: URLRequest
+        if let optionId = optionId {
+            request = try client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST", body: ["option_id": optionId])
+        } else {
+            request = client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST")
+        }
         let response: PropertyUpgradeResponse = try await client.execute(request)
         return response
     }

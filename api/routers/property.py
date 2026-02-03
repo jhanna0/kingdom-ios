@@ -176,6 +176,10 @@ class PurchaseLandRequest(BaseModel):
     location: str  # "north", "south", "east", "west"
 
 
+class UpgradePropertyRequest(BaseModel):
+    option_id: str | None = None  # Which option to build (e.g., 'workshop', 'kitchen'). If None, uses first option at next tier.
+
+
 class PurchaseConstructionResponse(BaseModel):
     success: bool
     message: str
@@ -197,7 +201,17 @@ def get_tier_name(tier: int) -> str:
     return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
 
 
-def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_required: int = None) -> dict:
+def get_option_name(tier: int, option_id: str) -> str | None:
+    """Get display name for an option_id at a specific tier."""
+    from routers.tiers import PROPERTY_TIERS
+    tier_data = PROPERTY_TIERS.get(tier, {})
+    for opt in tier_data.get("options", []):
+        if opt.get("id") == option_id:
+            return opt.get("name")
+    return None
+
+
+def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_required: int = None, option_id: str = None) -> dict:
     """
     Get ALL upgrade costs for next tier - FULLY DYNAMIC from tiers.py!
     Returns dict with:
@@ -207,7 +221,7 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
       - total_costs: Total resources needed over all actions (for display)
     """
     from routers.tiers import (
-        get_property_max_tier, get_property_per_action_costs,
+        get_property_max_tier, get_property_option_per_action_costs,
         calculate_property_gold_per_action, calculate_property_actions
     )
     from routers.resources import RESOURCES
@@ -216,7 +230,7 @@ def get_upgrade_costs_full(current_tier: int, population: int = 0, actions_requi
     if current_tier >= get_property_max_tier():
         return {"gold_cost": 0, "gold_per_action": 0, "per_action_costs": [], "total_costs": []}
     gold_per_action = calculate_property_gold_per_action(next_tier)
-    base_per_action = get_property_per_action_costs(next_tier)
+    base_per_action = get_property_option_per_action_costs(next_tier, option_id)
     base_actions = calculate_property_actions(next_tier)
     
     # Use provided actions_required or default to base
@@ -335,7 +349,7 @@ def get_available_rooms(tier: int) -> list:
     """
     rooms = []
     
-    # Tier 2+: Fortification & Garden (requires house, not just land)
+    # Tier 2+: Fortification & Garden
     if tier >= 2:
         rooms.append({
             "id": "fortification",
@@ -354,7 +368,7 @@ def get_available_rooms(tier: int) -> list:
             "route": "/garden"
         })
     
-    # Tier 3+: Workshop
+    # Tier 3+: Workshop & Kitchen
     if tier >= 3:
         rooms.append({
             "id": "workshop",
@@ -364,10 +378,14 @@ def get_available_rooms(tier: int) -> list:
             "description": "Craft items from blueprints",
             "route": "/workshop"
         })
-    
-    # Future rooms can be added here:
-    # if tier >= 4:
-    #     rooms.append({"id": "library", ...})
+        rooms.append({
+            "id": "kitchen",
+            "name": "Kitchen",
+            "icon": "fork.knife",
+            "color": "buttonWarning",
+            "description": "Cook meals for temporary stat buffs",
+            "route": "/kitchen"
+        })
     
     return rooms
 
@@ -417,9 +435,9 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             ContractContribution.contract_id == contract.id
         ).scalar()
         
-        # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
+        # Get per-action costs for this specific option
         from_tier = (contract.tier or 1) - 1
-        all_costs = get_upgrade_costs_full(from_tier, actions_required=contract.actions_required)
+        all_costs = get_upgrade_costs_full(from_tier, actions_required=contract.actions_required, option_id=contract.option_id)
         
         # Get gold per action info
         gold_per_action = contract.gold_per_action or 0
@@ -431,6 +449,9 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             if kingdom:
                 current_tax_rate = kingdom.tax_rate
         
+        # Look up option name
+        option_name = get_option_name(contract.tier, contract.option_id) if contract.tier and contract.option_id else None
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": contract.target_id,
@@ -439,6 +460,8 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "from_tier": from_tier,
             "to_tier": contract.tier or 1,
             "target_tier_name": get_tier_name(contract.tier or 1),
+            "option_id": contract.option_id,  # Which specific room is being built
+            "option_name": option_name,  # Display name for the room
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
             "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
@@ -771,10 +794,11 @@ def purchase_land(
 @router.post("/{property_id}/upgrade/purchase")
 def start_property_upgrade(
     property_id: str,
+    request: UpgradePropertyRequest = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Purchase property upgrade contract.
+    """Purchase property upgrade contract for a specific room/option.
     
     NEW PAY-PER-ACTION SYSTEM:
     - No upfront gold cost
@@ -783,6 +807,8 @@ def start_property_upgrade(
     - Tax goes to kingdom treasury, base cost is burned
     - Resources still required per action (wood, etc.)
     """
+    from routers.tiers import PROPERTY_TIERS, get_property_max_tier
+    
     state = current_user.player_state
     if not state:
         raise HTTPException(
@@ -802,34 +828,77 @@ def start_property_upgrade(
             detail="Property not found or not owned by you"
         )
     
-    # FULLY DYNAMIC - check max tier from config
-    from routers.tiers import get_property_max_tier
-    max_tier = get_property_max_tier()
+    # Get option_id from request, or default to first option at next tier (backwards compat)
+    option_id = request.option_id if request and request.option_id else None
+    next_tier = property.tier + 1
     
-    if property.tier >= max_tier:
+    if not option_id:
+        # Default to first option at next tier
+        tier_data = PROPERTY_TIERS.get(next_tier, {})
+        options = tier_data.get("options", [])
+        if options:
+            option_id = options[0].get("id")
+    
+    # Find which tier this option belongs to
+    option_tier = None
+    option_data = None
+    for t in range(1, 6):
+        tier_data = PROPERTY_TIERS.get(t, {})
+        for opt in tier_data.get("options", []):
+            if opt.get("id") == option_id:
+                option_tier = t
+                option_data = opt
+                break
+        if option_tier:
+            break
+    
+    if not option_tier or not option_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Property is already at maximum tier ({max_tier})"
+            detail=f"Unknown option: {option_id}"
         )
     
-    # Check if ANY property upgrade in progress
+    # Check if this option is already built (query completed contracts)
+    already_built = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.target_id == property_id,
+        UnifiedContract.option_id == option_id,
+        UnifiedContract.completed_at.isnot(None)
+    ).first()
+    
+    if already_built:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You've already built {option_id}"
+        )
+    
+    # Check if player can build this option (tier requirement)
+    if option_tier > property.tier + 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{option_data['name']} requires tier {option_tier}. Your property is tier {property.tier}."
+        )
+    
+    # Check if ANY property upgrade in progress for this option
     active_contract = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == current_user.id,
         UnifiedContract.type == 'property',
-        UnifiedContract.completed_at.is_(None)  # Active contracts only
+        UnifiedContract.target_id == property_id,
+        UnifiedContract.option_id == option_id,
+        UnifiedContract.completed_at.is_(None)
     ).first()
     
     if active_contract:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have a property upgrade in progress. Complete it first."
+            detail=f"You already have a contract to build {option_data['name']}. Complete it first."
         )
     
     actions_required = calculate_upgrade_actions_required(property.tier, state.building_skill)
-    next_tier = property.tier + 1
     
-    # Get cost breakdown from centralized config
-    all_costs = get_upgrade_costs_full(property.tier, actions_required=actions_required)
+    # Get cost breakdown for this specific option
+    all_costs = get_upgrade_costs_full(option_tier - 1, actions_required=actions_required, option_id=option_id)
     gold_cost = all_costs["gold_cost"]  # Total gold for display
     gold_per_action = all_costs["gold_per_action"]  # Per-action cost (before tax)
     per_action_costs = all_costs["per_action_costs"]
@@ -838,28 +907,26 @@ def start_property_upgrade(
     kingdom = db.query(Kingdom).filter(Kingdom.id == property.kingdom_id).first()
     current_tax_rate = kingdom.tax_rate if kingdom else 0
     
-    # Create contract
-    # NEW: gold_paid = 0 (no upfront), gold_per_action = calculated cost per action
+    # Create contract with option_id
     contract = UnifiedContract(
         user_id=current_user.id,
         kingdom_id=property.kingdom_id,
         kingdom_name=property.kingdom_name,
         category='personal_property',
         type='property',
-        tier=next_tier,
+        tier=option_tier,
         target_id=property_id,
+        option_id=option_id,
         actions_required=actions_required,
-        gold_paid=0,  # NEW: No upfront payment
-        gold_per_action=gold_per_action  # NEW: Pay per action
+        gold_paid=0,
+        gold_per_action=gold_per_action
     )
     db.add(contract)
-    
-    # No gold deducted upfront
     
     db.commit()
     db.refresh(contract)
     
-    tier_name = get_tier_name(next_tier)
+    option_name = option_data.get("name", option_id)
     
     # Build warning message about per-action costs
     per_action_warning = ""
@@ -869,16 +936,18 @@ def start_property_upgrade(
     
     return {
         "success": True,
-        "message": f"Started upgrade to {tier_name}! Complete {actions_required} actions to finish.{per_action_warning}",
+        "message": f"Started building {option_name}! Complete {actions_required} actions to finish.{per_action_warning}",
         "contract_id": str(contract.id),
         "property_id": property_id,
         "from_tier": property.tier,
-        "to_tier": next_tier,
-        "gold_cost": gold_cost,  # Total if paid upfront (for display)
-        "gold_per_action": int(gold_per_action),  # Cost per action before tax
-        "current_tax_rate": current_tax_rate,  # Current rate (may change)
-        "per_action_costs": per_action_costs,  # What each action will cost (resources)
-        "total_costs": all_costs["total_costs"],  # Total resources over all actions
+        "to_tier": option_tier,
+        "option_id": option_id,
+        "option_name": option_name,
+        "gold_cost": gold_cost,
+        "gold_per_action": int(gold_per_action),
+        "current_tax_rate": current_tax_rate,
+        "per_action_costs": per_action_costs,
+        "total_costs": all_costs["total_costs"],
         "actions_required": actions_required
     }
 
@@ -947,8 +1016,8 @@ def get_property_upgrade_status(
             ContractContribution.contract_id == contract.id
         ).scalar()
         
-        # Get per-action costs for this tier (for display on contract card)
-        contract_costs = get_upgrade_costs_full(contract.tier - 1, actions_required=contract.actions_required)
+        # Get per-action costs for this specific option
+        contract_costs = get_upgrade_costs_full(contract.tier - 1, actions_required=contract.actions_required, option_id=contract.option_id)
         
         active_contract_data = {
             "contract_id": str(contract.id),

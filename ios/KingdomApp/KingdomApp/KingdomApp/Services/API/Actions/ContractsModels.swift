@@ -48,7 +48,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let propertyId: String
     let fromTier: Int
     let toTier: Int
-    let targetTierName: String
+    let targetTierName: String  // Contains option name (e.g., "Kitchen") or tier name as fallback
     let actionsRequired: Int
     let actionsCompleted: Int
     let cost: Int  // OLD: upfront payment (backwards compat)

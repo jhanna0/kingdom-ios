@@ -381,13 +381,12 @@ def work_on_property_upgrade(
             )
     # else: OLD SYSTEM - gold_paid > 0 means they paid upfront, action is FREE
     
-    # Get per-action costs for this tier (DYNAMIC from PROPERTY_TIERS)
-    from routers.tiers import get_property_per_action_costs
+    # Get per-action costs for this specific option
+    from routers.tiers import get_property_option_per_action_costs
     from routers.resources import RESOURCES
     from .utils import get_inventory_map
     
-    from_tier = (contract.tier or 1) - 1
-    per_action_costs = get_property_per_action_costs(contract.tier or 1)
+    per_action_costs = get_property_option_per_action_costs(contract.tier, contract.option_id) if contract.tier else []
     
     # Get player's inventory for resource checking
     inventory_map = get_inventory_map(db, current_user.id)

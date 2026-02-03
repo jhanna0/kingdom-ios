@@ -29,6 +29,7 @@ class UnifiedContract(Base):
     type = Column(String(32), nullable=False)  # 'attack', 'weapon', 'wall', 'property', etc.
     tier = Column(Integer, nullable=True)  # Level/tier if applicable
     target_id = Column(String(128), nullable=True)  # Property ID, etc. if needed
+    option_id = Column(String(64), nullable=True)  # Which room at this tier (e.g., 'workshop', 'kitchen')
     
     # Requirements
     actions_required = Column(Integer, nullable=False, default=1)
