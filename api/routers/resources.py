@@ -203,6 +203,17 @@ RESOURCES = {
         "effect": "skip_cooldown",  # "skip_cooldown" = clear entire cooldown, "reduce_cooldown" = reduce by X minutes
         "cooldown_reduction_minutes": None,  # None = skip entire cooldown
     },
+    "sourdough": {
+        "display_name": "Sourdough",
+        "icon": "cloud.fill",
+        "color": "gold",
+        "description": "Delicious smelling bread. Good food for activities.",
+        "category": "consumable",
+        "display_order": 92,
+        "is_tradeable": True,  # Non-tradeable to prevent RMT
+        "storage_type": "inventory",
+        "is_food": True,
+    },
 }
 
 
