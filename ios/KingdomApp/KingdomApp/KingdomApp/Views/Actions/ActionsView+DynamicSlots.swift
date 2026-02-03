@@ -139,7 +139,8 @@ extension ActionsView {
                 globalCooldownActive: !isReady,
                 blockingAction: cooldown?.blockingAction,
                 globalCooldownSecondsRemaining: remainingSeconds,
-                onAction: { performTraining(contractId: contract.id) }
+                onAction: { performTraining(contractId: contract.id) },
+                onRefresh: { Task { await loadActionStatus(force: true) } }
             )
         }
     }
@@ -160,7 +161,8 @@ extension ActionsView {
                     globalCooldownActive: !isReady,
                     blockingAction: cooldown?.blockingAction,
                     globalCooldownSecondsRemaining: remainingSeconds,
-                    onAction: { performWorkshopWork(contract: contract) }
+                    onAction: { performWorkshopWork(contract: contract) },
+                    onRefresh: { Task { await loadActionStatus(force: true) } }
                 )
             }
         }
@@ -182,7 +184,9 @@ extension ActionsView {
                     globalCooldownActive: !isReady,
                     blockingAction: cooldown?.blockingAction,
                     globalCooldownSecondsRemaining: remainingSeconds,
-                    onAction: { performPropertyUpgrade(contract: contract) }
+                    canUseBook: cooldown?.canUseBook ?? false,
+                    onAction: { performPropertyUpgrade(contract: contract) },
+                    onRefresh: { Task { await loadActionStatus(force: true) } }
                 )
             }
         }
@@ -203,7 +207,8 @@ extension ActionsView {
                     } else {
                         performWork(contractId: contract.id)
                     }
-                }
+                },
+                onRefresh: { Task { await loadActionStatus(force: true) } }
             )
         }
     }

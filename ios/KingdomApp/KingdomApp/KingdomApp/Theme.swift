@@ -634,3 +634,18 @@ extension ButtonStyle where Self == BrutalistButtonStyle {
     }
 }
 
+// MARK: - Clear Background for Transparent Modals
+
+/// Helper view to make fullScreenCover backgrounds transparent
+struct ClearBackgroundView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        DispatchQueue.main.async {
+            view.superview?.superview?.backgroundColor = .clear
+        }
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
+

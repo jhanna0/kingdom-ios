@@ -195,12 +195,13 @@ RESOURCES = {
         "display_name": "Book",
         "icon": "book.fill",
         "color": "brown",
-        "description": "A tome of knowledge. Used to reduce training or building cooldown by 1 hour.",
+        "description": "A tome of knowledge. Skip your current cooldown and train again immediately!",
         "category": "consumable",
         "display_order": 91,
         "is_tradeable": False,  # Non-tradeable to prevent RMT
         "storage_type": "inventory",
-        "cooldown_reduction_minutes": 60,  # 1 hour reduction per book
+        "effect": "skip_cooldown",  # "skip_cooldown" = clear entire cooldown, "reduce_cooldown" = reduce by X minutes
+        "cooldown_reduction_minutes": None,  # None = skip entire cooldown
     },
 }
 

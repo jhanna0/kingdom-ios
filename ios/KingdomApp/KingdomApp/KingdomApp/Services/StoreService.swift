@@ -207,8 +207,7 @@ class StoreService: ObservableObject {
                 
                 // Notify the app to refresh player state
                 NotificationCenter.default.post(name: .purchaseCompleted, object: nil, userInfo: [
-                    "gold": response.gold_granted,
-                    "meat": response.meat_granted
+                    "display_message": response.display_message ?? "Purchase complete!"
                 ])
                 
                 return true
@@ -336,14 +335,17 @@ class StoreService: ObservableObject {
     // MARK: - Book Usage
     
     /// Use a book to reduce cooldown on a slot
-    /// - Parameter slot: "personal" (training), "building", or "crafting"
-    func useBook(on slot: String) async -> UseBookResponse? {
+    /// - Parameters:
+    ///   - slot: "personal" (training), "building", or "crafting"
+    ///   - actionType: Optional specific action type for validation
+    func useBook(on slot: String, actionType: String? = nil) async -> UseBookResponse? {
         struct UseBookRequest: Encodable {
             let slot: String
+            let action_type: String?
         }
         
         do {
-            let body = UseBookRequest(slot: slot)
+            let body = UseBookRequest(slot: slot, action_type: actionType)
             let request = try client.request(endpoint: "/store/use-book", method: "POST", body: body)
             let response: UseBookResponse = try await client.execute(request)
             
@@ -373,6 +375,17 @@ class StoreService: ObservableObject {
             return 0
         }
     }
+    
+    /// Get book info for cooldown skip popup
+    func getBookInfo() async -> BookInfoResponse? {
+        do {
+            let request = client.request(endpoint: "/store/book-info", method: "GET")
+            return try await client.execute(request)
+        } catch {
+            print("❌ Failed to get book info: \(error)")
+            return nil
+        }
+    }
 }
 
 // MARK: - Response Models
@@ -380,6 +393,7 @@ class StoreService: ObservableObject {
 struct RedeemResponse: Decodable {
     let success: Bool
     let message: String?
+    let display_message: String?  // Server-driven UI message
     let gold_granted: Int
     let meat_granted: Int
     let books_granted: Int
@@ -398,6 +412,17 @@ struct UseBookResponse: Decodable {
 
 struct BookCountResponse: Decodable {
     let books: Int
+}
+
+struct BookInfoResponse: Decodable {
+    let books_owned: Int
+    let description: String
+    let effect: String  // "skip_cooldown" or "reduce_cooldown"
+    let effect_description: String  // Human-readable for button, e.g. "Skip cooldown"
+    let cooldown_reduction_minutes: Int?  // nil if skip_cooldown
+    let eligible_slots: [String]
+    let can_purchase: Bool
+    let purchase_product_id: String?
 }
 
 // MARK: - Errors
@@ -424,4 +449,5 @@ enum StoreError: LocalizedError {
 extension Notification.Name {
     static let purchaseCompleted = Notification.Name("purchaseCompleted")
     static let bookUsed = Notification.Name("bookUsed")
+    static let openStore = Notification.Name("openStore")
 }

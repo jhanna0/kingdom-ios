@@ -101,9 +101,11 @@ struct MapHUD: View {
                             
                             // Gold
                             HStack(spacing: 3) {
-                                Text("\(viewModel.player.gold)")
+                                Text(viewModel.player.gold.abbreviated())
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.black)
+                                    .lineLimit(1)
+                                    .fixedSize()
                                 
                                 Image(systemName: "g.circle.fill")
                                     .font(.system(size: 12, weight: .semibold))
@@ -131,9 +133,18 @@ struct MapHUD: View {
                     Button(action: {
                         showStore = true
                     }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(KingdomTheme.Colors.goldLight)
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
                     }
                     
                     Spacer()

@@ -86,6 +86,17 @@ PRODUCTS = {
 
 
 # ============================================================
+# BOOK CONFIGURATION
+# ============================================================
+
+# Slots that can use books (excludes farm, patrol, and battle-related)
+BOOK_ELIGIBLE_SLOTS = ["personal", "building", "crafting"]
+
+# Action types that CANNOT use books (farming, patrolling, fighting)
+BOOK_INELIGIBLE_ACTIONS = ["farm", "patrol", "view_coup", "view_invasion", "view_battle", "spectate_battle"]
+
+
+# ============================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================
 
@@ -98,6 +109,7 @@ class RedeemRequest(BaseModel):
 class RedeemResponse(BaseModel):
     success: bool
     message: Optional[str] = None
+    display_message: Optional[str] = None  # Ready-to-display message for UI (server-driven)
     gold_granted: int = 0
     meat_granted: int = 0
     books_granted: int = 0
@@ -108,6 +120,7 @@ class RedeemResponse(BaseModel):
 
 class UseBookRequest(BaseModel):
     slot: str  # "personal" (training), "building", or "crafting"
+    action_type: Optional[str] = None  # Optional: specific action type for validation
 
 
 class UseBookResponse(BaseModel):
@@ -378,9 +391,27 @@ async def redeem_purchase(
         print(f"   Books: +{book_amount} (total: {new_books})")
     print(f"   Verified: {verified_with_apple} ({environment})")
     
+    # Build display message for UI (server-driven)
+    from routers.resources import RESOURCES
+    items = []
+    if gold_amount > 0:
+        gold_name = RESOURCES.get("gold", {}).get("display_name", "Gold")
+        items.append(f"{gold_amount:,} {gold_name}")
+    if meat_amount > 0:
+        meat_name = RESOURCES.get("meat", {}).get("display_name", "Meat")
+        items.append(f"{meat_amount:,} {meat_name}")
+    if book_amount > 0:
+        book_name = RESOURCES.get("book", {}).get("display_name", "Book")
+        if book_amount > 1:
+            book_name += "s"
+        items.append(f"{book_amount} {book_name}")
+    
+    display_message = f"Added {' and '.join(items)}!" if items else "Purchase complete!"
+    
     return RedeemResponse(
         success=True,
         message=f"Successfully redeemed {product['name']}!",
+        display_message=display_message,
         gold_granted=gold_amount,
         meat_granted=meat_amount,
         books_granted=book_amount,
@@ -450,28 +481,38 @@ async def use_book(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Use a book to reduce cooldown by 1 hour.
+    Use a book to skip or reduce a cooldown. Effect is server-driven from resources.py.
     
     Books can be used on:
     - "personal" slot (training)
     - "building" slot (work, property_upgrade)
     - "crafting" slot
     
-    The book reduces the cooldown by moving last_performed forward by 1 hour,
-    effectively reducing the remaining wait time.
+    Books CANNOT be used on:
+    - farm (economy slot)
+    - patrol (security slot)
+    - battle-related actions (view_coup, view_invasion, etc.)
+    
+    Effect is determined by resources.py book config:
+    - effect="skip_cooldown" (or cooldown_reduction_minutes=None): Clears entire cooldown
+    - effect="reduce_cooldown" with cooldown_reduction_minutes=X: Reduces by X minutes
     """
     from datetime import timedelta
     from db.models import ActionCooldown
     from routers.actions.action_config import ACTION_SLOTS
     
-    BOOK_REDUCTION_MINUTES = 60  # 1 hour per book
-    
-    # Validate slot
-    valid_slots = ["personal", "building", "crafting"]
-    if request.slot not in valid_slots:
+    # Validate slot - books can only be used on certain slots
+    if request.slot not in BOOK_ELIGIBLE_SLOTS:
         raise HTTPException(
             status_code=400, 
-            detail=f"Invalid slot. Must be one of: {', '.join(valid_slots)}"
+            detail=f"Books cannot be used on {request.slot}. Eligible slots: {', '.join(BOOK_ELIGIBLE_SLOTS)}"
+        )
+    
+    # Validate action_type if provided - some actions can't use books even if in eligible slot
+    if request.action_type and request.action_type in BOOK_INELIGIBLE_ACTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Books cannot be used on {request.action_type}."
         )
     
     # Check if player has books
@@ -479,73 +520,80 @@ async def use_book(
     if book_count <= 0:
         raise HTTPException(status_code=400, detail="No books available")
     
-    # Get actions in this slot
+    # Get ALL action types in this slot - we need to clear ALL of them
     actions_in_slot = [action for action, slot in ACTION_SLOTS.items() if slot == request.slot]
     
     if not actions_in_slot:
         raise HTTPException(status_code=400, detail=f"No actions in slot: {request.slot}")
     
-    # Find the cooldown record for this slot (any action in the slot)
-    cooldown = db.query(ActionCooldown).filter(
+    # Find ALL cooldowns in the slot
+    all_cooldowns = db.query(ActionCooldown).filter(
         ActionCooldown.user_id == current_user.id,
         ActionCooldown.action_type.in_(actions_in_slot)
-    ).order_by(ActionCooldown.last_performed.desc()).first()
+    ).all()
     
-    if not cooldown or not cooldown.last_performed:
-        raise HTTPException(status_code=400, detail="No active cooldown to reduce")
+    if not all_cooldowns:
+        raise HTTPException(status_code=400, detail="No active cooldown to skip")
     
-    # Check if there's actually time remaining
-    from routers.actions.action_config import get_action_cooldown
-    from routers.actions.utils import calculate_cooldown, calculate_training_cooldown
-    
-    # Get base cooldown for the action
-    base_cooldown = get_action_cooldown(cooldown.action_type)
-    
-    # Apply skill reduction if applicable
-    state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
-    if request.slot == "personal":
-        # Training uses science skill
-        cooldown_minutes = calculate_training_cooldown(base_cooldown, state.science or 1)
-    elif request.slot in ["building", "crafting"]:
-        # Building/crafting uses building skill
-        cooldown_minutes = calculate_cooldown(base_cooldown, state.building_skill or 1)
-    else:
-        cooldown_minutes = base_cooldown
-    
-    # Calculate remaining time
+    # Check if ANY cooldown in the slot has time remaining
     now = datetime.utcnow()
-    elapsed = (now - cooldown.last_performed).total_seconds()
-    required = cooldown_minutes * 60
-    remaining = required - elapsed
+    has_active_cooldown = False
     
-    if remaining <= 0:
-        raise HTTPException(status_code=400, detail="Cooldown already expired")
+    for cd in all_cooldowns:
+        if cd.last_performed:
+            # Use a generous 3 hour check - if performed within 3 hours, consider it active
+            elapsed = (now - cd.last_performed).total_seconds()
+            if elapsed < 3 * 60 * 60:  # 3 hours
+                has_active_cooldown = True
+                break
     
-    # Use the book - move last_performed forward by 1 hour
-    # This effectively reduces the remaining cooldown
-    reduction_seconds = BOOK_REDUCTION_MINUTES * 60
-    cooldown.last_performed = cooldown.last_performed - timedelta(minutes=BOOK_REDUCTION_MINUTES)
+    if not has_active_cooldown:
+        return UseBookResponse(
+            success=True,
+            message="Cooldown already ready - no book needed!",
+            books_remaining=book_count,
+            cooldown_reduced_minutes=0,
+            new_cooldown_seconds=0
+        )
+    
+    # Get book config to determine effect
+    from routers.resources import RESOURCES
+    book_config = RESOURCES.get("book", {})
+    effect = book_config.get("effect", "skip_cooldown")
+    reduction_minutes = book_config.get("cooldown_reduction_minutes")
+    
+    if effect == "skip_cooldown" or reduction_minutes is None:
+        # SKIP ENTIRE SLOT COOLDOWN - clear ALL cooldowns in the slot
+        for cd in all_cooldowns:
+            cd.last_performed = now - timedelta(days=7)
+        cooldown_skipped = True
+        new_remaining = 0
+        message = f"Used 1 book to skip {request.slot} cooldown!"
+    else:
+        # REDUCE COOLDOWN - reduce all cooldowns in slot
+        for cd in all_cooldowns:
+            if cd.last_performed:
+                cd.last_performed = cd.last_performed - timedelta(minutes=reduction_minutes)
+        cooldown_skipped = False
+        new_remaining = 0  # We don't calculate this for reduce mode
+        message = f"Used 1 book to reduce {request.slot} cooldown by {reduction_minutes} minutes!"
     
     # Deduct the book
     add_books(db, current_user.id, -1)
     
     db.commit()
     
-    # Calculate new remaining time
-    new_elapsed = (now - cooldown.last_performed).total_seconds()
-    new_remaining = max(0, required - new_elapsed)
-    
     books_remaining = get_player_books(db, current_user.id)
     
-    print(f"📚 Book used! User {current_user.id} reduced {request.slot} cooldown by {BOOK_REDUCTION_MINUTES} min")
+    print(f"📚 Book used! User {current_user.id} {'skipped' if cooldown_skipped else 'reduced'} {request.slot} cooldown")
     print(f"   Books remaining: {books_remaining}")
-    print(f"   New cooldown: {int(new_remaining)}s remaining")
+    print(f"   Cooldowns cleared: {len(all_cooldowns)}")
     
     return UseBookResponse(
         success=True,
-        message=f"Used 1 book to reduce {request.slot} cooldown by 1 hour!",
+        message=message,
         books_remaining=books_remaining,
-        cooldown_reduced_minutes=BOOK_REDUCTION_MINUTES,
+        cooldown_reduced_minutes=reduction_minutes or 0,
         new_cooldown_seconds=int(new_remaining)
     )
 
@@ -559,6 +607,61 @@ async def get_book_count(
     return {
         "books": get_player_books(db, current_user.id)
     }
+
+
+class BookInfoResponse(BaseModel):
+    """Book information for the cooldown skip popup."""
+    books_owned: int
+    description: str
+    effect: str  # "skip_cooldown" or "reduce_cooldown"
+    effect_description: str  # Human-readable effect for button/UI
+    cooldown_reduction_minutes: Optional[int] = None  # None if skip_cooldown
+    eligible_slots: List[str]
+    can_purchase: bool
+    purchase_product_id: Optional[str] = None
+
+
+@router.get("/book-info", response_model=BookInfoResponse)
+async def get_book_info(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get book information for the cooldown skip popup.
+    
+    All book behavior is server-driven so we can change it without app updates:
+    - effect: "skip_cooldown" clears entire cooldown, "reduce_cooldown" reduces by X minutes
+    - effect_description: Human-readable text for the button/UI
+    - description: Full description of what books do
+    """
+    from routers.resources import RESOURCES
+    
+    book_config = RESOURCES.get("book", {})
+    book_count = get_player_books(db, current_user.id)
+    
+    effect = book_config.get("effect", "skip_cooldown")
+    reduction_minutes = book_config.get("cooldown_reduction_minutes")
+    
+    # Generate effect description based on current config
+    if effect == "skip_cooldown" or reduction_minutes is None:
+        effect_description = "Skip cooldown"
+    else:
+        if reduction_minutes >= 60:
+            hours = reduction_minutes // 60
+            effect_description = f"Skip {hours} hour{'s' if hours > 1 else ''}"
+        else:
+            effect_description = f"Skip {reduction_minutes} minutes"
+    
+    return BookInfoResponse(
+        books_owned=book_count,
+        description=book_config.get("description", "A tome of knowledge. Skip your current cooldown!"),
+        effect=effect,
+        effect_description=effect_description,
+        cooldown_reduction_minutes=reduction_minutes,
+        eligible_slots=BOOK_ELIGIBLE_SLOTS,
+        can_purchase=True,
+        purchase_product_id="com.kingdom.book_pack_5"
+    )
 
 
 # ============================================================

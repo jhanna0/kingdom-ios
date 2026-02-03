@@ -44,18 +44,9 @@ struct StoreView: View {
             .onReceive(NotificationCenter.default.publisher(for: .purchaseCompleted)) { notification in
                 Task { await player.loadFromAPI() }
                 
-                if let userInfo = notification.userInfo {
-                    let gold = userInfo["gold"] as? Int ?? 0
-                    let meat = userInfo["meat"] as? Int ?? 0
-                    let books = userInfo["books"] as? Int ?? 0
-                    
-                    var items: [String] = []
-                    if gold > 0 { items.append("\(gold.formatted()) Gold") }
-                    if meat > 0 { items.append("\(meat.formatted()) Meat") }
-                    if books > 0 { items.append("\(books) Book\(books == 1 ? "" : "s")") }
-                    
+                if let displayMessage = notification.userInfo?["display_message"] as? String {
                     resultTitle = "Purchase Successful!"
-                    resultMessage = "You received \(items.joined(separator: " and "))!"
+                    resultMessage = displayMessage
                     resultIsSuccess = true
                     showingResult = true
                 }
@@ -82,11 +73,11 @@ struct StoreView: View {
                 )
             
             Text("Royal Treasury")
-                .font(KingdomTheme.Typography.title2())
+                .font(FontStyles.headingLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Text("Boost your character with some time savers")
-                .font(KingdomTheme.Typography.subheadline())
+                .font(FontStyles.bodySmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
         .padding(.vertical, KingdomTheme.Spacing.medium)
@@ -97,8 +88,7 @@ struct StoreView: View {
     private var currentResourcesSection: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
             Text("What you have")
-                .font(KingdomTheme.Typography.caption())
-                .fontWeight(.bold)
+                .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -123,10 +113,9 @@ struct StoreView: View {
     // MARK: - Products
     
     private var productsSection: some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             Text("Available")
-                .font(KingdomTheme.Typography.caption())
-                .fontWeight(.bold)
+                .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
             
             if store.isLoading && store.products.isEmpty {
@@ -134,9 +123,11 @@ struct StoreView: View {
             } else if store.products.isEmpty {
                 emptyView
             } else {
-                ForEach(store.products, id: \.id) { product in
-                    StoreProductCard(product: product, store: store) {
-                        await purchaseProduct(product)
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    ForEach(store.products, id: \.id) { product in
+                        StoreProductCard(product: product, store: store) {
+                            await purchaseProduct(product)
+                        }
                     }
                 }
             }
@@ -146,7 +137,7 @@ struct StoreView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     Text(error)
-                        .font(KingdomTheme.Typography.caption())
+                        .font(FontStyles.labelMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
                 .padding(.top, KingdomTheme.Spacing.small)
@@ -162,7 +153,7 @@ struct StoreView: View {
                 ProgressView()
                     .tint(KingdomTheme.Colors.loadingTint)
                 Text("Loading wares...")
-                    .font(KingdomTheme.Typography.caption())
+                    .font(FontStyles.labelMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             .padding(KingdomTheme.Spacing.large)
@@ -185,7 +176,7 @@ struct StoreView: View {
                 )
             
             Text("Market Closed")
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingMedium)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             
             Button("Try Again") {
@@ -208,7 +199,7 @@ struct StoreView: View {
                 Image(systemName: "arrow.clockwise")
                 Text("Restore Purchases")
             }
-            .font(KingdomTheme.Typography.subheadline())
+            .font(FontStyles.bodySmall)
             .foregroundColor(KingdomTheme.Colors.buttonPrimary)
         }
         .disabled(store.isLoading)
@@ -218,7 +209,7 @@ struct StoreView: View {
     
     private var termsSection: some View {
         Text("Payment will be charged to your Apple ID account.")
-            .font(KingdomTheme.Typography.caption2())
+            .font(FontStyles.labelTiny)
             .foregroundColor(KingdomTheme.Colors.inkLight)
             .multilineTextAlignment(.center)
             .padding(.top, KingdomTheme.Spacing.small)
@@ -262,7 +253,7 @@ private struct StoreResourceBadge: View {
                     )
                 
                 Text(value.abbreviated())
-                    .font(.system(size: 9, weight: .bold))
+                    .font(FontStyles.captionMedium)
                     .foregroundColor(value.valueColor())
                     .padding(.horizontal, 4)
                     .frame(minWidth: 18, minHeight: 18)
@@ -276,7 +267,7 @@ private struct StoreResourceBadge: View {
             }
             
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(FontStyles.captionLarge)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
                 .lineLimit(1)
         }
@@ -324,12 +315,12 @@ private struct StoreProductCard: View {
     }
     
     private var productDetails: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(config?.name ?? product.displayName)
-                .font(KingdomTheme.Typography.headline())
+                .font(FontStyles.headingSmall)
                 .foregroundColor(KingdomTheme.Colors.inkDark)
             Text(config?.description ?? product.description)
-                .font(KingdomTheme.Typography.caption())
+                .font(FontStyles.labelMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
         }
     }
@@ -348,7 +339,7 @@ private struct StoreProductCard: View {
                         .tint(.white)
                 } else {
                     Text(product.displayPrice)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(FontStyles.labelSmall)
                         .foregroundColor(.white)
                 }
             }

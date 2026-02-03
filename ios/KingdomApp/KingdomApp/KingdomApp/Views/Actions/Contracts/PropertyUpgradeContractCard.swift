@@ -9,7 +9,39 @@ struct PropertyUpgradeContractCard: View {
     let globalCooldownActive: Bool
     let blockingAction: String?
     let globalCooldownSecondsRemaining: Int
+    let canUseBook: Bool  // Server-driven: can books skip this cooldown?
     let onAction: () -> Void
+    let onRefresh: (() -> Void)?  // Callback to refresh after book use
+    
+    @State private var showBookPopup = false
+    
+    init(
+        contract: PropertyUpgradeContract,
+        fetchedAt: Date,
+        currentTime: Date,
+        globalCooldownActive: Bool,
+        blockingAction: String?,
+        globalCooldownSecondsRemaining: Int,
+        canUseBook: Bool = false,
+        onAction: @escaping () -> Void,
+        onRefresh: (() -> Void)? = nil
+    ) {
+        self.contract = contract
+        self.fetchedAt = fetchedAt
+        self.currentTime = currentTime
+        self.globalCooldownActive = globalCooldownActive
+        self.blockingAction = blockingAction
+        self.globalCooldownSecondsRemaining = globalCooldownSecondsRemaining
+        self.canUseBook = canUseBook
+        self.onAction = onAction
+        self.onRefresh = onRefresh
+    }
+    
+    var calculatedSecondsRemaining: Int {
+        let elapsed = currentTime.timeIntervalSince(fetchedAt)
+        let remaining = max(0, Double(globalCooldownSecondsRemaining) - elapsed)
+        return Int(remaining)
+    }
     
     var canAffordResources: Bool {
         return contract.canAfford ?? true
@@ -117,20 +149,31 @@ struct PropertyUpgradeContractCard: View {
             .frame(height: 12)
             
             if globalCooldownActive {
-                let blockingActionDisplay = actionNameToDisplayName(blockingAction)
-                let elapsed = currentTime.timeIntervalSince(fetchedAt)
-                let calculatedRemaining = max(0, Double(globalCooldownSecondsRemaining) - elapsed)
-                let remaining = Int(calculatedRemaining)
-                let minutes = remaining / 60
-                let seconds = remaining % 60
+                let minutes = calculatedSecondsRemaining / 60
+                let seconds = calculatedSecondsRemaining % 60
                 
-                Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
-                    .font(FontStyles.labelLarge)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                ZStack {
+                    Text("Building for \(minutes)m \(seconds)s")
+                        .font(FontStyles.labelLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity)
+                    
+                    if canUseBook {
+                        HStack {
+                            Spacer()
+                            Button(action: { showBookPopup = true }) {
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(6)
+                                    .brutalistBadge(backgroundColor: .brown)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !canAffordAll {
                 Text(!canAffordFood ? "Need food" : "Need resources")
                     .font(FontStyles.labelLarge)
@@ -152,6 +195,26 @@ struct PropertyUpgradeContractCard: View {
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
+        .fullScreenCover(isPresented: $showBookPopup) {
+            BookUsagePopup(
+                slot: "building",
+                actionType: blockingAction,
+                cooldownSecondsRemaining: calculatedSecondsRemaining,
+                isShowing: $showBookPopup,
+                onUseBook: {
+                    Task {
+                        let response = await StoreService.shared.useBook(on: "building", actionType: blockingAction)
+                        if response?.success == true {
+                            onRefresh?()
+                        }
+                    }
+                },
+                onBuyBooks: {
+                    NotificationCenter.default.post(name: .openStore, object: nil)
+                }
+            )
+            .background(ClearBackgroundView())
+        }
     }
     
     @ViewBuilder

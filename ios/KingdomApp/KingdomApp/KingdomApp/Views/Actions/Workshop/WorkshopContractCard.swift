@@ -11,6 +11,31 @@ struct WorkshopContractCard: View {
     let blockingAction: String?
     let globalCooldownSecondsRemaining: Int
     let onAction: () -> Void
+    let onRefresh: (() -> Void)?  // Callback to refresh after book use
+    
+    @State private var showBookPopup = false
+    
+    init(
+        contract: WorkshopContract,
+        status: ActionStatus,
+        fetchedAt: Date,
+        currentTime: Date,
+        globalCooldownActive: Bool,
+        blockingAction: String?,
+        globalCooldownSecondsRemaining: Int,
+        onAction: @escaping () -> Void,
+        onRefresh: (() -> Void)? = nil
+    ) {
+        self.contract = contract
+        self.status = status
+        self.fetchedAt = fetchedAt
+        self.currentTime = currentTime
+        self.globalCooldownActive = globalCooldownActive
+        self.blockingAction = blockingAction
+        self.globalCooldownSecondsRemaining = globalCooldownSecondsRemaining
+        self.onAction = onAction
+        self.onRefresh = onRefresh
+    }
     
     var calculatedSecondsRemaining: Int {
         let elapsed = currentTime.timeIntervalSince(fetchedAt)
@@ -96,13 +121,28 @@ struct WorkshopContractCard: View {
                 let minutes = remaining / 60
                 let seconds = remaining % 60
                 
-                Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
-                    .font(FontStyles.labelLarge)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                ZStack {
+                    Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
+                        .font(FontStyles.labelLarge)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .frame(maxWidth: .infinity)
+                    
+                    if status.canUseBook == true {
+                        HStack {
+                            Spacer()
+                            Button(action: { showBookPopup = true }) {
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(6)
+                                    .brutalistBadge(backgroundColor: .brown)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !(status.canAffordFood ?? true) {
                 Text("Need food")
                     .font(FontStyles.labelLarge)
@@ -122,13 +162,34 @@ struct WorkshopContractCard: View {
             } else {
                 CooldownTimer(
                     secondsRemaining: calculatedSecondsRemaining,
-                    totalSeconds: Int(status.cooldownMinutes ?? 120 * 60)
+                    totalSeconds: Int(status.cooldownMinutes ?? 120 * 60),
+                    onBookTap: status.canUseBook == true ? { showBookPopup = true } : nil
                 )
             }
         }
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         .padding(.horizontal)
+        .fullScreenCover(isPresented: $showBookPopup) {
+            BookUsagePopup(
+                slot: "crafting",
+                actionType: blockingAction,
+                cooldownSecondsRemaining: calculatedSecondsRemaining,
+                isShowing: $showBookPopup,
+                onUseBook: {
+                    Task {
+                        let response = await StoreService.shared.useBook(on: "crafting", actionType: blockingAction)
+                        if response?.success == true {
+                            onRefresh?()
+                        }
+                    }
+                },
+                onBuyBooks: {
+                    NotificationCenter.default.post(name: .openStore, object: nil)
+                }
+            )
+            .background(ClearBackgroundView())
+        }
     }
     
     private func buildCosts() -> [CostItem] {
