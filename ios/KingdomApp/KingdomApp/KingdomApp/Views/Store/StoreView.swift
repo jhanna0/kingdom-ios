@@ -35,9 +35,7 @@ struct StoreView: View {
                 }
             }
             .alert(resultTitle, isPresented: $showingResult) {
-                Button("OK") {
-                    if resultIsSuccess { dismiss() }
-                }
+                Button("OK") { }
             } message: {
                 Text(resultMessage)
             }
@@ -45,9 +43,14 @@ struct StoreView: View {
                 Task { await player.loadFromAPI() }
                 
                 if let displayMessage = notification.userInfo?["display_message"] as? String {
-                    resultTitle = "Purchase Successful!"
+                    // Check if anything was actually granted
+                    let granted = (notification.userInfo?["gold_granted"] as? Int ?? 0) +
+                                  (notification.userInfo?["meat_granted"] as? Int ?? 0) +
+                                  (notification.userInfo?["books_granted"] as? Int ?? 0)
+                    
+                    resultTitle = granted > 0 ? "Purchase Successful!" : "Already Owned"
                     resultMessage = displayMessage
-                    resultIsSuccess = true
+                    resultIsSuccess = granted > 0  // Only dismiss if something was granted
                     showingResult = true
                 }
             }

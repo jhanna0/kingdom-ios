@@ -1,5 +1,28 @@
 import SwiftUI
 
+// MARK: - Precise Number Formatting (for HUD gold display)
+
+private extension Int {
+    /// Format large numbers with k/m suffix and one decimal place, truncated (e.g., 1950 → "1.9k")
+    func abbreviatedPrecise() -> String {
+        if abs(self) >= 1_000_000 {
+            let truncated = Double(self / 100_000) / 10.0  // Truncate to 1 decimal
+            if truncated.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(truncated))m"
+            }
+            return String(format: "%.1fm", truncated)
+        } else if abs(self) >= 1_000 {
+            let truncated = Double(self / 100) / 10.0  // Truncate to 1 decimal
+            if truncated.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(truncated))k"
+            }
+            return String(format: "%.1fk", truncated)
+        } else {
+            return "\(self)"
+        }
+    }
+}
+
 struct MapHUD: View {
     @ObservedObject var viewModel: MapViewModel
     @Binding var showCharacterSheet: Bool
@@ -101,7 +124,7 @@ struct MapHUD: View {
                             
                             // Gold
                             HStack(spacing: 3) {
-                                Text(viewModel.player.gold.abbreviated())
+                                Text(viewModel.player.gold.abbreviatedPrecise())
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.black)
                                     .lineLimit(1)

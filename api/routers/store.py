@@ -7,6 +7,8 @@ Endpoints:
 - POST /store/redeem - Redeem a purchase and grant resources (verifies with Apple)
 - GET /store/products - Get available products
 - GET /store/history - Get user's purchase history
+- POST /store/use-book - Use a book to skip/reduce cooldown
+- GET /store/book-history - Get book usage history for traceability
 
 Security:
 - All purchases are verified with Apple's App Store Server API
@@ -23,7 +25,7 @@ from typing import Optional, List
 from jose import jwt
 
 from db import get_db
-from db.models import User, PlayerState, PlayerInventory, Purchase
+from db.models import User, PlayerState, PlayerInventory, Purchase, BookUsage
 from routers.auth import get_current_user
 import config
 
@@ -302,18 +304,20 @@ async def redeem_purchase(
     
     if existing:
         if existing.user_id == current_user.id:
-            # Same user trying to redeem again - just return success
+            # Already processed - return success with popup
+            state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
             return RedeemResponse(
                 success=True,
-                message="Purchase already redeemed",
+                message="Already received",
+                display_message="This purchase was already added to your account!",
                 gold_granted=0,
                 meat_granted=0,
-                new_gold_total=int(db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first().gold or 0),
-                new_meat_total=get_player_meat(db, current_user.id)
+                books_granted=0,
+                new_gold_total=int(state.gold or 0) if state else 0,
+                new_meat_total=get_player_meat(db, current_user.id),
+                new_book_total=get_player_books(db, current_user.id)
             )
         else:
-            # Different user trying to use same transaction - fraud attempt
-            print(f"🚨 FRAUD ALERT: User {current_user.id} tried to redeem transaction {request.transaction_id} owned by user {existing.user_id}")
             raise HTTPException(status_code=400, detail="Invalid transaction")
     
     # 3. Get player state
@@ -483,6 +487,9 @@ async def use_book(
     """
     Use a book to skip or reduce a cooldown. Effect is server-driven from resources.py.
     
+    Books are purchased with REAL MONEY. All usage attempts are logged with full
+    state for debugging support issues.
+    
     Books can be used on:
     - "personal" slot (training)
     - "building" slot (work, property_upgrade)
@@ -492,110 +499,154 @@ async def use_book(
     - farm (economy slot)
     - patrol (security slot)
     - battle-related actions (view_coup, view_invasion, etc.)
-    
-    Effect is determined by resources.py book config:
-    - effect="skip_cooldown" (or cooldown_reduction_minutes=None): Clears entire cooldown
-    - effect="reduce_cooldown" with cooldown_reduction_minutes=X: Reduces by X minutes
     """
     from datetime import timedelta
     from db.models import ActionCooldown
     from routers.actions.action_config import ACTION_SLOTS
+    from routers.resources import RESOURCES
     
-    # Validate slot - books can only be used on certain slots
+    # Capture initial state
+    books_before = get_player_books(db, current_user.id)
+    now = datetime.utcnow()
+    
+    # Get book config
+    book_config = RESOURCES.get("book", {})
+    effect = book_config.get("effect", "skip_cooldown")
+    reduction_minutes = book_config.get("cooldown_reduction_minutes")
+    cooldown_skipped = (effect == "skip_cooldown" or reduction_minutes is None)
+    
+    # Validate slot
     if request.slot not in BOOK_ELIGIBLE_SLOTS:
         raise HTTPException(
             status_code=400, 
             detail=f"Books cannot be used on {request.slot}. Eligible slots: {', '.join(BOOK_ELIGIBLE_SLOTS)}"
         )
     
-    # Validate action_type if provided - some actions can't use books even if in eligible slot
+    # Validate action_type
     if request.action_type and request.action_type in BOOK_INELIGIBLE_ACTIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Books cannot be used on {request.action_type}."
-        )
+        raise HTTPException(status_code=400, detail=f"Books cannot be used on {request.action_type}.")
     
     # Check if player has books
-    book_count = get_player_books(db, current_user.id)
-    if book_count <= 0:
+    if books_before <= 0:
         raise HTTPException(status_code=400, detail="No books available")
     
-    # Get ALL action types in this slot - we need to clear ALL of them
+    # Get actions in slot
     actions_in_slot = [action for action, slot in ACTION_SLOTS.items() if slot == request.slot]
-    
     if not actions_in_slot:
         raise HTTPException(status_code=400, detail=f"No actions in slot: {request.slot}")
     
-    # Find ALL cooldowns in the slot
+    # Find cooldowns
     all_cooldowns = db.query(ActionCooldown).filter(
         ActionCooldown.user_id == current_user.id,
         ActionCooldown.action_type.in_(actions_in_slot)
     ).all()
     
+    cooldowns_found = len(all_cooldowns)
+    
     if not all_cooldowns:
         raise HTTPException(status_code=400, detail="No active cooldown to skip")
     
-    # Check if ANY cooldown in the slot has time remaining
-    now = datetime.utcnow()
+    # Check for active cooldown
     has_active_cooldown = False
-    
     for cd in all_cooldowns:
         if cd.last_performed:
-            # Use a generous 3 hour check - if performed within 3 hours, consider it active
             elapsed = (now - cd.last_performed).total_seconds()
             if elapsed < 3 * 60 * 60:  # 3 hours
                 has_active_cooldown = True
                 break
     
     if not has_active_cooldown:
+        # No book needed - don't charge them, no need to log
         return UseBookResponse(
             success=True,
             message="Cooldown already ready - no book needed!",
-            books_remaining=book_count,
+            books_remaining=books_before,
             cooldown_reduced_minutes=0,
             new_cooldown_seconds=0
         )
     
-    # Get book config to determine effect
-    from routers.resources import RESOURCES
-    book_config = RESOURCES.get("book", {})
-    effect = book_config.get("effect", "skip_cooldown")
-    reduction_minutes = book_config.get("cooldown_reduction_minutes")
-    
-    if effect == "skip_cooldown" or reduction_minutes is None:
-        # SKIP ENTIRE SLOT COOLDOWN - clear ALL cooldowns in the slot
+    # === ACTUALLY USE THE BOOK ===
+    # This is the critical section - we deduct the book and modify cooldowns
+    # Only log here since this is when real money is at stake
+    try:
+        # Modify cooldowns
+        cooldowns_modified = 0
         for cd in all_cooldowns:
-            cd.last_performed = now - timedelta(days=7)
-        cooldown_skipped = True
-        new_remaining = 0
-        message = f"Used 1 book to skip {request.slot} cooldown!"
-    else:
-        # REDUCE COOLDOWN - reduce all cooldowns in slot
-        for cd in all_cooldowns:
-            if cd.last_performed:
+            if cooldown_skipped:
+                cd.last_performed = now - timedelta(days=7)
+            elif cd.last_performed:
                 cd.last_performed = cd.last_performed - timedelta(minutes=reduction_minutes)
-        cooldown_skipped = False
-        new_remaining = 0  # We don't calculate this for reduce mode
-        message = f"Used 1 book to reduce {request.slot} cooldown by {reduction_minutes} minutes!"
-    
-    # Deduct the book
-    add_books(db, current_user.id, -1)
-    
-    db.commit()
-    
-    books_remaining = get_player_books(db, current_user.id)
-    
-    print(f"📚 Book used! User {current_user.id} {'skipped' if cooldown_skipped else 'reduced'} {request.slot} cooldown")
-    print(f"   Books remaining: {books_remaining}")
-    print(f"   Cooldowns cleared: {len(all_cooldowns)}")
-    
-    return UseBookResponse(
-        success=True,
-        message=message,
-        books_remaining=books_remaining,
-        cooldown_reduced_minutes=reduction_minutes or 0,
-        new_cooldown_seconds=int(new_remaining)
-    )
+            cooldowns_modified += 1
+        
+        # Deduct the book
+        add_books(db, current_user.id, -1)
+        books_after = get_player_books(db, current_user.id)
+        
+        # Record usage
+        usage = BookUsage(
+            user_id=current_user.id,
+            slot=request.slot,
+            action_type=request.action_type,
+            effect="skip_cooldown" if cooldown_skipped else "reduce_cooldown",
+            cooldown_reduction_minutes=None if cooldown_skipped else reduction_minutes,
+            success=True,
+            error_message=None,
+            books_before=books_before,
+            books_after=books_after,
+            cooldowns_found=cooldowns_found,
+            cooldowns_modified=cooldowns_modified
+        )
+        db.add(usage)
+        
+        db.commit()
+        
+        if cooldown_skipped:
+            message = f"Used 1 book to skip {request.slot} cooldown!"
+        else:
+            message = f"Used 1 book to reduce {request.slot} cooldown by {reduction_minutes} minutes!"
+        
+        print(f"📚 Book used! User {current_user.id} - {message}")
+        print(f"   Books: {books_before} -> {books_after}")
+        print(f"   Cooldowns modified: {cooldowns_modified}/{cooldowns_found}")
+        print(f"   Usage ID: #{usage.id}")
+        
+        return UseBookResponse(
+            success=True,
+            message=message,
+            books_remaining=books_after,
+            cooldown_reduced_minutes=reduction_minutes or 0,
+            new_cooldown_seconds=0
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Something went wrong - log the failure, rollback
+        db.rollback()
+        error_msg = f"Unexpected error: {str(e)}"
+        print(f"❌ Book usage failed for user {current_user.id}: {error_msg}")
+        
+        # Record failure in a fresh transaction
+        try:
+            usage = BookUsage(
+                user_id=current_user.id,
+                slot=request.slot,
+                action_type=request.action_type,
+                effect="skip_cooldown" if cooldown_skipped else "reduce_cooldown",
+                cooldown_reduction_minutes=None if cooldown_skipped else reduction_minutes,
+                success=False,
+                error_message=error_msg[:500],  # Truncate long errors
+                books_before=books_before,
+                books_after=books_before,  # Book not consumed
+                cooldowns_found=cooldowns_found,
+                cooldowns_modified=0
+            )
+            db.add(usage)
+            db.commit()
+        except Exception:
+            pass  # Don't fail if logging fails
+        
+        raise HTTPException(status_code=500, detail="Failed to use book. Your book was not consumed. Please try again.")
 
 
 @router.get("/books")
@@ -662,6 +713,65 @@ async def get_book_info(
         can_purchase=True,
         purchase_product_id="com.kingdom.book_pack_5"
     )
+
+
+# ============================================================
+# BOOK USAGE HISTORY
+# ============================================================
+
+class BookUsageHistoryItem(BaseModel):
+    """Single book usage record with full state for debugging."""
+    id: int
+    slot: str
+    action_type: Optional[str]
+    effect: str
+    cooldown_reduction_minutes: Optional[int]
+    # Result
+    success: bool
+    error_message: Optional[str]
+    # Balances
+    books_before: int
+    books_after: int
+    # Cooldown state
+    cooldowns_found: Optional[int]
+    cooldowns_modified: Optional[int]
+    # Timestamp
+    used_at: str
+
+
+@router.get("/book-history", response_model=List[BookUsageHistoryItem])
+async def get_book_usage_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = 50
+):
+    """
+    Get the current user's book usage history.
+    
+    Shows all usage attempts (successful and failed) with full state
+    for debugging "my book didn't work" issues.
+    """
+    usages = db.query(BookUsage).filter(
+        BookUsage.user_id == current_user.id
+    ).order_by(BookUsage.used_at.desc()).limit(limit).all()
+    
+    return [
+        BookUsageHistoryItem(
+            id=u.id,
+            slot=u.slot,
+            action_type=u.action_type,
+            effect=u.effect,
+            cooldown_reduction_minutes=u.cooldown_reduction_minutes,
+            success=u.success,
+            error_message=u.error_message,
+            books_before=u.books_before,
+            books_after=u.books_after,
+            cooldowns_found=u.cooldowns_found,
+            cooldowns_modified=u.cooldowns_modified,
+            used_at=u.used_at.isoformat() if u.used_at else "",
+        )
+        for u in usages
+    ]
 
 
 # ============================================================

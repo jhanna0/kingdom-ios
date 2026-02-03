@@ -195,7 +195,7 @@ RESOURCES = {
         "display_name": "Book",
         "icon": "book.fill",
         "color": "brown",
-        "description": "A tome of knowledge. Skip your current cooldown and train again immediately!",
+        "description": "A rare tome of knowledge. Immediately completes your current cooldown!",
         "category": "consumable",
         "display_order": 91,
         "is_tradeable": False,  # Non-tradeable to prevent RMT

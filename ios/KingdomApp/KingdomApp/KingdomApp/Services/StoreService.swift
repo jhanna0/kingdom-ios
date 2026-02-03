@@ -207,7 +207,10 @@ class StoreService: ObservableObject {
                 
                 // Notify the app to refresh player state
                 NotificationCenter.default.post(name: .purchaseCompleted, object: nil, userInfo: [
-                    "display_message": response.display_message ?? "Purchase complete!"
+                    "display_message": response.display_message ?? "Purchase complete!",
+                    "gold_granted": response.gold_granted,
+                    "meat_granted": response.meat_granted,
+                    "books_granted": response.books_granted
                 ])
                 
                 return true
@@ -259,10 +262,7 @@ class StoreService: ObservableObject {
                     let transaction = try await self?.checkVerified(result)
                     
                     if let transaction = transaction {
-                        // Deliver the product
                         await self?.deliverProduct(transaction)
-                        
-                        // Finish the transaction
                         await transaction.finish()
                     }
                 } catch {

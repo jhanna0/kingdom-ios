@@ -64,6 +64,9 @@ from .garden import GardenSlot, PlantStatus, PlantType
 # In-app purchases
 from .purchase import Purchase
 
+# Book usage tracking
+from .book_usage import BookUsage
+
 __all__ = [
     "User",
     "PlayerState",
@@ -153,5 +156,7 @@ __all__ = [
     "PlantType",
     # In-app purchases
     "Purchase",
+    # Book usage tracking
+    "BookUsage",
 ]
 
