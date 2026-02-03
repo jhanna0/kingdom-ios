@@ -10,6 +10,7 @@ struct MapHUD: View {
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
+    @State private var showStore = false
     
     // Get home kingdom name - use direct property from backend (always available)
     private var homeKingdomName: String? {
@@ -100,9 +101,11 @@ struct MapHUD: View {
                             
                             // Gold
                             HStack(spacing: 3) {
-                                Text("\(viewModel.player.gold)")
+                                Text(viewModel.player.gold.abbreviated())
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.black)
+                                    .lineLimit(1)
+                                    .fixedSize()
                                 
                                 Image(systemName: "g.circle.fill")
                                     .font(.system(size: 12, weight: .semibold))
@@ -124,6 +127,24 @@ struct MapHUD: View {
                                     )
                             }
                         )
+                    }
+                    
+                    // Store button (buy gold/resources)
+                    Button(action: {
+                        showStore = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(KingdomTheme.Colors.goldLight)
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
                     }
                     
                     Spacer()
@@ -201,6 +222,10 @@ struct MapHUD: View {
         }
         .sheet(isPresented: $showTutorial) {
             TutorialView()
+        }
+        .sheet(isPresented: $showStore) {
+            StoreView()
+                .environmentObject(viewModel.player)
         }
     }
     

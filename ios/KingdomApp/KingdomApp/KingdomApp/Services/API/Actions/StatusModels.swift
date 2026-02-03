@@ -24,12 +24,14 @@ struct SlotCooldown: Codable {
     let secondsRemaining: Int
     let blockingAction: String?
     let blockingSlot: String?
+    let canUseBook: Bool?  // Server-driven: can books skip this cooldown?
     
     enum CodingKeys: String, CodingKey {
         case ready
         case secondsRemaining = "seconds_remaining"
         case blockingAction = "blocking_action"
         case blockingSlot = "blocking_slot"
+        case canUseBook = "can_use_book"
     }
 }
 
@@ -112,6 +114,7 @@ struct ActionStatus: Codable {
     let displayOrder: Int?
     let endpoint: String?  // FULLY DYNAMIC: Backend provides complete endpoint with all params
     let slot: String?  // NEW: Which slot this action belongs to (building, economy, security, etc)
+    let canUseBook: Bool?  // Server-driven: can books skip this cooldown?
     
     // DYNAMIC HANDLER - Backend tells frontend HOW to handle this action
     let handler: String?  // "initiate_battle", "view_battle", "generic" (default)
@@ -155,6 +158,7 @@ struct ActionStatus: Codable {
         case displayOrder = "display_order"
         case endpoint
         case slot
+        case canUseBook = "can_use_book"
         // Dynamic handler fields
         case handler
         case battleId = "battle_id"

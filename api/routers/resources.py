@@ -191,6 +191,18 @@ RESOURCES = {
         "is_tradeable": True,
         "storage_type": "inventory",
     },
+    "book": {
+        "display_name": "Book",
+        "icon": "book.fill",
+        "color": "brown",
+        "description": "A tome of knowledge. Skip your current cooldown and train again immediately!",
+        "category": "consumable",
+        "display_order": 91,
+        "is_tradeable": False,  # Non-tradeable to prevent RMT
+        "storage_type": "inventory",
+        "effect": "skip_cooldown",  # "skip_cooldown" = clear entire cooldown, "reduce_cooldown" = reduce by X minutes
+        "cooldown_reduction_minutes": None,  # None = skip entire cooldown
+    },
 }
 
 

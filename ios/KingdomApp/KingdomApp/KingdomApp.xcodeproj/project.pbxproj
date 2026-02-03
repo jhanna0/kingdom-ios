@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		0514A3222F31940F009A15B3 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		05B99CEE2F00340200258527 /* KingdomApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KingdomApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -32,6 +33,7 @@
 		05B99CE52F00340200258527 = {
 			isa = PBXGroup;
 			children = (
+				0514A3222F31940F009A15B3 /* Products.storekit */,
 				05B99CF02F00340200258527 /* KingdomApp */,
 				05B99CEF2F00340200258527 /* Products */,
 			);

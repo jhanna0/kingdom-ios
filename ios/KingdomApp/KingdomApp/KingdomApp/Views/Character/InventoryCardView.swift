@@ -143,7 +143,7 @@ struct InventoryCardView: View {
         .alert(item: $selectedItem) { item in
             Alert(
                 title: Text(item.displayName),
-                message: Text(item.description),
+                message: Text(item.description.isEmpty ? "\(item.amount.formatted())" : "\(item.description)\n\n\(item.amount.formatted())"),
                 dismissButton: .default(Text("OK"))
             )
         }

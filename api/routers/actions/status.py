@@ -374,6 +374,9 @@ def get_action_status(
     slot_cooldowns = {}
     action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout"]
     
+    # Import book eligibility - server-driven so we can change without app updates
+    from routers.store import BOOK_ELIGIBLE_SLOTS
+    
     for action_type in action_types_to_check:
         slot = get_action_slot(action_type)
         if slot not in slot_cooldowns:
@@ -384,6 +387,8 @@ def get_action_status(
                 current_action_type=action_type,
                 cooldown_minutes=action_cooldown_map[action_type]
             )
+            # Add book eligibility to slot cooldown (frontend uses this to show book button)
+            cooldown_info["can_use_book"] = slot in BOOK_ELIGIBLE_SLOTS
             slot_cooldowns[slot] = cooldown_info
     
     # Check for ACTIVE BATTLE cooldowns (separate from action slots)
@@ -1067,9 +1072,18 @@ def get_action_status(
                     "is_spectator": True,  # NEW: Frontend knows this is spectate-only
                 }
     
-    # Add slot information to each action
+    # Add slot information and book eligibility to each action
+    # Book eligibility is server-driven so we can change it without app updates
+    from routers.store import BOOK_ELIGIBLE_SLOTS, BOOK_INELIGIBLE_ACTIONS
+    
     for action_key, action_data in actions.items():
-        action_data["slot"] = get_action_slot(action_key)
+        slot = get_action_slot(action_key)
+        action_data["slot"] = slot
+        
+        # Can this action use books to skip cooldown?
+        # Must be in eligible slot AND not in the ineligible actions list
+        can_use_book = slot in BOOK_ELIGIBLE_SLOTS and action_key not in BOOK_INELIGIBLE_ACTIONS
+        action_data["can_use_book"] = can_use_book
     
     # Build slots array with actions for each slot
     # Frontend renders this dynamically - no hardcoding!

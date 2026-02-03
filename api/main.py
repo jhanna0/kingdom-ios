@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden, feedback, achievements, empire
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden, feedback, achievements, empire, store
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -67,6 +67,7 @@ PUBLIC_ROUTES = {
     "/auth/client-log",    # Client debug logging (for sign-up debugging)
     "/auth/demo-login",    # Demo login for App Store review
     "/app-config",         # App config (version check)
+    "/store/products",     # IAP product list (needed before auth)
     "/docs",               # Swagger docs (dev only)
     "/openapi.json",       # OpenAPI schema
     "/",                   # Root
@@ -239,6 +240,7 @@ app.include_router(garden.router)  # Personal garden - plant, water, harvest
 app.include_router(feedback.router)  # In-app feedback submission
 app.include_router(achievements.router)  # Achievement diary with tiered rewards
 app.include_router(empire.router)  # Empire management (treasury, fund transfers)
+app.include_router(store.router)  # In-app purchases (StoreKit 2)
 
 
 # ===== WebSocket Endpoint (Local Development) =====

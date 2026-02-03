@@ -61,6 +61,9 @@ from .daily_gathering import DailyGathering
 # Garden system
 from .garden import GardenSlot, PlantStatus, PlantType
 
+# In-app purchases
+from .purchase import Purchase
+
 __all__ = [
     "User",
     "PlayerState",
@@ -148,5 +151,7 @@ __all__ = [
     "GardenSlot",
     "PlantStatus",
     "PlantType",
+    # In-app purchases
+    "Purchase",
 ]
 
