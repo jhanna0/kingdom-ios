@@ -19,7 +19,7 @@ enum AppConfig {
     static var apiBaseURL: String {
         switch apiEnvironment {
         case .local:
-            return "http://10.1.10.158:8000"
+            return "http://192.168.1.7:8000"
         case .lambda:
             return "https://eu0qm86e1m.execute-api.us-east-1.amazonaws.com"
         case .production:

@@ -10,6 +10,7 @@ struct MapHUD: View {
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
+    @State private var showStore = false
     
     // Get home kingdom name - use direct property from backend (always available)
     private var homeKingdomName: String? {
@@ -126,6 +127,15 @@ struct MapHUD: View {
                         )
                     }
                     
+                    // Store button (buy gold/resources)
+                    Button(action: {
+                        showStore = true
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(KingdomTheme.Colors.goldLight)
+                    }
+                    
                     Spacer()
                     
                     // Actions (icon only)
@@ -201,6 +211,10 @@ struct MapHUD: View {
         }
         .sheet(isPresented: $showTutorial) {
             TutorialView()
+        }
+        .sheet(isPresented: $showStore) {
+            StoreView()
+                .environmentObject(viewModel.player)
         }
     }
     
