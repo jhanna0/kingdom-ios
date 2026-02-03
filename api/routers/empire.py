@@ -112,10 +112,10 @@ EMPIRE_UI_CONFIG = {
         },
         "alliances": {
             "title": "Alliances",
-            "icon": "person.2.fill",
-            "color": "royalPurple",
+            "icon": "handshake.fill",
+            "color": "royalEmerald",
             "empty_message": None,
-            "ally_icon": "link",
+            "ally_icon": "handshake.fill",
             "days_label": "days remaining",
             "kingdoms_label": "kingdoms",
         },

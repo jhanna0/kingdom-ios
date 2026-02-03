@@ -1,12 +1,6 @@
 import SwiftUI
 import MapKit
 
-enum KingdomDetailDestination: Hashable {
-    case build
-    case taxRate
-    case decree
-}
-
 struct KingdomDetailView: View {
     let kingdomId: String
     @ObservedObject var player: Player
@@ -123,7 +117,7 @@ struct KingdomDetailView: View {
                             .font(FontStyles.headingMedium)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        NavigationLink(value: KingdomDetailDestination.build) {
+                        NavigationLink(destination: BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)) {
                             HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "hammer.fill")
                                     .font(.title3)
@@ -150,7 +144,7 @@ struct KingdomDetailView: View {
                         }
                         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                         
-                        NavigationLink(value: KingdomDetailDestination.taxRate) {
+                        NavigationLink(destination: TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)) {
                             HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "percent")
                                     .font(.title3)
@@ -177,7 +171,7 @@ struct KingdomDetailView: View {
                         }
                         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                         
-                        NavigationLink(value: KingdomDetailDestination.decree) {
+                        NavigationLink(destination: DecreeInputView(kingdom: kingdom, decreeText: $decreeText)) {
                             HStack(spacing: KingdomTheme.Spacing.medium) {
                                 Image(systemName: "scroll.fill")
                                     .font(.title3)
@@ -214,16 +208,6 @@ struct KingdomDetailView: View {
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
-        .navigationDestination(for: KingdomDetailDestination.self) { destination in
-            switch destination {
-            case .build:
-                BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)
-            case .taxRate:
-                TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)
-            case .decree:
-                DecreeInputView(kingdom: kingdom, decreeText: $decreeText)
-            }
-        }
         .task {
             // Refresh kingdom data with upgrade costs when sheet opens
             await viewModel.refreshKingdom(id: kingdomId)
