@@ -7,7 +7,7 @@ from sqlalchemy import func
 from datetime import datetime
 import json
 
-from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom
+from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom, Property
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
@@ -190,8 +190,11 @@ def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
-def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
-    """Get property contracts from unified_contracts table for status endpoint"""
+def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False, current_kingdom_id: str = None) -> list:
+    """Get property contracts from unified_contracts table for status endpoint.
+    
+    Only returns contracts for properties in the player's current kingdom.
+    """
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
     from db.models.inventory import PlayerInventory
@@ -199,11 +202,20 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
     # Rulers don't pay tax
     effective_tax_rate = 0 if is_ruler else current_tax_rate
     
-    contracts = db.query(UnifiedContract).filter(
+    # Get contracts and filter to current kingdom via Property join
+    contracts_query = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property',
         UnifiedContract.completed_at.is_(None)  # Active contracts only
-    ).all()
+    )
+    
+    # Filter to only properties in current kingdom
+    if current_kingdom_id:
+        contracts_query = contracts_query.join(
+            Property, Property.id == UnifiedContract.target_id
+        ).filter(Property.kingdom_id == current_kingdom_id)
+    
+    contracts = contracts_query.all()
     
     # Pre-fetch inventory items for resource checking (wood, etc.)
     inventory_items = db.query(PlayerInventory).filter(
@@ -438,8 +450,9 @@ def get_action_status(
     
     # Load property upgrade contracts from unified_contracts table
     # Rulers don't pay tax, so pass is_ruler flag
+    # Only show contracts for properties in current kingdom
     is_ruler = kingdom and kingdom.ruler_id == current_user.id
-    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler)
+    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler, state.current_kingdom_id)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward

@@ -199,6 +199,9 @@ PROPERTY_TIERS = {
                 "description": "Crafting workshop",
                 "benefits": ["All House benefits", "Unlocks crafting of weapons and armor"],
                 "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
+                "free_at_tier": 3,  # Backwards compat: auto-available at tier 3+
+                "color": "buttonPrimary",
+                "route": "/workshop",
             },
             {
                 "id": "kitchen",
@@ -207,6 +210,9 @@ PROPERTY_TIERS = {
                 "description": "Cook meals for buffs",
                 "benefits": ["All House benefits", "Unlocks cooking and baking"],
                 "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "stone", "ratio": 0.5}],
+                # No free_at_tier - must be built via contract
+                "color": "buttonWarning",
+                "route": "/kitchen",
             }
         ]
     },

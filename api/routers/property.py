@@ -345,12 +345,19 @@ def deduct_resource_costs(db: Session, user_id: int, resource_costs: list):
 
 
 def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
-    """Get list of rooms that have been built.
+    """Get list of rooms available to use at this property.
+    
+    Reads from PROPERTY_TIERS config - no hardcoding!
+    A room is available if:
+      - It has free_at_tier <= current tier (backwards compat)
+      - OR it's in built_rooms (explicitly built via contract)
     
     Args:
         tier: Property tier level
         built_rooms: List of room IDs that have been built via completed contracts.
     """
+    from routers.tiers import PROPERTY_TIERS
+    
     rooms = []
     
     # Tier 2+ gets fortification and garden free (no contract needed)
@@ -372,25 +379,29 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
             "route": "/garden"
         })
     
-    # All other rooms require completed contracts - show if built
-    if "workshop" in built_rooms:
-        rooms.append({
-            "id": "workshop",
-            "name": "Workshop",
-            "icon": "hammer.fill",
-            "color": "buttonPrimary",
-            "description": "Craft items from blueprints",
-            "route": "/workshop"
-        })
-    if "kitchen" in built_rooms:
-        rooms.append({
-            "id": "kitchen",
-            "name": "Kitchen",
-            "icon": "fork.knife",
-            "color": "buttonWarning",
-            "description": "Bake wheat into sourdough bread",
-            "route": "/kitchen"
-        })
+    # Check all options from config for rooms to show
+    seen_ids = set()
+    for tier_num, tier_data in PROPERTY_TIERS.items():
+        for opt in tier_data.get("options", []):
+            opt_id = opt.get("id")
+            if opt_id in seen_ids:
+                continue
+            
+            # Room is available if: free_at_tier <= current tier OR explicitly built
+            free_at = opt.get("free_at_tier")
+            is_free = free_at is not None and tier >= free_at
+            is_built = opt_id in built_rooms
+            
+            if is_free or is_built:
+                rooms.append({
+                    "id": opt_id,
+                    "name": opt.get("name", opt_id),
+                    "icon": opt.get("icon", "questionmark"),
+                    "color": opt.get("color", "inkMedium"),
+                    "description": opt.get("description", ""),
+                    "route": opt.get("route", f"/{opt_id}")
+                })
+                seen_ids.add(opt_id)
     
     return rooms
 
@@ -541,11 +552,26 @@ def get_property_status(
         prop_dict["available_rooms"] = get_available_rooms(p.tier, built_rooms)
         prop_dict["built_rooms"] = built_rooms  # List of room IDs that are built
         
-        # Available options to build (not yet built, tier > current tier, and tier <= current+1)
-        prop_dict["available_options"] = [
-            opt for opt in all_buildable_options 
-            if opt["id"] not in built_rooms and opt["tier"] > p.tier and opt["tier"] <= p.tier + 1
-        ]
+        # Available options to build at next tier (only if not already built)
+        next_tier = p.tier + 1
+        next_tier_options = [opt for opt in all_buildable_options if opt["tier"] == next_tier]
+        next_tier_option_ids = [opt["id"] for opt in next_tier_options]
+        
+        # Check if ALL options at next tier are built
+        all_next_tier_built = all(opt_id in built_rooms for opt_id in next_tier_option_ids) if next_tier_option_ids else True
+        
+        if all_next_tier_built and next_tier_option_ids:
+            # All options at next tier built - show tier after that
+            prop_dict["available_options"] = [
+                opt for opt in all_buildable_options 
+                if opt["tier"] == next_tier + 1 and opt["id"] not in built_rooms
+            ]
+        else:
+            # Show remaining options at next tier
+            prop_dict["available_options"] = [
+                opt for opt in next_tier_options 
+                if opt["id"] not in built_rooms
+            ]
         
         # Add fortification info object for easier UI consumption
         if p.tier >= 2:  # Fortification unlocked at T2

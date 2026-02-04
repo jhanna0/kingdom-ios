@@ -508,13 +508,16 @@ def work_on_property_upgrade(
         # Mark as completed
         contract.completed_at = datetime.utcnow()
         
-        # Update the property tier (property is created at purchase time with tier=0)
-        property = db.query(Property).filter(Property.id == contract.target_id).first()
+        # Update the property tier (legacy behavior - room contracts have option_id set)
+        property_obj = db.query(Property).filter(Property.id == contract.target_id).first()
         
-        if property:
-            property.tier = contract.tier
+        if property_obj:
+            if not contract.option_id:
+                # Legacy tier upgrade
+                property_obj.tier = contract.tier
+            
             if contract.tier > 1:
-                property.last_upgraded = datetime.utcnow()
+                property_obj.last_upgraded = datetime.utcnow()
             
             # Log property completion to activity feed
             from routers.tiers import PROPERTY_TIERS
