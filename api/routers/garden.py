@@ -421,56 +421,25 @@ def plant_seed(
     if not consume_seed(db, current_user.id):
         raise HTTPException(status_code=400, detail="Failed to consume seed.")
     
-    # Determine what this plant will become (deterministic at plant time!)
-    roll = random.random()
-    cumulative = 0
-    determined_type = PlantType.WEED  # Default
-    determined_color = None
-    determined_rarity = None
-    
-    for outcome_type, outcome_config in GARDEN_CONFIG["outcomes"].items():
-        cumulative += outcome_config["probability"]
-        if roll <= cumulative:
-            determined_type = PlantType(outcome_type)
-            
-            # If it's a flower, pick color based on rarity tiers
-            if outcome_type == "flower" and "color_tiers" in outcome_config:
-                rarity_roll = random.random()
-                rarity_cumulative = 0
-                for rarity, tier_config in outcome_config["color_tiers"].items():
-                    rarity_cumulative += tier_config["probability"]
-                    if rarity_roll <= rarity_cumulative:
-                        determined_rarity = rarity
-                        determined_color = random.choice(tier_config["colors"])
-                        break
-            
-            break
-    
-    # Plant the seed with pre-determined outcome
+    # Plant the seed - outcome determined when fully grown
     slot.status = PlantStatus.GROWING
     slot.planted_at = datetime.utcnow()
     slot.last_watered_at = datetime.utcnow()  # Initial "watering" when planted
     slot.watering_cycles = 0
-    slot.plant_type = determined_type  # Already know what it will be!
-    slot.flower_color = determined_color
-    slot.flower_rarity = determined_rarity
+    slot.plant_type = None
+    slot.flower_color = None
+    slot.flower_rarity = None
     
     # Log the planting event
     history = GardenHistory(
         user_id=current_user.id,
         slot_index=slot_index,
         action="planted",
-        plant_type=determined_type.value,
-        flower_color=determined_color,
-        flower_rarity=determined_rarity,
         planted_at=slot.planted_at
     )
     db.add(history)
     
     db.commit()
-    
-    seed_info = RESOURCES.get(GARDEN_CONFIG["seed_item_id"], {})
-    outcome_config = GARDEN_CONFIG["outcomes"].get(determined_type.value, {})
     
     return {
         "success": True,
@@ -529,11 +498,47 @@ def water_plant(
     
     # Check if plant is now fully grown
     if slot.watering_cycles >= GARDEN_CONFIG["watering_cycles_required"]:
-        # Plant type was already determined at planting - just reveal it!
-        slot.status = PlantStatus.READY
+        # Determine what plant it becomes NOW
+        roll = random.random()
+        cumulative = 0
+        determined_type = PlantType.WEED
+        determined_color = None
+        determined_rarity = None
         
-        outcome_config = GARDEN_CONFIG["outcomes"].get(slot.plant_type.value, {})
-        resource_config = RESOURCES.get(slot.plant_type.value, {})
+        for outcome_type, outcome_config in GARDEN_CONFIG["outcomes"].items():
+            cumulative += outcome_config["probability"]
+            if roll <= cumulative:
+                determined_type = PlantType(outcome_type)
+                if outcome_type == "flower" and "color_tiers" in outcome_config:
+                    rarity_roll = random.random()
+                    rarity_cumulative = 0
+                    for rarity, tier_config in outcome_config["color_tiers"].items():
+                        rarity_cumulative += tier_config["probability"]
+                        if rarity_roll <= rarity_cumulative:
+                            determined_rarity = rarity
+                            determined_color = random.choice(tier_config["colors"])
+                            break
+                break
+        
+        slot.status = PlantStatus.READY
+        slot.plant_type = determined_type
+        slot.flower_color = determined_color
+        slot.flower_rarity = determined_rarity
+        
+        # Log the grown event (for achievements)
+        history = GardenHistory(
+            user_id=current_user.id,
+            slot_index=slot_index,
+            action="grown",
+            plant_type=determined_type.value,
+            flower_color=determined_color,
+            flower_rarity=determined_rarity,
+            planted_at=slot.planted_at
+        )
+        db.add(history)
+        
+        outcome_config = GARDEN_CONFIG["outcomes"].get(determined_type.value, {})
+        resource_config = RESOURCES.get(determined_type.value, {})
         display_name = outcome_config.get("display_name") or resource_config.get("display_name", "something")
         message = f"Your plant is fully grown! It's {display_name}!"
         next_water_in_seconds = None

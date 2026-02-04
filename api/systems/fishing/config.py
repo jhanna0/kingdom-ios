@@ -125,8 +125,8 @@ CAST_DROP_TABLE_DISPLAY = [
 # Rarer fish = harder to land = more rolls needed
 
 # Base reel odds (before fish difficulty applied)
-REEL_BASE_CAUGHT = 58
-REEL_BASE_ESCAPED = 42
+REEL_BASE_CAUGHT = 62
+REEL_BASE_ESCAPED = 38
 
 # Difficulty modifier per fish tier (reduces "caught" slots)
 # Higher tier = harder to catch
