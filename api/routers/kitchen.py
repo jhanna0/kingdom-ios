@@ -19,6 +19,7 @@ from db import get_db, User, Property
 from db.models.kitchen import OvenSlot, OvenStatus
 from db.models.kitchen_history import KitchenHistory
 from db.models.inventory import PlayerInventory
+from db.models.unified_contract import UnifiedContract
 from routers.auth import get_current_user
 from routers.resources import RESOURCES
 from routers.actions.utils import format_datetime_iso, log_activity
@@ -244,22 +245,27 @@ def get_kitchen_status(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check property requirement (tier 3+ = villa with kitchen)
-    kitchen_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 3
+    # Check if user has completed the kitchen contract
+    kitchen_contract = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.option_id == 'kitchen',
+        UnifiedContract.completed_at.isnot(None)
     ).first()
     
-    has_kitchen = kitchen_property is not None
-    
-    if not has_kitchen:
+    if not kitchen_contract:
         return {
             "has_kitchen": False,
-            "kitchen_requirement": "Upgrade to a Villa (Tier 3) to unlock your kitchen.",
+            "kitchen_requirement": "Build a Kitchen in your property to unlock baking.",
             "slots": [],
             "wheat_count": 0,
             "config": KITCHEN_CONFIG["ui"],
         }
+    
+    # Get the property that has the kitchen
+    kitchen_property = db.query(Property).filter(
+        Property.id == kitchen_contract.target_id
+    ).first()
     
     # Get or create oven slots
     slots = get_or_create_oven_slots(db, current_user.id)
@@ -328,14 +334,16 @@ def load_oven(
     if wheat_amount > 4:
         wheat_amount = 4  # Max 4 wheat per slot (48 loaves)
     
-    # Check property requirement (tier 3+ = villa with kitchen)
-    kitchen_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 3
+    # Check if user has completed the kitchen contract
+    kitchen_contract = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.option_id == 'kitchen',
+        UnifiedContract.completed_at.isnot(None)
     ).first()
     
-    if not kitchen_property:
-        raise HTTPException(status_code=400, detail="You need a Villa (Tier 3+) to have a kitchen.")
+    if not kitchen_contract:
+        raise HTTPException(status_code=400, detail="Build a Kitchen in your property to unlock baking.")
     
     # Validate slot index
     if slot_index < 0 or slot_index >= KITCHEN_CONFIG["max_slots"]:

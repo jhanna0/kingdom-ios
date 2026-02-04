@@ -14,6 +14,10 @@ struct KitchenView: View {
     @State private var actionInProgress: Int? = nil  // slot index being acted on
     @State private var selectedSlot: OvenSlot? = nil  // For detail sheet
     
+    // Mini-game state
+    @State private var showMiniGame = false
+    @State private var miniGameSlotIndex: Int? = nil
+    
     // Timer for updating countdowns
     @State private var currentTime = Date()
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -69,6 +73,24 @@ struct KitchenView: View {
         }
         .onReceive(timer) { _ in
             currentTime = Date()
+        }
+        .fullScreenCover(isPresented: $showMiniGame) {
+            SourdoughMiniGameView(
+                onComplete: {
+                    showMiniGame = false
+                    // After mini-game, actually load the oven
+                    if let slotIndex = miniGameSlotIndex {
+                        Task {
+                            await loadOven(slotIndex: slotIndex)
+                        }
+                    }
+                    miniGameSlotIndex = nil
+                },
+                onCancel: {
+                    showMiniGame = false
+                    miniGameSlotIndex = nil
+                }
+            )
         }
     }
     
@@ -541,9 +563,20 @@ struct KitchenView: View {
             
             VStack(alignment: .leading, spacing: 6) {
                 tipRow(icon: "1.circle.fill", text: "Harvest wheat from your garden")
-                tipRow(icon: "2.circle.fill", text: "Load wheat into an oven slot")
+                tipRow(icon: "2.circle.fill", text: "Tap a slot to make sourdough!")
                 tipRow(icon: "3.circle.fill", text: "Wait 3 hours, then collect your bread!")
             }
+            
+            // Mini-game hint
+            HStack(spacing: 4) {
+                Image(systemName: "gamecontroller.fill")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                Text("Mix, knead, shape & score like a real baker!")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .padding(.top, 2)
             
             // Conversion info
             HStack(spacing: 4) {
@@ -616,12 +649,12 @@ struct KitchenView: View {
             return
         }
         
-        Task {
-            if slot.isEmpty && wheatCount > 0 {
-                await loadOven(slotIndex: slot.slotIndex)
-            } else if slot.isEmpty && wheatCount == 0 {
-                showResult(success: false, message: "No wheat! Harvest some from your garden.")
-            }
+        if slot.isEmpty && wheatCount > 0 {
+            // Show the sourdough mini-game!
+            miniGameSlotIndex = slot.slotIndex
+            showMiniGame = true
+        } else if slot.isEmpty && wheatCount == 0 {
+            showResult(success: false, message: "No wheat! Harvest some from your garden.")
         }
     }
     
