@@ -250,6 +250,65 @@ class NotificationManager {
         print("🗑️ Cancelled all garden watering notifications")
     }
     
+    // MARK: - Kitchen Baking Notifications
+    
+    /// Schedule a notification for when bread is done baking
+    /// - Parameters:
+    ///   - slotIndex: The oven slot index (0-3)
+    ///   - secondsUntilReady: Seconds until the bread is done
+    func scheduleKitchenBakingNotification(slotIndex: Int, secondsUntilReady: Int) async {
+        // Don't schedule if too short
+        guard secondsUntilReady > 60 else {
+            print("⏭️ Skipping kitchen notification - too short (\(secondsUntilReady)s)")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule kitchen notification - permission not granted")
+            return
+        }
+        
+        let identifier = "kitchen_baking_\(slotIndex)"
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Bread is Ready! 🍞"
+        content.body = "Your sourdough is done baking. Time to collect!"
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "KITCHEN_BAKING"
+        content.userInfo = ["slot_index": slotIndex]
+        
+        // Cancel existing notification for this slot
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(secondsUntilReady), repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let hours = secondsUntilReady / 3600
+            let minutes = (secondsUntilReady % 3600) / 60
+            print("✅ Scheduled kitchen baking notification for slot \(slotIndex) in \(hours)h \(minutes)m")
+        } catch {
+            print("❌ Error scheduling kitchen notification: \(error)")
+        }
+    }
+    
+    /// Cancel kitchen baking notification for a specific slot
+    func cancelKitchenNotification(slotIndex: Int) {
+        let identifier = "kitchen_baking_\(slotIndex)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        print("🗑️ Cancelled kitchen notification for slot \(slotIndex)")
+    }
+    
+    /// Cancel all kitchen baking notifications
+    func cancelAllKitchenNotifications() {
+        let identifiers = (0..<4).map { "kitchen_baking_\($0)" }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        print("🗑️ Cancelled all kitchen baking notifications")
+    }
+    
     // MARK: - Cancel Notifications
     
     /// Cancel all action cooldown notifications

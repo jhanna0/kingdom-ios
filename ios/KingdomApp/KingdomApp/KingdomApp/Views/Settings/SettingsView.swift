@@ -157,7 +157,7 @@ struct SettingsView: View {
                         Task {
                             isClearingCache = true
                             cacheCleared = false
-                            try? await TierManager.shared.forceRefresh()
+                            try? await TierManager.shared.loadAllTiers()
                             isClearingCache = false
                             cacheCleared = true
                             

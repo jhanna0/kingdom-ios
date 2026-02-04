@@ -12,6 +12,7 @@ struct MyPropertiesView: View {
     @State private var property: Property?
     @State private var activeContracts: [PropertyAPI.PropertyUpgradeContract] = []
     @State private var availableRooms: [PropertyAPI.PropertyRoom] = []
+    @State private var availableOptions: [PropertyAPI.AvailableOption] = []
     @State private var upgradeStatus: PropertyAPI.PropertyUpgradeStatus?
     @State private var isLoading = true
     @State private var isPurchasingUpgrade = false
@@ -328,6 +329,11 @@ struct MyPropertiesView: View {
                 inlineRoomContent(room)
             }
             .buttonStyle(.plain)
+        } else if room.route == "/kitchen" {
+            NavigationLink(destination: KitchenView()) {
+                inlineRoomContent(room)
+            }
+            .buttonStyle(.plain)
         } else if room.route == "/fortify", let prop = property {
             NavigationLink(destination: FortificationView(player: player, property: prop)) {
                 inlineRoomContent(room)
@@ -385,19 +391,114 @@ struct MyPropertiesView: View {
     
     @ViewBuilder
     private func upgradeSection(property: Property) -> some View {
-        let nextTier = property.tier + 1
-        let options = TierManager.shared.propertyTierOptions(nextTier)
+        // Show in-progress contracts
+        ForEach(activeContracts.filter { $0.status == "in_progress" }, id: \.contract_id) { contract in
+            upgradeProgressCardFromContract(property: property, contract: contract)
+        }
         
-        // Show a card for each option - either progress or build button
-        ForEach(options, id: \.id) { option in
-            if let contract = activeContracts.first(where: { $0.option_id == option.id }) {
-                // This option is being built - show progress
-                upgradeProgressCard(property: property, contract: contract, option: option)
-            } else {
-                // This option is not being built - show build button
-                optionUpgradeCard(property: property, option: option)
+        // Show available options to build (from backend - already filtered)
+        ForEach(availableOptions, id: \.id) { option in
+            // Skip if already has an active contract
+            if !activeContracts.contains(where: { $0.option_id == option.id && $0.status == "in_progress" }) {
+                availableOptionCard(property: property, option: option)
             }
         }
+    }
+    
+    // MARK: - Available Option Card (from backend)
+    
+    private func availableOptionCard(property: Property, option: PropertyAPI.AvailableOption) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: option.icon ?? "hammer.fill")
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(option.name)
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    if let desc = option.description {
+                        Text(desc)
+                            .font(FontStyles.labelMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            Button(action: { purchaseUpgrade(optionId: option.id) }) {
+                HStack(spacing: 8) {
+                    if isPurchasingUpgrade {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "hammer.fill")
+                        Text("Build \(option.name)")
+                    }
+                }
+            }
+            .buttonStyle(.brutalist(
+                backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                foregroundColor: .white,
+                fullWidth: true
+            ))
+            .disabled(isPurchasingUpgrade)
+        }
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+    }
+    
+    // MARK: - Upgrade Progress Card (from contract)
+    
+    private func upgradeProgressCardFromContract(property: Property, contract: PropertyAPI.PropertyUpgradeContract) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: "hammer.fill")
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        cornerRadius: 12,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(contract.option_name ?? "Building...")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    Text("In progress...")
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+            }
+            
+            constructionProgressView(contract: contract)
+            
+            NavigationLink(value: PropertyDestination.tiers(property)) {
+                Text("View all tiers →")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
     // MARK: - Option Upgrade Card (same style as original)
@@ -960,9 +1061,11 @@ struct MyPropertiesView: View {
                     if let firstProperty = status.properties.first {
                         property = firstProperty.toProperty()
                         availableRooms = firstProperty.available_rooms ?? []
+                        availableOptions = firstProperty.available_options ?? []
                     } else {
                         property = nil
                         availableRooms = []
+                        availableOptions = []
                     }
                     
                     // Get all active contracts

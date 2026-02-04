@@ -344,13 +344,16 @@ def deduct_resource_costs(db: Session, user_id: int, resource_costs: list):
         deduct_inventory_amount(db, user_id, resource_id, amount)
 
 
-def get_available_rooms(tier: int) -> list:
-    """Get list of rooms/features available for a property tier.
-    Rooms are ordered by importance/usage frequency.
+def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
+    """Get list of rooms that have been built.
+    
+    Args:
+        tier: Property tier level
+        built_rooms: List of room IDs that have been built via completed contracts.
     """
     rooms = []
     
-    # Tier 2+: Fortification & Garden
+    # Tier 2+ gets fortification and garden free (no contract needed)
     if tier >= 2:
         rooms.append({
             "id": "fortification",
@@ -369,8 +372,8 @@ def get_available_rooms(tier: int) -> list:
             "route": "/garden"
         })
     
-    # Tier 3+: Workshop & Kitchen
-    if tier >= 3:
+    # All other rooms require completed contracts - show if built
+    if "workshop" in built_rooms:
         rooms.append({
             "id": "workshop",
             "name": "Workshop",
@@ -379,12 +382,13 @@ def get_available_rooms(tier: int) -> list:
             "description": "Craft items from blueprints",
             "route": "/workshop"
         })
+    if "kitchen" in built_rooms:
         rooms.append({
             "id": "kitchen",
             "name": "Kitchen",
             "icon": "fork.knife",
             "color": "buttonWarning",
-            "description": "Cook meals for temporary stat buffs",
+            "description": "Bake wheat into sourdough bread",
             "route": "/kitchen"
         })
     
@@ -499,12 +503,50 @@ def get_property_status(
         Property.owner_id == current_user.id
     ).all()
     
+    # Get all completed room contracts for this user
+    completed_room_contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.completed_at.isnot(None),
+        UnifiedContract.option_id.isnot(None)
+    ).all()
+    
+    # Build a dict of property_id -> list of built room IDs
+    built_rooms_by_property = {}
+    for contract in completed_room_contracts:
+        prop_id = contract.target_id
+        if prop_id not in built_rooms_by_property:
+            built_rooms_by_property[prop_id] = []
+        built_rooms_by_property[prop_id].append(contract.option_id)
+    
+    # Get all buildable options from tiers config
+    from routers.tiers import PROPERTY_TIERS
+    all_buildable_options = []
+    for tier_num, tier_data in PROPERTY_TIERS.items():
+        for opt in tier_data.get("options", []):
+            all_buildable_options.append({
+                "id": opt.get("id"),
+                "name": opt.get("name"),
+                "tier": tier_num,
+                "icon": opt.get("icon"),
+                "description": opt.get("description"),
+            })
+    
     # Convert properties to response format and add available rooms
     # Note: property_to_response applies lazy decay to fortification
     properties_list = []
     for p in properties:
         prop_dict = property_to_response(p).model_dump()
-        prop_dict["available_rooms"] = get_available_rooms(p.tier)
+        built_rooms = built_rooms_by_property.get(str(p.id), [])
+        prop_dict["available_rooms"] = get_available_rooms(p.tier, built_rooms)
+        prop_dict["built_rooms"] = built_rooms  # List of room IDs that are built
+        
+        # Available options to build (not yet built, tier > current tier, and tier <= current+1)
+        prop_dict["available_options"] = [
+            opt for opt in all_buildable_options 
+            if opt["id"] not in built_rooms and opt["tier"] > p.tier and opt["tier"] <= p.tier + 1
+        ]
+        
         # Add fortification info object for easier UI consumption
         if p.tier >= 2:  # Fortification unlocked at T2
             prop_dict["fortification"] = {
