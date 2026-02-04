@@ -195,10 +195,17 @@ class PurchaseConstructionResponse(BaseModel):
 # ===== Helper Functions =====
 
 def get_tier_name(tier: int) -> str:
-    """Get the display name for a property tier."""
-    # Import from unified tier system
+    """Get the display name for a property tier.
+    
+    Returns the first option's name if available (e.g., 'Workshop' instead of 'Workshop & Kitchen').
+    Falls back to legacy tier name if no options defined.
+    """
     from routers.tiers import PROPERTY_TIERS
-    return PROPERTY_TIERS.get(tier, {}).get("name", f"Tier {tier}")
+    tier_data = PROPERTY_TIERS.get(tier, {})
+    options = tier_data.get("options", [])
+    if options:
+        return options[0].get("name", f"Tier {tier}")
+    return tier_data.get("name", f"Tier {tier}")
 
 
 def get_option_name(tier: int, option_id: str) -> str | None:
@@ -380,10 +387,16 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
         })
     
     # Check all options from config for rooms to show
+    # Only show options that have a "route" defined (actual rooms, not tier upgrades)
     seen_ids = set()
     for tier_num, tier_data in PROPERTY_TIERS.items():
         for opt in tier_data.get("options", []):
             opt_id = opt.get("id")
+            
+            # Skip if no route defined - it's a tier upgrade, not an accessible room
+            if not opt.get("route"):
+                continue
+                
             if opt_id in seen_ids:
                 continue
             
@@ -399,7 +412,7 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
                     "icon": opt.get("icon", "questionmark"),
                     "color": opt.get("color", "inkMedium"),
                     "description": opt.get("description", ""),
-                    "route": opt.get("route", f"/{opt_id}")
+                    "route": opt.get("route")
                 })
                 seen_ids.add(opt_id)
     
@@ -480,7 +493,7 @@ def get_property_contracts_for_user(db: Session, user_id: int) -> list:
             "option_name": option_name,  # Display name for the room
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
+            "cost": contract.gold_paid or 0,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
             "current_tax_rate": current_tax_rate if gold_per_action > 0 else None,  # For display
             "status": "completed" if contract.completed_at else "in_progress",

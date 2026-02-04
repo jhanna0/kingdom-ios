@@ -277,7 +277,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "target_tier_name": option_name or get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
+            "cost": contract.gold_paid or 0,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
             "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
             "can_afford_gold": can_afford_gold if gold_per_action > 0 else None,  # NEW: gold affordability
