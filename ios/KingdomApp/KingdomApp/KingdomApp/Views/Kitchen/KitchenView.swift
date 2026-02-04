@@ -160,64 +160,72 @@ struct KitchenView: View {
     // MARK: - Kitchen Header Card
     
     private func kitchenHeaderCard(status: KitchenStatusResponse) -> some View {
-        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
-            HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
-                Image(systemName: "flame.fill")
-                    .font(FontStyles.iconLarge)
-                    .foregroundColor(.white)
-                    .frame(width: 48, height: 48)
-                    .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.buttonWarning,
-                        cornerRadius: 12,
-                        shadowOffset: 3,
-                        borderWidth: 2
-                    )
+        HStack(alignment: .top, spacing: KingdomTheme.Spacing.medium) {
+            // Flame icon badge
+            Image(systemName: "flame.fill")
+                .font(FontStyles.iconLarge)
+                .foregroundColor(.white)
+                .frame(width: 48, height: 48)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.buttonWarning,
+                    cornerRadius: 12,
+                    shadowOffset: 3,
+                    borderWidth: 2
+                )
+            
+            // Title and stats
+            VStack(alignment: .leading, spacing: 6) {
+                Text("My Kitchen")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("My Kitchen")
-                        .font(FontStyles.headingMedium)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    HStack(spacing: 12) {
-                        // Wheat count
-                        HStack(spacing: 4) {
-                            Image(systemName: "leaf")
-                                .font(FontStyles.iconMini)
-                            Text("\(status.wheatCount) wheat")
-                                .font(FontStyles.labelMedium)
-                        }
-                        .foregroundColor(status.wheatCount > 0 ? KingdomTheme.Colors.goldLight : KingdomTheme.Colors.inkMedium)
-                        
-                        // Baking count
-                        if let stats = status.stats, stats.baking > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "flame")
-                                    .font(FontStyles.iconMini)
-                                Text("\(stats.baking) baking")
-                                    .font(FontStyles.labelMedium)
-                            }
-                            .foregroundColor(KingdomTheme.Colors.buttonWarning)
-                        }
-                        
-                        // Ready count
-                        if let stats = status.stats, stats.ready > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(FontStyles.iconMini)
-                                Text("\(stats.ready) ready")
-                                    .font(FontStyles.labelMedium)
-                            }
-                            .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                        }
+                // Wheat available
+                HStack(spacing: 4) {
+                    Image(systemName: "leaf.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("\(status.wheatCount) wheat available")
+                        .font(FontStyles.labelMedium)
+                }
+                .foregroundColor(status.wheatCount > 0 ? KingdomTheme.Colors.goldLight : KingdomTheme.Colors.inkMedium)
+            }
+            
+            Spacer()
+            
+            // Status badges on the right
+            VStack(alignment: .trailing, spacing: 6) {
+                if let stats = status.stats, stats.baking > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("\(stats.baking)")
+                            .font(.system(size: 13, weight: .bold))
                     }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(KingdomTheme.Colors.buttonWarning)
+                            .overlay(Capsule().stroke(Color.black, lineWidth: 1.5))
+                    )
                 }
                 
-                Spacer()
-                
-                // Bread icon
-                Image(systemName: "cloud.fill")
-                    .font(FontStyles.iconLarge)
-                    .foregroundColor(KingdomTheme.Colors.goldLight)
+                if let stats = status.stats, stats.ready > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("\(stats.ready)")
+                            .font(.system(size: 13, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(KingdomTheme.Colors.buttonSuccess)
+                            .overlay(Capsule().stroke(Color.black, lineWidth: 1.5))
+                    )
+                }
             }
         }
         .padding(KingdomTheme.Spacing.medium)
@@ -227,136 +235,125 @@ struct KitchenView: View {
     // MARK: - Oven View (Main Visual!)
     
     private func ovenView(slots: [OvenSlot], wheatCount: Int) -> some View {
-        VStack(spacing: 0) {
-            // Warm kitchen header
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.85, green: 0.65, blue: 0.45),
-                        Color(red: 0.95, green: 0.85, blue: 0.75)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                
-                // Kitchen shelves decor
-                HStack {
-                    Image(systemName: "cup.and.saucer.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.6))
-                    Spacer()
-                    Image(systemName: "fork.knife")
-                        .font(.system(size: 24))
-                        .foregroundColor(.white.opacity(0.5))
-                    Spacer()
-                    Image(systemName: "carrot.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-                .padding(.horizontal, 30)
-            }
-            .frame(height: 50)
+        GeometryReader { geo in
+            let slotSize = (geo.size.width - 60) / 2  // 2 columns with padding
+            let slotHeight = slotSize * 0.9  // Slightly shorter than wide
             
-            // Oven body with slots
-            ZStack {
-                // Warm brick background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.6, green: 0.35, blue: 0.25),
-                        Color(red: 0.5, green: 0.28, blue: 0.2)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+            VStack(spacing: 0) {
+                // Warm kitchen header
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.85, green: 0.65, blue: 0.45),
+                            Color(red: 0.95, green: 0.85, blue: 0.75)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    
+                    // Kitchen shelves decor
+                    HStack {
+                        Image(systemName: "cup.and.saucer.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
+                        Image(systemName: "fork.knife")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.5))
+                        Spacer()
+                        Image(systemName: "carrot.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 30)
+                }
+                .frame(height: 40)
                 
-                // Brick pattern
-                VStack(spacing: 6) {
-                    ForEach(0..<4, id: \.self) { row in
-                        HStack(spacing: 4) {
-                            ForEach(0..<8, id: \.self) { col in
-                                Rectangle()
-                                    .fill(Color(red: 0.55, green: 0.3, blue: 0.2).opacity(0.6))
-                                    .frame(height: 12)
+                // Oven body with slots
+                ZStack {
+                    // Warm brick background
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.6, green: 0.35, blue: 0.25),
+                            Color(red: 0.5, green: 0.28, blue: 0.2)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    
+                    // Oven slots grid (2x2) - fills the space
+                    VStack(spacing: 16) {
+                        HStack(spacing: 16) {
+                            ForEach(slots.prefix(2)) { slot in
+                                ovenSlotView(slot: slot, wheatCount: wheatCount, size: slotSize, height: slotHeight)
                             }
                         }
-                        .offset(x: row % 2 == 0 ? -10 : 10)
-                    }
-                }
-                .padding(.horizontal, 10)
-                
-                // Oven slots grid (2x2)
-                VStack(spacing: 20) {
-                    HStack(spacing: 30) {
-                        ForEach(slots.prefix(2)) { slot in
-                            ovenSlotView(slot: slot, wheatCount: wheatCount)
+                        HStack(spacing: 16) {
+                            ForEach(slots.dropFirst(2).prefix(2)) { slot in
+                                ovenSlotView(slot: slot, wheatCount: wheatCount, size: slotSize, height: slotHeight)
+                            }
                         }
                     }
-                    HStack(spacing: 30) {
-                        ForEach(slots.dropFirst(2).prefix(2)) { slot in
-                            ovenSlotView(slot: slot, wheatCount: wheatCount)
+                    .padding(20)
+                }
+                
+                // Oven bottom / floor
+                ZStack(alignment: .top) {
+                    Color(red: 0.4, green: 0.25, blue: 0.18)
+                    
+                    // Wood floor planks
+                    HStack(spacing: 4) {
+                        ForEach(0..<6, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color(red: 0.5, green: 0.35, blue: 0.25))
                         }
                     }
+                    .frame(height: 16)
+                    .padding(.horizontal, 8)
+                    .offset(y: 4)
                 }
-                .padding(.vertical, 30)
+                .frame(height: 24)
             }
-            .frame(height: 280)
-            
-            // Oven bottom / floor
-            ZStack(alignment: .top) {
-                Color(red: 0.4, green: 0.25, blue: 0.18)
-                
-                // Wood floor planks
-                HStack(spacing: 4) {
-                    ForEach(0..<6, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color(red: 0.5, green: 0.35, blue: 0.25))
-                            .frame(height: 20)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .offset(y: 5)
-            }
-            .frame(height: 30)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.black, lineWidth: 3)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.black)
+                    .offset(x: 3, y: 3)
+            )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.black, lineWidth: 3)
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.black)
-                .offset(x: 3, y: 3)
-        )
+        .aspectRatio(0.85, contentMode: .fit)
     }
     
     // MARK: - Oven Slot View
     
-    private func ovenSlotView(slot: OvenSlot, wheatCount: Int) -> some View {
+    private func ovenSlotView(slot: OvenSlot, wheatCount: Int, size: CGFloat, height: CGFloat) -> some View {
         let isActing = actionInProgress == slot.slotIndex
         
         return Button {
             handleSlotTap(slot: slot, wheatCount: wheatCount)
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 ZStack {
                     // Oven door frame
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Color(red: 0.25, green: 0.15, blue: 0.1))
-                        .frame(width: 90, height: 90)
                     
                     // Oven interior
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(ovenInteriorColor(for: slot))
-                        .frame(width: 80, height: 80)
+                        .padding(6)
                     
                     // Slot content
-                    slotContentView(slot: slot, isActing: isActing)
+                    slotContentView(slot: slot, isActing: isActing, size: size)
                 }
+                .frame(width: size, height: height)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black, lineWidth: 2)
-                        .frame(width: 90, height: 90)
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.black, lineWidth: 2.5)
                 )
                 
                 // Badge
@@ -384,16 +381,16 @@ struct KitchenView: View {
         let isBaking = slot.isBaking
         
         return Text(text)
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: 12, weight: .bold))
             .foregroundColor(isReady ? .white : KingdomTheme.Colors.inkDark)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
             .background(
                 Capsule()
                     .fill(isReady ? KingdomTheme.Colors.buttonSuccess : (isBaking ? KingdomTheme.Colors.buttonWarning : Color.white.opacity(0.9)))
                     .overlay(
                         Capsule()
-                            .stroke(Color.black, lineWidth: 1)
+                            .stroke(Color.black, lineWidth: 1.5)
                     )
             )
     }
@@ -422,41 +419,41 @@ struct KitchenView: View {
     }
     
     @ViewBuilder
-    private func slotContentView(slot: OvenSlot, isActing: Bool) -> some View {
+    private func slotContentView(slot: OvenSlot, isActing: Bool, size: CGFloat) -> some View {
         if isActing {
             ProgressView()
-                .scaleEffect(0.8)
+                .scaleEffect(1.2)
                 .tint(.white)
         } else if slot.isEmpty {
-            emptyOvenGraphic
+            emptyOvenGraphic(size: size)
         } else if slot.isBaking {
-            bakingDoughGraphic(progress: slot.progressPercent ?? 0)
+            bakingDoughGraphic(progress: slot.progressPercent ?? 0, size: size)
         } else if slot.isReady {
-            readyBreadGraphic
+            readyBreadGraphic(size: size)
         }
     }
     
     // MARK: - Oven Graphics
     
-    private var emptyOvenGraphic: some View {
+    private func emptyOvenGraphic(size: CGFloat) -> some View {
         ZStack {
-            // Empty oven rack
-            VStack(spacing: 8) {
+            // Empty oven rack lines
+            VStack(spacing: size * 0.08) {
                 ForEach(0..<3, id: \.self) { _ in
                     Rectangle()
                         .fill(Color.gray.opacity(0.4))
-                        .frame(width: 50, height: 2)
+                        .frame(width: size * 0.5, height: 2)
                 }
             }
             
             // Plus hint
-            Text("+")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white.opacity(0.3))
+            Image(systemName: "plus")
+                .font(.system(size: size * 0.25, weight: .bold))
+                .foregroundColor(.white.opacity(0.4))
         }
     }
     
-    private func bakingDoughGraphic(progress: Int) -> some View {
+    private func bakingDoughGraphic(progress: Int, size: CGFloat) -> some View {
         ZStack {
             // Flame glow
             Circle()
@@ -465,50 +462,51 @@ struct KitchenView: View {
                         colors: [Color.orange.opacity(0.6), Color.clear],
                         center: .center,
                         startRadius: 0,
-                        endRadius: 40
+                        endRadius: size * 0.4
                     )
                 )
-                .frame(width: 70, height: 70)
+                .frame(width: size * 0.8, height: size * 0.8)
             
             // Rising dough/bread shape
+            let doughWidth = size * 0.45
+            let doughHeight = size * 0.25 + CGFloat(progress) * size * 0.002
+            
             Ellipse()
                 .fill(Color(red: 0.9, green: 0.75, blue: 0.5))
-                .frame(width: 50, height: CGFloat(25 + progress / 4))
+                .frame(width: doughWidth, height: doughHeight)
                 .overlay(
                     Ellipse()
                         .fill(Color(red: 0.95, green: 0.85, blue: 0.65))
-                        .frame(width: 35, height: CGFloat(15 + progress / 5))
-                        .offset(y: -5)
+                        .frame(width: doughWidth * 0.7, height: doughHeight * 0.6)
+                        .offset(y: -doughHeight * 0.15)
                 )
             
-            // Heat waves
+            // Heat waves / flame
             if progress > 30 {
-                VStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange.opacity(0.7))
-                }
-                .offset(y: 25)
+                Image(systemName: "flame.fill")
+                    .font(.system(size: size * 0.15))
+                    .foregroundColor(.orange.opacity(0.8))
+                    .offset(y: size * 0.28)
             }
         }
     }
     
-    private var readyBreadGraphic: some View {
+    private func readyBreadGraphic(size: CGFloat) -> some View {
         ZStack {
             // Golden glow
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color.yellow.opacity(0.3), Color.clear],
+                        colors: [Color.yellow.opacity(0.35), Color.clear],
                         center: .center,
                         startRadius: 0,
-                        endRadius: 35
+                        endRadius: size * 0.4
                     )
                 )
-                .frame(width: 70, height: 70)
+                .frame(width: size * 0.8, height: size * 0.8)
             
             // Finished bread loaves
-            VStack(spacing: 4) {
+            VStack(spacing: size * 0.03) {
                 // Top loaf
                 Ellipse()
                     .fill(
@@ -521,13 +519,16 @@ struct KitchenView: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 45, height: 22)
+                    .frame(width: size * 0.4, height: size * 0.2)
                     .overlay(
-                        // Crust detail
-                        Ellipse()
-                            .stroke(Color(red: 0.5, green: 0.35, blue: 0.2), lineWidth: 1)
-                            .frame(width: 30, height: 8)
-                            .offset(y: -4)
+                        // Score marks on bread
+                        VStack(spacing: size * 0.025) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Rectangle()
+                                    .fill(Color(red: 0.5, green: 0.35, blue: 0.2))
+                                    .frame(width: size * 0.2, height: 1.5)
+                            }
+                        }
                     )
                 
                 // Bottom loaf
@@ -542,14 +543,14 @@ struct KitchenView: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 40, height: 20)
+                    .frame(width: size * 0.35, height: size * 0.18)
             }
             
-            // Steam
+            // Steam wisps
             Image(systemName: "wind")
-                .font(.system(size: 10))
-                .foregroundColor(.white.opacity(0.6))
-                .offset(x: 25, y: -20)
+                .font(.system(size: size * 0.12))
+                .foregroundColor(.white.opacity(0.7))
+                .offset(x: size * 0.25, y: -size * 0.2)
         }
     }
     
