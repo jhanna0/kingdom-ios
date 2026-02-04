@@ -119,23 +119,21 @@ struct MapHUD: View {
                             
                             // Gold & Food stacked
                             VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 2) {
+                                HStack(spacing: 4) {
                                     Image(systemName: "g.circle.fill")
-                                        .font(.system(size: 9, weight: .semibold))
+                                        .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(KingdomTheme.Colors.goldLight)
                                     Text(viewModel.player.gold.abbreviatedPrecise())
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.system(size: 12, weight: .heavy))
                                         .foregroundColor(.black)
-                                        .lineLimit(1)
                                 }
-                                HStack(spacing: 2) {
+                                HStack(spacing: 4) {
                                     Image(systemName: "fork.knife")
-                                        .font(.system(size: 9, weight: .semibold))
+                                        .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
                                     Text(viewModel.player.food.abbreviatedPrecise())
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.system(size: 12, weight: .heavy))
                                         .foregroundColor(.black)
-                                        .lineLimit(1)
                                 }
                             }
                         }

@@ -1096,12 +1096,14 @@ def get_all_tiers(
                 "per_action_costs": opt_per_action_costs,
             })
         
+        # Use first option's name for legacy field (e.g., "Workshop" instead of "Workshop & Kitchen")
+        first_option = options[0] if options else {}
         property_tiers_with_costs[str(tier)] = {
             # Legacy fields (backwards compatibility)
-            "name": info["name"],
-            "icon": info.get("icon", "house.fill"),
-            "description": info["description"],
-            "benefits": info["benefits"],
+            "name": first_option.get("name", info["name"]),
+            "icon": first_option.get("icon", info.get("icon", "house.fill")),
+            "description": first_option.get("description", info["description"]),
+            "benefits": first_option.get("benefits", info["benefits"]),
             "gold_per_action": gold_per_action,
             "base_actions_required": base_actions,
             "total_gold_cost": total_gold,

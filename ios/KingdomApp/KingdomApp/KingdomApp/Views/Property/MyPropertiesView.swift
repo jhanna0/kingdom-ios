@@ -436,6 +436,11 @@ struct MyPropertiesView: View {
                 Spacer()
             }
             
+            // Cost table from upgradeStatus
+            if let status = upgradeStatus {
+                upgradeCostTable(status: status, fromTier: property.tier, toTier: property.tier + 1)
+            }
+            
             Button(action: { purchaseUpgrade(optionId: option.id) }) {
                 HStack(spacing: 8) {
                     if isPurchasingUpgrade {
@@ -448,11 +453,20 @@ struct MyPropertiesView: View {
                 }
             }
             .buttonStyle(.brutalist(
-                backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                backgroundColor: upgradeStatus?.can_afford == true ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
                 foregroundColor: .white,
                 fullWidth: true
             ))
-            .disabled(isPurchasingUpgrade)
+            .disabled(upgradeStatus?.can_afford != true || isPurchasingUpgrade)
+            
+            // View all tiers link
+            NavigationLink(value: PropertyDestination.tiers(property)) {
+                Text("View all tiers →")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
         .padding(KingdomTheme.Spacing.medium)
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
@@ -475,7 +489,7 @@ struct MyPropertiesView: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(contract.option_name ?? "Building...")
+                    Text(contract.option_name ?? contract.target_tier_name)
                         .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     

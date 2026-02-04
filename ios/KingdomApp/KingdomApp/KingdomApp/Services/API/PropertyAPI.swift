@@ -165,6 +165,8 @@ class PropertyAPI {
         let actions_required: Int
         let actions_completed: Int
         let cost: Int
+        let gold_per_action: Double?  // Gold cost per action
+        let current_tax_rate: Int?  // Tax rate for display
         let status: String
         let started_at: String
         let per_action_costs: [ResourceCost]?  // Resources consumed per work action
