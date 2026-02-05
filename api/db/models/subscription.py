@@ -56,14 +56,14 @@ STYLE_PRESETS = {
     "imperial_gold": {"background": "#78350F", "text": "#FCD34D", "name": "Imperial Gold"},
     
     # Nature
-    "forest": {"background": "#14532D", "text": "#BBF7D0", "name": "Forest"},
-    "ocean": {"background": "#0C4A6E", "text": "#BAE6FD", "name": "Ocean"},
-    "sunset": {"background": "#7C2D12", "text": "#FED7AA", "name": "Sunset"},
+    "forest": {"background": "#14532D", "text": "#DCFCE7", "name": "Forest"},
+    "ocean": {"background": "#0C4A6E", "text": "#E0F2FE", "name": "Ocean"},
+    "sunset": {"background": "#7C2D12", "text": "#FFEDD5", "name": "Sunset"},
     
     # Bold
-    "crimson": {"background": "#7F1D1D", "text": "#FECACA", "name": "Crimson"},
-    "midnight": {"background": "#1E1B4B", "text": "#C7D2FE", "name": "Midnight"},
-    "obsidian": {"background": "#18181B", "text": "#E4E4E7", "name": "Obsidian"},
+    "crimson": {"background": "#7F1D1D", "text": "#FEE2E2", "name": "Crimson"},
+    "midnight": {"background": "#1E1B4B", "text": "#E0E7FF", "name": "Midnight"},
+    "obsidian": {"background": "#18181B", "text": "#F4F4F5", "name": "Obsidian"},
     
     # Vibrant
     "emerald": {"background": "#047857", "text": "#FFFFFF", "name": "Emerald"},

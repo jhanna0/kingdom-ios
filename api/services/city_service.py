@@ -1100,6 +1100,7 @@ async def get_neighbor_cities(
                 'center_lat': city_info.get("center_lat", 0.0),
                 'center_lon': city_info.get("center_lon", 0.0),
                 'boundary_geojson': {"coordinates": []},  # Empty - frontend should fetch via batch endpoint
+                'simplified_boundary_geojson': None,  # No cached simplified boundary
                 'radius_meters': 5000.0,  # Estimated
                 'cached': False
             })()
@@ -1171,22 +1172,23 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
         cached.access_count += 1
         cached.last_accessed = datetime.utcnow()
         db.commit()
-    # Use cached simplified boundary if available, otherwise compute and store it
-    if cached.simplified_boundary_geojson:
-        simplified = cached.simplified_boundary_geojson.get("coordinates", [])
-    else:
-        # Backfill: Compute and store simplified boundary for this city
-        simplified = simplify_boundary(cached.boundary_geojson.get("coordinates", []))
-        cached.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
-        db.commit()
-    
-    return BoundaryResponse(
-        osm_id=cached.osm_id,
-        name=cached.name,
-        boundary=simplified,
-        radius_meters=cached.radius_meters,
-        from_cache=True
-    )
+        
+        # Use cached simplified boundary if available, otherwise compute and store it
+        if cached.simplified_boundary_geojson:
+            simplified = cached.simplified_boundary_geojson.get("coordinates", [])
+        else:
+            # Backfill: Compute and store simplified boundary for this city
+            simplified = simplify_boundary(cached.boundary_geojson.get("coordinates", []))
+            cached.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+            db.commit()
+        
+        return BoundaryResponse(
+            osm_id=cached.osm_id,
+            name=cached.name,
+            boundary=simplified,
+            radius_meters=cached.radius_meters,
+            from_cache=True
+        )
     
     print(f"🌐 Lazy-loading boundary for {osm_id}")
     boundary_data = await fetch_city_boundary_by_id(osm_id)
