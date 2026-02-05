@@ -28,8 +28,7 @@ struct CharacterSheetView: View {
                     level: player.level,
                     gold: player.gold,
                     rulerOf: player.isRuler ? player.currentKingdomName : nil,
-                    subscriberTheme: player.subscriberTheme,
-                    selectedTitle: player.selectedTitle,
+                    customization: player.subscriberCustomization,
                     isSubscriber: player.isSubscriber
                 )
                 
@@ -74,6 +73,27 @@ struct CharacterSheetView: View {
                         relocationStatus: relocationStatus,
                         isLoadingRelocationStatus: isLoadingRelocationStatus,
                         onRelocate: relocateHometown
+                    )
+                }
+                
+                // Subscriber customization button (only for subscribers)
+                if player.isSubscriber {
+                    NavigationLink(destination: SubscriberSettingsView().environmentObject(player)) {
+                        HStack {
+                            Image(systemName: "paintbrush.fill")
+                                .font(FontStyles.iconSmall)
+                            Text("Customize Profile")
+                        }
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                    }
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.imperialGold,
+                        cornerRadius: 8,
+                        shadowOffset: 2,
+                        borderWidth: 2
                     )
                 }
                 

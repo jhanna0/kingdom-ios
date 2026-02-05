@@ -233,22 +233,12 @@ class PlayerAPI {
     }
     
     /// Update subscriber settings
-    func updateSubscriberSettings(themeId: String?, titleAchievementId: Int?) async throws -> SubscriberSettingsResponse {
+    func updateSubscriberSettings(_ update: SubscriberSettingsUpdateRequest) async throws -> SubscriberSettingsResponse {
         guard client.isAuthenticated else {
             throw APIError.unauthorized
         }
         
-        struct UpdateRequest: Encodable {
-            let theme_id: String?
-            let selected_title_achievement_id: Int?
-        }
-        
-        let body = UpdateRequest(
-            theme_id: themeId,
-            selected_title_achievement_id: titleAchievementId
-        )
-        
-        let request = try client.request(endpoint: "/players/me/subscriber-settings", method: "PUT", body: body)
+        let request = try client.request(endpoint: "/players/me/subscriber-settings", method: "PUT", body: update)
         return try await client.execute(request)
     }
     
@@ -272,13 +262,5 @@ struct RelocationResponse: Codable {
     let next_relocation_available: String
 }
 
-// MARK: - Subscriber Settings Response
-
-struct SubscriberSettingsResponse: Codable {
-    let is_subscriber: Bool
-    let current_theme: APIThemeData?
-    let selected_title: APITitleData?
-    let available_themes: [APIThemeData]
-    let available_titles: [APITitleData]
-}
+// MARK: - Subscriber Settings Response (see SubscriberSettingsView.swift)
 

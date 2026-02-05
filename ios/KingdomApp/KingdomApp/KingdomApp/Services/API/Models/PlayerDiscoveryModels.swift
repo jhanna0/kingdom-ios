@@ -152,8 +152,7 @@ struct PlayerPublicProfile: Codable, Identifiable {
     
     // Subscriber customization (server-driven)
     let is_subscriber: Bool?
-    let subscriber_theme: APIThemeData?
-    let selected_title: APITitleData?
+    let subscriber_customization: APISubscriberCustomization?
     
     // Achievement stats
     let total_checkins: Int

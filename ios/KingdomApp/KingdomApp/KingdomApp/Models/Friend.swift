@@ -3,42 +3,6 @@ import SwiftUI
 
 // MARK: - Server-Driven Subscriber Customization
 
-/// Theme data from server - colors as hex strings
-struct APIThemeData: Codable {
-    let id: String
-    let displayName: String
-    let description: String?
-    let backgroundColor: String  // hex e.g., "#6B21A8"
-    let textColor: String
-    let iconBackgroundColor: String
-    let displayOrder: Int?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case displayName = "display_name"
-        case description
-        case backgroundColor = "background_color"
-        case textColor = "text_color"
-        case iconBackgroundColor = "icon_background_color"
-        case displayOrder = "display_order"
-    }
-    
-    /// Convert hex background color to SwiftUI Color
-    var backgroundColorValue: Color {
-        Color(hex: backgroundColor) ?? .gray
-    }
-    
-    /// Convert hex text color to SwiftUI Color
-    var textColorValue: Color {
-        Color(hex: textColor) ?? .black
-    }
-    
-    /// Convert hex icon background color to SwiftUI Color
-    var iconBackgroundColorValue: Color {
-        Color(hex: iconBackgroundColor) ?? .gray
-    }
-}
-
 /// Achievement title data from server
 struct APITitleData: Codable {
     let achievementId: Int
@@ -49,6 +13,36 @@ struct APITitleData: Codable {
         case achievementId = "achievement_id"
         case displayName = "display_name"
         case icon
+    }
+}
+
+/// Subscriber customization (hex colors stored directly)
+struct APISubscriberCustomization: Codable {
+    let iconBackgroundColor: String?  // hex
+    let iconTextColor: String?        // hex
+    let cardBackgroundColor: String?  // hex
+    let selectedTitle: APITitleData?
+    
+    enum CodingKeys: String, CodingKey {
+        case iconBackgroundColor = "icon_background_color"
+        case iconTextColor = "icon_text_color"
+        case cardBackgroundColor = "card_background_color"
+        case selectedTitle = "selected_title"
+    }
+    
+    var iconBackgroundColorValue: Color {
+        if let hex = iconBackgroundColor { return Color(hex: hex) ?? .gray }
+        return .gray
+    }
+    
+    var iconTextColorValue: Color {
+        if let hex = iconTextColor { return Color(hex: hex) ?? .white }
+        return .white
+    }
+    
+    var cardBackgroundColorValue: Color {
+        if let hex = cardBackgroundColor { return Color(hex: hex) ?? KingdomTheme.Colors.parchmentLight }
+        return KingdomTheme.Colors.parchmentLight
     }
 }
 
@@ -73,8 +67,7 @@ struct Friend: Codable, Identifiable {
     let activity: FriendActivity?
     
     // Subscriber customization (server-driven)
-    let subscriberTheme: APIThemeData?
-    let selectedTitle: APITitleData?
+    let subscriberCustomization: APISubscriberCustomization?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -91,8 +84,7 @@ struct Friend: Codable, Identifiable {
         case currentKingdomName = "current_kingdom_name"
         case lastSeen = "last_seen"
         case activity
-        case subscriberTheme = "subscriber_theme"
-        case selectedTitle = "selected_title"
+        case subscriberCustomization = "subscriber_customization"
     }
     
     var displayName: String {

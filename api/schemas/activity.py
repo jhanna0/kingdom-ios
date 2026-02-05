@@ -29,9 +29,8 @@ class ActivityLogEntry(BaseModel):
     display_name: Optional[str] = None
     user_level: Optional[int] = None
     
-    # Subscriber customization (server-driven themes for activity card)
-    subscriber_theme: Optional[Dict[str, Any]] = None  # ThemeData as dict
-    selected_title: Optional[Dict[str, Any]] = None    # TitleData as dict
+    # Subscriber customization (server-driven colors for activity card)
+    subscriber_customization: Optional[Dict[str, Any]] = None  # SubscriberCustomization as dict
 
     class Config:
         from_attributes = True

@@ -2,43 +2,33 @@ import SwiftUI
 import StoreKit
 import Combine
 
-/// Subscriber profile customization settings
-/// All themes and titles are server-driven - no hardcoded values
 struct SubscriberSettingsView: View {
+    @EnvironmentObject var player: Player
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = SubscriberSettingsViewModel()
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                headerSection
-                
+            VStack(spacing: 20) {
                 if viewModel.isLoading && viewModel.settings == nil {
-                    loadingSection
+                    ProgressView().padding(.vertical, 40)
                 } else if !viewModel.isSubscriber {
                     subscribeSection
                 } else {
-                    // Preview Card
                     previewSection
-                    
-                    // Theme Selection
-                    themeSection
-                    
-                    // Title Selection
+                    iconColorSection
+                    cardColorSection
                     titleSection
+                    saveButton
                 }
-                
                 Spacer(minLength: 40)
             }
             .padding()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-        .navigationTitle("Profile Customization")
+        .navigationTitle("Customize Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await viewModel.loadSettings()
-        }
+        .task { await viewModel.loadSettings() }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") { }
         } message: {
@@ -46,392 +36,294 @@ struct SubscriberSettingsView: View {
         }
     }
     
-    // MARK: - Header
-    
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 48))
-                .foregroundColor(KingdomTheme.Colors.imperialGold)
-            
-            Text("Supporter Perks")
-                .font(KingdomTheme.Typography.title())
-                .fontWeight(.bold)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Text("Customize how others see you")
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-        .padding(.top, 12)
-    }
-    
-    // MARK: - Loading
-    
-    private var loadingSection: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: KingdomTheme.Colors.loadingTint))
-            Text("Loading settings...")
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-        .padding(.vertical, 40)
-    }
-    
-    // MARK: - Subscribe Prompt
-    
     private var subscribeSection: some View {
         VStack(spacing: 16) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 40))
-                .foregroundColor(KingdomTheme.Colors.inkSubtle)
+            Image(systemName: "lock.fill").font(.system(size: 40)).foregroundColor(KingdomTheme.Colors.inkSubtle)
+            Text("Become a Supporter").font(KingdomTheme.Typography.headline()).fontWeight(.bold)
             
-            Text("Become a Supporter")
-                .font(KingdomTheme.Typography.headline())
-                .fontWeight(.bold)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                benefitRow(icon: "paintpalette.fill", text: "Custom profile themes")
-                benefitRow(icon: "rosette", text: "Achievement titles")
-                benefitRow(icon: "pawprint.fill", text: "Show pets on profile")
-                benefitRow(icon: "trophy.fill", text: "Display achievements")
-            }
-            .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            
-            // Subscribe button
-            if let subscriptionProduct = StoreService.shared.subscriptionProducts.first {
+            if let sub = StoreService.shared.subscriptionProducts.first {
                 Button {
                     Task {
-                        let success = await StoreService.shared.purchaseSubscription(subscriptionProduct)
-                        if success {
+                        if await StoreService.shared.purchaseSubscription(sub) {
                             await viewModel.loadSettings()
                         }
                     }
                 } label: {
                     HStack {
                         Image(systemName: "star.fill")
-                        Text("Subscribe - \(subscriptionProduct.displayPrice)/month")
-                            .fontWeight(.bold)
+                        Text("Subscribe - \(sub.displayPrice)/month").fontWeight(.bold)
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                 }
-                .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.imperialGold,
-                    cornerRadius: 12
-                )
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 12)
             }
         }
         .padding(.vertical, 20)
     }
     
-    private func benefitRow(icon: String, text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(KingdomTheme.Colors.imperialGold)
-                .frame(width: 24)
-            
-            Text(text)
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-        }
-    }
-    
-    // MARK: - Preview Section
-    
     private var previewSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Preview")
-                .font(KingdomTheme.Typography.headline())
-                .fontWeight(.bold)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-                .padding(.horizontal, 4)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Preview").font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
             
-            // Preview card with current theme
-            HStack(spacing: 12) {
-                // Avatar with theme
-                ZStack {
-                    Circle()
-                        .fill(viewModel.selectedTheme?.iconBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight)
-                        .frame(width: 60, height: 60)
-                    
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(viewModel.selectedTheme?.textColorValue ?? KingdomTheme.Colors.inkDark)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Your Name")
-                        .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(viewModel.selectedTheme?.textColorValue ?? KingdomTheme.Colors.inkDark)
-                    
-                    if let title = viewModel.selectedTitle {
-                        HStack(spacing: 4) {
-                            Image(systemName: title.icon)
-                                .font(.system(size: 12))
-                            Text(title.displayName)
-                                .font(FontStyles.labelSmall)
-                        }
-                        .foregroundColor(viewModel.selectedTheme?.textColorValue.opacity(0.8) ?? KingdomTheme.Colors.inkMedium)
-                    }
-                    
-                    Text("Level 25")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(viewModel.selectedTheme?.textColorValue.opacity(0.6) ?? KingdomTheme.Colors.inkSubtle)
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .background(viewModel.selectedTheme?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(KingdomTheme.Colors.inkDark, lineWidth: 2)
+            ProfileHeaderCard(
+                displayName: player.name,
+                level: player.level,
+                customization: viewModel.previewCustomization,
+                isSubscriber: true
             )
         }
     }
     
-    // MARK: - Theme Selection
-    
-    private var themeSection: some View {
+    private var iconColorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Theme")
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-                
-                if viewModel.selectedTheme != nil {
-                    Button("Clear") {
-                        viewModel.selectTheme(nil)
-                    }
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
-                }
-            }
-            .padding(.horizontal, 4)
+            Text("Icon Background").font(FontStyles.headingSmall)
+            ColorPalette(selectedHex: $viewModel.iconBackgroundColor)
             
-            // Horizontal scroll of theme cards
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(viewModel.availableThemes, id: \.id) { theme in
-                        ThemeCard(
-                            theme: theme,
-                            isSelected: viewModel.selectedTheme?.id == theme.id,
-                            onTap: {
-                                viewModel.selectTheme(theme)
-                            }
-                        )
-                    }
-                }
-                .padding(.horizontal, 4)
-            }
+            Text("Icon Text").font(FontStyles.headingSmall).padding(.top, 8)
+            ColorPalette(selectedHex: $viewModel.iconTextColor)
         }
     }
     
-    // MARK: - Title Selection
+    private var cardColorSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Card Background").font(FontStyles.headingSmall)
+            ColorPalette(selectedHex: $viewModel.cardBackgroundColor)
+        }
+    }
     
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Title")
-                    .font(KingdomTheme.Typography.headline())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
+                Text("Title").font(FontStyles.headingSmall)
                 Spacer()
-                
                 if viewModel.selectedTitle != nil {
-                    Button("Clear") {
-                        viewModel.selectTitle(nil)
-                    }
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
+                    Button("Reset") { viewModel.selectedTitle = nil }
+                        .font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.buttonDanger)
                 }
             }
-            .padding(.horizontal, 4)
             
             if viewModel.availableTitles.isEmpty {
                 Text("Earn achievements to unlock titles!")
-                    .font(FontStyles.bodyMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .font(FontStyles.bodyMedium).foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .frame(maxWidth: .infinity).padding(.vertical, 20)
+                    .background(KingdomTheme.Colors.parchmentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     ForEach(viewModel.availableTitles, id: \.achievementId) { title in
-                        TitleRow(
-                            title: title,
-                            isSelected: viewModel.selectedTitle?.achievementId == title.achievementId,
-                            onTap: {
-                                viewModel.selectTitle(title)
+                        Button {
+                            viewModel.selectedTitle = title
+                        } label: {
+                            HStack {
+                                Image(systemName: title.icon).font(.system(size: 20)).foregroundColor(KingdomTheme.Colors.imperialGold).frame(width: 32)
+                                Text(title.displayName).font(FontStyles.bodyMedium).foregroundColor(KingdomTheme.Colors.inkDark)
+                                Spacer()
+                                if viewModel.selectedTitle?.achievementId == title.achievementId {
+                                    Image(systemName: "checkmark").foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                }
                             }
-                        )
+                            .padding(.horizontal, 16).padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                        if title.achievementId != viewModel.availableTitles.last?.achievementId { Divider() }
+                    }
+                }
+                .background(KingdomTheme.Colors.parchmentLight)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+    
+    private var saveButton: some View {
+        Button {
+            viewModel.saveSettings()
+        } label: {
+            HStack {
+                if viewModel.isSaving { ProgressView().tint(.white) }
+                else { Image(systemName: "checkmark"); Text("Save Changes") }
+            }
+            .font(FontStyles.bodyMediumBold).foregroundColor(.white)
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
+        }
+        .brutalistBadge(backgroundColor: viewModel.hasChanges ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled, cornerRadius: 10)
+        .disabled(!viewModel.hasChanges || viewModel.isSaving)
+    }
+}
+
+// MARK: - Color Palette
+
+private struct ColorPalette: View {
+    @Binding var selectedHex: String?
+    
+    private let colors: [(String, String)] = [
+        ("#6B21A8", "Purple"), ("#7C3AED", "Violet"), ("#166534", "Forest"),
+        ("#059669", "Emerald"), ("#1E40AF", "Blue"), ("#0284C7", "Sky"),
+        ("#991B1B", "Crimson"), ("#DC2626", "Ruby"), ("#CA8A04", "Gold"),
+        ("#D97706", "Amber"), ("#475569", "Slate"), ("#1F2937", "Charcoal"),
+        ("#BE185D", "Rose"), ("#0D9488", "Teal"), ("#4338CA", "Indigo"),
+        ("#FFFFFF", "White"), ("#000000", "Black")
+    ]
+    
+    private let columns = [GridItem(.adaptive(minimum: 44))]
+    
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 10) {
+            // None option
+            Button { selectedHex = nil } label: {
+                ZStack {
+                    Circle().stroke(Color.gray, lineWidth: 1).frame(width: 40, height: 40)
+                    if selectedHex == nil {
+                        Image(systemName: "xmark").foregroundColor(.gray)
                     }
                 }
             }
-        }
-    }
-}
-
-// MARK: - Theme Card
-
-private struct ThemeCard: View {
-    let theme: APIThemeData
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 8) {
-                // Color preview circle
-                Circle()
-                    .fill(theme.backgroundColorValue)
-                    .frame(width: 50, height: 50)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(theme.textColorValue)
-                    )
-                
-                Text(theme.displayName)
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .lineLimit(1)
-            }
-            .padding(12)
-            .background(isSelected ? KingdomTheme.Colors.buttonPrimary.opacity(0.1) : KingdomTheme.Colors.parchmentLight)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.inkSubtle, lineWidth: isSelected ? 3 : 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Title Row
-
-private struct TitleRow: View {
-    let title: APITitleData
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Image(systemName: title.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(KingdomTheme.Colors.imperialGold)
-                    .frame(width: 30)
-                
-                Text(title.displayName)
-                    .font(FontStyles.bodyMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                
-                Spacer()
-                
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+            .buttonStyle(.plain)
+            
+            ForEach(colors, id: \.0) { hex, _ in
+                Button { selectedHex = hex } label: {
+                    ZStack {
+                        Circle().fill(Color(hex: hex) ?? .gray).frame(width: 40, height: 40)
+                        if selectedHex == hex {
+                            Circle().stroke(Color.white, lineWidth: 3).frame(width: 40, height: 40)
+                            Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                        }
+                    }
+                    .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 1))
                 }
+                .buttonStyle(.plain)
             }
-            .padding()
-            .background(isSelected ? KingdomTheme.Colors.buttonSuccess.opacity(0.1) : KingdomTheme.Colors.parchmentLight)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? KingdomTheme.Colors.buttonSuccess : Color.clear, lineWidth: 2)
-            )
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(12)
+        .background(KingdomTheme.Colors.parchmentLight)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
 // MARK: - View Model
 
-@MainActor
 class SubscriberSettingsViewModel: ObservableObject {
     @Published var settings: SubscriberSettingsResponse?
     @Published var isLoading = false
+    @Published var isSaving = false
     @Published var showError = false
     @Published var errorMessage: String?
     
-    @Published var selectedTheme: APIThemeData?
+    @Published var iconBackgroundColor: String?
+    @Published var iconTextColor: String?
+    @Published var cardBackgroundColor: String?
     @Published var selectedTitle: APITitleData?
     
-    private let playerAPI = PlayerAPI()
+    private var originalIconBg: String?
+    private var originalIconText: String?
+    private var originalCardBg: String?
+    private var originalTitleId: Int?
     
-    var isSubscriber: Bool {
-        settings?.is_subscriber ?? false
+    var isSubscriber: Bool { settings?.isSubscriber ?? false }
+    var availableTitles: [APITitleData] { settings?.availableTitles ?? [] }
+    
+    var hasChanges: Bool {
+        iconBackgroundColor != originalIconBg ||
+        iconTextColor != originalIconText ||
+        cardBackgroundColor != originalCardBg ||
+        selectedTitle?.achievementId != originalTitleId
     }
     
-    var availableThemes: [APIThemeData] {
-        settings?.available_themes ?? []
+    var previewCustomization: APISubscriberCustomization {
+        APISubscriberCustomization(
+            iconBackgroundColor: iconBackgroundColor,
+            iconTextColor: iconTextColor,
+            cardBackgroundColor: cardBackgroundColor,
+            selectedTitle: selectedTitle
+        )
     }
     
-    var availableTitles: [APITitleData] {
-        settings?.available_titles ?? []
-    }
-    
+    @MainActor
     func loadSettings() async {
         isLoading = true
-        
         do {
-            let response = try await playerAPI.getSubscriberSettings()
+            let response = try await APIClient.shared.player.getSubscriberSettings()
             settings = response
-            selectedTheme = response.current_theme
-            selectedTitle = response.selected_title
+            iconBackgroundColor = response.iconBackgroundColor
+            iconTextColor = response.iconTextColor
+            cardBackgroundColor = response.cardBackgroundColor
+            selectedTitle = response.selectedTitle
+            
+            originalIconBg = response.iconBackgroundColor
+            originalIconText = response.iconTextColor
+            originalCardBg = response.cardBackgroundColor
+            originalTitleId = response.selectedTitle?.achievementId
         } catch {
-            errorMessage = "Failed to load settings"
+            errorMessage = error.localizedDescription
             showError = true
         }
-        
         isLoading = false
     }
     
-    func selectTheme(_ theme: APIThemeData?) {
-        selectedTheme = theme
-        saveSettings()
-    }
-    
-    func selectTitle(_ title: APITitleData?) {
-        selectedTitle = title
-        saveSettings()
-    }
-    
-    private func saveSettings() {
-        Task {
+    func saveSettings() {
+        guard hasChanges else { return }
+        isSaving = true
+        
+        Task { @MainActor in
             do {
-                let response = try await playerAPI.updateSubscriberSettings(
-                    themeId: selectedTheme?.id ?? "",
-                    titleAchievementId: selectedTitle?.achievementId ?? 0
+                let update = SubscriberSettingsUpdateRequest(
+                    iconBackgroundColor: iconBackgroundColor,
+                    iconTextColor: iconTextColor,
+                    cardBackgroundColor: cardBackgroundColor,
+                    selectedTitleAchievementId: selectedTitle?.achievementId ?? 0
                 )
+                let response = try await APIClient.shared.player.updateSubscriberSettings(update)
                 settings = response
+                originalIconBg = iconBackgroundColor
+                originalIconText = iconTextColor
+                originalCardBg = cardBackgroundColor
+                originalTitleId = selectedTitle?.achievementId
             } catch {
-                errorMessage = "Failed to save settings"
+                errorMessage = error.localizedDescription
                 showError = true
-                // Revert to server state
-                await loadSettings()
             }
+            isSaving = false
         }
     }
 }
 
-// MARK: - Preview
+// MARK: - API Models
+
+struct SubscriberSettingsResponse: Codable {
+    let isSubscriber: Bool
+    let iconBackgroundColor: String?
+    let iconTextColor: String?
+    let cardBackgroundColor: String?
+    let selectedTitle: APITitleData?
+    let availableTitles: [APITitleData]
+    
+    enum CodingKeys: String, CodingKey {
+        case isSubscriber = "is_subscriber"
+        case iconBackgroundColor = "icon_background_color"
+        case iconTextColor = "icon_text_color"
+        case cardBackgroundColor = "card_background_color"
+        case selectedTitle = "selected_title"
+        case availableTitles = "available_titles"
+    }
+}
+
+struct SubscriberSettingsUpdateRequest: Codable {
+    let iconBackgroundColor: String?
+    let iconTextColor: String?
+    let cardBackgroundColor: String?
+    let selectedTitleAchievementId: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case iconBackgroundColor = "icon_background_color"
+        case iconTextColor = "icon_text_color"
+        case cardBackgroundColor = "card_background_color"
+        case selectedTitleAchievementId = "selected_title_achievement_id"
+    }
+}
 
 #Preview {
-    NavigationStack {
-        SubscriberSettingsView()
+    NavigationView {
+        SubscriberSettingsView().environmentObject(Player())
     }
 }

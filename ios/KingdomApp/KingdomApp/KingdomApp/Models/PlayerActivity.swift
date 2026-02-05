@@ -23,9 +23,8 @@ struct ActivityLogEntry: Codable, Identifiable {
     let iconName: String?
     let colorName: String?
     
-    // Subscriber customization (server-driven themes for activity card)
-    let subscriberTheme: APIThemeData?
-    let selectedTitle: APITitleData?
+    // Subscriber customization (server-driven colors for activity card)
+    let subscriberCustomization: APISubscriberCustomization?
     
     enum CodingKeys: String, CodingKey {
         case id, description, amount, visibility, username, details
@@ -39,8 +38,7 @@ struct ActivityLogEntry: Codable, Identifiable {
         case userLevel = "user_level"
         case iconName = "icon"
         case colorName = "color"
-        case subscriberTheme = "subscriber_theme"
-        case selectedTitle = "selected_title"
+        case subscriberCustomization = "subscriber_customization"
     }
 }
 

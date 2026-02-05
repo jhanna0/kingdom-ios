@@ -115,10 +115,9 @@ class Player: ObservableObject {
         return ownedProperties.contains { $0.tier >= 3 }
     }
     
-    // Subscriber customization (server-driven themes and titles)
+    // Subscriber customization (server-driven colors and titles)
     @Published var isSubscriber: Bool = false
-    @Published var subscriberTheme: APIThemeData?
-    @Published var selectedTitle: APITitleData?
+    @Published var subscriberCustomization: APISubscriberCustomization?
     
     // Stats
     @Published var coupsWon: Int = 0
@@ -895,12 +894,11 @@ class Player: ObservableObject {
             print("🎯 Loaded \(skillsData.count) skills from backend dynamically!")
         }
         
-        // Subscriber customization (server-driven themes and titles)
+        // Subscriber customization (server-driven colors and titles)
         isSubscriber = apiState.is_subscriber ?? false
-        subscriberTheme = apiState.subscriber_theme
-        selectedTitle = apiState.selected_title
+        subscriberCustomization = apiState.subscriber_customization
         if isSubscriber {
-            print("⭐ Subscriber status loaded with theme: \(subscriberTheme?.displayName ?? "none")")
+            print("⭐ Subscriber status loaded with customization: icon=\(subscriberCustomization?.iconBackgroundColor ?? "none"), card=\(subscriberCustomization?.cardBackgroundColor ?? "none")")
         }
         
         // Backend is source of truth - no local caching

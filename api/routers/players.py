@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
-from db.models import KingdomIntelligence, UserKingdom, SubscriberTheme
+from db.models import KingdomIntelligence, UserKingdom
 from routers.auth import get_current_user
 from sqlalchemy import func
 from schemas.player import (
@@ -20,8 +20,8 @@ from schemas.player import (
     PlayerEquipment,
     PlayerAchievement,
     AchievementGroup,
-    ThemeData,
     TitleData,
+    SubscriberCustomization,
     SubscriberSettings,
     SubscriberSettingsUpdate
 )
@@ -285,26 +285,23 @@ def _get_user_preferences(db: Session, user_id: int):
     return db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
 
 
-def _get_user_subscriber_theme(db: Session, user_id: int) -> Optional[ThemeData]:
-    """Get user's selected subscriber theme data (server-driven)."""
+def _get_user_subscriber_customization(db: Session, user_id: int) -> Optional[SubscriberCustomization]:
+    """Get user's full subscriber customization."""
     prefs = _get_user_preferences(db, user_id)
-    if not prefs or not prefs.subscriber_theme_id:
+    selected_title = _get_user_selected_title(db, user_id)
+    
+    if not prefs and not selected_title:
         return None
     
-    theme = db.query(SubscriberTheme).filter(
-        SubscriberTheme.id == prefs.subscriber_theme_id
-    ).first()
-    
-    if not theme:
+    has_colors = prefs and (prefs.icon_background_color or prefs.icon_text_color or prefs.card_background_color)
+    if not has_colors and not selected_title:
         return None
     
-    return ThemeData(
-        id=theme.id,
-        display_name=theme.display_name,
-        description=theme.description,
-        background_color=theme.background_color,
-        text_color=theme.text_color,
-        icon_background_color=theme.icon_background_color
+    return SubscriberCustomization(
+        icon_background_color=prefs.icon_background_color if prefs else None,
+        icon_text_color=prefs.icon_text_color if prefs else None,
+        card_background_color=prefs.card_background_color if prefs else None,
+        selected_title=selected_title
     )
 
 
@@ -731,8 +728,7 @@ def get_player_profile(
     
     # Get subscriber customization data (server-driven)
     is_subscriber = _has_membership(db, user.id)
-    subscriber_theme = _get_user_subscriber_theme(db, user.id) if is_subscriber else None
-    selected_title = _get_user_selected_title(db, user.id) if is_subscriber else None
+    subscriber_customization = _get_user_subscriber_customization(db, user.id) if is_subscriber else None
     
     return PlayerPublicProfile(
         id=user.id,
@@ -750,8 +746,7 @@ def get_player_profile(
         pets=pets,
         achievement_groups=achievement_groups,
         is_subscriber=is_subscriber,
-        subscriber_theme=subscriber_theme,
-        selected_title=selected_title,
+        subscriber_customization=subscriber_customization,
         total_checkins=total_checkins,
         total_conquests=total_conquests,
         kingdoms_ruled=kingdoms_ruled,
@@ -772,38 +767,10 @@ def get_subscriber_settings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get current user's subscriber settings.
-    
-    Returns:
-    - is_subscriber: Whether user has active subscription
-    - current_theme: Currently selected theme (server-driven colors)
-    - selected_title: Currently selected achievement title
-    - available_themes: All themes from database (server-driven)
-    - available_titles: All claimed achievements that can be used as titles
-    """
+    """Get current user's subscriber settings."""
     is_subscriber = _has_membership(db, current_user.id)
-    
-    # Get current theme
-    current_theme = _get_user_subscriber_theme(db, current_user.id)
-    
-    # Get selected title
+    prefs = _get_user_preferences(db, current_user.id)
     selected_title = _get_user_selected_title(db, current_user.id)
-    
-    # Get all available themes (server-driven)
-    themes = db.query(SubscriberTheme).all()
-    
-    available_themes = [
-        ThemeData(
-            id=t.id,
-            display_name=t.display_name,
-            description=t.description,
-            background_color=t.background_color,
-            text_color=t.text_color,
-            icon_background_color=t.icon_background_color
-        )
-        for t in themes
-    ]
     
     # Get available titles (claimed achievements)
     available_titles = []
@@ -830,9 +797,10 @@ def get_subscriber_settings(
     
     return SubscriberSettings(
         is_subscriber=is_subscriber,
-        current_theme=current_theme,
+        icon_background_color=prefs.icon_background_color if prefs else None,
+        icon_text_color=prefs.icon_text_color if prefs else None,
+        card_background_color=prefs.card_background_color if prefs else None,
         selected_title=selected_title,
-        available_themes=available_themes,
         available_titles=available_titles
     )
 
@@ -843,67 +811,40 @@ def update_subscriber_settings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Update subscriber settings.
-    
-    Requires active subscription to make changes.
-    Settings are preserved even if subscription lapses.
-    """
+    """Update subscriber settings. Requires active subscription."""
     from db.models import UserPreferences
     
-    # Check if user is a subscriber
     if not _has_membership(db, current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Active subscription required to change settings"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active subscription required")
     
-    # Get or create user preferences
     prefs = db.query(UserPreferences).filter(UserPreferences.user_id == current_user.id).first()
     if not prefs:
         prefs = UserPreferences(user_id=current_user.id)
         db.add(prefs)
     
-    # Update theme if provided
-    if settings.theme_id is not None:
-        if settings.theme_id == "":
-            prefs.subscriber_theme_id = None
-        else:
-            # Validate theme exists
-            theme = db.query(SubscriberTheme).filter(
-                SubscriberTheme.id == settings.theme_id
-            ).first()
-            if not theme:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid theme"
-                )
-            prefs.subscriber_theme_id = settings.theme_id
+    # Update colors directly (hex values)
+    if settings.icon_background_color is not None:
+        prefs.icon_background_color = settings.icon_background_color if settings.icon_background_color else None
+    if settings.icon_text_color is not None:
+        prefs.icon_text_color = settings.icon_text_color if settings.icon_text_color else None
+    if settings.card_background_color is not None:
+        prefs.card_background_color = settings.card_background_color if settings.card_background_color else None
     
-    # Update title if provided
+    # Update title
     if settings.selected_title_achievement_id is not None:
         if settings.selected_title_achievement_id == 0:
             prefs.selected_title_achievement_id = None
         else:
-            # Validate user has claimed this achievement
             claim_check = db.execute(text("""
                 SELECT 1 FROM player_achievement_claims pac
                 JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
                 WHERE pac.user_id = :user_id AND ad.id = :achievement_id
-            """), {
-                "user_id": current_user.id,
-                "achievement_id": settings.selected_title_achievement_id
-            }).fetchone()
+            """), {"user_id": current_user.id, "achievement_id": settings.selected_title_achievement_id}).fetchone()
             
             if not claim_check:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Achievement not claimed"
-                )
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Achievement not claimed")
             prefs.selected_title_achievement_id = settings.selected_title_achievement_id
     
     db.commit()
-    
-    # Return updated settings
     return get_subscriber_settings(current_user, db)
 

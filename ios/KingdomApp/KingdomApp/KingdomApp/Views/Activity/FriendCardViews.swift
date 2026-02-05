@@ -5,108 +5,75 @@ import SwiftUI
 struct FriendCard: View {
     let friend: Friend
     
-    // Server-driven theme colors
     private var avatarBackgroundColor: Color {
-        friend.subscriberTheme?.iconBackgroundColorValue ?? KingdomTheme.Colors.inkMedium
+        friend.subscriberCustomization?.iconBackgroundColorValue ?? KingdomTheme.Colors.inkMedium
     }
     
-    private var textColor: Color {
-        friend.subscriberTheme?.textColorValue ?? .white
+    private var avatarTextColor: Color {
+        friend.subscriberCustomization?.iconTextColorValue ?? .white
     }
     
     private var cardBackgroundColor: Color {
-        friend.subscriberTheme?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
-    }
-    
-    private var cardTextColor: Color {
-        friend.subscriberTheme != nil ? (friend.subscriberTheme?.textColorValue ?? KingdomTheme.Colors.inkDark) : KingdomTheme.Colors.inkDark
+        friend.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
 
     var body: some View {
         NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
             HStack(spacing: 12) {
-                // Avatar with online indicator - themed
                 ZStack(alignment: .bottomTrailing) {
                     Text(String(friend.displayName.prefix(1)).uppercased())
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(textColor)
+                        .foregroundColor(avatarTextColor)
                         .frame(width: 48, height: 48)
                         .brutalistBadge(backgroundColor: avatarBackgroundColor, cornerRadius: 12)
                     
-                    // Online indicator
                     if let isOnline = friend.isOnline, isOnline {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 14, height: 14)
+                        Circle().fill(Color.green).frame(width: 14, height: 14)
                             .overlay(Circle().stroke(Color.black, lineWidth: 2))
                             .offset(x: 4, y: 4)
                     }
                 }
                 
-                // Friend info
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(friend.displayName)
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(cardTextColor)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        // Subscriber badge
-                        if friend.subscriberTheme != nil {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        if friend.subscriberCustomization != nil {
+                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(KingdomTheme.Colors.imperialGold)
                         }
                     }
                     
-                    // Selected title from achievement
-                    if let title = friend.selectedTitle {
+                    if let title = friend.subscriberCustomization?.selectedTitle {
                         HStack(spacing: 4) {
-                            Image(systemName: title.icon)
-                                .font(.system(size: 10))
-                            Text(title.displayName)
-                                .font(FontStyles.labelSmall)
+                            Image(systemName: title.icon).font(.system(size: 10))
+                            Text(title.displayName).font(FontStyles.labelSmall)
                         }
-                        .foregroundColor(cardTextColor.opacity(0.7))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                     
                     HStack(spacing: 8) {
                         if let level = friend.level {
-                            Text("Lv\(level)")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
+                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
                         }
                         
                         if let activity = friend.activity {
                             HStack(spacing: 4) {
-                                Image(systemName: activity.icon)
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(activityColor(activity.color))
-                                
-                                Text(activity.displayText)
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
-                                    .lineLimit(1)
+                                Image(systemName: activity.icon).font(FontStyles.iconMini).foregroundColor(activityColor(activity.color))
+                                Text(activity.displayText).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium).lineLimit(1)
                             }
                         } else if let kingdomName = friend.currentKingdomName {
                             HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
-                                
-                                Text(kingdomName)
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
-                                    .lineLimit(1)
+                                Image(systemName: "mappin.circle.fill").font(FontStyles.iconMini).foregroundColor(KingdomTheme.Colors.inkMedium)
+                                Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium).lineLimit(1)
                             }
                         }
                     }
                 }
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.4) : KingdomTheme.Colors.inkLight)
+                Image(systemName: "chevron.right").font(FontStyles.iconSmall).foregroundColor(KingdomTheme.Colors.inkLight)
             }
             .padding()
             .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)

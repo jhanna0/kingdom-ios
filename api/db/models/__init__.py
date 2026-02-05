@@ -72,7 +72,7 @@ from .purchase import Purchase
 from .book_usage import BookUsage
 
 # Subscriptions
-from .subscription import Subscription, SubscriberTheme, UserPreferences
+from .subscription import Subscription, UserPreferences
 
 __all__ = [
     "User",
@@ -171,7 +171,6 @@ __all__ = [
     "BookUsage",
     # Subscriptions
     "Subscription",
-    "SubscriberTheme",
     "UserPreferences",
 ]
 

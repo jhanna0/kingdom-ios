@@ -347,31 +347,15 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
     
     # Get subscriber data
     from routers.store import is_user_subscriber
-    from db.models import SubscriberTheme, UserPreferences
+    from db.models import UserPreferences
     
     is_subscriber = is_user_subscriber(db, user.id)
-    subscriber_theme_dict = None
-    selected_title_dict = None
+    subscriber_customization_dict = None
     
     if is_subscriber:
         prefs = db.query(UserPreferences).filter(UserPreferences.user_id == user.id).first()
         if prefs:
-            # Get subscriber theme if selected
-            if prefs.subscriber_theme_id:
-                theme = db.query(SubscriberTheme).filter(
-                    SubscriberTheme.id == prefs.subscriber_theme_id
-                ).first()
-                if theme:
-                    subscriber_theme_dict = {
-                        "id": theme.id,
-                        "display_name": theme.display_name,
-                        "description": theme.description,
-                        "background_color": theme.background_color,
-                        "text_color": theme.text_color,
-                        "icon_background_color": theme.icon_background_color,
-                    }
-            
-            # Get selected title if any
+            selected_title_dict = None
             if prefs.selected_title_achievement_id:
                 title_result = db.execute(text("""
                     SELECT ad.id, ad.display_name, ad.icon
@@ -379,11 +363,15 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
                     WHERE ad.id = :achievement_id
                 """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
                 if title_result:
-                    selected_title_dict = {
-                        "achievement_id": title_result[0],
-                        "display_name": title_result[1],
-                        "icon": title_result[2],
-                    }
+                    selected_title_dict = {"achievement_id": title_result[0], "display_name": title_result[1], "icon": title_result[2]}
+            
+            if prefs.icon_background_color or prefs.card_background_color or selected_title_dict:
+                subscriber_customization_dict = {
+                    "icon_background_color": prefs.icon_background_color,
+                    "icon_text_color": prefs.icon_text_color,
+                    "card_background_color": prefs.card_background_color,
+                    "selected_title": selected_title_dict
+                }
     
     return PlayerState(
         id=user.id,
@@ -440,8 +428,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         is_subscriber=is_subscriber,
         
         # Subscriber customization
-        subscriber_theme=subscriber_theme_dict,
-        selected_title=selected_title_dict,
+        subscriber_customization=subscriber_customization_dict,
         
         # Legacy resource fields (now fetched from inventory for backwards compatibility)
         iron=inventory_map.get("iron", 0),

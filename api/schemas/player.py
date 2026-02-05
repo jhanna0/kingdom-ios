@@ -74,21 +74,6 @@ class AchievementGroup(BaseModel):
 # SUBSCRIBER CUSTOMIZATION SCHEMAS (Server-Driven)
 # ============================================================
 
-class ThemeData(BaseModel):
-    """
-    Server-driven theme data.
-    
-    All theme colors are defined in the database (subscriber_themes table).
-    The frontend just renders these hex colors directly.
-    """
-    id: str
-    display_name: str
-    description: Optional[str] = None
-    background_color: str  # hex e.g., '#6B21A8'
-    text_color: str        # hex
-    icon_background_color: str  # hex
-
-
 class TitleData(BaseModel):
     """Selected achievement title for profile display."""
     achievement_id: int
@@ -96,18 +81,29 @@ class TitleData(BaseModel):
     icon: str  # SF Symbol name
 
 
+class SubscriberCustomization(BaseModel):
+    """User's selected customization (for rendering their profile/card)."""
+    icon_background_color: Optional[str] = None  # hex
+    icon_text_color: Optional[str] = None        # hex
+    card_background_color: Optional[str] = None  # hex
+    selected_title: Optional[TitleData] = None
+
+
 class SubscriberSettings(BaseModel):
     """Full subscriber settings response (for settings screen)."""
     is_subscriber: bool
-    current_theme: Optional[ThemeData] = None
+    icon_background_color: Optional[str] = None
+    icon_text_color: Optional[str] = None
+    card_background_color: Optional[str] = None
     selected_title: Optional[TitleData] = None
-    available_themes: list[ThemeData] = []
     available_titles: list[TitleData] = []
 
 
 class SubscriberSettingsUpdate(BaseModel):
     """Request body for updating subscriber settings."""
-    theme_id: Optional[str] = None
+    icon_background_color: Optional[str] = None
+    icon_text_color: Optional[str] = None
+    card_background_color: Optional[str] = None
     selected_title_achievement_id: Optional[int] = None
 
 
@@ -145,8 +141,7 @@ class PlayerPublicProfile(BaseModel):
     
     # Subscriber customization (server-driven)
     is_subscriber: bool = False
-    subscriber_theme: Optional[ThemeData] = None
-    selected_title: Optional[TitleData] = None
+    subscriber_customization: Optional[SubscriberCustomization] = None
     
     # Achievement stats
     total_checkins: int

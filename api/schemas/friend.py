@@ -31,8 +31,7 @@ class FriendResponse(BaseModel):
     activity: Optional[dict] = None
     
     # Subscriber customization (server-driven)
-    subscriber_theme: Optional[dict] = None  # ThemeData as dict
-    selected_title: Optional[dict] = None    # TitleData as dict
+    subscriber_customization: Optional[dict] = None  # SubscriberCustomization as dict
 
 
 class FriendListResponse(BaseModel):

@@ -1,29 +1,16 @@
 """
 Subscription Models
 ===================
-Tracks subscriber status and theme customization options.
+Tracks subscriber status and customization options.
 
 Tables:
-1. SubscriberTheme - Server-driven theme definitions (colors, names)
-2. Subscription - Subscription history (multiple rows per user)
-3. UserPreferences - User customization preferences
+1. Subscription - Subscription history (multiple rows per user)
+2. UserPreferences - User customization preferences (colors stored directly as hex)
 """
 from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from ..base import Base
-
-
-class SubscriberTheme(Base):
-    """Server-driven theme definitions."""
-    __tablename__ = "subscriber_themes"
-    
-    id = Column(String, primary_key=True)  # e.g., 'royal_purple'
-    display_name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    background_color = Column(String, nullable=False)  # hex e.g., '#6B21A8'
-    text_color = Column(String, nullable=False)
-    icon_background_color = Column(String, nullable=False)
 
 
 class Subscription(Base):
@@ -47,9 +34,16 @@ class UserPreferences(Base):
     __tablename__ = "user_preferences"
     
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    subscriber_theme_id = Column(String, ForeignKey("subscriber_themes.id", ondelete="SET NULL"), nullable=True)
+    
+    # Icon colors (hex values)
+    icon_background_color = Column(String, nullable=True)  # hex e.g., '#6B21A8'
+    icon_text_color = Column(String, nullable=True)        # hex
+    
+    # Card background color (hex)
+    card_background_color = Column(String, nullable=True)  # hex
+    
+    # Selected title
     selected_title_achievement_id = Column(Integer, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="preferences")
-    theme = relationship("SubscriberTheme")

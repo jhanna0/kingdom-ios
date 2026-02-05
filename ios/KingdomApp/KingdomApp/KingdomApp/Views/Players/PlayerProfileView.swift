@@ -71,10 +71,9 @@ struct PlayerProfileView: View {
                 ProfileHeaderCard(
                     displayName: profile.display_name,
                     level: profile.level,
-                    gold: nil,  // Don't show other players' gold
-                    rulerOf: profile.ruled_kingdom_name,  // Backend returns actual ruled kingdom
-                    subscriberTheme: profile.subscriber_theme,
-                    selectedTitle: profile.selected_title,
+                    gold: nil,
+                    rulerOf: profile.ruled_kingdom_name,
+                    customization: profile.subscriber_customization,
                     isSubscriber: profile.isSubscriber
                 )
                 
