@@ -220,6 +220,28 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Subscriber Settings
+    
+    /// Get subscriber settings (themes, titles, current selections)
+    func getSubscriberSettings() async throws -> SubscriberSettingsResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/players/me/subscriber-settings")
+        return try await client.execute(request)
+    }
+    
+    /// Update subscriber settings
+    func updateSubscriberSettings(_ update: SubscriberSettingsUpdateRequest) async throws -> SubscriberSettingsResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = try client.request(endpoint: "/players/me/subscriber-settings", method: "PUT", body: update)
+        return try await client.execute(request)
+    }
+    
 }
 
 // MARK: - Relocation Response Models
@@ -239,4 +261,6 @@ struct RelocationResponse: Codable {
     let lost_ruler_status: Bool
     let next_relocation_available: String
 }
+
+// MARK: - Subscriber Settings Response (see SubscriberSettingsView.swift)
 

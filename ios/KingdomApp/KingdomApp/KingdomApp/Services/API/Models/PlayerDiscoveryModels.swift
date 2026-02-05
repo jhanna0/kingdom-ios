@@ -147,7 +147,14 @@ struct PlayerPublicProfile: Codable, Identifiable {
     // Pets
     let pets: [PetData]?
     
-    // Achievements
+    // Claimed achievements grouped by category
+    let achievement_groups: [AchievementGroup]?
+    
+    // Subscriber customization (server-driven)
+    let is_subscriber: Bool?
+    let subscriber_customization: APISubscriberCustomization?
+    
+    // Achievement stats
     let total_checkins: Int
     let total_conquests: Int
     let kingdoms_ruled: Int
@@ -168,6 +175,11 @@ struct PlayerPublicProfile: Codable, Identifiable {
     
     var totalCombatPower: Int {
         skillTier(for: "attack") + skillTier(for: "defense") + (equipment.weapon_attack_bonus ?? 0) + (equipment.armor_defense_bonus ?? 0)
+    }
+    
+    /// Check if this user is a subscriber
+    var isSubscriber: Bool {
+        is_subscriber ?? false
     }
 }
 
@@ -225,6 +237,30 @@ struct PetData: Codable, Identifiable {
     let color: String
     let description: String
     let source: String?
+}
+
+// MARK: - Player Achievement (for profile display)
+
+struct PlayerAchievement: Codable, Identifiable {
+    let id: Int  // achievement_definitions.id
+    let achievement_type: String
+    let tier: Int
+    let display_name: String
+    let icon: String?
+    let category: String
+    let color: String  // Theme color name from backend
+    let claimed_at: String?
+}
+
+// MARK: - Achievement Group (grouped by category)
+
+struct AchievementGroup: Codable, Identifiable {
+    let category: String
+    let display_name: String
+    let icon: String
+    let achievements: [PlayerAchievement]
+    
+    var id: String { category }
 }
 
 

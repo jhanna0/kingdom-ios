@@ -1,0 +1,135 @@
+{
+  "identifier" : "F8A8B8C8-D8E8-4F8A-8B8C-8D8E8F8A8B8C",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "starter_pack",
+      "localizations" : [
+        {
+          "description" : "1000 Gold + 1000 Meat",
+          "displayName" : "Starter Pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.kingdom.starter_pack",
+      "referenceName" : "Starter Pack",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "3.99",
+      "familyShareable" : false,
+      "internalID" : "book_pack_5",
+      "localizations" : [
+        {
+          "description" : "5 Books for cooldown reduction",
+          "displayName" : "Book Pack (5)",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.kingdom.book_pack_5",
+      "referenceName" : "Book Pack (5)",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "kingdom",
+    "_developerTeamID" : "TEAM_ID",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "kingdom_supporter",
+      "localizations" : [
+
+      ],
+      "name" : "Kingdom Supporter",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "supporter_monthly",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Customize your profile with themes and titles",
+              "displayName" : "Kingdom Supporter",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.kingdom.sub",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Kingdom Supporter Monthly",
+          "subscriptionGroupID" : "kingdom_supporter",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

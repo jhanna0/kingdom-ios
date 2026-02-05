@@ -87,6 +87,10 @@ class PlayerState(BaseModel):
     is_alive: bool = True
     is_ruler: bool = False  # Computed on read
     is_verified: bool = False
+    is_subscriber: bool = False  # Has active subscription
+    
+    # Subscriber customization (server-driven colors and titles)
+    subscriber_customization: Optional[dict] = None  # SubscriberCustomization as dict
     
     # Resources (computed from player_inventory table for backwards compatibility)
     # These fields are populated by the API from inventory queries

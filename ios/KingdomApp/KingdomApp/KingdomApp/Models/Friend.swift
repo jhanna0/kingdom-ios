@@ -1,4 +1,73 @@
 import Foundation
+import SwiftUI
+
+// MARK: - Server-Driven Subscriber Customization
+
+/// Achievement title data from server
+struct APITitleData: Codable {
+    let achievementId: Int
+    let displayName: String
+    let icon: String
+    
+    enum CodingKeys: String, CodingKey {
+        case achievementId = "achievement_id"
+        case displayName = "display_name"
+        case icon
+    }
+}
+
+/// Style preset (background + text color combo)
+struct APIStylePreset: Codable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let backgroundColor: String  // hex
+    let textColor: String        // hex
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case backgroundColor = "background_color"
+        case textColor = "text_color"
+    }
+    
+    var backgroundColorValue: Color {
+        Color(hex: backgroundColor) ?? .gray
+    }
+    
+    var textColorValue: Color {
+        Color(hex: textColor) ?? .white
+    }
+}
+
+/// Subscriber customization (style presets)
+struct APISubscriberCustomization: Codable {
+    let iconStyle: APIStylePreset?
+    let cardStyle: APIStylePreset?
+    let selectedTitle: APITitleData?
+    
+    enum CodingKeys: String, CodingKey {
+        case iconStyle = "icon_style"
+        case cardStyle = "card_style"
+        case selectedTitle = "selected_title"
+    }
+    
+    // Convenience computed properties for backwards compatibility
+    var iconBackgroundColorValue: Color {
+        iconStyle?.backgroundColorValue ?? .white
+    }
+    
+    var iconTextColorValue: Color {
+        iconStyle?.textColorValue ?? .black
+    }
+    
+    var cardBackgroundColorValue: Color {
+        cardStyle?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    var cardTextColorValue: Color {
+        cardStyle?.textColorValue ?? KingdomTheme.Colors.inkDark
+    }
+}
 
 // MARK: - Friend Models
 
@@ -20,6 +89,9 @@ struct Friend: Codable, Identifiable {
     let lastSeen: String?
     let activity: FriendActivity?
     
+    // Subscriber customization (server-driven)
+    let subscriberCustomization: APISubscriberCustomization?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -35,6 +107,7 @@ struct Friend: Codable, Identifiable {
         case currentKingdomName = "current_kingdom_name"
         case lastSeen = "last_seen"
         case activity
+        case subscriberCustomization = "subscriber_customization"
     }
     
     var displayName: String {

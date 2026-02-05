@@ -28,13 +28,16 @@ class CityBoundary(Base):
     center_lat = Column(Float, nullable=False)
     center_lon = Column(Float, nullable=False)
     
-    # Simplified boundary as GeoJSON (for efficient storage and transfer)
-    # Stored as JSONB for fast queries and indexing
+    # Original boundary as GeoJSON (full detail from OSM)
     boundary_geojson = Column(JSONB, nullable=False)
+    
+    # Pre-computed simplified boundary (Visvalingam-Whyatt algorithm, ~250 points)
+    # This is what gets returned to clients for efficient data transfer
+    simplified_boundary_geojson = Column(JSONB, nullable=True)
     
     # Metadata
     radius_meters = Column(Float, nullable=False)  # Approximate radius
-    boundary_points_count = Column(Integer, nullable=False)  # Number of points in simplified boundary
+    boundary_points_count = Column(Integer, nullable=False)  # Number of points in original boundary
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

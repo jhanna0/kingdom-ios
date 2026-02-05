@@ -19,6 +19,11 @@ provider:
     JWT_SECRET_KEY: ${ssm:/kingdom/jwt-secret-key}
     # Apple Sign In verification
     APPLE_APP_ID: ${ssm:/kingdom/apple-app-id}  # Your iOS app's bundle ID
+    # Apple App Store Server API (for IAP verification)
+    APPLE_KEY_ID: ${ssm:/kingdom/apple-key-id}
+    APPLE_ISSUER_ID: ${ssm:/kingdom/apple-issuer-id}
+    APPLE_PRIVATE_KEY: ${ssm:/kingdom/apple-private-key}
+    APPLE_BUNDLE_ID: ${ssm:/kingdom/apple-app-id}
     DEV_MODE: 'False'  # Production mode - cooldowns enforced with atomic locking
     # WebSocket config
     CONNECTIONS_TABLE: ${self:service}-connections-${sls:stage}
@@ -45,6 +50,15 @@ provider:
           Action:
             - secretsmanager:GetSecretValue
           Resource: 'arn:aws:secretsmanager:us-east-1:*:secret:rds!db-5465f705-3666-44af-b197-39944abad239-*'
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource: 'arn:aws:ssm:us-east-1:*:parameter/kingdom/*'
+        - Effect: Allow
+          Action:
+            - kms:Decrypt
+          Resource: '*'
         # DynamoDB permissions for WebSocket connections
         - Effect: Allow
           Action:
@@ -118,8 +132,12 @@ functions:
 
 plugins:
   - serverless-domain-manager
+  - serverless-prune-plugin
 
 custom:
+  prune:
+    automatic: true
+    number: 5
   customDomain:
     http:
       domainName: 'api.kingdoms.ninja'

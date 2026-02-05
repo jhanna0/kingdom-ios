@@ -1,5 +1,28 @@
 import SwiftUI
 
+// MARK: - Precise Number Formatting (for HUD gold display)
+
+private extension Int {
+    /// Format large numbers with k/m suffix and one decimal place, truncated (e.g., 1950 → "1.9k")
+    func abbreviatedPrecise() -> String {
+        if abs(self) >= 1_000_000 {
+            let truncated = Double(self / 100_000) / 10.0  // Truncate to 1 decimal
+            if truncated.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(truncated))m"
+            }
+            return String(format: "%.1fm", truncated)
+        } else if abs(self) >= 1_000 {
+            let truncated = Double(self / 100) / 10.0  // Truncate to 1 decimal
+            if truncated.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(truncated))k"
+            }
+            return String(format: "%.1fk", truncated)
+        } else {
+            return "\(self)"
+        }
+    }
+}
+
 struct MapHUD: View {
     @ObservedObject var viewModel: MapViewModel
     @Binding var showCharacterSheet: Bool
@@ -10,6 +33,7 @@ struct MapHUD: View {
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
+    @State private var showStore = false
     
     // Get home kingdom name - use direct property from backend (always available)
     private var homeKingdomName: String? {
@@ -41,19 +65,14 @@ struct MapHUD: View {
                     }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .frame(height: 36)
                     .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.black)
-                                .offset(x: 2, y: 2)
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(KingdomTheme.Colors.parchmentLight)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                        }
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
                     )
                     
                     Spacer()
@@ -84,11 +103,11 @@ struct MapHUD: View {
                             ZStack {
                                 Circle()
                                     .fill(Color.black)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 22, height: 22)
                                     .offset(x: 1, y: 1)
                                 Circle()
                                     .fill(KingdomTheme.Colors.buttonPrimary)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 22, height: 22)
                                     .overlay(
                                         Circle()
                                             .stroke(Color.black, lineWidth: 2)
@@ -98,32 +117,54 @@ struct MapHUD: View {
                                     .foregroundColor(.white)
                             }
                             
-                            // Gold
-                            HStack(spacing: 3) {
-                                Text("\(viewModel.player.gold)")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.black)
-                                
-                                Image(systemName: "g.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(KingdomTheme.Colors.goldLight)
+                            // Gold & Food stacked
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "g.circle.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                                    Text(viewModel.player.gold.abbreviatedPrecise())
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(.black)
+                                }
+                                HStack(spacing: 4) {
+                                    Image(systemName: "fork.knife")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    Text(viewModel.player.food.abbreviatedPrecise())
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(.black)
+                                }
                             }
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .frame(height: 36)
                         .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black)
-                                    .offset(x: 2, y: 2)
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(KingdomTheme.Colors.parchmentLight)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.black, lineWidth: 2)
-                                    )
-                            }
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
                         )
+                    }
+                    
+                    // Store button (buy gold/resources)
+                    Button(action: {
+                        showStore = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(KingdomTheme.Colors.goldLight)
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
                     }
                     
                     Spacer()
@@ -202,6 +243,10 @@ struct MapHUD: View {
         .sheet(isPresented: $showTutorial) {
             TutorialView()
         }
+        .sheet(isPresented: $showStore) {
+            StoreView()
+                .environmentObject(viewModel.player)
+        }
     }
     
     // MARK: - Timer
@@ -252,20 +297,15 @@ struct MapHUD: View {
                     .font(.system(size: 12))
             }
         }
-        .frame(height: 32)
+        .frame(height: 36)
         .padding(.horizontal, 8)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-            }
+            RoundedRectangle(cornerRadius: 10)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.black, lineWidth: 2)
+                )
         )
     }
     
@@ -291,20 +331,14 @@ struct MapHUD: View {
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
         }
-        .frame(height: 32)
-        .padding(.horizontal, 8)
+        .frame(width: 36, height: 36)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-            }
+            RoundedRectangle(cornerRadius: 10)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.black, lineWidth: 2)
+                )
         )
     }
     

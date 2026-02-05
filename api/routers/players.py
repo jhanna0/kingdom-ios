@@ -17,8 +17,17 @@ from schemas.player import (
     PlayersInKingdomResponse, 
     ActivePlayersResponse,
     PlayerActivity,
-    PlayerEquipment
+    PlayerEquipment,
+    PlayerAchievement,
+    AchievementGroup,
+    TitleData,
+    StylePreset,
+    SubscriberCustomization,
+    SubscriberSettings,
+    SubscriberSettingsUpdate
 )
+from db.models.subscription import STYLE_PRESETS, get_style_colors
+from sqlalchemy import text
 
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -261,6 +270,71 @@ def _is_player_online(user: User) -> bool:
     if not user.last_login:
         return False
     return user.last_login > datetime.utcnow() - timedelta(minutes=10)
+
+
+def _has_membership(db: Session, user_id: int) -> bool:
+    """
+    Check if user has active subscription.
+    Membership controls visibility of achievements and pets on public profile.
+    """
+    from routers.store import is_user_subscriber
+    return is_user_subscriber(db, user_id)
+
+
+def _get_user_preferences(db: Session, user_id: int):
+    """Get user preferences from user_preferences table."""
+    from db.models import UserPreferences
+    return db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
+
+
+def _get_style_preset(style_id: str) -> Optional[StylePreset]:
+    """Convert style ID to StylePreset object."""
+    if not style_id:
+        return None
+    colors = get_style_colors(style_id)
+    if not colors.get("background"):
+        return None
+    return StylePreset(id=style_id, name=colors["name"], background_color=colors["background"], text_color=colors["text"])
+
+
+def _get_user_subscriber_customization(db: Session, user_id: int) -> Optional[SubscriberCustomization]:
+    """Get user's full subscriber customization."""
+    prefs = _get_user_preferences(db, user_id)
+    selected_title = _get_user_selected_title(db, user_id)
+    
+    if not prefs and not selected_title:
+        return None
+    
+    icon_style = _get_style_preset(prefs.icon_style) if prefs else None
+    card_style = _get_style_preset(prefs.card_style) if prefs else None
+    
+    if not icon_style and not card_style and not selected_title:
+        return None
+    
+    return SubscriberCustomization(icon_style=icon_style, card_style=card_style, selected_title=selected_title)
+
+
+def _get_user_selected_title(db: Session, user_id: int) -> Optional[TitleData]:
+    """Get user's selected achievement title."""
+    prefs = _get_user_preferences(db, user_id)
+    if not prefs or not prefs.selected_title_achievement_id:
+        return None
+    
+    # Query the achievement definition
+    result = db.execute(text("""
+        SELECT id, display_name, icon
+        FROM achievement_definitions
+        WHERE id = :achievement_id
+    """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
+    
+    if not result:
+        return None
+    
+    return TitleData(
+        achievement_id=result.id,
+        display_name=result.display_name,
+        icon=result.icon or "star.fill"
+    )
 
 
 @router.get("/in-kingdom/{kingdom_id}", response_model=PlayersInKingdomResponse)
@@ -592,13 +666,78 @@ def get_player_profile(
         KingdomHistory.event_type.in_(['coup', 'invasion', 'reconquest'])
     ).scalar() or 0
     
-    # Get pets
-    from routers.resources import get_player_pets
-    pets = get_player_pets(db, user.id)
-    
     # Generate dynamic skills data - frontend renders without hardcoding!
     from routers.tiers import get_skills_data_for_player
     skills_data = get_skills_data_for_player(state)
+    
+    # Check if this is own profile or if target user has membership
+    # Pets and achievements are only shown publicly for members
+    is_own_profile = user.id == current_user.id
+    show_premium_content = is_own_profile or _has_membership(db, user.id)
+    
+    # Get pets (only if own profile or has membership)
+    pets = []
+    if show_premium_content:
+        from routers.resources import get_player_pets
+        pets = get_player_pets(db, user.id)
+    
+    # Get claimed achievements for profile display (only if own profile or has membership)
+    achievement_groups = []
+    if show_premium_content:
+        from routers.achievements import CATEGORY_CONFIG
+        
+        achievements_query = text("""
+            SELECT DISTINCT ON (ad.achievement_type)
+                ad.id,
+                ad.achievement_type,
+                ad.tier,
+                ad.display_name,
+                ad.icon,
+                ad.category,
+                pac.claimed_at
+            FROM player_achievement_claims pac
+            JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
+            WHERE pac.user_id = :user_id
+            ORDER BY ad.achievement_type, ad.tier DESC
+        """)
+        achievements_result = db.execute(achievements_query, {"user_id": user.id}).fetchall()
+        
+        # Group achievements by category
+        from collections import defaultdict
+        achievements_by_category = defaultdict(list)
+        for row in achievements_result:
+            achievements_by_category[row.category].append(
+                PlayerAchievement(
+                    id=row.id,
+                    achievement_type=row.achievement_type,
+                    tier=row.tier,
+                    display_name=row.display_name,
+                    icon=row.icon,
+                    category=row.category,
+                    color=CATEGORY_CONFIG.get(row.category, {}).get("color", "inkMedium"),
+                    claimed_at=row.claimed_at
+                )
+            )
+        
+        # Build sorted category groups
+        sorted_categories = sorted(
+            achievements_by_category.keys(),
+            key=lambda c: CATEGORY_CONFIG.get(c, {}).get("order", 999)
+        )
+        for cat in sorted_categories:
+            cat_config = CATEGORY_CONFIG.get(cat, {"display_name": cat.title(), "icon": "star.fill"})
+            achievement_groups.append(
+                AchievementGroup(
+                    category=cat,
+                    display_name=cat_config["display_name"],
+                    icon=cat_config["icon"],
+                    achievements=achievements_by_category[cat]
+                )
+            )
+    
+    # Get subscriber customization data (server-driven)
+    is_subscriber = _has_membership(db, user.id)
+    subscriber_customization = _get_user_subscriber_customization(db, user.id) if is_subscriber else None
     
     return PlayerPublicProfile(
         id=user.id,
@@ -614,6 +753,9 @@ def get_player_profile(
         skills_data=skills_data,
         equipment=equipment,
         pets=pets,
+        achievement_groups=achievement_groups,
+        is_subscriber=is_subscriber,
+        subscriber_customization=subscriber_customization,
         total_checkins=total_checkins,
         total_conquests=total_conquests,
         kingdoms_ruled=kingdoms_ruled,
@@ -623,4 +765,94 @@ def get_player_profile(
         last_login=user.last_login,
         created_at=user.created_at
     )
+
+
+# ============================================================
+# SUBSCRIBER SETTINGS ENDPOINTS
+# ============================================================
+
+@router.get("/me/subscriber-settings", response_model=SubscriberSettings)
+def get_subscriber_settings(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's subscriber settings."""
+    is_subscriber = _has_membership(db, current_user.id)
+    prefs = _get_user_preferences(db, current_user.id)
+    selected_title = _get_user_selected_title(db, current_user.id)
+    
+    # Build available styles list
+    available_styles = [
+        StylePreset(id=sid, name=s["name"], background_color=s["background"], text_color=s["text"])
+        for sid, s in STYLE_PRESETS.items()
+    ]
+    
+    # Get available titles (claimed achievements)
+    available_titles = []
+    achievements_query = text("""
+        SELECT DISTINCT ON (ad.achievement_type)
+            ad.id, ad.display_name, ad.icon
+        FROM player_achievement_claims pac
+        JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
+        WHERE pac.user_id = :user_id
+        ORDER BY ad.achievement_type, ad.tier DESC
+    """)
+    for row in db.execute(achievements_query, {"user_id": current_user.id}).fetchall():
+        available_titles.append(TitleData(achievement_id=row.id, display_name=row.display_name, icon=row.icon or "star.fill"))
+    
+    return SubscriberSettings(
+        is_subscriber=is_subscriber,
+        icon_style=_get_style_preset(prefs.icon_style) if prefs else None,
+        card_style=_get_style_preset(prefs.card_style) if prefs else None,
+        selected_title=selected_title,
+        available_styles=available_styles,
+        available_titles=available_titles
+    )
+
+
+@router.put("/me/subscriber-settings", response_model=SubscriberSettings)
+def update_subscriber_settings(
+    settings: SubscriberSettingsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update subscriber settings. Requires active subscription."""
+    from db.models import UserPreferences
+    
+    if not _has_membership(db, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active subscription required")
+    
+    prefs = db.query(UserPreferences).filter(UserPreferences.user_id == current_user.id).first()
+    if not prefs:
+        prefs = UserPreferences(user_id=current_user.id)
+        db.add(prefs)
+    
+    # Update styles (validate they exist, empty string or None clears the style)
+    icon_style = settings.icon_style_id if settings.icon_style_id else None
+    if icon_style and icon_style not in STYLE_PRESETS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid icon style: {icon_style}")
+    prefs.icon_style = icon_style
+    
+    card_style = settings.card_style_id if settings.card_style_id else None
+    if card_style and card_style not in STYLE_PRESETS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid card style: {card_style}")
+    prefs.card_style = card_style
+    
+    # Update title
+    if settings.selected_title_achievement_id is not None:
+        if settings.selected_title_achievement_id == 0:
+            prefs.selected_title_achievement_id = None
+        else:
+            claim_check = db.execute(text("""
+                SELECT 1 FROM player_achievement_claims pac
+                JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
+                WHERE pac.user_id = :user_id AND ad.id = :achievement_id
+            """), {"user_id": current_user.id, "achievement_id": settings.selected_title_achievement_id}).fetchone()
+            
+            if not claim_check:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Achievement not claimed")
+            prefs.selected_title_achievement_id = settings.selected_title_achievement_id
+    
+    db.commit()
+    return get_subscriber_settings(current_user, db)
 

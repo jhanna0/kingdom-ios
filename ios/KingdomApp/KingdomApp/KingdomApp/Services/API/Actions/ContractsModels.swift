@@ -34,10 +34,13 @@ struct PerActionResourceCost: Codable {
     let amount: Int
     let displayName: String
     let icon: String
+    let color: String?  // Theme color name from backend (e.g., "brown", "gray")
+    let canAfford: Bool?  // Per-resource affordability (nil = assume true for backwards compat)
     
     enum CodingKeys: String, CodingKey {
-        case resource, amount, icon
+        case resource, amount, icon, color
         case displayName = "display_name"
+        case canAfford = "can_afford"
     }
 }
 
@@ -48,7 +51,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let propertyId: String
     let fromTier: Int
     let toTier: Int
-    let targetTierName: String
+    let targetTierName: String  // Contains option name (e.g., "Kitchen") or tier name as fallback
     let actionsRequired: Int
     let actionsCompleted: Int
     let cost: Int  // OLD: upfront payment (backwards compat)

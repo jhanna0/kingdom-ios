@@ -7,7 +7,7 @@ from sqlalchemy import func
 from datetime import datetime
 import json
 
-from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom
+from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom, Property
 from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
@@ -190,8 +190,11 @@ def get_workshop_contracts_for_status(db: Session, user_id: int) -> list:
     return result
 
 
-def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
-    """Get property contracts from unified_contracts table for status endpoint"""
+def get_property_contracts_for_status(db: Session, user_id: int, player_state, current_tax_rate: int = 0, is_ruler: bool = False, current_kingdom_id: str = None) -> list:
+    """Get property contracts from unified_contracts table for status endpoint.
+    
+    Only returns contracts for properties in the player's current kingdom.
+    """
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
     from db.models.inventory import PlayerInventory
@@ -199,10 +202,15 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
     # Rulers don't pay tax
     effective_tax_rate = 0 if is_ruler else current_tax_rate
     
+    # Get contracts for properties in current kingdom only
+    if not current_kingdom_id:
+        return []
+    
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
         UnifiedContract.type == 'property',
-        UnifiedContract.completed_at.is_(None)  # Active contracts only
+        UnifiedContract.kingdom_id == current_kingdom_id,
+        UnifiedContract.completed_at.is_(None)
     ).all()
     
     # Pre-fetch inventory items for resource checking (wood, etc.)
@@ -221,8 +229,9 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         target_parts = contract.target_id.split("|") if contract.target_id else []
         property_id = target_parts[0] if target_parts else contract.target_id
         
-        # Get per-action costs from tier config (dynamically calculated)
-        raw_per_action = get_property_per_action_costs(contract.tier or 1)
+        # Get per-action costs for this specific option
+        from routers.tiers import get_property_option_per_action_costs
+        raw_per_action = get_property_option_per_action_costs(contract.tier, contract.option_id) if contract.tier else []
         
         # Enrich with display info and check affordability
         per_action_costs = []
@@ -238,7 +247,9 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
                 "resource": cost["resource"],
                 "amount": cost["amount"],
                 "display_name": resource_info.get("display_name", cost["resource"].capitalize()),
-                "icon": resource_info.get("icon", "questionmark.circle")
+                "icon": resource_info.get("icon", "questionmark.circle"),
+                "color": resource_info.get("color", "inkMedium"),
+                "can_afford": has_enough  # Per-resource affordability
             })
         
         # Get gold per action for pay-per-action system
@@ -248,6 +259,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
         can_afford_gold = player_state.gold >= gold_cost_with_tax
         
+        # Look up option name for display
+        from routers.property import get_option_name
+        option_name = get_option_name(contract.tier, contract.option_id) if contract.tier and contract.option_id else None
+        
         result.append({
             "contract_id": str(contract.id),
             "property_id": property_id,
@@ -255,10 +270,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "kingdom_name": contract.kingdom_name,
             "from_tier": (contract.tier or 1) - 1,
             "to_tier": contract.tier or 1,
-            "target_tier_name": get_tier_name(contract.tier or 1),
+            "target_tier_name": option_name or get_tier_name(contract.tier or 1),
             "actions_required": contract.actions_required,
             "actions_completed": actions_completed,
-            "cost": contract.gold_paid,  # OLD: upfront payment (backwards compat)
+            "cost": contract.gold_paid or 0,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
             "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
             "can_afford_gold": can_afford_gold if gold_per_action > 0 else None,  # NEW: gold affordability
@@ -374,6 +389,9 @@ def get_action_status(
     slot_cooldowns = {}
     action_types_to_check = ["work", "farm", "patrol", "training", "crafting", "scout"]
     
+    # Import book eligibility - server-driven so we can change without app updates
+    from routers.store import BOOK_ELIGIBLE_SLOTS
+    
     for action_type in action_types_to_check:
         slot = get_action_slot(action_type)
         if slot not in slot_cooldowns:
@@ -384,6 +402,8 @@ def get_action_status(
                 current_action_type=action_type,
                 cooldown_minutes=action_cooldown_map[action_type]
             )
+            # Add book eligibility to slot cooldown (frontend uses this to show book button)
+            cooldown_info["can_use_book"] = slot in BOOK_ELIGIBLE_SLOTS
             slot_cooldowns[slot] = cooldown_info
     
     # Check for ACTIVE BATTLE cooldowns (separate from action slots)
@@ -426,8 +446,9 @@ def get_action_status(
     
     # Load property upgrade contracts from unified_contracts table
     # Rulers don't pay tax, so pass is_ruler flag
+    # Only show contracts for properties in current kingdom
     is_ruler = kingdom and kingdom.ruler_id == current_user.id
-    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler)
+    property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler, state.current_kingdom_id)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
     # Farm reward
@@ -551,9 +572,11 @@ def get_action_status(
     # Patrol count determines if the incident triggers
     intel_tier = state.intelligence
     
-    # Check if we're in allied territory (can't scout allies)
-    is_in_allied_territory = False
-    if state.current_kingdom_id and state.hometown_kingdom_id and state.current_kingdom_id != state.hometown_kingdom_id:
+    # Check if we're in friendly territory (same empire or allied - can farm/patrol, but can't scout)
+    # "Friendly" = home kingdom, same empire, or allied empire
+    is_home_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
+    is_in_allied_territory = False  # Same empire or allied
+    if state.current_kingdom_id and state.hometown_kingdom_id and not is_home_kingdom:
         home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
         current_kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         if home_kingdom and current_kingdom:
@@ -562,6 +585,8 @@ def get_action_status(
                 home_kingdom.empire_id or home_kingdom.id,
                 current_kingdom.empire_id or current_kingdom.id
             )
+    # Friendly = home OR same empire/allied
+    is_friendly_territory = is_home_kingdom or is_in_allied_territory
     
     # Build outcome list dynamically from OUTCOMES_BY_TIER
     available_outcomes = OUTCOMES_BY_TIER.get(intel_tier, []) if intel_tier >= 1 else []
@@ -1063,9 +1088,18 @@ def get_action_status(
                     "is_spectator": True,  # NEW: Frontend knows this is spectate-only
                 }
     
-    # Add slot information to each action
+    # Add slot information and book eligibility to each action
+    # Book eligibility is server-driven so we can change it without app updates
+    from routers.store import BOOK_ELIGIBLE_SLOTS, BOOK_INELIGIBLE_ACTIONS
+    
     for action_key, action_data in actions.items():
-        action_data["slot"] = get_action_slot(action_key)
+        slot = get_action_slot(action_key)
+        action_data["slot"] = slot
+        
+        # Can this action use books to skip cooldown?
+        # Must be in eligible slot AND not in the ineligible actions list
+        can_use_book = slot in BOOK_ELIGIBLE_SLOTS and action_key not in BOOK_INELIGIBLE_ACTIONS
+        action_data["can_use_book"] = can_use_book
     
     # Build slots array with actions for each slot
     # Frontend renders this dynamically - no hardcoding!
@@ -1078,6 +1112,13 @@ def get_action_status(
             action_key for action_key, action_data in actions.items()
             if action_data.get("slot") == slot_id and (action_data.get("endpoint") or action_data.get("handler"))
         ]
+        
+        # Dynamic location: if slot has allow_in_friendly and we're in friendly (non-home) territory,
+        # set location to "any" so frontend shows it in enemy slots too
+        slot_location = slot_def["location"]
+        if slot_def.get("allow_in_friendly", False) and is_friendly_territory and not is_home_kingdom:
+            slot_location = "any"  # Show in both home and enemy views
+        
         slots.append({
             "id": slot_id,
             "display_name": slot_def["display_name"],
@@ -1085,7 +1126,7 @@ def get_action_status(
             "color_theme": slot_def["color_theme"],
             "display_order": slot_def["display_order"],
             "description": slot_def["description"],
-            "location": slot_def["location"],
+            "location": slot_location,  # Dynamic based on territory
             "content_type": slot_def["content_type"],  # Tells frontend which renderer to use
             "actions": slot_actions,
         })
@@ -1101,6 +1142,9 @@ def get_action_status(
         "slots": slots,  # NEW: Full slot metadata for frontend rendering (no hardcoding!)
         "global_cooldown": slot_cooldowns.get("building", {"ready": True, "seconds_remaining": 0}),  # For old clients
         "actions": actions,  # DYNAMIC ACTION LIST
+        # Territory context for slot filtering
+        "is_home_kingdom": is_home_kingdom,  # In player's hometown
+        "is_friendly_territory": is_friendly_territory,  # Home OR same empire OR allied (can farm/patrol)
         # Food system - actions cost food based on cooldown (0.5 food per minute)
         "player_food_total": player_food_total,
         "food_cost_per_minute": 0.4,  # For frontend to calculate costs dynamically (minutes / 2.5)

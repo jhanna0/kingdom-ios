@@ -29,6 +29,9 @@ class FriendResponse(BaseModel):
     current_kingdom_name: Optional[str] = None
     last_seen: Optional[str] = None
     activity: Optional[dict] = None
+    
+    # Subscriber customization (server-driven)
+    subscriber_customization: Optional[dict] = None  # SubscriberCustomization as dict
 
 
 class FriendListResponse(BaseModel):

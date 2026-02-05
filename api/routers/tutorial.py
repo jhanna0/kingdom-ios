@@ -157,10 +157,35 @@ Education buildings reduce actions needed.
 """
     ),
     TutorialSection(
+        id="roll_mechanics",
+        title="Game Mechanics",
+        icon="gearshape.2.fill",
+        order=7,
+        content="""
+Every action in the game uses a **two-phase roll system**.
+
+**Phase 1: Mini Rolls**
+Before your main attempt, you get a series of mini rolls. Each mini roll has a chance to **shift your success odds** for the master roll.
+
+- You get **(skill level + 1)** mini rolls
+- A level 0 skill = 1 mini roll
+- A level 5 skill = 6 mini rolls
+
+**Phase 2: Master Roll**
+After mini rolls resolve, the master roll determines your final success or failure - now with adjusted odds from your mini rolls.
+
+**How to improve**
+- **Level up skills** → more mini rolls per attempt
+- **Rare Drops** → Some items (like Rabbit's Foot) increase chance each mini roll successfully shifts odds
+
+The higher your skill, the more chances you have to tip the scales in your favor before the final roll.
+"""
+    ),
+    TutorialSection(
         id="buildings",
         title="Buildings",
         icon="building.2.fill",
-        order=7,
+        order=8,
         content="""
 Kingdoms construct buildings for permanent bonuses. These are citizen wide.
 Citizen perform the actions to build. Number of actions required for a building scales to the population of a kingdom.
@@ -179,7 +204,7 @@ Contributing as often as possible to kingdom buildings is recommended for optimi
         id="coups",
         title="Coups",
         icon="flame.fill",
-        order=8,
+        order=9,
         content="""
 Don't like your ruler? Overthrow them.
 
@@ -198,7 +223,7 @@ The best coups are coordinated. Communicate often with your team.
         id="invasions",
         title="Invasions",
         icon="shield.lefthalf.filled",
-        order=9,
+        order=10,
         content="""
 Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 
@@ -219,7 +244,7 @@ A kingdom can only be attacked once every 30 days.
         id="sabotage",
         title="Intelligence & Sabotage",
         icon="eye.fill",
-        order=10,
+        order=11,
         content="""
 Can't invade yet? Disrupt them anyway.
 
@@ -242,7 +267,7 @@ Coordinate with your allies. Good intel wins wars before they start.
         id="battles",
         title="Battle System",
         icon="burst.fill",
-        order=11,
+        order=12,
         content="""
 **The "300" problem**
 
@@ -268,7 +293,7 @@ Try the **Battle Simulator** to see it in action.
         id="notifications",
         title="Notifications",
         icon="bell.fill",
-        order=12,
+        order=13,
         content="""
 **Settings → Action Notifications → Allow**
 
@@ -287,7 +312,7 @@ async def get_tutorial():
     Sections are ordered and include icons for visual hierarchy.
     """
     return TutorialResponse(
-        version="1.1.0",
+        version="1.2.0",
         sections=sorted(TUTORIAL_SECTIONS, key=lambda s: s.order)
     )
 

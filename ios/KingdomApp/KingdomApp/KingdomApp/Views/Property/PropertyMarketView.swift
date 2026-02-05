@@ -327,7 +327,7 @@ struct PropertyMarketView: View {
                             .frame(width: 24, height: 24)
                             .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonDanger, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
                         
-                        Text("Need 50+ reputation (you have \(status.player_reputation))")
+                        Text("Need 500 reputation (you have \(status.player_reputation))")
                             .font(FontStyles.labelMedium)
                             .foregroundColor(KingdomTheme.Colors.buttonDanger)
                     }

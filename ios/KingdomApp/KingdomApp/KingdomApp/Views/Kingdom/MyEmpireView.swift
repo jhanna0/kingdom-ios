@@ -124,13 +124,13 @@ struct MyEmpireView: View {
                     activeWarsSection(empire.activeWars, config: config)
                 }
                 
+                // Kingdoms List
+                kingdomsSection(empire.kingdoms, config: config)
+                
                 // Alliances (if any)
                 if !empire.alliances.isEmpty {
                     alliancesSection(empire.alliances, config: config)
                 }
-                
-                // Kingdoms List
-                kingdomsSection(empire.kingdoms, config: config)
             }
             .padding(.bottom, KingdomTheme.Spacing.xLarge)
         }
@@ -285,7 +285,7 @@ struct MyEmpireView: View {
     private func alliancesSection(_ alliances: [EmpireAllianceSummary], config: EmpireUIConfig) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
-                Image(systemName: "person.2.fill")
+                Image(systemName: config.alliancesSection.icon)
                     .font(FontStyles.iconMedium)
                     .foregroundColor(config.alliancesSection.swiftColor)
                 
@@ -311,7 +311,7 @@ struct MyEmpireView: View {
     
     private func allianceCard(_ alliance: EmpireAllianceSummary, config: EmpireUIConfig) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "link")
+            Image(systemName: config.alliancesSection.icon)
                 .font(FontStyles.iconMedium)
                 .foregroundColor(.white)
                 .frame(width: 40, height: 40)

@@ -27,10 +27,11 @@ from osm_service import (
 from routers.tiers import BUILDING_TYPES
 
 
-# Toggle boundary simplification on/off
-# TODO: Once we find an algorithm we like, store simplified_boundary in CityBoundary table
-#       and return that instead of computing on every request. Add a column like:
-#       simplified_boundary_geojson = Column(JSONB)  # Pre-computed simplified version
+# Boundary simplification settings
+# ✅ IMPLEMENTED: Simplified boundaries are now pre-computed and cached in the database
+#    - New cities: simplified_boundary_geojson is computed and stored on creation
+#    - Existing cities: backfilled on-the-fly when accessed (lazy migration)
+#    - This eliminates redundant computation on every API request
 SIMPLIFY_BOUNDARIES = True
 SIMPLIFY_TARGET_POINTS = 250
 
@@ -778,13 +779,22 @@ async def get_current_city(
         _ensure_kingdom_exists(db, city.osm_id, city.name)
         kingdoms = _get_kingdom_data(db, [city.osm_id], current_user)
         
+        # Use cached simplified boundary if available, otherwise compute and store it
+        if city.simplified_boundary_geojson:
+            simplified = city.simplified_boundary_geojson.get("coordinates", [])
+        else:
+            # Backfill: Compute and store simplified boundary for this city
+            simplified = simplify_boundary(boundary)
+            city.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+            db.commit()
+        
         return CityBoundaryResponse(
             osm_id=city.osm_id,
             name=city.name,
             admin_level=city.admin_level,
             center_lat=city.center_lat,
             center_lon=city.center_lon,
-            boundary=simplify_boundary(boundary),
+            boundary=simplified,
             radius_meters=city.radius_meters,
             cached=True,
             is_current=True,
@@ -813,13 +823,22 @@ async def get_current_city(
         _ensure_kingdom_exists(db, cached.osm_id, cached.name)
         kingdoms = _get_kingdom_data(db, [cached.osm_id], current_user)
         
+        # Use cached simplified boundary if available, otherwise compute and store it
+        if cached.simplified_boundary_geojson:
+            simplified = cached.simplified_boundary_geojson.get("coordinates", [])
+        else:
+            # Backfill: Compute and store simplified boundary for this city
+            simplified = simplify_boundary(cached.boundary_geojson.get("coordinates", []))
+            cached.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+            db.commit()
+        
         return CityBoundaryResponse(
             osm_id=cached.osm_id,
             name=cached.name,
             admin_level=cached.admin_level,
             center_lat=cached.center_lat,
             center_lon=cached.center_lon,
-            boundary=simplify_boundary(cached.boundary_geojson.get("coordinates", [])),
+            boundary=simplified,
             radius_meters=cached.radius_meters,
             cached=True,
             is_current=True,
@@ -850,6 +869,9 @@ async def get_current_city(
         )
     
     # Cache it (with race condition protection)
+    # Pre-compute and store simplified boundary for efficient retrieval
+    simplified = simplify_boundary(boundary_data["boundary"])
+    
     try:
         new_city = CityBoundary(
             osm_id=osm_id,
@@ -858,6 +880,7 @@ async def get_current_city(
             center_lat=boundary_data["center_lat"],
             center_lon=boundary_data["center_lon"],
             boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+            simplified_boundary_geojson={"type": "Polygon", "coordinates": simplified},
             radius_meters=boundary_data["radius_meters"],
             boundary_points_count=len(boundary_data["boundary"]),
             access_count=1,
@@ -891,7 +914,7 @@ async def get_current_city(
         admin_level=boundary_data["admin_level"],
         center_lat=boundary_data["center_lat"],
         center_lon=boundary_data["center_lon"],
-        boundary=simplify_boundary(boundary_data["boundary"]),
+        boundary=simplified,  # Use pre-computed simplified boundary
         radius_meters=boundary_data["radius_meters"],
         cached=False,
         is_current=True,
@@ -1112,6 +1135,7 @@ async def get_neighbor_cities(
                 'center_lat': city_info.get("center_lat", 0.0),
                 'center_lon': city_info.get("center_lon", 0.0),
                 'boundary_geojson': {"coordinates": []},  # Empty - frontend should fetch via batch endpoint
+                'simplified_boundary_geojson': None,  # No cached simplified boundary
                 'radius_meters': 5000.0,  # Estimated
                 'cached': False
             })()
@@ -1126,21 +1150,34 @@ async def get_neighbor_cities(
     uncached_count = len(result_cities) - cached_count
     print(f"   ✅ Returning {len(result_cities)} neighbors ({cached_count} with boundaries, {uncached_count} center-only)")
     
-    return [
-        CityBoundaryResponse(
+    # Build response with cached simplified boundaries
+    response = []
+    for city in result_cities:
+        # Use cached simplified boundary if available, otherwise compute and store it
+        if city.simplified_boundary_geojson:
+            simplified = city.simplified_boundary_geojson.get("coordinates", [])
+        else:
+            # Backfill: Compute and store simplified boundary for this city
+            simplified = simplify_boundary(city.boundary_geojson.get("coordinates", []))
+            city.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+        
+        response.append(CityBoundaryResponse(
             osm_id=city.osm_id,
             name=city.name,
             admin_level=city.admin_level,
             center_lat=city.center_lat,
             center_lon=city.center_lon,
-            boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
+            boundary=simplified,
             radius_meters=city.radius_meters,
             cached=True,
             is_current=False,
             kingdom=kingdoms.get(city.osm_id)
-        )
-        for city in result_cities
-    ]
+        ))
+    
+    # Commit any backfill updates
+    db.commit()
+    
+    return response
 
 
 # Legacy endpoint - combines current + neighbors (for backward compat)
@@ -1170,10 +1207,20 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
         cached.access_count += 1
         cached.last_accessed = datetime.utcnow()
         db.commit()
+        
+        # Use cached simplified boundary if available, otherwise compute and store it
+        if cached.simplified_boundary_geojson:
+            simplified = cached.simplified_boundary_geojson.get("coordinates", [])
+        else:
+            # Backfill: Compute and store simplified boundary for this city
+            simplified = simplify_boundary(cached.boundary_geojson.get("coordinates", []))
+            cached.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+            db.commit()
+        
         return BoundaryResponse(
             osm_id=cached.osm_id,
             name=cached.name,
-            boundary=simplify_boundary(cached.boundary_geojson.get("coordinates", [])),
+            boundary=simplified,
             radius_meters=cached.radius_meters,
             from_cache=True
         )
@@ -1185,6 +1232,9 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
         return None
     
     # Cache it (with race condition protection)
+    # Pre-compute and store simplified boundary for efficient retrieval
+    simplified = simplify_boundary(boundary_data["boundary"])
+    
     try:
         new_city = CityBoundary(
             osm_id=osm_id,
@@ -1193,6 +1243,7 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
             center_lat=boundary_data["center_lat"],
             center_lon=boundary_data["center_lon"],
             boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+            simplified_boundary_geojson={"type": "Polygon", "coordinates": simplified},
             radius_meters=boundary_data["radius_meters"],
             boundary_points_count=len(boundary_data["boundary"]),
             access_count=1,
@@ -1218,7 +1269,7 @@ async def get_city_boundary(db: Session, osm_id: str) -> Optional[BoundaryRespon
     return BoundaryResponse(
         osm_id=osm_id,
         name=boundary_data["name"],
-        boundary=simplify_boundary(boundary_data["boundary"]),
+        boundary=simplified,  # Use pre-computed simplified boundary
         radius_meters=boundary_data["radius_meters"],
         from_cache=False
     )
@@ -1267,6 +1318,9 @@ async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[Bou
                 continue
             
             try:
+                # Pre-compute and store simplified boundary for efficient retrieval
+                simplified = simplify_boundary(boundary_data["boundary"])
+                
                 new_city = CityBoundary(
                     osm_id=osm_id,
                     name=boundary_data["name"],
@@ -1274,6 +1328,7 @@ async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[Bou
                     center_lat=boundary_data["center_lat"],
                     center_lon=boundary_data["center_lon"],
                     boundary_geojson={"type": "Polygon", "coordinates": boundary_data["boundary"]},
+                    simplified_boundary_geojson={"type": "Polygon", "coordinates": simplified},
                     radius_meters=boundary_data["radius_meters"],
                     boundary_points_count=len(boundary_data["boundary"]),
                     access_count=1,
@@ -1315,10 +1370,19 @@ async def get_city_boundaries_batch(db: Session, osm_ids: List[str]) -> List[Bou
     for osm_id in osm_ids:
         if osm_id in cached_by_id:
             city = cached_by_id[osm_id]
+            
+            # Use cached simplified boundary if available, otherwise compute and store it
+            if city.simplified_boundary_geojson:
+                simplified = city.simplified_boundary_geojson.get("coordinates", [])
+            else:
+                # Backfill: Compute and store simplified boundary for this city
+                simplified = simplify_boundary(city.boundary_geojson.get("coordinates", []))
+                city.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+            
             result.append(BoundaryResponse(
                 osm_id=city.osm_id,
                 name=city.name,
-                boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
+                boundary=simplified,
                 radius_meters=city.radius_meters,
                 from_cache=(osm_id in cached_by_id and osm_id not in missing_ids)
             ))
@@ -1348,13 +1412,22 @@ def get_city_by_id(db: Session, osm_id: str) -> Optional[CityBoundaryResponse]:
     
     kingdoms = _get_kingdom_data(db, [osm_id], None)
     
+    # Use cached simplified boundary if available, otherwise compute and store it
+    if city.simplified_boundary_geojson:
+        simplified = city.simplified_boundary_geojson.get("coordinates", [])
+    else:
+        # Backfill: Compute and store simplified boundary for this city
+        simplified = simplify_boundary(city.boundary_geojson.get("coordinates", []))
+        city.simplified_boundary_geojson = {"type": "Polygon", "coordinates": simplified}
+        db.commit()
+    
     return CityBoundaryResponse(
         osm_id=city.osm_id,
         name=city.name,
         admin_level=city.admin_level,
         center_lat=city.center_lat,
         center_lon=city.center_lon,
-        boundary=simplify_boundary(city.boundary_geojson.get("coordinates", [])),
+        boundary=simplified,
         radius_meters=city.radius_meters,
         cached=True,
         kingdom=kingdoms.get(osm_id)

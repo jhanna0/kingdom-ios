@@ -55,7 +55,7 @@ RESOURCES = {
     "stone": {
         "display_name": "Stone",
         "icon": "cube.fill",
-        "color": "parchmentDark",
+        "color": "imperialGold",
         "description": "Quarried stone for building walls and structures",
         "category": "material",
         "display_order": 12,
@@ -190,6 +190,29 @@ RESOURCES = {
         "display_order": 90,
         "is_tradeable": True,
         "storage_type": "inventory",
+    },
+    "book": {
+        "display_name": "Book",
+        "icon": "book.fill",
+        "color": "brown",
+        "description": "A rare tome of knowledge. Completes any one cooldown!",
+        "category": "consumable",
+        "display_order": 91,
+        "is_tradeable": False,  # Non-tradeable to prevent RMT
+        "storage_type": "inventory",
+        "effect": "skip_cooldown",  # "skip_cooldown" = clear entire cooldown, "reduce_cooldown" = reduce by X minutes
+        "cooldown_reduction_minutes": None,  # None = skip entire cooldown
+    },
+    "sourdough": {
+        "display_name": "Sourdough",
+        "icon": "cloud.fill",
+        "color": "gold",
+        "description": "Delicious smelling bread. Good food for activities.",
+        "category": "consumable",
+        "display_order": 92,
+        "is_tradeable": True,  # Non-tradeable to prevent RMT
+        "storage_type": "inventory",
+        "is_food": True,
     },
 }
 

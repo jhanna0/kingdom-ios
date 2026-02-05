@@ -30,38 +30,41 @@ router = APIRouter(prefix="/achievements", tags=["achievements"])
 
 # Category display configuration with explicit ordering
 # Order determines how categories appear in the UI (lower = first)
+# Using intervals of 10 to allow easy insertion without renumbering
+# Colors use theme color names that iOS maps to actual colors
 CATEGORY_CONFIG = {
     # Core progression (most common activities)
-    "building": {"display_name": "Building", "icon": "building.2.fill", "order": 1},
-    "training": {"display_name": "Training", "icon": "figure.strengthtraining.traditional", "order": 2},
-    "gathering": {"display_name": "Gathering", "icon": "leaf.fill", "order": 3},
-    "crafting": {"display_name": "Crafting", "icon": "hammer.fill", "order": 4},
+    "building": {"display_name": "Building", "icon": "building.2.fill", "color": "inkMedium", "order": 10},
+    "training": {"display_name": "Training", "icon": "figure.strengthtraining.traditional", "color": "purple", "order": 20},
+    "gathering": {"display_name": "Gathering", "icon": "leaf.fill", "color": "green", "order": 30},
+    "crafting": {"display_name": "Crafting", "icon": "hammer.fill", "color": "orange", "order": 40},
+    "exploration": {"display_name": "Exploration", "icon": "map.fill", "color": "blue", "order": 50},
+    "properties": {"display_name": "Properties", "icon": "house.fill", "color": "brown", "order": 55},
     
     # Activities
-    "hunting": {"display_name": "Hunting", "icon": "scope", "order": 5},
-    "fishing": {"display_name": "Fishing", "icon": "fish.fill", "order": 6},
-    "foraging": {"display_name": "Foraging", "icon": "leaf.fill", "order": 7},
-    "gardening": {"display_name": "Gardening", "icon": "leaf.fill", "order": 8},
+    "hunting": {"display_name": "Hunting", "icon": "scope", "color": "red", "order": 60},
+    "fishing": {"display_name": "Fishing", "icon": "fish.fill", "color": "royalBlue", "order": 70},
+    "foraging": {"display_name": "Foraging", "icon": "leaf.fill", "color": "green", "order": 80},
+    "gardening": {"display_name": "Gardening", "icon": "leaf.fill", "color": "green", "order": 90},
     
     # Economy & Science
-    "merchant": {"display_name": "Merchant", "icon": "storefront.fill", "order": 9},
-    "science": {"display_name": "Science", "icon": "flask.fill", "order": 10},
+    "merchant": {"display_name": "Merchant", "icon": "storefront.fill", "color": "gold", "order": 100},
+    "science": {"display_name": "Science", "icon": "flask.fill", "color": "purple", "order": 110},
     
     # PvP (more common than coups/battles)
-    "pvp": {"display_name": "PvP", "icon": "figure.fencing", "order": 11},
-    "intelligence": {"display_name": "Intelligence", "icon": "eye.fill", "order": 12},
+    "pvp": {"display_name": "PvP", "icon": "figure.fencing", "color": "red", "order": 120},
+    "intelligence": {"display_name": "Intelligence", "icon": "eye.fill", "color": "inkDark", "order": 130},
     
     # Kingdom stuff (rarer)
-    "fortification": {"display_name": "Fortification", "icon": "brick.fill", "order": 13},
-    "ruler": {"display_name": "Ruler", "icon": "crown.fill", "order": 14},
+    "ruler": {"display_name": "Ruler", "icon": "crown.fill", "color": "gold", "order": 150},
     
     # Rare events (least common)
-    "coup": {"display_name": "Coup", "icon": "theatermasks.fill", "order": 15},
-    "battle": {"display_name": "Battle", "icon": "flag.fill", "order": 16},
+    "coup": {"display_name": "Coup", "icon": "theatermasks.fill", "color": "orange", "order": 160},
+    "battle": {"display_name": "Battle", "icon": "flag.fill", "color": "red", "order": 170},
     
     # Meta
-    "progression": {"display_name": "Progression", "icon": "star.fill", "order": 20},
-    "general": {"display_name": "General", "icon": "trophy.fill", "order": 99},
+    "progression": {"display_name": "Progression", "icon": "star.fill", "color": "gold", "order": 200},
+    "general": {"display_name": "General", "icon": "trophy.fill", "color": "inkMedium", "order": 999},
 }
 
 
@@ -142,7 +145,15 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT operations_attempted FROM player_intelligence_stats WHERE user_id = :user_id), 0) as operations_attempted,
             COALESCE((SELECT intel_gathered FROM player_intelligence_stats WHERE user_id = :user_id), 0) as intel_gathered,
             COALESCE((SELECT sabotages_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as sabotages_completed,
-            COALESCE((SELECT heists_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as heists_completed
+            COALESCE((SELECT heists_completed FROM player_intelligence_stats WHERE user_id = :user_id), 0) as heists_completed,
+            
+            -- Exploration stats (only count kingdoms that have a ruler)
+            COALESCE((SELECT COUNT(DISTINCT uk.kingdom_id) FROM user_kingdoms uk
+                      JOIN kingdoms k ON k.id = uk.kingdom_id
+                      WHERE uk.user_id = :user_id AND k.ruler_id IS NOT NULL), 0) as kingdoms_visited,
+            
+            -- Properties stats
+            COALESCE((SELECT COUNT(DISTINCT kingdom_id) FROM properties WHERE owner_id = :user_id), 0) as kingdoms_with_properties
     """)
     
     combined_result = db.execute(combined_query, {"user_id": user_id}).first()
@@ -172,6 +183,8 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["intel_gathered"] = int(combined_result.intel_gathered)
         progress["sabotages_completed"] = int(combined_result.sabotages_completed)
         progress["heists_completed"] = int(combined_result.heists_completed)
+        progress["kingdoms_visited"] = int(combined_result.kingdoms_visited)
+        progress["kingdoms_with_properties"] = int(combined_result.kingdoms_with_properties)
     
     # =========================================================================
     # SECOND COMBINED QUERY: Battle + Garden (more complex aggregations)
@@ -201,12 +214,12 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             ), 0) as invasions_won_defend,
             
             -- Garden stats
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action IN ('harvested', 'discarded') AND plant_type IS NOT NULL), 0) as plants_grown,
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower'), 0) as flowers_grown,
-            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type IS NOT NULL), 0) as plants_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower'), 0) as flowers_grown,
+            COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
             COALESCE((SELECT SUM(wheat_gained) FROM garden_history WHERE user_id = :user_id AND action = 'harvested'), 0) as wheat_harvested,
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'weed'), 0) as weeds_cleared,
-            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
+            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
     """)
     
     complex_result = db.execute(complex_query, {"user_id": user_id}).first()

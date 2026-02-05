@@ -28,6 +28,38 @@ struct SettingsView: View {
                 }
                 .padding(.top, 20)
                 
+                // Supporter Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Supporter")
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.bold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 16)
+                    
+                    NavigationLink(destination: SubscriberSettingsView()) {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .font(FontStyles.iconSmall)
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            
+                            Text("Profile Customization")
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                        }
+                        .padding()
+                    }
+                    .brutalistCard(
+                        backgroundColor: KingdomTheme.Colors.parchmentLight,
+                        cornerRadius: 12
+                    )
+                }
+                
                 // Audio Settings Section
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Audio")
@@ -157,7 +189,7 @@ struct SettingsView: View {
                         Task {
                             isClearingCache = true
                             cacheCleared = false
-                            try? await TierManager.shared.forceRefresh()
+                            try? await TierManager.shared.loadAllTiers()
                             isClearingCache = false
                             cacheCleared = true
                             

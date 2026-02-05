@@ -14,88 +14,114 @@ struct DecreeInputView: View {
             KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
-            VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                Text("Royal Decree")
-                    .font(KingdomTheme.Typography.title2())
-                    .fontWeight(.bold)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .padding(.top)
-                
-                Text("Announce your will to all subjects of \(kingdom.name)")
-                    .font(KingdomTheme.Typography.subheadline())
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                
-                // Character count
-                HStack {
-                    Spacer()
-                    Text("\(decreeText.count)/500")
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(decreeText.count > 500 ? .red : KingdomTheme.Colors.inkLight)
-                }
-                .padding(.horizontal)
-                
-                ZStack(alignment: .topLeading) {
-                    if decreeText.isEmpty {
-                        Text("What decree will you proclaim to your subjects?")
-                            .font(KingdomTheme.Typography.body())
-                            .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.6))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 20)
+            ScrollView {
+                VStack(spacing: KingdomTheme.Spacing.xLarge) {
+                    // Header Card
+                    VStack(spacing: KingdomTheme.Spacing.medium) {
+                        Image(systemName: "scroll.fill")
+                            .font(FontStyles.iconLarge)
+                            .foregroundColor(.white)
+                            .frame(width: 52, height: 52)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 12, shadowOffset: 3, borderWidth: 2)
+                        
+                        Text("Royal Decree")
+                            .font(FontStyles.headingLarge)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Text("Announce your will to all subjects of \(kingdom.name)")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .multilineTextAlignment(.center)
                     }
-                    
-                    TextEditor(text: $decreeText)
-                        .font(KingdomTheme.Typography.body())
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                        .tint(KingdomTheme.Colors.inkDark)
-                        .scrollContentBackground(.hidden)
-                        .frame(height: 150)
-                        .padding(12)
-                }
-                .background(Color.white)
-                .cornerRadius(KingdomTheme.CornerRadius.large)
-                .overlay(
-                    RoundedRectangle(cornerRadius: KingdomTheme.CornerRadius.large)
-                        .stroke(KingdomTheme.Colors.inkLight.opacity(0.3), lineWidth: KingdomTheme.BorderWidth.thin)
-                )
-                .padding(.horizontal)
-                
-                if let error = errorMessage {
-                    Text(error)
-                        .font(KingdomTheme.Typography.caption())
-                        .foregroundColor(.red)
-                        .padding(.horizontal)
-                }
-                
-                Button {
-                    Task {
-                        await submitDecree()
-                    }
-                } label: {
-                    HStack {
-                        if isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(0.8)
-                        }
-                        Text(isSubmitting ? "Proclaiming..." : "Proclaim Decree")
-                    }
-                    .font(FontStyles.bodyMediumBold)
-                    .foregroundColor(.white)
+                    .padding()
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    
+                    // Text Input Card
+                    VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+                        HStack {
+                            Text("Your Decree")
+                                .font(FontStyles.headingMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                            
+                            Spacer()
+                            
+                            Text("\(decreeText.count)/500")
+                                .font(FontStyles.labelSmall)
+                                .foregroundColor(decreeText.count > 500 ? KingdomTheme.Colors.royalCrimson : KingdomTheme.Colors.inkLight)
+                        }
+                        
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(height: 2)
+                        
+                        ZStack(alignment: .topLeading) {
+                            if decreeText.isEmpty {
+                                Text("What decree will you proclaim to your subjects?")
+                                    .font(FontStyles.bodyMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.6))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 8)
+                            }
+                            
+                            TextEditor(text: $decreeText)
+                                .font(FontStyles.bodyMedium)
+                                .foregroundColor(KingdomTheme.Colors.inkDark)
+                                .tint(KingdomTheme.Colors.inkDark)
+                                .scrollContentBackground(.hidden)
+                                .frame(minHeight: 150)
+                        }
+                        .padding(12)
+                        .background(KingdomTheme.Colors.parchment)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                        
+                        if let error = errorMessage {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(FontStyles.iconTiny)
+                                Text(error)
+                                    .font(FontStyles.labelSmall)
+                            }
+                            .foregroundColor(KingdomTheme.Colors.royalCrimson)
+                        }
+                    }
+                    .padding()
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    
+                    // Submit Button
+                    Button {
+                        Task {
+                            await submitDecree()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "megaphone.fill")
+                                    .font(FontStyles.iconSmall)
+                            }
+                            Text(isSubmitting ? "Proclaiming..." : "Proclaim Decree")
+                                .font(FontStyles.bodyMediumBold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                    }
+                    .brutalistBadge(
+                        backgroundColor: decreeText.isEmpty || decreeText.count > 500 ? KingdomTheme.Colors.inkLight : KingdomTheme.Colors.royalCrimson,
+                        cornerRadius: 8,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                    .disabled(decreeText.isEmpty || decreeText.count > 500 || isSubmitting)
                 }
-                .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.buttonPrimary,
-                    cornerRadius: 8,
-                    shadowOffset: 2,
-                    borderWidth: 2
-                )
-                .padding(.horizontal)
-                .disabled(decreeText.isEmpty || decreeText.count > 500 || isSubmitting)
-                
-                Spacer()
+                .padding()
             }
         }
         .navigationTitle("Make Decree")

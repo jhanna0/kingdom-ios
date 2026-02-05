@@ -16,16 +16,20 @@ struct CharacterSheetView: View {
     @State private var isLoadingActivities = true
     @State private var relocationStatus: RelocationStatusResponse?
     @State private var isLoadingRelocationStatus = false
+    @State private var achievementGroups: [AchievementGroup] = []
+    @State private var isLoadingAchievements = true
     
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with level and gold
+                // Header with level, gold, and subscriber customization
                 ProfileHeaderCard(
                     displayName: player.name,
                     level: player.level,
                     gold: player.gold,
-                    rulerOf: player.isRuler ? player.currentKingdomName : nil
+                    rulerOf: player.isRuler ? player.currentKingdomName : nil,
+                    customization: player.subscriberCustomization,
+                    isSubscriber: player.isSubscriber
                 )
                 
                 // Combined combat stats and training
@@ -42,6 +46,12 @@ struct CharacterSheetView: View {
                 // Equipment section
                 EquipmentInfoCard(player: player)
                 
+                // Earned Achievements/Titles section
+                EarnedTitlesCard(
+                    groups: achievementGroups,
+                    isLoading: isLoadingAchievements
+                )
+
                 // Pets section
                 PetsCard(pets: player.pets, showEmpty: true)
                 
@@ -64,6 +74,33 @@ struct CharacterSheetView: View {
                         isLoadingRelocationStatus: isLoadingRelocationStatus,
                         onRelocate: relocateHometown
                     )
+                }
+                
+                // Supporter Options section (only for subscribers)
+                if player.isSubscriber {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Supporter Benefits")
+                            .font(FontStyles.headingSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        NavigationLink(destination: SubscriberSettingsView().environmentObject(player)) {
+                            HStack {
+                                Image(systemName: "seal.fill")
+                                    .font(FontStyles.iconSmall)
+                                Text("Customize Profile")
+                            }
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        }
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                            cornerRadius: 8,
+                            shadowOffset: 2,
+                            borderWidth: 2
+                        )
+                    }
                 }
                 
                 // Settings button
@@ -92,9 +129,10 @@ struct CharacterSheetView: View {
             await loadTrainingContracts()
             await loadMyActivities()
             await loadRelocationStatus()
+            await loadEarnedAchievements()
         }
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
-        .navigationTitle("Character Sheet")
+        .navigationTitle("My Character")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -174,6 +212,27 @@ struct CharacterSheetView: View {
                 isLoadingRelocationStatus = false
             }
             print("❌ Failed to load relocation status: \(error)")
+        }
+    }
+    
+    private func loadEarnedAchievements() async {
+        await MainActor.run {
+            isLoadingAchievements = true
+        }
+        
+        do {
+            // Fetch own profile to get achievements
+            let profile = try await KingdomAPIService.shared.player.getPlayerProfile(userId: player.playerId)
+            
+            await MainActor.run {
+                achievementGroups = profile.achievement_groups ?? []
+                isLoadingAchievements = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingAchievements = false
+            }
+            print("❌ Failed to load achievements: \(error)")
         }
     }
     

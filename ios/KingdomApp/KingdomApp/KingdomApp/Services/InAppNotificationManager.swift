@@ -11,6 +11,8 @@ enum InAppNotificationType {
     case actionSuccess(message: String)
     case warning(message: String)
     case info(message: String)
+    case garden(message: String)
+    case kitchen(message: String)
     
     var icon: String {
         switch self {
@@ -18,6 +20,8 @@ enum InAppNotificationType {
         case .actionSuccess: return "sparkles"
         case .warning: return "exclamationmark.triangle.fill"
         case .info: return "info.circle.fill"
+        case .garden: return "leaf.fill"
+        case .kitchen: return "flame.fill"
         }
     }
     
@@ -31,6 +35,10 @@ enum InAppNotificationType {
             return "Warning"
         case .info:
             return "Info"
+        case .garden:
+            return "Garden"
+        case .kitchen:
+            return "Kitchen"
         }
     }
     
@@ -43,6 +51,10 @@ enum InAppNotificationType {
         case .warning(let message):
             return message
         case .info(let message):
+            return message
+        case .garden(let message):
+            return message
+        case .kitchen(let message):
             return message
         }
     }
@@ -57,6 +69,10 @@ enum InAppNotificationType {
             return KingdomTheme.Colors.buttonWarning
         case .info:
             return KingdomTheme.Colors.buttonPrimary
+        case .garden:
+            return KingdomTheme.Colors.buttonSuccess  // Green for garden
+        case .kitchen:
+            return KingdomTheme.Colors.buttonWarning  // Orange for kitchen
         }
     }
 }
@@ -120,6 +136,10 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
             // Use the notification title/body to create our toast
             if content.categoryIdentifier == "ACTION_COOLDOWN" || content.categoryIdentifier == "COUP_PHASE" {
                 self.show(.cooldownComplete(actionName: actionName.isEmpty ? "Action" : actionName, slot: slot))
+            } else if content.categoryIdentifier == "GARDEN_WATER" {
+                self.show(.garden(message: content.body))
+            } else if content.categoryIdentifier == "KITCHEN_BAKING" {
+                self.show(.kitchen(message: content.body))
             } else {
                 self.show(.info(message: content.body))
             }

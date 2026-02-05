@@ -36,6 +36,7 @@ struct OnboardingView: View {
                         selectedCity: $selectedCity,
                         selectedCityOsmId: $selectedCityOsmId,
                         selectedCityCoordinate: $selectedCityCoordinate,
+                        onBack: { currentStep = 0 },
                         onContinue: {
                             DebugLogger.shared.log("onboarding_step", message: "Step 1 -> 2 (Hometown -> DisplayName)", extra: [
                                 "selectedCity": selectedCity ?? "nil",
@@ -49,13 +50,17 @@ struct OnboardingView: View {
                         displayName: $displayName,
                         selectedCity: selectedCity ?? "your city",
                         hometownId: selectedCityOsmId ?? authManager.currentUser?.hometown_kingdom_id,
+                        onBack: { currentStep = 1 },
                         onContinue: { currentStep = 3 }
                     )
                     .environmentObject(authManager)
                 } else if currentStep == 3 {
-                    BalanceStep(onContinue: {
-                        authManager.finishOnboarding()
-                    })
+                    BalanceStep(
+                        onBack: { currentStep = 2 },
+                        onContinue: {
+                            authManager.finishOnboarding()
+                        }
+                    )
                 }
             }
         }
@@ -232,10 +237,23 @@ struct FeatureRow: View {
 // MARK: - Step 3: Live Balance
 
 struct BalanceStep: View {
+    let onBack: () -> Void
     let onContinue: () -> Void
     
     var body: some View {
         VStack(spacing: KingdomTheme.Spacing.xxLarge) {
+            // Back button
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.top, KingdomTheme.Spacing.medium)
+            
             // Header with brutalist icon
             VStack(spacing: KingdomTheme.Spacing.large) {
                 Image(systemName: "slider.horizontal.3")
@@ -258,7 +276,6 @@ struct BalanceStep: View {
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .multilineTextAlignment(.center)
             }
-            .padding(.top, 60)
             .padding(.horizontal, KingdomTheme.Spacing.large)
             
             // Info Card
@@ -325,6 +342,7 @@ struct DisplayNameStep: View {
     @Binding var displayName: String
     let selectedCity: String
     let hometownId: String?
+    let onBack: () -> Void
     let onContinue: () -> Void
     
     @State private var validationResult: UsernameValidator.ValidationResult = .valid
@@ -336,6 +354,18 @@ struct DisplayNameStep: View {
     
     var body: some View {
         VStack(spacing: KingdomTheme.Spacing.xxLarge) {
+            // Back button
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, KingdomTheme.Spacing.large)
+            .padding(.top, KingdomTheme.Spacing.medium)
+            
             // Header
             VStack(spacing: KingdomTheme.Spacing.large) {
                 Image(systemName: "person.circle.fill")
@@ -353,7 +383,6 @@ struct DisplayNameStep: View {
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                     .multilineTextAlignment(.center)
             }
-            .padding(.top, 60)
             .padding(.horizontal, KingdomTheme.Spacing.large)
             
             // Input Card
@@ -463,6 +492,7 @@ struct HometownStep: View {
     @Binding var selectedCity: String?
     @Binding var selectedCityOsmId: String?
     @Binding var selectedCityCoordinate: CLLocationCoordinate2D?
+    let onBack: () -> Void
     let onContinue: () -> Void
     
     @State private var cameraPosition: MapCameraPosition = .automatic
@@ -608,6 +638,21 @@ struct HometownStep: View {
             
             // Top Header
             VStack {
+                // Back button
+                HStack {
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .padding(KingdomTheme.Spacing.small)
+                            .background(KingdomTheme.Colors.parchment.opacity(0.9))
+                            .cornerRadius(8)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.medium)
+                .padding(.bottom, KingdomTheme.Spacing.small)
+                
                 HStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: "map.fill")
                         .font(FontStyles.iconMedium)

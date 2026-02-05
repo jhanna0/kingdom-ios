@@ -85,6 +85,7 @@ from .empire import (
 from .player import (
     PlayerActivity,
     PlayerEquipment,
+    PlayerAchievement,
     PlayerPublicProfile,
     PlayerInKingdom,
     PlayersInKingdomResponse,
@@ -156,6 +157,7 @@ __all__ = [
     # Player Discovery
     "PlayerActivity",
     "PlayerEquipment",
+    "PlayerAchievement",
     "PlayerPublicProfile",
     "PlayerInKingdom",
     "PlayersInKingdomResponse",

@@ -28,6 +28,9 @@ class ActivityLogEntry(BaseModel):
     username: Optional[str] = None
     display_name: Optional[str] = None
     user_level: Optional[int] = None
+    
+    # Subscriber customization (server-driven colors for activity card)
+    subscriber_customization: Optional[Dict[str, Any]] = None  # SubscriberCustomization as dict
 
     class Config:
         from_attributes = True

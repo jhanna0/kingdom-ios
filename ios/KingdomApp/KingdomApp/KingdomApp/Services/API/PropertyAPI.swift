@@ -16,6 +16,17 @@ class PropertyAPI {
         let route: String
     }
     
+    struct AvailableOption: Codable {
+        let id: String
+        let name: String
+        let tier: Int
+        let icon: String?
+        let description: String?
+        let gold_per_action: Double?
+        let actions_required: Int?
+        let per_action_costs: [ResourceCost]?
+    }
+    
     struct PropertyResponse: Codable {
         let id: String
         let kingdom_id: String
@@ -27,6 +38,8 @@ class PropertyAPI {
         let purchased_at: String
         let last_upgraded: String?
         let available_rooms: [PropertyRoom]?
+        let built_rooms: [String]?  // Room IDs that have been built
+        let available_options: [AvailableOption]?  // Options that can still be built
         // Fortification fields
         let fortification_unlocked: Bool?
         let fortification_percent: Int?
@@ -155,9 +168,13 @@ class PropertyAPI {
         let actions_required: Int
         let actions_completed: Int
         let cost: Int
+        let gold_per_action: Double?  // Gold cost per action
+        let current_tax_rate: Int?  // Tax rate for display
         let status: String
         let started_at: String
         let per_action_costs: [ResourceCost]?  // Resources consumed per work action
+        let option_id: String?  // Which specific room/option is being built
+        let option_name: String?  // Display name for the room
     }
     
     struct CurrentKingdomInfo: Codable {
@@ -183,8 +200,13 @@ class PropertyAPI {
     
     // MARK: - Upgrade Property (Purchase Contract)
     
-    func purchasePropertyUpgrade(propertyId: String) async throws -> PropertyUpgradeResponse {
-        let request = client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST")
+    func purchasePropertyUpgrade(propertyId: String, optionId: String? = nil) async throws -> PropertyUpgradeResponse {
+        let request: URLRequest
+        if let optionId = optionId {
+            request = try client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST", body: ["option_id": optionId])
+        } else {
+            request = client.request(endpoint: "/properties/\(propertyId)/upgrade/purchase", method: "POST")
+        }
         let response: PropertyUpgradeResponse = try await client.execute(request)
         return response
     }

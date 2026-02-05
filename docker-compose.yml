@@ -38,7 +38,11 @@ services:
       PYTHONUNBUFFERED: 1
       JWT_SECRET_KEY: "local-dev-secret-do-not-use-in-production"
       APPLE_APP_ID: "j.KingdomApp"
-      DEV_MODE: "False"  # Production mode - requires valid Apple/Google identity token
+      DEV_MODE: "True"  # Dev mode for local testing
+      # Apple IAP (optional for local - will skip verification in dev mode)
+      APPLE_KEY_ID: "PF8KVCVDRU"
+      APPLE_ISSUER_ID: "d487afd3-1583-451f-a7b5-80750bd59062"
+      APPLE_BUNDLE_ID: "j.KingdomApp"
     depends_on:
       db:
         condition: service_healthy

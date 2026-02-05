@@ -73,7 +73,8 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
                     "resource": resource_id,
                     "amount": cost["amount"],
                     "display_name": resource_info.get("display_name", resource_id.capitalize()),
-                    "icon": resource_info.get("icon", "questionmark.circle")
+                    "icon": resource_info.get("icon", "questionmark.circle"),
+                    "color": resource_info.get("color", "inkMedium")
                 })
     
     # Derive status from completion state (for backwards compatibility with clients)

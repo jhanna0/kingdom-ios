@@ -5,10 +5,12 @@ import SwiftUI
 struct CooldownTimer: View {
     let secondsRemaining: Int
     let totalSeconds: Int?
+    let onBookTap: (() -> Void)?  // Optional book button callback
     
-    init(secondsRemaining: Int, totalSeconds: Int? = nil) {
+    init(secondsRemaining: Int, totalSeconds: Int? = nil, onBookTap: (() -> Void)? = nil) {
         self.secondsRemaining = secondsRemaining
         self.totalSeconds = totalSeconds
+        self.onBookTap = onBookTap
     }
     
     var progress: Double {
@@ -47,6 +49,30 @@ struct CooldownTimer: View {
                 Text(formattedTime)
                     .font(FontStyles.bodyMedium)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                // Book button (skip cooldown)
+                if let onBookTap = onBookTap {
+                    Button(action: onBookTap) {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.black)
+                                        .offset(x: 2, y: 2)
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(KingdomTheme.Colors.buttonPrimary)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             }
             
             // Progress bar - brutalist style
