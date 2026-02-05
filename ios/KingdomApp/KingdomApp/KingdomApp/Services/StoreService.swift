@@ -11,21 +11,35 @@ class StoreService: ObservableObject {
     // MARK: - Published State
     
     @Published private(set) var products: [Product] = []
+    @Published private(set) var subscriptionProducts: [Product] = []  // Subscription products
     @Published private(set) var productConfigs: [String: ServerProduct] = [:]  // Server-side product info
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastPurchaseResult: PurchaseResult?
+    @Published private(set) var isSubscriber: Bool = false  // Active subscription status
     
     /// Server-side product configuration
     struct ServerProduct: Decodable {
         let id: String
         let name: String
+        let type: String?
         let gold: Int
         let meat: Int
         let books: Int
         let price_usd: Double
         let icon: String
         let color: String
+        // Subscription-specific fields (server-driven)
+        let subtitle: String?
+        let subscriptionDescription: String?
+        let benefits: [String]?
+        
+        enum CodingKeys: String, CodingKey {
+            case id, name, type, gold, meat, books, price_usd, icon, color
+            case subtitle
+            case subscriptionDescription = "description"
+            case benefits
+        }
         
         var description: String {
             var parts: [String] = []
@@ -57,6 +71,7 @@ class StoreService: ObservableObject {
         // Load products on init
         Task {
             await loadProducts()
+            await checkSubscriptionStatus()
         }
     }
     
@@ -84,10 +99,23 @@ class StoreService: ObservableObject {
             let productIDs = serverProducts.map { $0.id }
             let storeProducts = try await Product.products(for: Set(productIDs))
             
-            // Sort by price
-            products = storeProducts.sorted { $0.price < $1.price }
+            // Separate consumables and subscriptions
+            var consumables: [Product] = []
+            var subscriptions: [Product] = []
             
-            print("🛒 Loaded \(products.count) products from App Store (server configured \(serverProducts.count))")
+            for product in storeProducts {
+                if product.type == .autoRenewable {
+                    subscriptions.append(product)
+                } else {
+                    consumables.append(product)
+                }
+            }
+            
+            // Sort by price
+            products = consumables.sorted { $0.price < $1.price }
+            subscriptionProducts = subscriptions.sorted { $0.price < $1.price }
+            
+            print("🛒 Loaded \(products.count) consumables and \(subscriptionProducts.count) subscriptions from App Store")
             for product in products {
                 print("   - \(product.id): \(product.displayName) - \(product.displayPrice)")
             }
@@ -262,7 +290,13 @@ class StoreService: ObservableObject {
                     let transaction = try await self?.checkVerified(result)
                     
                     if let transaction = transaction {
-                        await self?.deliverProduct(transaction)
+                        // Handle subscription renewals
+                        if transaction.productType == .autoRenewable {
+                            await self?.deliverSubscription(transaction)
+                            await self?.checkSubscriptionStatus()
+                        } else {
+                            await self?.deliverProduct(transaction)
+                        }
                         await transaction.finish()
                     }
                 } catch {
@@ -302,18 +336,196 @@ class StoreService: ObservableObject {
             for await result in Transaction.currentEntitlements {
                 do {
                     let transaction = try checkVerified(result)
-                    await deliverProduct(transaction)
+                    
+                    // Handle subscription entitlements
+                    if transaction.productType == .autoRenewable {
+                        await deliverSubscription(transaction)
+                    } else {
+                        await deliverProduct(transaction)
+                    }
                     await transaction.finish()
                 } catch {
                     print("⚠️ Failed to process restored transaction: \(error)")
                 }
             }
+            
+            // Update subscription status
+            await checkSubscriptionStatus()
         } catch {
             print("❌ Failed to restore purchases: \(error)")
             errorMessage = "Failed to restore purchases"
         }
         
         isLoading = false
+    }
+    
+    // MARK: - Subscription Handling
+    
+    /// Check subscription status from both StoreKit and backend
+    func checkSubscriptionStatus() async {
+        // First check StoreKit entitlements
+        var hasActiveEntitlement = false
+        
+        for await result in Transaction.currentEntitlements {
+            do {
+                let transaction = try checkVerified(result)
+                
+                if transaction.productType == .autoRenewable {
+                    // Check if not expired
+                    if let expirationDate = transaction.expirationDate, expirationDate > Date() {
+                        hasActiveEntitlement = true
+                        // Sync with backend
+                        await deliverSubscription(transaction)
+                    }
+                }
+            } catch {
+                print("⚠️ Failed to verify entitlement: \(error)")
+            }
+        }
+        
+        // Also check backend status (in case subscription was managed elsewhere)
+        do {
+            let request = client.request(endpoint: "/store/subscription-status", method: "GET")
+            let response: SubscriptionStatusResponse = try await client.execute(request)
+            
+            await MainActor.run {
+                self.isSubscriber = response.is_subscriber
+            }
+            
+            print("⭐ Subscription status: \(response.is_subscriber ? "Active" : "Inactive")")
+        } catch {
+            print("❌ Failed to check subscription status: \(error)")
+            // Fall back to StoreKit entitlement check
+            await MainActor.run {
+                self.isSubscriber = hasActiveEntitlement
+            }
+        }
+    }
+    
+    /// Purchase a subscription product
+    func purchaseSubscription(_ product: Product) async -> Bool {
+        guard product.type == .autoRenewable else {
+            print("❌ Product is not a subscription")
+            return false
+        }
+        
+        guard !isLoading else { return false }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let result = try await product.purchase()
+            
+            switch result {
+            case .success(let verification):
+                let transaction = try checkVerified(verification)
+                
+                // Send to backend
+                let success = await deliverSubscription(transaction)
+                
+                await transaction.finish()
+                
+                if success {
+                    await checkSubscriptionStatus()
+                }
+                
+                isLoading = false
+                return success
+                
+            case .userCancelled:
+                print("🛒 User cancelled subscription purchase")
+                lastPurchaseResult = .cancelled
+                isLoading = false
+                return false
+                
+            case .pending:
+                print("🛒 Subscription pending approval")
+                errorMessage = "Subscription is pending approval"
+                lastPurchaseResult = .pending
+                isLoading = false
+                return false
+                
+            @unknown default:
+                lastPurchaseResult = .failed("Unknown error")
+                isLoading = false
+                return false
+            }
+        } catch {
+            print("❌ Subscription purchase failed: \(error)")
+            errorMessage = "Subscription purchase failed"
+            lastPurchaseResult = .failed(error.localizedDescription)
+            isLoading = false
+            return false
+        }
+    }
+    
+    /// Deliver subscription to backend
+    private func deliverSubscription(_ transaction: Transaction) async -> Bool {
+        print("⭐ Delivering subscription: \(transaction.productID)")
+        print("   Transaction ID: \(transaction.id)")
+        print("   Expires: \(transaction.expirationDate?.description ?? "N/A")")
+        
+        guard let expirationDate = transaction.expirationDate else {
+            print("❌ Subscription has no expiration date")
+            return false
+        }
+        
+        do {
+            let response = try await redeemSubscription(
+                productID: transaction.productID,
+                transactionID: String(transaction.id),
+                originalTransactionID: String(transaction.originalID),
+                expiresAt: expirationDate
+            )
+            
+            if response.success {
+                print("✅ Subscription activated!")
+                
+                await MainActor.run {
+                    self.isSubscriber = true
+                }
+                
+                // Notify the app
+                NotificationCenter.default.post(name: .subscriptionActivated, object: nil)
+                
+                return true
+            } else {
+                print("❌ Server rejected subscription: \(response.message)")
+                return false
+            }
+        } catch {
+            print("❌ Failed to redeem subscription: \(error)")
+            return false
+        }
+    }
+    
+    /// Redeem subscription with backend
+    private func redeemSubscription(
+        productID: String,
+        transactionID: String,
+        originalTransactionID: String,
+        expiresAt: Date
+    ) async throws -> SubscriptionRedeemResponse {
+        struct RedeemSubscriptionRequest: Encodable {
+            let product_id: String
+            let transaction_id: String
+            let original_transaction_id: String
+            let expires_at: String
+        }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        let body = RedeemSubscriptionRequest(
+            product_id: productID,
+            transaction_id: transactionID,
+            original_transaction_id: originalTransactionID,
+            expires_at: formatter.string(from: expiresAt)
+        )
+        
+        let request = try client.request(endpoint: "/store/redeem-subscription", method: "POST", body: body)
+        return try await client.execute(request)
     }
     
     // MARK: - Check Pending Transactions
@@ -425,6 +637,19 @@ struct BookInfoResponse: Decodable {
     let purchase_product_id: String?
 }
 
+struct SubscriptionStatusResponse: Decodable {
+    let is_subscriber: Bool
+    let product_id: String?
+    let expires_at: String?
+}
+
+struct SubscriptionRedeemResponse: Decodable {
+    let success: Bool
+    let message: String
+    let is_subscriber: Bool
+    let expires_at: String?
+}
+
 // MARK: - Errors
 
 enum StoreError: LocalizedError {
@@ -450,4 +675,5 @@ extension Notification.Name {
     static let purchaseCompleted = Notification.Name("purchaseCompleted")
     static let bookUsed = Notification.Name("bookUsed")
     static let openStore = Notification.Name("openStore")
+    static let subscriptionActivated = Notification.Name("subscriptionActivated")
 }

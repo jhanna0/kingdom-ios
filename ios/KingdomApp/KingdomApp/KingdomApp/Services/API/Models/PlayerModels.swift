@@ -80,6 +80,11 @@ struct APIPlayerState: Codable {
     let is_alive: Bool
     let is_ruler: Bool
     let is_verified: Bool
+    let is_subscriber: Bool?  // Has active subscription
+    
+    // Subscriber customization (server-driven themes and titles)
+    let subscriber_theme: APIThemeData?
+    let selected_title: APITitleData?
     
     // Legacy resources
     let iron: Int

@@ -17,6 +17,7 @@ Security:
 """
 
 import os
+import time
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -25,7 +26,7 @@ from typing import Optional, List
 from jose import jwt
 
 from db import get_db
-from db.models import User, PlayerState, PlayerInventory, Purchase, BookUsage
+from db.models import User, PlayerState, PlayerInventory, Purchase, BookUsage, Subscription
 from routers.auth import get_current_user
 import config
 
@@ -54,6 +55,7 @@ APPLE_SANDBOX_URL = "https://api.storekit-sandbox.itunes.apple.com"
 PRODUCTS = {
     "com.kingdom.starter_pack": {
         "name": "Starter Pack",
+        "type": "consumable",
         "gold": 1000,
         "meat": 1000,
         "price_usd": 1.99,
@@ -62,27 +64,35 @@ PRODUCTS = {
     },
     "com.kingdom.book_pack_5": {
         "name": "Book Pack (5)",
+        "type": "consumable",
         "books": 5,
         "price_usd": 3.99,
         "icon": "book.fill",
         "color": "buttonPrimary",
     },
+    # Subscription product
+    "com.kingdom.sub": {
+        "name": "Kingdom Supporter",
+        "type": "subscription",
+        "price_usd": 4.99,
+        "icon": "heart.fill",
+        "color": "imperialGold",
+        "subtitle": "Monthly subscription",
+        "description": "Kingdoms is a homemade side project done in my free time. It cost ~$150 to host 100 players per month. By supporting you unlock profile theming and other benefits. Thank you!",
+        "benefits": [
+            "Support independent development",
+            "Help keep the game ad-free",
+            "Unlock profile customization",
+        ],
+    },
     # Uncomment when added to App Store Connect:
     # "com.kingdom.book_pack_15": {
     #     "name": "Book Pack (15)",
+    #     "type": "consumable",
     #     "books": 15,
     #     "price_usd": 4.99,
     #     "icon": "books.vertical.fill",
     #     "color": "buttonPrimary",
-    # },
-    # Future products:
-    # "com.kingdom.mega_pack": {
-    #     "name": "Mega Pack", 
-    #     "gold": 5000,
-    #     "meat": 5000,
-    #     "price_usd": 19.99,
-    #     "icon": "crown.fill",
-    #     "color": "imperialGold",
     # },
 }
 
@@ -436,21 +446,27 @@ async def get_products():
     - Debugging
     - Verifying product configuration
     """
-    return {
-        "products": [
-            {
-                "id": product_id,
-                "name": cfg["name"],
-                "gold": cfg.get("gold", 0),
-                "meat": cfg.get("meat", 0),
-                "books": cfg.get("books", 0),
-                "price_usd": cfg["price_usd"],
-                "icon": cfg.get("icon", "bag.fill"),
-                "color": cfg.get("color", "royalBlue"),
-            }
-            for product_id, cfg in PRODUCTS.items()
-        ]
-    }
+    products = []
+    for product_id, cfg in PRODUCTS.items():
+        product = {
+            "id": product_id,
+            "name": cfg["name"],
+            "type": cfg.get("type", "consumable"),
+            "gold": cfg.get("gold", 0),
+            "meat": cfg.get("meat", 0),
+            "books": cfg.get("books", 0),
+            "price_usd": cfg["price_usd"],
+            "icon": cfg.get("icon", "bag.fill"),
+            "color": cfg.get("color", "royalBlue"),
+        }
+        # Add subscription-specific fields
+        if cfg.get("type") == "subscription":
+            product["subtitle"] = cfg.get("subtitle", "")
+            product["description"] = cfg.get("description", "")
+            product["benefits"] = cfg.get("benefits", [])
+        products.append(product)
+    
+    return {"products": products}
 
 
 @router.get("/history", response_model=List[PurchaseHistoryItem])
@@ -772,6 +788,147 @@ async def get_book_usage_history(
         )
         for u in usages
     ]
+
+
+# ============================================================
+# SUBSCRIPTION ENDPOINTS
+# ============================================================
+
+class SubscriptionStatusResponse(BaseModel):
+    """Current subscription status."""
+    is_subscriber: bool
+    product_id: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+@router.get("/subscription-status", response_model=SubscriptionStatusResponse)
+async def get_subscription_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the current user's subscription status.
+    
+    Returns whether the user has an active subscription and when it expires.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Get most recent active subscription
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == current_user.id,
+        Subscription.expires_at > now
+    ).order_by(Subscription.expires_at.desc()).first()
+    
+    if not subscription:
+        return SubscriptionStatusResponse(is_subscriber=False)
+    
+    return SubscriptionStatusResponse(
+        is_subscriber=True,
+        product_id=subscription.product_id,
+        expires_at=subscription.expires_at.isoformat()
+    )
+
+
+class RedeemSubscriptionRequest(BaseModel):
+    product_id: str
+    transaction_id: str
+    original_transaction_id: str
+    expires_at: str  # ISO format datetime
+
+
+class RedeemSubscriptionResponse(BaseModel):
+    success: bool
+    message: str
+    is_subscriber: bool
+    expires_at: Optional[str] = None
+
+
+@router.post("/redeem-subscription", response_model=RedeemSubscriptionResponse)
+async def redeem_subscription(
+    request: RedeemSubscriptionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Redeem a subscription purchase and activate subscriber status.
+    
+    Creates a new subscription row for history tracking.
+    If same original_transaction_id exists, updates the expiration (renewal).
+    """
+    
+    # 1. Validate product is a subscription
+    product = PRODUCTS.get(request.product_id)
+    if not product:
+        raise HTTPException(status_code=400, detail=f"Unknown product: {request.product_id}")
+    
+    if product.get("type") != "subscription":
+        raise HTTPException(status_code=400, detail="Product is not a subscription")
+    
+    # 2. Parse expiration date
+    try:
+        expires_at = datetime.fromisoformat(request.expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid expires_at format")
+    
+    # 3. Check for existing subscription by original_transaction_id (renewal case)
+    existing = db.query(Subscription).filter(
+        Subscription.original_transaction_id == request.original_transaction_id
+    ).first()
+    
+    if existing:
+        # Renewal - update expiration on existing row
+        if existing.user_id != current_user.id:
+            raise HTTPException(status_code=400, detail="Subscription belongs to another user")
+        
+        existing.expires_at = expires_at
+        db.commit()
+        
+        print(f"🔄 Subscription renewed for user {current_user.id} ({current_user.display_name})")
+        print(f"   Product: {product['name']}")
+        print(f"   Expires: {expires_at}")
+        
+        return RedeemSubscriptionResponse(
+            success=True,
+            message="Subscription renewed!",
+            is_subscriber=True,
+            expires_at=expires_at.isoformat()
+        )
+    
+    # 4. New subscription - create new row (for history tracking)
+    subscription = Subscription(
+        user_id=current_user.id,
+        product_id=request.product_id,
+        original_transaction_id=request.original_transaction_id,
+        expires_at=expires_at
+    )
+    db.add(subscription)
+    db.commit()
+    
+    print(f"⭐ New subscription activated for user {current_user.id} ({current_user.display_name})")
+    print(f"   Product: {product['name']}")
+    print(f"   Expires: {expires_at}")
+    
+    return RedeemSubscriptionResponse(
+        success=True,
+        message="Subscription activated! You can now customize your profile.",
+        is_subscriber=True,
+        expires_at=expires_at.isoformat()
+    )
+
+
+def is_user_subscriber(db: Session, user_id: int) -> bool:
+    """
+    Check if a user has an active subscription.
+    
+    Active = any subscription row with expires_at > NOW()
+    """
+    now = datetime.now(timezone.utc)
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id,
+        Subscription.expires_at > now
+    ).first()
+    
+    return subscription is not None
 
 
 # ============================================================

@@ -4,17 +4,34 @@ import SwiftUI
 
 struct FriendCard: View {
     let friend: Friend
+    
+    // Server-driven theme colors
+    private var avatarBackgroundColor: Color {
+        friend.subscriberTheme?.iconBackgroundColorValue ?? KingdomTheme.Colors.inkMedium
+    }
+    
+    private var textColor: Color {
+        friend.subscriberTheme?.textColorValue ?? .white
+    }
+    
+    private var cardBackgroundColor: Color {
+        friend.subscriberTheme?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    private var cardTextColor: Color {
+        friend.subscriberTheme != nil ? (friend.subscriberTheme?.textColorValue ?? KingdomTheme.Colors.inkDark) : KingdomTheme.Colors.inkDark
+    }
 
     var body: some View {
         NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
             HStack(spacing: 12) {
-                // Avatar with online indicator
+                // Avatar with online indicator - themed
                 ZStack(alignment: .bottomTrailing) {
                     Text(String(friend.displayName.prefix(1)).uppercased())
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(.white)
+                        .foregroundColor(textColor)
                         .frame(width: 48, height: 48)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
+                        .brutalistBadge(backgroundColor: avatarBackgroundColor, cornerRadius: 12)
                     
                     // Online indicator
                     if let isOnline = friend.isOnline, isOnline {
@@ -28,15 +45,35 @@ struct FriendCard: View {
                 
                 // Friend info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(friend.displayName)
-                        .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack(spacing: 6) {
+                        Text(friend.displayName)
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(cardTextColor)
+                        
+                        // Subscriber badge
+                        if friend.subscriberTheme != nil {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                        }
+                    }
+                    
+                    // Selected title from achievement
+                    if let title = friend.selectedTitle {
+                        HStack(spacing: 4) {
+                            Image(systemName: title.icon)
+                                .font(.system(size: 10))
+                            Text(title.displayName)
+                                .font(FontStyles.labelSmall)
+                        }
+                        .foregroundColor(cardTextColor.opacity(0.7))
+                    }
                     
                     HStack(spacing: 8) {
                         if let level = friend.level {
                             Text("Lv\(level)")
                                 .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
                         }
                         
                         if let activity = friend.activity {
@@ -47,18 +84,18 @@ struct FriendCard: View {
                                 
                                 Text(activity.displayText)
                                     .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
                             }
                         } else if let kingdomName = friend.currentKingdomName {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.circle.fill")
                                     .font(FontStyles.iconMini)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
                                 
                                 Text(kingdomName)
                                     .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.6) : KingdomTheme.Colors.inkMedium)
                                     .lineLimit(1)
                             }
                         }
@@ -69,10 +106,10 @@ struct FriendCard: View {
                 
                 Image(systemName: "chevron.right")
                     .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                    .foregroundColor(friend.subscriberTheme != nil ? cardTextColor.opacity(0.4) : KingdomTheme.Colors.inkLight)
             }
             .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+            .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)
         }
         .buttonStyle(.plain)
         .padding(.horizontal)

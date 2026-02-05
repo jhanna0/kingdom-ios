@@ -22,12 +22,15 @@ struct CharacterSheetView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with level and gold
+                // Header with level, gold, and subscriber customization
                 ProfileHeaderCard(
                     displayName: player.name,
                     level: player.level,
                     gold: player.gold,
-                    rulerOf: player.isRuler ? player.currentKingdomName : nil
+                    rulerOf: player.isRuler ? player.currentKingdomName : nil,
+                    subscriberTheme: player.subscriberTheme,
+                    selectedTitle: player.selectedTitle,
+                    isSubscriber: player.isSubscriber
                 )
                 
                 // Combined combat stats and training

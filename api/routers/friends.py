@@ -224,6 +224,45 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
             if kingdom:
                 current_kingdom_name = kingdom.name
     
+    # Get subscriber customization (server-driven) if accepted
+    subscriber_theme_dict = None
+    selected_title_dict = None
+    if friendship.status == 'accepted':
+        from routers.store import is_user_subscriber
+        from db.models import SubscriberTheme, UserPreferences
+        from sqlalchemy import text
+        
+        if is_user_subscriber(db, friend_user_id):
+            prefs = db.query(UserPreferences).filter(UserPreferences.user_id == friend_user_id).first()
+            if prefs:
+                # Get theme
+                if prefs.subscriber_theme_id:
+                    theme = db.query(SubscriberTheme).filter(
+                        SubscriberTheme.id == prefs.subscriber_theme_id
+                    ).first()
+                    if theme:
+                        subscriber_theme_dict = {
+                            "id": theme.id,
+                            "display_name": theme.display_name,
+                            "background_color": theme.background_color,
+                            "text_color": theme.text_color,
+                            "icon_background_color": theme.icon_background_color
+                        }
+                
+                # Get title
+                if prefs.selected_title_achievement_id:
+                    title_result = db.execute(text("""
+                        SELECT id, display_name, icon
+                        FROM achievement_definitions
+                        WHERE id = :achievement_id
+                    """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
+                    if title_result:
+                        selected_title_dict = {
+                            "achievement_id": title_result.id,
+                            "display_name": title_result.display_name,
+                            "icon": title_result.icon or "star.fill"
+                        }
+    
     return FriendResponse(
         id=friendship.id,
         user_id=friendship.user_id,
@@ -238,7 +277,9 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
         current_kingdom_id=friend_state.current_kingdom_id if friend_state and friendship.status == 'accepted' else None,
         current_kingdom_name=current_kingdom_name,
         last_seen=last_seen if friendship.status == 'accepted' else None,
-        activity=activity_dict if friendship.status == 'accepted' else None
+        activity=activity_dict if friendship.status == 'accepted' else None,
+        subscriber_theme=subscriber_theme_dict,
+        selected_title=selected_title_dict
     )
 
 

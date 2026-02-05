@@ -115,6 +115,11 @@ class Player: ObservableObject {
         return ownedProperties.contains { $0.tier >= 3 }
     }
     
+    // Subscriber customization (server-driven themes and titles)
+    @Published var isSubscriber: Bool = false
+    @Published var subscriberTheme: APIThemeData?
+    @Published var selectedTitle: APITitleData?
+    
     // Stats
     @Published var coupsWon: Int = 0
     @Published var coupsFailed: Int = 0
@@ -888,6 +893,14 @@ class Player: ObservableObject {
                     )
                 }
             print("🎯 Loaded \(skillsData.count) skills from backend dynamically!")
+        }
+        
+        // Subscriber customization (server-driven themes and titles)
+        isSubscriber = apiState.is_subscriber ?? false
+        subscriberTheme = apiState.subscriber_theme
+        selectedTitle = apiState.selected_title
+        if isSubscriber {
+            print("⭐ Subscriber status loaded with theme: \(subscriberTheme?.displayName ?? "none")")
         }
         
         // Backend is source of truth - no local caching

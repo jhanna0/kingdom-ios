@@ -3,7 +3,7 @@ Player Activity Feed - Aggregate activity from existing tables
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, desc
+from sqlalchemy import or_, and_, desc, text
 from typing import List, Optional
 from datetime import datetime, timedelta
 
@@ -432,11 +432,52 @@ def get_friend_activities(
         user_activities.extend(_get_training_activities(db, uid, user_state, 10))
         user_activities.extend(_get_action_log_activities(db, uid, 20, exclude_types=["travel_fee"]))
         
-        # Add user info to activities
+        # Add user info and subscriber customization to activities
+        from routers.store import is_user_subscriber
+        from db.models import SubscriberTheme, UserPreferences
+        
+        is_subscriber = is_user_subscriber(db, uid)
+        subscriber_theme_dict = None
+        selected_title_dict = None
+        
+        if is_subscriber:
+            prefs = db.query(UserPreferences).filter(UserPreferences.user_id == uid).first()
+            if prefs:
+                # Get subscriber theme if selected
+                if prefs.subscriber_theme_id:
+                    theme = db.query(SubscriberTheme).filter(
+                        SubscriberTheme.id == prefs.subscriber_theme_id
+                    ).first()
+                    if theme:
+                        subscriber_theme_dict = {
+                            "id": theme.id,
+                            "display_name": theme.display_name,
+                            "description": theme.description,
+                            "background_color": theme.background_color,
+                            "text_color": theme.text_color,
+                            "icon_background_color": theme.icon_background_color,
+                        }
+                
+                # Get selected title if any
+                if prefs.selected_title_achievement_id:
+                    title_result = db.execute(text("""
+                        SELECT ad.id, ad.display_name, ad.icon
+                        FROM achievement_definitions ad
+                        WHERE ad.id = :achievement_id
+                    """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
+                    if title_result:
+                        selected_title_dict = {
+                            "achievement_id": title_result[0],
+                            "display_name": title_result[1],
+                            "icon": title_result[2],
+                        }
+        
         for activity in user_activities:
             activity.username = the_user.display_name
             activity.display_name = the_user.display_name
             activity.user_level = user_state.level
+            activity.subscriber_theme = subscriber_theme_dict
+            activity.selected_title = selected_title_dict
         
         all_activities.extend(user_activities)
     

@@ -1,7 +1,7 @@
 """
 User model - Authentication and account data ONLY
 """
-from sqlalchemy import Column, String, DateTime, Boolean, BigInteger, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, Boolean, BigInteger, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -43,6 +43,7 @@ class User(Base):
     player_state = relationship("PlayerState", uselist=False, backref="user", cascade="all, delete-orphan")
     kingdoms = relationship("UserKingdom", back_populates="user")
     contracts = relationship("Contract", back_populates="creator", foreign_keys="Contract.created_by")
+    preferences = relationship("UserPreferences", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id='{self.id}', display_name='{self.display_name}')>"

@@ -70,6 +70,47 @@ class AchievementGroup(BaseModel):
     achievements: list[PlayerAchievement]
 
 
+# ============================================================
+# SUBSCRIBER CUSTOMIZATION SCHEMAS (Server-Driven)
+# ============================================================
+
+class ThemeData(BaseModel):
+    """
+    Server-driven theme data.
+    
+    All theme colors are defined in the database (subscriber_themes table).
+    The frontend just renders these hex colors directly.
+    """
+    id: str
+    display_name: str
+    description: Optional[str] = None
+    background_color: str  # hex e.g., '#6B21A8'
+    text_color: str        # hex
+    icon_background_color: str  # hex
+
+
+class TitleData(BaseModel):
+    """Selected achievement title for profile display."""
+    achievement_id: int
+    display_name: str
+    icon: str  # SF Symbol name
+
+
+class SubscriberSettings(BaseModel):
+    """Full subscriber settings response (for settings screen)."""
+    is_subscriber: bool
+    current_theme: Optional[ThemeData] = None
+    selected_title: Optional[TitleData] = None
+    available_themes: list[ThemeData] = []
+    available_titles: list[TitleData] = []
+
+
+class SubscriberSettingsUpdate(BaseModel):
+    """Request body for updating subscriber settings."""
+    theme_id: Optional[str] = None
+    selected_title_achievement_id: Optional[int] = None
+
+
 class PlayerPublicProfile(BaseModel):
     """Public profile for any player - visible to others"""
     # Identity
@@ -101,6 +142,11 @@ class PlayerPublicProfile(BaseModel):
     
     # Claimed achievements grouped by category (for profile display)
     achievement_groups: list[AchievementGroup] = []
+    
+    # Subscriber customization (server-driven)
+    is_subscriber: bool = False
+    subscriber_theme: Optional[ThemeData] = None
+    selected_title: Optional[TitleData] = None
     
     # Achievement stats
     total_checkins: int

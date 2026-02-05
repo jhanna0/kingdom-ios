@@ -220,6 +220,38 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Subscriber Settings
+    
+    /// Get subscriber settings (themes, titles, current selections)
+    func getSubscriberSettings() async throws -> SubscriberSettingsResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/players/me/subscriber-settings")
+        return try await client.execute(request)
+    }
+    
+    /// Update subscriber settings
+    func updateSubscriberSettings(themeId: String?, titleAchievementId: Int?) async throws -> SubscriberSettingsResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        struct UpdateRequest: Encodable {
+            let theme_id: String?
+            let selected_title_achievement_id: Int?
+        }
+        
+        let body = UpdateRequest(
+            theme_id: themeId,
+            selected_title_achievement_id: titleAchievementId
+        )
+        
+        let request = try client.request(endpoint: "/players/me/subscriber-settings", method: "PUT", body: body)
+        return try await client.execute(request)
+    }
+    
 }
 
 // MARK: - Relocation Response Models
@@ -238,5 +270,15 @@ struct RelocationResponse: Codable {
     let old_hometown_name: String
     let lost_ruler_status: Bool
     let next_relocation_available: String
+}
+
+// MARK: - Subscriber Settings Response
+
+struct SubscriberSettingsResponse: Codable {
+    let is_subscriber: Bool
+    let current_theme: APIThemeData?
+    let selected_title: APITitleData?
+    let available_themes: [APIThemeData]
+    let available_titles: [APITitleData]
 }
 

@@ -28,6 +28,10 @@ class ActivityLogEntry(BaseModel):
     username: Optional[str] = None
     display_name: Optional[str] = None
     user_level: Optional[int] = None
+    
+    # Subscriber customization (server-driven themes for activity card)
+    subscriber_theme: Optional[Dict[str, Any]] = None  # ThemeData as dict
+    selected_title: Optional[Dict[str, Any]] = None    # TitleData as dict
 
     class Config:
         from_attributes = True

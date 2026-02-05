@@ -1,29 +1,67 @@
 import SwiftUI
 
 /// Reusable profile header showing name, level, and optionally gold - brutalist style
+/// Supports server-driven subscriber themes
 struct ProfileHeaderCard: View {
     let displayName: String
     let level: Int
     let gold: Int?  // Optional - only shown for own profile
     let rulerOf: String?  // Optional - kingdom name if they're a ruler
     
-    init(displayName: String, level: Int, gold: Int? = nil, rulerOf: String? = nil) {
+    // Server-driven subscriber customization
+    let subscriberTheme: APIThemeData?
+    let selectedTitle: APITitleData?
+    let isSubscriber: Bool
+    
+    init(
+        displayName: String,
+        level: Int,
+        gold: Int? = nil,
+        rulerOf: String? = nil,
+        subscriberTheme: APIThemeData? = nil,
+        selectedTitle: APITitleData? = nil,
+        isSubscriber: Bool = false
+    ) {
         self.displayName = displayName
         self.level = level
         self.gold = gold
         self.rulerOf = rulerOf
+        self.subscriberTheme = subscriberTheme
+        self.selectedTitle = selectedTitle
+        self.isSubscriber = isSubscriber
+    }
+    
+    // Server-driven colors with fallbacks
+    private var avatarBackgroundColor: Color {
+        subscriberTheme?.iconBackgroundColorValue ?? .white
+    }
+    
+    private var avatarTextColor: Color {
+        subscriberTheme?.textColorValue ?? .black
+    }
+    
+    private var cardBackgroundColor: Color {
+        subscriberTheme?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    private var textColor: Color {
+        subscriberTheme?.textColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var secondaryTextColor: Color {
+        subscriberTheme != nil ? textColor.opacity(0.7) : KingdomTheme.Colors.inkMedium
     }
     
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
-            // Avatar with level badge
+            // Avatar with level badge - themed
             ZStack(alignment: .bottomTrailing) {
                 Text(String(displayName.prefix(1)).uppercased())
                     .font(FontStyles.displaySmall)
-                    .foregroundColor(.black)
+                    .foregroundColor(avatarTextColor)
                     .frame(width: 64, height: 64)
                     .brutalistBadge(
-                        backgroundColor: .white,
+                        backgroundColor: avatarBackgroundColor,
                         cornerRadius: 16,
                         shadowOffset: 3,
                         borderWidth: 2.5
@@ -44,10 +82,30 @@ struct ProfileHeaderCard: View {
             }
             
             VStack(alignment: .leading, spacing: 6) {
-                Text(displayName)
-                    .font(FontStyles.headingLarge)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .lineLimit(2)
+                HStack(spacing: 8) {
+                    Text(displayName)
+                        .font(FontStyles.headingLarge)
+                        .foregroundColor(textColor)
+                        .lineLimit(2)
+                    
+                    // Subscriber badge
+                    if isSubscriber {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(KingdomTheme.Colors.imperialGold)
+                    }
+                }
+                
+                // Selected title from achievement
+                if let title = selectedTitle {
+                    HStack(spacing: 4) {
+                        Image(systemName: title.icon)
+                            .font(.system(size: 12))
+                        Text(title.displayName)
+                            .font(FontStyles.bodySmall)
+                    }
+                    .foregroundColor(secondaryTextColor)
+                }
                 
                 // Ruler status if provided
                 if let kingdom = rulerOf {
@@ -58,28 +116,15 @@ struct ProfileHeaderCard: View {
                         
                         Text("Ruler of \(kingdom)")
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .foregroundColor(secondaryTextColor)
                     }
                 }
-                
-                // Gold display (only if provided)
-                // if let gold = gold {
-                //     HStack(spacing: 4) {
-                //         Text("\(gold)")
-                //             .font(FontStyles.bodyMediumBold)
-                //             .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                //         Image(systemName: "g.circle.fill")
-                //             .font(FontStyles.iconMini)
-                //             .foregroundColor(KingdomTheme.Colors.goldLight)
-                //     }
-                // }
             }
             
             Spacer()
         }
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+        .brutalistCard(backgroundColor: cardBackgroundColor)
     }
 }
 

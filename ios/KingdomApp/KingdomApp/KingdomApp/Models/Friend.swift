@@ -1,4 +1,56 @@
 import Foundation
+import SwiftUI
+
+// MARK: - Server-Driven Subscriber Customization
+
+/// Theme data from server - colors as hex strings
+struct APIThemeData: Codable {
+    let id: String
+    let displayName: String
+    let description: String?
+    let backgroundColor: String  // hex e.g., "#6B21A8"
+    let textColor: String
+    let iconBackgroundColor: String
+    let displayOrder: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case description
+        case backgroundColor = "background_color"
+        case textColor = "text_color"
+        case iconBackgroundColor = "icon_background_color"
+        case displayOrder = "display_order"
+    }
+    
+    /// Convert hex background color to SwiftUI Color
+    var backgroundColorValue: Color {
+        Color(hex: backgroundColor) ?? .gray
+    }
+    
+    /// Convert hex text color to SwiftUI Color
+    var textColorValue: Color {
+        Color(hex: textColor) ?? .black
+    }
+    
+    /// Convert hex icon background color to SwiftUI Color
+    var iconBackgroundColorValue: Color {
+        Color(hex: iconBackgroundColor) ?? .gray
+    }
+}
+
+/// Achievement title data from server
+struct APITitleData: Codable {
+    let achievementId: Int
+    let displayName: String
+    let icon: String
+    
+    enum CodingKeys: String, CodingKey {
+        case achievementId = "achievement_id"
+        case displayName = "display_name"
+        case icon
+    }
+}
 
 // MARK: - Friend Models
 
@@ -20,6 +72,10 @@ struct Friend: Codable, Identifiable {
     let lastSeen: String?
     let activity: FriendActivity?
     
+    // Subscriber customization (server-driven)
+    let subscriberTheme: APIThemeData?
+    let selectedTitle: APITitleData?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -35,6 +91,8 @@ struct Friend: Codable, Identifiable {
         case currentKingdomName = "current_kingdom_name"
         case lastSeen = "last_seen"
         case activity
+        case subscriberTheme = "subscriber_theme"
+        case selectedTitle = "selected_title"
     }
     
     var displayName: String {
