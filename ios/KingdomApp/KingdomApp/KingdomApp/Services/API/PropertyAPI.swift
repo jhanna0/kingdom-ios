@@ -22,6 +22,9 @@ class PropertyAPI {
         let tier: Int
         let icon: String?
         let description: String?
+        let gold_per_action: Double?
+        let actions_required: Int?
+        let per_action_costs: [ResourceCost]?
     }
     
     struct PropertyResponse: Codable {

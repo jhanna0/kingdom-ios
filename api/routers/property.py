@@ -543,17 +543,38 @@ def get_property_status(
             built_rooms_by_property[prop_id] = []
         built_rooms_by_property[prop_id].append(contract.option_id)
     
-    # Get all buildable options from tiers config
-    from routers.tiers import PROPERTY_TIERS
+    # Get all buildable options from tiers config WITH per-action costs
+    from routers.tiers import PROPERTY_TIERS, get_property_option_per_action_costs, calculate_property_gold_per_action, calculate_property_actions
+    from routers.resources import RESOURCES
+    
     all_buildable_options = []
     for tier_num, tier_data in PROPERTY_TIERS.items():
         for opt in tier_data.get("options", []):
+            opt_id = opt.get("id")
+            # Get per-action costs for this specific option
+            raw_per_action = get_property_option_per_action_costs(tier_num, opt_id)
+            # Enrich with display info
+            per_action_costs = []
+            for cost in raw_per_action:
+                resource_id = cost["resource"]
+                resource_info = RESOURCES.get(resource_id, {})
+                per_action_costs.append({
+                    "resource": resource_id,
+                    "amount": cost["amount"],
+                    "display_name": resource_info.get("display_name", resource_id.capitalize()),
+                    "icon": resource_info.get("icon", "questionmark.circle"),
+                    "color": resource_info.get("color", "inkMedium")
+                })
+            
             all_buildable_options.append({
-                "id": opt.get("id"),
+                "id": opt_id,
                 "name": opt.get("name"),
                 "tier": tier_num,
                 "icon": opt.get("icon"),
                 "description": opt.get("description"),
+                "gold_per_action": calculate_property_gold_per_action(tier_num),
+                "actions_required": calculate_property_actions(tier_num),
+                "per_action_costs": per_action_costs,
             })
     
     # Convert properties to response format and add available rooms

@@ -13,7 +13,6 @@ struct MyPropertiesView: View {
     @State private var activeContracts: [PropertyAPI.PropertyUpgradeContract] = []
     @State private var availableRooms: [PropertyAPI.PropertyRoom] = []
     @State private var availableOptions: [PropertyAPI.AvailableOption] = []
-    @State private var upgradeStatus: PropertyAPI.PropertyUpgradeStatus?
     @State private var isLoading = true
     @State private var isPurchasingUpgrade = false
     @State private var errorMessage: String?
@@ -436,9 +435,9 @@ struct MyPropertiesView: View {
                 Spacer()
             }
             
-            // Cost table from upgradeStatus
-            if let status = upgradeStatus {
-                upgradeCostTable(status: status, fromTier: property.tier, toTier: property.tier + 1)
+            // Cost table from option's per-action costs
+            if let actions = option.actions_required, let goldPerAction = option.gold_per_action {
+                optionCostTableFromAvailable(option: option, actions: actions, goldPerAction: goldPerAction)
             }
             
             Button(action: { purchaseUpgrade(optionId: option.id) }) {
@@ -453,11 +452,11 @@ struct MyPropertiesView: View {
                 }
             }
             .buttonStyle(.brutalist(
-                backgroundColor: upgradeStatus?.can_afford == true ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled,
+                backgroundColor: KingdomTheme.Colors.buttonSuccess,
                 foregroundColor: .white,
                 fullWidth: true
             ))
-            .disabled(upgradeStatus?.can_afford != true || isPurchasingUpgrade)
+            .disabled(isPurchasingUpgrade)
             
             // View all tiers link
             NavigationLink(value: PropertyDestination.tiers(property)) {
@@ -678,6 +677,58 @@ struct MyPropertiesView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 
+    // MARK: - Option Cost Table (from AvailableOption with its own costs)
+    
+    @ViewBuilder
+    private func optionCostTableFromAvailable(option: PropertyAPI.AvailableOption, actions: Int, goldPerAction: Double) -> some View {
+        let perActionCosts = option.per_action_costs ?? []
+        
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 0) {
+                // Header
+                HStack(spacing: 16) {
+                    Text("Build")
+                        .frame(width: 80, alignment: .leading)
+                    Text("Actions")
+                        .frame(width: 60, alignment: .center)
+                    Text("Gold/Act")
+                        .frame(width: 70, alignment: .center)
+                    ForEach(perActionCosts, id: \.resource) { cost in
+                        Text("\(resourceName(cost.resource))/Act")
+                            .frame(width: 70, alignment: .center)
+                    }
+                }
+                .font(FontStyles.labelBold)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                
+                Divider().overlay(Color.black.opacity(0.1))
+                
+                // Values
+                HStack(spacing: 16) {
+                    Text(option.name)
+                        .frame(width: 80, alignment: .leading)
+                    Text("\(actions)")
+                        .frame(width: 60, alignment: .center)
+                    Text("\(Int(goldPerAction))g")
+                        .frame(width: 70, alignment: .center)
+                    ForEach(perActionCosts, id: \.resource) { cost in
+                        Text("\(cost.amount)")
+                            .frame(width: 70, alignment: .center)
+                    }
+                }
+                .font(FontStyles.bodyMediumBold)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+        }
+        .background(Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black, lineWidth: 2))
+    }
+    
     // MARK: - Upgrade Cost Table (matches SkillDetailView format)
     
     @ViewBuilder
@@ -1088,13 +1139,6 @@ struct MyPropertiesView: View {
                     isLoading = false
                 }
                 
-                // Load upgrade status if we have a property
-                if let prop = property, prop.tier < TierManager.shared.propertyMaxTier {
-                    let upStatus = try await propertyAPI.getPropertyUpgradeStatus(propertyId: prop.id)
-                    await MainActor.run {
-                        upgradeStatus = upStatus
-                    }
-                }
             } catch {
                 await MainActor.run {
                     isLoading = false
