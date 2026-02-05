@@ -61,6 +61,10 @@ from .daily_gathering import DailyGathering
 # Garden system
 from .garden import GardenSlot, PlantStatus, PlantType
 
+# Kitchen system (oven for baking)
+from .kitchen import OvenSlot, OvenStatus
+from .kitchen_history import KitchenHistory
+
 # In-app purchases
 from .purchase import Purchase
 
@@ -154,6 +158,10 @@ __all__ = [
     "GardenSlot",
     "PlantStatus",
     "PlantType",
+    # Kitchen system
+    "OvenSlot",
+    "OvenStatus",
+    "KitchenHistory",
     # In-app purchases
     "Purchase",
     # Book usage tracking

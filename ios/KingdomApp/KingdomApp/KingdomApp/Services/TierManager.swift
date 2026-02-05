@@ -3,14 +3,9 @@ import Foundation
 /// UNIVERSAL TIER MANAGER - Fetches ALL tier data from backend
 /// Single source of truth for: Properties, Skills, Buildings, Crafting, Training, Reputation
 /// NO MORE HARDCODED DESCRIPTIONS!
-/// NOT ObservableObject - data is loaded once at startup and cached (no view re-renders)
+/// NOT ObservableObject - data is loaded once at startup (no view re-renders)
 class TierManager {
     static let shared = TierManager()
-    
-    // MARK: - Cache Configuration
-    private static let cacheKey = "TierManager.cachedTiersData"
-    private static let cacheTimestampKey = "TierManager.cacheTimestamp"
-    private static let cacheTTLSeconds: TimeInterval = 2 * 60 * 60  // 2 hours
     
     var isLoaded: Bool = false
     var resources: [String: ResourceInfo] = [:]  // Resource configurations from backend
@@ -31,71 +26,18 @@ class TierManager {
         loadDefaults()
     }
     
-    // MARK: - Cache Management
-    
-    /// Check if cached tier data is still valid
-    private func isCacheValid() -> Bool {
-        guard let timestamp = UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as? Date else {
-            return false
-        }
-        let age = Date().timeIntervalSince(timestamp)
-        return age < Self.cacheTTLSeconds
-    }
-    
-    /// Load tier data from disk cache
-    private func loadFromCache() -> AllTiersResponse? {
-        guard isCacheValid(),
-              let data = UserDefaults.standard.data(forKey: Self.cacheKey) else {
-            return nil
-        }
-        
-        do {
-            let response = try JSONDecoder().decode(AllTiersResponse.self, from: data)
-            print("📦 TierManager: Loaded from cache (valid for \(Int(Self.cacheTTLSeconds - Date().timeIntervalSince(UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as! Date)))s more)")
-            return response
-        } catch {
-            print("⚠️ TierManager: Cache decode failed: \(error)")
-            return nil
-        }
-    }
-    
-    /// Save tier data to disk cache
-    private func saveToCache(_ response: AllTiersResponse) {
-        do {
-            let data = try JSONEncoder().encode(response)
-            UserDefaults.standard.set(data, forKey: Self.cacheKey)
-            UserDefaults.standard.set(Date(), forKey: Self.cacheTimestampKey)
-            print("💾 TierManager: Saved to cache")
-        } catch {
-            print("⚠️ TierManager: Cache save failed: \(error)")
-        }
-    }
-    
-    /// Clear the tier cache - forces refresh on next load
-    func clearCache() {
-        UserDefaults.standard.removeObject(forKey: Self.cacheKey)
-        UserDefaults.standard.removeObject(forKey: Self.cacheTimestampKey)
-        isLoaded = false
-        print("🗑️ TierManager: Cache cleared")
-    }
-    
-    /// Force refresh from backend (ignores cache)
-    func forceRefresh() async throws {
-        clearCache()
-        try await loadAllTiers()
-    }
-    
     private func loadDefaults() {
         // Resources loaded from backend ONLY - no defaults!
         resources = [:]
         
         // Property defaults (icons match backend PROPERTY_TIERS)
+        // Note: Empty options arrays - real data comes from backend
         properties = PropertyTiersData(maxTier: 5, tiers: [
-            1: PropertyTierInfo(name: "Land", icon: "square.dashed", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
-            2: PropertyTierInfo(name: "House", icon: "house.fill", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
-            3: PropertyTierInfo(name: "Workshop", icon: "hammer.fill", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
-            4: PropertyTierInfo(name: "Beautiful Property", icon: "building.columns.fill", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: []),
-            5: PropertyTierInfo(name: "Estate", icon: "shield.fill", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [])
+            1: PropertyTierInfo(name: "Land", icon: "square.dashed", description: "Cleared land", benefits: ["Instant travel", "50% off travel cost"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [], options: []),
+            2: PropertyTierInfo(name: "House", icon: "house.fill", description: "Basic dwelling", benefits: ["All Land benefits", "Personal residence"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [], options: []),
+            3: PropertyTierInfo(name: "Workshop", icon: "hammer.fill", description: "Crafting workshop", benefits: ["All House benefits", "Unlock crafting", "15% faster crafting"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [], options: []),
+            4: PropertyTierInfo(name: "Beautiful Property", icon: "building.columns.fill", description: "Luxurious property", benefits: ["All Workshop benefits", "Tax exemption"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [], options: []),
+            5: PropertyTierInfo(name: "Estate", icon: "shield.fill", description: "Grand estate", benefits: ["All Beautiful Property benefits", "Conquest protection"], baseGoldCost: nil, baseActionsRequired: nil, goldPerAction: nil, totalGoldCost: nil, perActionCosts: [], options: [])
         ])
         
         // Skill tier names
@@ -119,13 +61,6 @@ class TierManager {
     // MARK: - Load All Tiers
     
     func loadAllTiers() async throws {
-        // Check cache first
-        if let cachedResponse = loadFromCache() {
-            await processResponse(cachedResponse)
-            return
-        }
-        
-        // Cache miss or expired - fetch from backend
         print("🎯 TierManager: Fetching ALL tier data from backend /tiers endpoint...")
         
         let request = client.request(endpoint: "/tiers", method: "GET")
@@ -133,13 +68,10 @@ class TierManager {
         let response: AllTiersResponse = try await client.execute(request)
         print("✅ TierManager: Received response from /tiers")
         
-        // Save to cache for next time
-        saveToCache(response)
-        
         await processResponse(response)
     }
     
-    /// Process the tier response (from cache or network)
+    /// Process the tier response
     private func processResponse(_ response: AllTiersResponse) async {
         
         await MainActor.run {
@@ -170,6 +102,24 @@ class TierManager {
                             PropertyPerActionCost(resource: cost.resource, amount: cost.amount)
                         }
                         
+                        // Convert options array (NEW: multiple buildable options per tier)
+                        let options: [PropertyTierOption] = (value.options ?? []).map { opt in
+                            let optCosts = (opt.per_action_costs ?? []).map { cost in
+                                PropertyPerActionCost(resource: cost.resource, amount: cost.amount)
+                            }
+                            return PropertyTierOption(
+                                id: opt.id,
+                                name: opt.name,
+                                icon: opt.icon ?? "star.fill",
+                                description: opt.description,
+                                benefits: opt.benefits,
+                                goldPerAction: opt.gold_per_action,
+                                baseActionsRequired: opt.base_actions_required,
+                                totalGoldCost: opt.total_gold_cost,
+                                perActionCosts: optCosts
+                            )
+                        }
+                        
                         tiers[tier] = PropertyTierInfo(
                             name: value.name,
                             icon: value.icon ?? "star.fill",
@@ -179,12 +129,14 @@ class TierManager {
                             baseActionsRequired: value.base_actions_required,
                             goldPerAction: value.gold_per_action,
                             totalGoldCost: value.total_gold_cost,
-                            perActionCosts: perActionCosts
+                            perActionCosts: perActionCosts,
+                            options: options
                         )
                     }
                 }
                 self.properties = PropertyTiersData(maxTier: propertyData.max_tier, tiers: tiers)
-                print("   - Loaded \(tiers.count) property tiers with per-action costs")
+                let totalOptions = tiers.values.reduce(0) { $0 + $1.options.count }
+                print("   - Loaded \(tiers.count) property tiers with \(totalOptions) total options")
             }
             
             // Equipment - convert string keys to int
@@ -356,6 +308,22 @@ class TierManager {
     
     func propertyPerActionCosts(_ tier: Int) -> [PropertyPerActionCost] {
         properties?.tiers[tier]?.perActionCosts ?? []
+    }
+    
+    /// Get all buildable options for a property tier
+    /// Returns array of options (may have multiple at some tiers like Workshop + Kitchen at tier 3)
+    func propertyTierOptions(_ tier: Int) -> [PropertyTierOption] {
+        properties?.tiers[tier]?.options ?? []
+    }
+    
+    /// Check if a tier has multiple buildable options
+    func propertyTierHasMultipleOptions(_ tier: Int) -> Bool {
+        (properties?.tiers[tier]?.options.count ?? 0) > 1
+    }
+    
+    /// Get a specific option by ID at a tier
+    func propertyTierOption(_ tier: Int, optionId: String) -> PropertyTierOption? {
+        properties?.tiers[tier]?.options.first { $0.id == optionId }
     }
     
     // MARK: - Equipment Accessors
@@ -533,6 +501,19 @@ struct PropertyPerActionCostResponse: Codable {
     let amount: Int
 }
 
+/// A buildable option at a property tier (e.g., Workshop or Kitchen at tier 3)
+struct PropertyTierOptionResponse: Codable {
+    let id: String
+    let name: String
+    let icon: String?
+    let description: String
+    let benefits: [String]
+    let gold_per_action: Double?
+    let base_actions_required: Int?
+    let total_gold_cost: Int?
+    let per_action_costs: [PropertyPerActionCostResponse]?
+}
+
 struct PropertyTierInfoResponse: Codable {
     let name: String
     let icon: String?
@@ -544,6 +525,8 @@ struct PropertyTierInfoResponse: Codable {
     let gold_per_action: Double?
     let total_gold_cost: Int?
     let per_action_costs: [PropertyPerActionCostResponse]?
+    // NEW: Multiple buildable options at this tier
+    let options: [PropertyTierOptionResponse]?
 }
 
 struct EquipmentTiersResponseData: Codable {
@@ -614,6 +597,19 @@ struct PropertyPerActionCost {
     let amount: Int
 }
 
+/// A buildable option at a property tier (e.g., Workshop or Kitchen at tier 3)
+struct PropertyTierOption {
+    let id: String
+    let name: String
+    let icon: String
+    let description: String
+    let benefits: [String]
+    let goldPerAction: Double?
+    let baseActionsRequired: Int?
+    let totalGoldCost: Int?
+    let perActionCosts: [PropertyPerActionCost]
+}
+
 struct PropertyTierInfo {
     let name: String
     let icon: String
@@ -625,6 +621,8 @@ struct PropertyTierInfo {
     let goldPerAction: Double?
     let totalGoldCost: Int?
     let perActionCosts: [PropertyPerActionCost]
+    // NEW: Multiple buildable options at this tier
+    let options: [PropertyTierOption]
 }
 
 struct EquipmentTiersData {

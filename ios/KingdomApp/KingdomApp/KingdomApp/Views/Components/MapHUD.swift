@@ -65,19 +65,14 @@ struct MapHUD: View {
                     }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .frame(height: 36)
                     .background(
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.black)
-                                .offset(x: 2, y: 2)
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(KingdomTheme.Colors.parchmentLight)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                        }
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(KingdomTheme.Colors.parchmentLight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
                     )
                     
                     Spacer()
@@ -108,11 +103,11 @@ struct MapHUD: View {
                             ZStack {
                                 Circle()
                                     .fill(Color.black)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 22, height: 22)
                                     .offset(x: 1, y: 1)
                                 Circle()
                                     .fill(KingdomTheme.Colors.buttonPrimary)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 22, height: 22)
                                     .overlay(
                                         Circle()
                                             .stroke(Color.black, lineWidth: 2)
@@ -122,33 +117,35 @@ struct MapHUD: View {
                                     .foregroundColor(.white)
                             }
                             
-                            // Gold
-                            HStack(spacing: 3) {
-                                Text(viewModel.player.gold.abbreviatedPrecise())
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.black)
-                                    .lineLimit(1)
-                                    .fixedSize()
-                                
-                                Image(systemName: "g.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(KingdomTheme.Colors.goldLight)
+                            // Gold & Food stacked
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "g.circle.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.goldLight)
+                                    Text(viewModel.player.gold.abbreviatedPrecise())
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(.black)
+                                }
+                                HStack(spacing: 4) {
+                                    Image(systemName: "fork.knife")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(KingdomTheme.Colors.buttonWarning)
+                                    Text(viewModel.player.food.abbreviatedPrecise())
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(.black)
+                                }
                             }
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .frame(height: 36)
                         .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black)
-                                    .offset(x: 2, y: 2)
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(KingdomTheme.Colors.parchmentLight)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.black, lineWidth: 2)
-                                    )
-                            }
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
                         )
                     }
                     
@@ -300,20 +297,15 @@ struct MapHUD: View {
                     .font(.system(size: 12))
             }
         }
-        .frame(height: 32)
+        .frame(height: 36)
         .padding(.horizontal, 8)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-            }
+            RoundedRectangle(cornerRadius: 10)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.black, lineWidth: 2)
+                )
         )
     }
     
@@ -339,20 +331,15 @@ struct MapHUD: View {
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
         }
-        .frame(height: 32)
+        .frame(height: 36)
         .padding(.horizontal, 8)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black)
-                    .offset(x: 2, y: 2)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KingdomTheme.Colors.parchmentLight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-            }
+            RoundedRectangle(cornerRadius: 10)
+                .fill(KingdomTheme.Colors.parchmentLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.black, lineWidth: 2)
+                )
         )
     }
     

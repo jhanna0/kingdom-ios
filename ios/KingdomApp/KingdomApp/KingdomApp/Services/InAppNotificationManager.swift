@@ -12,6 +12,7 @@ enum InAppNotificationType {
     case warning(message: String)
     case info(message: String)
     case garden(message: String)
+    case kitchen(message: String)
     
     var icon: String {
         switch self {
@@ -20,6 +21,7 @@ enum InAppNotificationType {
         case .warning: return "exclamationmark.triangle.fill"
         case .info: return "info.circle.fill"
         case .garden: return "leaf.fill"
+        case .kitchen: return "flame.fill"
         }
     }
     
@@ -35,6 +37,8 @@ enum InAppNotificationType {
             return "Info"
         case .garden:
             return "Garden"
+        case .kitchen:
+            return "Kitchen"
         }
     }
     
@@ -49,6 +53,8 @@ enum InAppNotificationType {
         case .info(let message):
             return message
         case .garden(let message):
+            return message
+        case .kitchen(let message):
             return message
         }
     }
@@ -65,6 +71,8 @@ enum InAppNotificationType {
             return KingdomTheme.Colors.buttonPrimary
         case .garden:
             return KingdomTheme.Colors.buttonSuccess  // Green for garden
+        case .kitchen:
+            return KingdomTheme.Colors.buttonWarning  // Orange for kitchen
         }
     }
 }
@@ -130,6 +138,8 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
                 self.show(.cooldownComplete(actionName: actionName.isEmpty ? "Action" : actionName, slot: slot))
             } else if content.categoryIdentifier == "GARDEN_WATER" {
                 self.show(.garden(message: content.body))
+            } else if content.categoryIdentifier == "KITCHEN_BAKING" {
+                self.show(.kitchen(message: content.body))
             } else {
                 self.show(.info(message: content.body))
             }

@@ -38,6 +38,202 @@ struct PropertyTiersView: View {
     }
     
     private func tierContent(tier: Int) -> some View {
+        let options = tierManager.propertyTierOptions(tier)
+        
+        return VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Show multiple options if available, otherwise fall back to legacy single view
+            if options.count > 1 {
+                // Multiple options header
+                HStack {
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                    Text("\(options.count) rooms available at this level")
+                        .font(FontStyles.bodySmallBold)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                .padding(.bottom, 4)
+                
+                // Render each option
+                ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                    optionCard(tier: tier, option: option)
+                    
+                    // Add spacing between options, but not after the last one
+                    if index < options.count - 1 {
+                        Rectangle()
+                            .fill(KingdomTheme.Colors.inkLight.opacity(0.3))
+                            .frame(height: 1)
+                            .padding(.vertical, KingdomTheme.Spacing.small)
+                    }
+                }
+            } else if let option = options.first {
+                // Single option - render with option data
+                optionCard(tier: tier, option: option)
+            } else {
+                // Fallback to legacy rendering (no options array from backend)
+                legacyTierContent(tier: tier)
+            }
+            
+            // Status indicator - shared across all options at this tier
+            tierStatusIndicator(tier: tier)
+        }
+    }
+    
+    /// Renders a single buildable option (room) card
+    private func optionCard(tier: Int, option: PropertyTierOption) -> some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
+            // Option header with icon
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: option.icon)
+                    .font(FontStyles.iconLarge)
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .brutalistBadge(
+                        backgroundColor: tierColor(tier),
+                        cornerRadius: 10,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.name)
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    Text(option.description)
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                // Status badge
+                if tier <= currentTier {
+                    Text("Unlocked")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.black)
+                                    .offset(x: 1, y: 1)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(KingdomTheme.Colors.inkMedium)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            }
+                        )
+                }
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Benefits from option
+            VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+                sectionHeader(icon: "star.fill", title: "Benefits")
+                
+                ForEach(option.benefits, id: \.self) { benefit in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: tier <= currentTier ? "checkmark.circle.fill" : "lock.circle.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.inkLight)
+                            .frame(width: 20)
+                        
+                        Text(benefit)
+                            .font(FontStyles.bodySmall)
+                            .foregroundColor(tier <= currentTier ? KingdomTheme.Colors.inkDark : KingdomTheme.Colors.inkMedium)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 2)
+            
+            // Cost section using option's costs
+            if let actions = option.baseActionsRequired, actions > 0,
+               let goldPerAction = option.goldPerAction {
+                let perActionCosts = option.perActionCosts
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionHeader(icon: "dollarsign.circle.fill", title: "Build Cost")
+                    
+                    // Cost table
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            // Table header
+                            HStack(spacing: 16) {
+                                Text("Build")
+                                    .frame(width: 100, alignment: .leading)
+                                
+                                Text("Actions")
+                                    .frame(width: 60, alignment: .center)
+                                
+                                Text("Gold/Act")
+                                    .frame(width: 70, alignment: .center)
+                                
+                                ForEach(perActionCosts, id: \.resource) { cost in
+                                    Text("\(resourceDisplayName(cost.resource))/Act")
+                                        .frame(width: 70, alignment: .center)
+                                }
+                            }
+                            .font(FontStyles.labelBold)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            
+                            Divider()
+                                .overlay(Color.black.opacity(0.1))
+                            
+                            // Table row with values
+                            HStack(spacing: 16) {
+                                Text(option.name)
+                                    .frame(width: 100, alignment: .leading)
+                                
+                                Text("\(actions)")
+                                    .frame(width: 60, alignment: .center)
+                                
+                                Text("\(Int(goldPerAction))g")
+                                    .frame(width: 70, alignment: .center)
+                                
+                                ForEach(perActionCosts, id: \.resource) { cost in
+                                    Text("\(cost.amount)")
+                                        .frame(width: 70, alignment: .center)
+                                }
+                            }
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                        }
+                    }
+                    .background(Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black, lineWidth: 2)
+                    )
+                    .padding(.top, 4)
+                    
+                    // Total summary
+                    Text("Total cost is \(buildTotalSummary(actions: actions, goldPerAction: goldPerAction, perActionCosts: perActionCosts)).")
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
+                }
+            }
+        }
+    }
+    
+    /// Legacy tier content for backwards compatibility (when no options array exists)
+    private func legacyTierContent(tier: Int) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             // Tier header with icon
             HStack(spacing: KingdomTheme.Spacing.medium) {
@@ -60,7 +256,6 @@ struct PropertyTiersView: View {
                 
                 Spacer()
                 
-                // Status badge - MapHUD style
                 if tier <= currentTier {
                     Text("Unlocked")
                         .font(.system(size: 12, weight: .bold))
@@ -110,7 +305,7 @@ struct PropertyTiersView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Cost section - EXACTLY matching SkillDetailView format
+            // Cost section
             if let actions = tierManager.propertyTierActions(tier), actions > 0 {
                 let goldPerAction = tierManager.propertyGoldPerAction(tier) ?? 0
                 let perActionCosts = tierManager.propertyPerActionCosts(tier)
@@ -118,10 +313,8 @@ struct PropertyTiersView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionHeader(icon: "dollarsign.circle.fill", title: "Upgrade Cost")
                     
-                    // Cost table - horizontal scroll for many columns
                     ScrollView(.horizontal, showsIndicators: false) {
                         VStack(spacing: 0) {
-                            // Table header
                             HStack(spacing: 16) {
                                 Text("Upgrade")
                                     .frame(width: 100, alignment: .leading)
@@ -132,7 +325,6 @@ struct PropertyTiersView: View {
                                 Text("Gold/Act")
                                     .frame(width: 70, alignment: .center)
                                 
-                                // Dynamic resource columns
                                 ForEach(perActionCosts, id: \.resource) { cost in
                                     Text("\(resourceDisplayName(cost.resource))/Act")
                                         .frame(width: 70, alignment: .center)
@@ -146,7 +338,6 @@ struct PropertyTiersView: View {
                             Divider()
                                 .overlay(Color.black.opacity(0.1))
                             
-                            // Table row with values
                             HStack(spacing: 16) {
                                 Text("\(tierName(tier - 1)) → \(tierName(tier))")
                                     .frame(width: 100, alignment: .leading)
@@ -157,7 +348,6 @@ struct PropertyTiersView: View {
                                 Text("\(Int(goldPerAction))g")
                                     .frame(width: 70, alignment: .center)
                                 
-                                // Dynamic resource values
                                 ForEach(perActionCosts, id: \.resource) { cost in
                                     Text("\(cost.amount)")
                                         .frame(width: 70, alignment: .center)
@@ -177,20 +367,19 @@ struct PropertyTiersView: View {
                     )
                     .padding(.top, 4)
                     
-                    // Total summary
                     Text("Total cost is \(buildTotalSummary(actions: actions, goldPerAction: goldPerAction, perActionCosts: perActionCosts)).")
                         .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 4)
                 }
-                
-                Rectangle()
-                    .fill(Color.black)
-                    .frame(height: 2)
             }
-            
-            // Status indicator - MapHUD style
+        }
+    }
+    
+    /// Status indicator shown at the bottom of tier content
+    private func tierStatusIndicator(tier: Int) -> some View {
+        Group {
             if tier <= currentTier {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
