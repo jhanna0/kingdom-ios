@@ -894,11 +894,11 @@ class Player: ObservableObject {
             print("🎯 Loaded \(skillsData.count) skills from backend dynamically!")
         }
         
-        // Subscriber customization (server-driven colors and titles)
+        // Subscriber customization (server-driven styles and titles)
         isSubscriber = apiState.is_subscriber ?? false
         subscriberCustomization = apiState.subscriber_customization
         if isSubscriber {
-            print("⭐ Subscriber status loaded with customization: icon=\(subscriberCustomization?.iconBackgroundColor ?? "none"), card=\(subscriberCustomization?.cardBackgroundColor ?? "none")")
+            print("⭐ Subscriber status loaded with customization: iconStyle=\(subscriberCustomization?.iconStyle?.id ?? "none"), cardStyle=\(subscriberCustomization?.cardStyle?.id ?? "none")")
         }
         
         // Backend is source of truth - no local caching

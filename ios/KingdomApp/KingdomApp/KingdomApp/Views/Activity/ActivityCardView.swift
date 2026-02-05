@@ -8,6 +8,14 @@ struct ActivityCard: View {
         activity.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
     
+    private var cardTextColor: Color {
+        activity.subscriberCustomization?.cardTextColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var cardSecondaryTextColor: Color {
+        activity.subscriberCustomization?.cardTextColorValue.opacity(0.7) ?? KingdomTheme.Colors.inkMedium
+    }
+    
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: activity.icon)
@@ -19,12 +27,12 @@ struct ActivityCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 if showUser, let displayName = activity.displayName {
                     HStack(spacing: 4) {
-                        Text(displayName).font(FontStyles.bodyMediumBold).foregroundColor(KingdomTheme.Colors.inkDark)
+                        Text(displayName).font(FontStyles.bodyMediumBold).foregroundColor(cardTextColor)
                         if activity.subscriberCustomization != nil {
                             Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(KingdomTheme.Colors.imperialGold)
                         }
                         if let level = activity.userLevel {
-                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
                         }
                     }
                     
@@ -33,17 +41,17 @@ struct ActivityCard: View {
                             Image(systemName: title.icon).font(.system(size: 10))
                             Text(title.displayName).font(FontStyles.labelSmall)
                         }
-                        .foregroundColor(KingdomTheme.Colors.inkMedium.opacity(0.8))
+                        .foregroundColor(cardSecondaryTextColor)
                     }
                 }
                     
-                Text(activity.description).font(FontStyles.bodySmall).foregroundColor(KingdomTheme.Colors.inkDark)
+                Text(activity.description).font(FontStyles.bodySmall).foregroundColor(cardTextColor)
                     
                 HStack(spacing: 6) {
-                    Text(activity.timeAgo).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
+                    Text(activity.timeAgo).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
                     if let kingdomName = activity.kingdomName {
-                        Text("•").foregroundColor(KingdomTheme.Colors.inkMedium)
-                        Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
+                        Text("•").foregroundColor(cardSecondaryTextColor)
+                        Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
                     }
                 }
             }

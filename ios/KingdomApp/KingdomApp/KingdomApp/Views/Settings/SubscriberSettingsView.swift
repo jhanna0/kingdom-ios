@@ -16,8 +16,8 @@ struct SubscriberSettingsView: View {
                     subscribeSection
                 } else {
                     previewSection
-                    iconColorSection
-                    cardColorSection
+                    iconStyleSection
+                    cardStyleSection
                     titleSection
                     saveButton
                 }
@@ -65,7 +65,7 @@ struct SubscriberSettingsView: View {
     
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Preview").font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
+            Text("Preview").font(FontStyles.headingSmall).foregroundColor(KingdomTheme.Colors.inkDark)
             
             ProfileHeaderCard(
                 displayName: player.name,
@@ -76,27 +76,38 @@ struct SubscriberSettingsView: View {
         }
     }
     
-    private var iconColorSection: some View {
+    private var iconStyleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Icon Background").font(FontStyles.headingSmall)
-            ColorPalette(selectedHex: $viewModel.iconBackgroundColor)
-            
-            Text("Icon Text").font(FontStyles.headingSmall).padding(.top, 8)
-            ColorPalette(selectedHex: $viewModel.iconTextColor)
+            HStack {
+                Text("Icon Style").font(FontStyles.headingSmall).foregroundColor(KingdomTheme.Colors.inkDark)
+                Spacer()
+                if viewModel.selectedIconStyle != nil {
+                    Button("Reset") { viewModel.selectedIconStyle = nil }
+                        .font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.buttonDanger)
+                }
+            }
+            StyleGrid(styles: viewModel.availableStyles, selectedStyle: $viewModel.selectedIconStyle)
         }
     }
     
-    private var cardColorSection: some View {
+    private var cardStyleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Card Background").font(FontStyles.headingSmall)
-            ColorPalette(selectedHex: $viewModel.cardBackgroundColor)
+            HStack {
+                Text("Card Style").font(FontStyles.headingSmall).foregroundColor(KingdomTheme.Colors.inkDark)
+                Spacer()
+                if viewModel.selectedCardStyle != nil {
+                    Button("Reset") { viewModel.selectedCardStyle = nil }
+                        .font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.buttonDanger)
+                }
+            }
+            StyleGrid(styles: viewModel.availableStyles, selectedStyle: $viewModel.selectedCardStyle, isCard: true)
         }
     }
     
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Title").font(FontStyles.headingSmall)
+                Text("Title").font(FontStyles.headingSmall).foregroundColor(KingdomTheme.Colors.inkDark)
                 Spacer()
                 if viewModel.selectedTitle != nil {
                     Button("Reset") { viewModel.selectedTitle = nil }
@@ -152,52 +163,85 @@ struct SubscriberSettingsView: View {
     }
 }
 
-// MARK: - Color Palette
+// MARK: - Style Grid (shows preset style swatches with brutalist styling)
 
-private struct ColorPalette: View {
-    @Binding var selectedHex: String?
+private struct StyleGrid: View {
+    let styles: [APIStylePreset]
+    @Binding var selectedStyle: APIStylePreset?
+    var isCard: Bool = false
     
-    private let colors: [(String, String)] = [
-        ("#6B21A8", "Purple"), ("#7C3AED", "Violet"), ("#166534", "Forest"),
-        ("#059669", "Emerald"), ("#1E40AF", "Blue"), ("#0284C7", "Sky"),
-        ("#991B1B", "Crimson"), ("#DC2626", "Ruby"), ("#CA8A04", "Gold"),
-        ("#D97706", "Amber"), ("#475569", "Slate"), ("#1F2937", "Charcoal"),
-        ("#BE185D", "Rose"), ("#0D9488", "Teal"), ("#4338CA", "Indigo"),
-        ("#FFFFFF", "White"), ("#000000", "Black")
-    ]
-    
-    private let columns = [GridItem(.adaptive(minimum: 44))]
+    private let columns = [GridItem(.adaptive(minimum: 80))]
     
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 10) {
-            // None option
-            Button { selectedHex = nil } label: {
-                ZStack {
-                    Circle().stroke(Color.gray, lineWidth: 1).frame(width: 40, height: 40)
-                    if selectedHex == nil {
-                        Image(systemName: "xmark").foregroundColor(.gray)
+        LazyVGrid(columns: columns, spacing: 12) {
+            // Default/None option
+            Button { selectedStyle = nil } label: {
+                VStack(spacing: 6) {
+                    if isCard {
+                        Text("Abc")
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                    } else {
+                        Text("A")
+                            .font(FontStyles.headingSmall)
+                            .foregroundColor(.black)
+                            .frame(width: 48, height: 48)
+                            .brutalistBadge(backgroundColor: .white, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
                     }
+                    Text("Default")
+                        .font(FontStyles.labelSmall)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .lineLimit(1)
                 }
+                .padding(8)
+                .background(selectedStyle == nil ? KingdomTheme.Colors.imperialGold.opacity(0.15) : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(selectedStyle == nil ? KingdomTheme.Colors.imperialGold : Color.clear, lineWidth: 3)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
             
-            ForEach(colors, id: \.0) { hex, _ in
-                Button { selectedHex = hex } label: {
-                    ZStack {
-                        Circle().fill(Color(hex: hex) ?? .gray).frame(width: 40, height: 40)
-                        if selectedHex == hex {
-                            Circle().stroke(Color.white, lineWidth: 3).frame(width: 40, height: 40)
-                            Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+            // Style presets
+            ForEach(styles) { style in
+                Button { selectedStyle = style } label: {
+                    VStack(spacing: 6) {
+                        if isCard {
+                            Text("Abc")
+                                .font(FontStyles.bodyMediumBold)
+                                .foregroundColor(style.textColorValue)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .brutalistBadge(backgroundColor: style.backgroundColorValue, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                        } else {
+                            Text("A")
+                                .font(FontStyles.headingSmall)
+                                .foregroundColor(style.textColorValue)
+                                .frame(width: 48, height: 48)
+                                .brutalistBadge(backgroundColor: style.backgroundColorValue, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
                         }
+                        Text(style.name)
+                            .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .lineLimit(1)
                     }
-                    .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 1))
+                    .padding(8)
+                    .background(selectedStyle?.id == style.id ? KingdomTheme.Colors.imperialGold.opacity(0.15) : Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(selectedStyle?.id == style.id ? KingdomTheme.Colors.imperialGold : Color.clear, lineWidth: 3)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(12)
-        .background(KingdomTheme.Colors.parchmentLight)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding()
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
 }
 
@@ -210,31 +254,28 @@ class SubscriberSettingsViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage: String?
     
-    @Published var iconBackgroundColor: String?
-    @Published var iconTextColor: String?
-    @Published var cardBackgroundColor: String?
+    @Published var selectedIconStyle: APIStylePreset?
+    @Published var selectedCardStyle: APIStylePreset?
     @Published var selectedTitle: APITitleData?
     
-    private var originalIconBg: String?
-    private var originalIconText: String?
-    private var originalCardBg: String?
+    private var originalIconStyleId: String?
+    private var originalCardStyleId: String?
     private var originalTitleId: Int?
     
     var isSubscriber: Bool { settings?.isSubscriber ?? false }
+    var availableStyles: [APIStylePreset] { settings?.availableStyles ?? [] }
     var availableTitles: [APITitleData] { settings?.availableTitles ?? [] }
     
     var hasChanges: Bool {
-        iconBackgroundColor != originalIconBg ||
-        iconTextColor != originalIconText ||
-        cardBackgroundColor != originalCardBg ||
+        selectedIconStyle?.id != originalIconStyleId ||
+        selectedCardStyle?.id != originalCardStyleId ||
         selectedTitle?.achievementId != originalTitleId
     }
     
     var previewCustomization: APISubscriberCustomization {
         APISubscriberCustomization(
-            iconBackgroundColor: iconBackgroundColor,
-            iconTextColor: iconTextColor,
-            cardBackgroundColor: cardBackgroundColor,
+            iconStyle: selectedIconStyle,
+            cardStyle: selectedCardStyle,
             selectedTitle: selectedTitle
         )
     }
@@ -243,16 +284,14 @@ class SubscriberSettingsViewModel: ObservableObject {
     func loadSettings() async {
         isLoading = true
         do {
-            let response = try await APIClient.shared.player.getSubscriberSettings()
+            let response = try await KingdomAPIService.shared.player.getSubscriberSettings()
             settings = response
-            iconBackgroundColor = response.iconBackgroundColor
-            iconTextColor = response.iconTextColor
-            cardBackgroundColor = response.cardBackgroundColor
+            selectedIconStyle = response.iconStyle
+            selectedCardStyle = response.cardStyle
             selectedTitle = response.selectedTitle
             
-            originalIconBg = response.iconBackgroundColor
-            originalIconText = response.iconTextColor
-            originalCardBg = response.cardBackgroundColor
+            originalIconStyleId = response.iconStyle?.id
+            originalCardStyleId = response.cardStyle?.id
             originalTitleId = response.selectedTitle?.achievementId
         } catch {
             errorMessage = error.localizedDescription
@@ -268,16 +307,14 @@ class SubscriberSettingsViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 let update = SubscriberSettingsUpdateRequest(
-                    iconBackgroundColor: iconBackgroundColor,
-                    iconTextColor: iconTextColor,
-                    cardBackgroundColor: cardBackgroundColor,
+                    iconStyleId: selectedIconStyle?.id,
+                    cardStyleId: selectedCardStyle?.id,
                     selectedTitleAchievementId: selectedTitle?.achievementId ?? 0
                 )
-                let response = try await APIClient.shared.player.updateSubscriberSettings(update)
+                let response = try await KingdomAPIService.shared.player.updateSubscriberSettings(update)
                 settings = response
-                originalIconBg = iconBackgroundColor
-                originalIconText = iconTextColor
-                originalCardBg = cardBackgroundColor
+                originalIconStyleId = selectedIconStyle?.id
+                originalCardStyleId = selectedCardStyle?.id
                 originalTitleId = selectedTitle?.achievementId
             } catch {
                 errorMessage = error.localizedDescription
@@ -292,32 +329,30 @@ class SubscriberSettingsViewModel: ObservableObject {
 
 struct SubscriberSettingsResponse: Codable {
     let isSubscriber: Bool
-    let iconBackgroundColor: String?
-    let iconTextColor: String?
-    let cardBackgroundColor: String?
+    let iconStyle: APIStylePreset?
+    let cardStyle: APIStylePreset?
     let selectedTitle: APITitleData?
+    let availableStyles: [APIStylePreset]
     let availableTitles: [APITitleData]
     
     enum CodingKeys: String, CodingKey {
         case isSubscriber = "is_subscriber"
-        case iconBackgroundColor = "icon_background_color"
-        case iconTextColor = "icon_text_color"
-        case cardBackgroundColor = "card_background_color"
+        case iconStyle = "icon_style"
+        case cardStyle = "card_style"
         case selectedTitle = "selected_title"
+        case availableStyles = "available_styles"
         case availableTitles = "available_titles"
     }
 }
 
 struct SubscriberSettingsUpdateRequest: Codable {
-    let iconBackgroundColor: String?
-    let iconTextColor: String?
-    let cardBackgroundColor: String?
+    let iconStyleId: String?
+    let cardStyleId: String?
     let selectedTitleAchievementId: Int
     
     enum CodingKeys: String, CodingKey {
-        case iconBackgroundColor = "icon_background_color"
-        case iconTextColor = "icon_text_color"
-        case cardBackgroundColor = "card_background_color"
+        case iconStyleId = "icon_style_id"
+        case cardStyleId = "card_style_id"
         case selectedTitleAchievementId = "selected_title_achievement_id"
     }
 }

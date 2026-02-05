@@ -21,10 +21,12 @@ from schemas.player import (
     PlayerAchievement,
     AchievementGroup,
     TitleData,
+    StylePreset,
     SubscriberCustomization,
     SubscriberSettings,
     SubscriberSettingsUpdate
 )
+from db.models.subscription import STYLE_PRESETS, get_style_colors
 from sqlalchemy import text
 
 
@@ -285,6 +287,16 @@ def _get_user_preferences(db: Session, user_id: int):
     return db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
 
 
+def _get_style_preset(style_id: str) -> Optional[StylePreset]:
+    """Convert style ID to StylePreset object."""
+    if not style_id:
+        return None
+    colors = get_style_colors(style_id)
+    if not colors.get("background"):
+        return None
+    return StylePreset(id=style_id, name=colors["name"], background_color=colors["background"], text_color=colors["text"])
+
+
 def _get_user_subscriber_customization(db: Session, user_id: int) -> Optional[SubscriberCustomization]:
     """Get user's full subscriber customization."""
     prefs = _get_user_preferences(db, user_id)
@@ -293,16 +305,13 @@ def _get_user_subscriber_customization(db: Session, user_id: int) -> Optional[Su
     if not prefs and not selected_title:
         return None
     
-    has_colors = prefs and (prefs.icon_background_color or prefs.icon_text_color or prefs.card_background_color)
-    if not has_colors and not selected_title:
+    icon_style = _get_style_preset(prefs.icon_style) if prefs else None
+    card_style = _get_style_preset(prefs.card_style) if prefs else None
+    
+    if not icon_style and not card_style and not selected_title:
         return None
     
-    return SubscriberCustomization(
-        icon_background_color=prefs.icon_background_color if prefs else None,
-        icon_text_color=prefs.icon_text_color if prefs else None,
-        card_background_color=prefs.card_background_color if prefs else None,
-        selected_title=selected_title
-    )
+    return SubscriberCustomization(icon_style=icon_style, card_style=card_style, selected_title=selected_title)
 
 
 def _get_user_selected_title(db: Session, user_id: int) -> Optional[TitleData]:
@@ -772,35 +781,31 @@ def get_subscriber_settings(
     prefs = _get_user_preferences(db, current_user.id)
     selected_title = _get_user_selected_title(db, current_user.id)
     
+    # Build available styles list
+    available_styles = [
+        StylePreset(id=sid, name=s["name"], background_color=s["background"], text_color=s["text"])
+        for sid, s in STYLE_PRESETS.items()
+    ]
+    
     # Get available titles (claimed achievements)
     available_titles = []
     achievements_query = text("""
         SELECT DISTINCT ON (ad.achievement_type)
-            ad.id,
-            ad.display_name,
-            ad.icon
+            ad.id, ad.display_name, ad.icon
         FROM player_achievement_claims pac
         JOIN achievement_definitions ad ON ad.id = pac.achievement_tier_id
         WHERE pac.user_id = :user_id
         ORDER BY ad.achievement_type, ad.tier DESC
     """)
-    achievements_result = db.execute(achievements_query, {"user_id": current_user.id}).fetchall()
-    
-    for row in achievements_result:
-        available_titles.append(
-            TitleData(
-                achievement_id=row.id,
-                display_name=row.display_name,
-                icon=row.icon or "star.fill"
-            )
-        )
+    for row in db.execute(achievements_query, {"user_id": current_user.id}).fetchall():
+        available_titles.append(TitleData(achievement_id=row.id, display_name=row.display_name, icon=row.icon or "star.fill"))
     
     return SubscriberSettings(
         is_subscriber=is_subscriber,
-        icon_background_color=prefs.icon_background_color if prefs else None,
-        icon_text_color=prefs.icon_text_color if prefs else None,
-        card_background_color=prefs.card_background_color if prefs else None,
+        icon_style=_get_style_preset(prefs.icon_style) if prefs else None,
+        card_style=_get_style_preset(prefs.card_style) if prefs else None,
         selected_title=selected_title,
+        available_styles=available_styles,
         available_titles=available_titles
     )
 
@@ -822,13 +827,15 @@ def update_subscriber_settings(
         prefs = UserPreferences(user_id=current_user.id)
         db.add(prefs)
     
-    # Update colors directly (hex values)
-    if settings.icon_background_color is not None:
-        prefs.icon_background_color = settings.icon_background_color if settings.icon_background_color else None
-    if settings.icon_text_color is not None:
-        prefs.icon_text_color = settings.icon_text_color if settings.icon_text_color else None
-    if settings.card_background_color is not None:
-        prefs.card_background_color = settings.card_background_color if settings.card_background_color else None
+    # Update styles (validate they exist)
+    if settings.icon_style_id is not None:
+        if settings.icon_style_id and settings.icon_style_id not in STYLE_PRESETS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid icon style: {settings.icon_style_id}")
+        prefs.icon_style = settings.icon_style_id or None
+    if settings.card_style_id is not None:
+        if settings.card_style_id and settings.card_style_id not in STYLE_PRESETS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid card style: {settings.card_style_id}")
+        prefs.card_style = settings.card_style_id or None
     
     # Update title
     if settings.selected_title_achievement_id is not None:

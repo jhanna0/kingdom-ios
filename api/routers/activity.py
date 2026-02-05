@@ -435,6 +435,7 @@ def get_friend_activities(
         # Add user info and subscriber customization to activities
         from routers.store import is_user_subscriber
         from db.models import UserPreferences
+        from db.models.subscription import STYLE_PRESETS
         
         is_subscriber = is_user_subscriber(db, uid)
         subscriber_customization_dict = None
@@ -452,11 +453,20 @@ def get_friend_activities(
                     if title_result:
                         selected_title_dict = {"achievement_id": title_result[0], "display_name": title_result[1], "icon": title_result[2]}
                 
-                if prefs.icon_background_color or prefs.card_background_color or selected_title_dict:
+                icon_style_dict = None
+                if prefs.icon_style and prefs.icon_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.icon_style]
+                    icon_style_dict = {"id": prefs.icon_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                card_style_dict = None
+                if prefs.card_style and prefs.card_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.card_style]
+                    card_style_dict = {"id": prefs.card_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                if icon_style_dict or card_style_dict or selected_title_dict:
                     subscriber_customization_dict = {
-                        "icon_background_color": prefs.icon_background_color,
-                        "icon_text_color": prefs.icon_text_color,
-                        "card_background_color": prefs.card_background_color,
+                        "icon_style": icon_style_dict,
+                        "card_style": card_style_dict,
                         "selected_title": selected_title_dict
                     }
         

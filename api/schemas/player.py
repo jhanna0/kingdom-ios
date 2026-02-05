@@ -81,29 +81,35 @@ class TitleData(BaseModel):
     icon: str  # SF Symbol name
 
 
+class StylePreset(BaseModel):
+    """A style preset with background and text colors."""
+    id: str
+    name: str
+    background_color: str  # hex
+    text_color: str        # hex
+
+
 class SubscriberCustomization(BaseModel):
     """User's selected customization (for rendering their profile/card)."""
-    icon_background_color: Optional[str] = None  # hex
-    icon_text_color: Optional[str] = None        # hex
-    card_background_color: Optional[str] = None  # hex
+    icon_style: Optional[StylePreset] = None
+    card_style: Optional[StylePreset] = None
     selected_title: Optional[TitleData] = None
 
 
 class SubscriberSettings(BaseModel):
     """Full subscriber settings response (for settings screen)."""
     is_subscriber: bool
-    icon_background_color: Optional[str] = None
-    icon_text_color: Optional[str] = None
-    card_background_color: Optional[str] = None
+    icon_style: Optional[StylePreset] = None
+    card_style: Optional[StylePreset] = None
     selected_title: Optional[TitleData] = None
+    available_styles: list[StylePreset] = []
     available_titles: list[TitleData] = []
 
 
 class SubscriberSettingsUpdate(BaseModel):
     """Request body for updating subscriber settings."""
-    icon_background_color: Optional[str] = None
-    icon_text_color: Optional[str] = None
-    card_background_color: Optional[str] = None
+    icon_style_id: Optional[str] = None
+    card_style_id: Optional[str] = None
     selected_title_achievement_id: Optional[int] = None
 
 

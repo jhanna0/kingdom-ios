@@ -40,6 +40,15 @@ struct ProfileHeaderCard: View {
         customization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
     
+    private var cardTextColor: Color {
+        customization?.cardTextColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var cardSecondaryTextColor: Color {
+        // Slightly dimmed version of the card text color
+        customization?.cardTextColorValue.opacity(0.7) ?? KingdomTheme.Colors.inkMedium
+    }
+    
     var body: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
             ZStack(alignment: .bottomTrailing) {
@@ -61,7 +70,7 @@ struct ProfileHeaderCard: View {
                 HStack(spacing: 8) {
                     Text(displayName)
                         .font(FontStyles.headingLarge)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .foregroundColor(cardTextColor)
                         .lineLimit(2)
                     
                     if isSubscriber {
@@ -78,7 +87,7 @@ struct ProfileHeaderCard: View {
                         Text(title.displayName)
                             .font(FontStyles.bodySmall)
                     }
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                    .foregroundColor(cardSecondaryTextColor)
                 }
                 
                 if let kingdom = rulerOf {
@@ -88,7 +97,7 @@ struct ProfileHeaderCard: View {
                             .foregroundColor(KingdomTheme.Colors.imperialGold)
                         Text("Ruler of \(kingdom)")
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            .foregroundColor(cardSecondaryTextColor)
                     }
                 }
             }

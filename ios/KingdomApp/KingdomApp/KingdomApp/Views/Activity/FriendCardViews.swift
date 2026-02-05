@@ -16,6 +16,14 @@ struct FriendCard: View {
     private var cardBackgroundColor: Color {
         friend.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
+    
+    private var cardTextColor: Color {
+        friend.subscriberCustomization?.cardTextColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var cardSecondaryTextColor: Color {
+        friend.subscriberCustomization?.cardTextColorValue.opacity(0.7) ?? KingdomTheme.Colors.inkMedium
+    }
 
     var body: some View {
         NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
@@ -38,7 +46,7 @@ struct FriendCard: View {
                     HStack(spacing: 6) {
                         Text(friend.displayName)
                             .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                            .foregroundColor(cardTextColor)
                         
                         if friend.subscriberCustomization != nil {
                             Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(KingdomTheme.Colors.imperialGold)
@@ -50,30 +58,30 @@ struct FriendCard: View {
                             Image(systemName: title.icon).font(.system(size: 10))
                             Text(title.displayName).font(FontStyles.labelSmall)
                         }
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .foregroundColor(cardSecondaryTextColor)
                     }
                     
                     HStack(spacing: 8) {
                         if let level = friend.level {
-                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
                         }
                         
                         if let activity = friend.activity {
                             HStack(spacing: 4) {
                                 Image(systemName: activity.icon).font(FontStyles.iconMini).foregroundColor(activityColor(activity.color))
-                                Text(activity.displayText).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium).lineLimit(1)
+                                Text(activity.displayText).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor).lineLimit(1)
                             }
                         } else if let kingdomName = friend.currentKingdomName {
                             HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle.fill").font(FontStyles.iconMini).foregroundColor(KingdomTheme.Colors.inkMedium)
-                                Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(KingdomTheme.Colors.inkMedium).lineLimit(1)
+                                Image(systemName: "mappin.circle.fill").font(FontStyles.iconMini).foregroundColor(cardSecondaryTextColor)
+                                Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor).lineLimit(1)
                             }
                         }
                     }
                 }
                 
                 Spacer()
-                Image(systemName: "chevron.right").font(FontStyles.iconSmall).foregroundColor(KingdomTheme.Colors.inkLight)
+                Image(systemName: "chevron.right").font(FontStyles.iconSmall).foregroundColor(cardSecondaryTextColor)
             }
             .padding()
             .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)

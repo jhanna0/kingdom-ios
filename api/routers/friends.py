@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func, desc
+from sqlalchemy import or_, and_, func, desc, text
 from typing import List
 from datetime import datetime, timedelta
 
 from db.base import get_db
-from db.models import User, Friend, PlayerState
+from db.models import User, Friend, PlayerState, UserPreferences
+from db.models.subscription import STYLE_PRESETS
 from schemas.friend import (
     FriendRequest,
     FriendResponse,
@@ -16,6 +17,7 @@ from schemas.friend import (
 )
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso, get_activity_icon_color
+from routers.store import is_user_subscriber
 
 
 router = APIRouter(prefix="/friends", tags=["friends"])
@@ -229,6 +231,7 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
     if friendship.status == 'accepted':
         from routers.store import is_user_subscriber
         from db.models import UserPreferences
+        from db.models.subscription import STYLE_PRESETS
         from sqlalchemy import text
         
         if is_user_subscriber(db, friend_user_id):
@@ -244,11 +247,20 @@ def _get_friend_response(db: Session, friendship: Friend, current_user_id: int) 
                     if title_result:
                         selected_title_dict = {"achievement_id": title_result.id, "display_name": title_result.display_name, "icon": title_result.icon or "star.fill"}
                 
-                if prefs.icon_background_color or prefs.card_background_color or selected_title_dict:
+                icon_style_dict = None
+                if prefs.icon_style and prefs.icon_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.icon_style]
+                    icon_style_dict = {"id": prefs.icon_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                card_style_dict = None
+                if prefs.card_style and prefs.card_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.card_style]
+                    card_style_dict = {"id": prefs.card_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                if icon_style_dict or card_style_dict or selected_title_dict:
                     subscriber_customization_dict = {
-                        "icon_background_color": prefs.icon_background_color,
-                        "icon_text_color": prefs.icon_text_color,
-                        "card_background_color": prefs.card_background_color,
+                        "icon_style": icon_style_dict,
+                        "card_style": card_style_dict,
                         "selected_title": selected_title_dict
                     }
     
@@ -547,17 +559,51 @@ def get_friends_dashboard(
     activity_user_ids = list(set(log.user_id for log in activity_logs))
     users_map = {}
     states_map = {}
+    prefs_map = {}
     if activity_user_ids:
         users = db.query(User).filter(User.id.in_(activity_user_ids)).all()
         users_map = {u.id: u for u in users}
         states = db.query(PlayerState).filter(PlayerState.user_id.in_(activity_user_ids)).all()
         states_map = {s.user_id: s for s in states}
+        # Load subscriber preferences
+        prefs_list = db.query(UserPreferences).filter(UserPreferences.user_id.in_(activity_user_ids)).all()
+        prefs_map = {p.user_id: p for p in prefs_list}
     
     friend_activities = []
     for log in activity_logs:
         user = users_map.get(log.user_id)
         user_state = states_map.get(log.user_id)
+        prefs = prefs_map.get(log.user_id)
         icon, color = get_activity_icon_color(log.action_type)
+        
+        # Build subscriber customization if user is subscriber with prefs
+        subscriber_customization_dict = None
+        if is_user_subscriber(db, log.user_id) and prefs:
+            selected_title_dict = None
+            if prefs.selected_title_achievement_id:
+                title_result = db.execute(text("""
+                    SELECT id, display_name, icon FROM achievement_definitions WHERE id = :achievement_id
+                """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
+                if title_result:
+                    selected_title_dict = {"achievement_id": title_result[0], "display_name": title_result[1], "icon": title_result[2] or "star.fill"}
+            
+            icon_style_dict = None
+            if prefs.icon_style and prefs.icon_style in STYLE_PRESETS:
+                s = STYLE_PRESETS[prefs.icon_style]
+                icon_style_dict = {"id": prefs.icon_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+            
+            card_style_dict = None
+            if prefs.card_style and prefs.card_style in STYLE_PRESETS:
+                s = STYLE_PRESETS[prefs.card_style]
+                card_style_dict = {"id": prefs.card_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+            
+            if icon_style_dict or card_style_dict or selected_title_dict:
+                subscriber_customization_dict = {
+                    "icon_style": icon_style_dict,
+                    "card_style": card_style_dict,
+                    "selected_title": selected_title_dict
+                }
+        
         friend_activities.append({
             "id": log.id,
             "user_id": log.user_id,
@@ -574,6 +620,7 @@ def get_friends_dashboard(
             "details": log.details or {},
             "icon": icon,
             "color": color,
+            "subscriber_customization": subscriber_customization_dict,
             # TODO: Using wrong format here. Should use format_datetime_iso once iOS TimeFormatter.parseISO supports Z suffix
             "created_at": log.created_at.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
         })

@@ -16,33 +16,56 @@ struct APITitleData: Codable {
     }
 }
 
-/// Subscriber customization (hex colors stored directly)
+/// Style preset (background + text color combo)
+struct APIStylePreset: Codable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let backgroundColor: String  // hex
+    let textColor: String        // hex
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case backgroundColor = "background_color"
+        case textColor = "text_color"
+    }
+    
+    var backgroundColorValue: Color {
+        Color(hex: backgroundColor) ?? .gray
+    }
+    
+    var textColorValue: Color {
+        Color(hex: textColor) ?? .white
+    }
+}
+
+/// Subscriber customization (style presets)
 struct APISubscriberCustomization: Codable {
-    let iconBackgroundColor: String?  // hex
-    let iconTextColor: String?        // hex
-    let cardBackgroundColor: String?  // hex
+    let iconStyle: APIStylePreset?
+    let cardStyle: APIStylePreset?
     let selectedTitle: APITitleData?
     
     enum CodingKeys: String, CodingKey {
-        case iconBackgroundColor = "icon_background_color"
-        case iconTextColor = "icon_text_color"
-        case cardBackgroundColor = "card_background_color"
+        case iconStyle = "icon_style"
+        case cardStyle = "card_style"
         case selectedTitle = "selected_title"
     }
     
+    // Convenience computed properties for backwards compatibility
     var iconBackgroundColorValue: Color {
-        if let hex = iconBackgroundColor { return Color(hex: hex) ?? .gray }
-        return .gray
+        iconStyle?.backgroundColorValue ?? .gray
     }
     
     var iconTextColorValue: Color {
-        if let hex = iconTextColor { return Color(hex: hex) ?? .white }
-        return .white
+        iconStyle?.textColorValue ?? .white
     }
     
     var cardBackgroundColorValue: Color {
-        if let hex = cardBackgroundColor { return Color(hex: hex) ?? KingdomTheme.Colors.parchmentLight }
-        return KingdomTheme.Colors.parchmentLight
+        cardStyle?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    var cardTextColorValue: Color {
+        cardStyle?.textColorValue ?? KingdomTheme.Colors.inkDark
     }
 }
 
