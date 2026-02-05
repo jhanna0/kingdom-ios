@@ -47,17 +47,6 @@ struct KitchenView: View {
         .refreshable {
             await loadKitchenStatus()
         }
-        .overlay {
-            if showResultOverlay {
-                KitchenResultOverlay(
-                    success: resultSuccess,
-                    message: resultMessage,
-                    flavor: flavorText,
-                    isShowing: $showResultOverlay
-                )
-                .transition(.opacity)
-            }
-        }
         .sheet(item: $selectedSlot) { slot in
             if slot.isBaking {
                 OvenBakingSheet(slot: slot, currentTime: currentTime)
@@ -121,9 +110,6 @@ struct KitchenView: View {
             
             // Oven - The main visual!
             ovenView(slots: status.slots, wheatCount: status.wheatCount)
-            
-            // Info/Tips Card
-            kitchenTipsCard
         }
     }
     
@@ -241,32 +227,14 @@ struct KitchenView: View {
             
             VStack(spacing: 0) {
                 // Warm kitchen header
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.85, green: 0.65, blue: 0.45),
-                            Color(red: 0.95, green: 0.85, blue: 0.75)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    
-                    // Kitchen shelves decor
-                    HStack {
-                        Image(systemName: "cup.and.saucer.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.6))
-                        Spacer()
-                        Image(systemName: "fork.knife")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white.opacity(0.5))
-                        Spacer()
-                        Image(systemName: "carrot.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .padding(.horizontal, 30)
-                }
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.85, green: 0.65, blue: 0.45),
+                        Color(red: 0.95, green: 0.85, blue: 0.75)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
                 .frame(height: 40)
                 
                 // Oven body with slots
@@ -274,8 +242,8 @@ struct KitchenView: View {
                     // Warm brick background
                     LinearGradient(
                         colors: [
-                            Color(red: 0.6, green: 0.35, blue: 0.25),
-                            Color(red: 0.5, green: 0.28, blue: 0.2)
+                            Color(red: 0.75, green: 0.55, blue: 0.40),
+                            Color(red: 0.65, green: 0.45, blue: 0.35)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -299,13 +267,13 @@ struct KitchenView: View {
                 
                 // Oven bottom / floor
                 ZStack(alignment: .top) {
-                    Color(red: 0.4, green: 0.25, blue: 0.18)
+                    Color(red: 0.55, green: 0.40, blue: 0.30)
                     
                     // Wood floor planks
                     HStack(spacing: 4) {
                         ForEach(0..<6, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(Color(red: 0.5, green: 0.35, blue: 0.25))
+                                .fill(Color(red: 0.65, green: 0.50, blue: 0.40))
                         }
                     }
                     .frame(height: 16)

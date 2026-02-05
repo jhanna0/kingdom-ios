@@ -9,23 +9,21 @@ struct KneadGameView: View {
     @State private var isStretching = false
     @State private var foldCount: Int = 0
     @State private var glutenLevel: CGFloat = 0
-    @State private var showFoldText = false
     
     let targetFolds = 35
     let stretchThreshold: CGFloat = 60  // Lowered from 80 since dough moves slower now (harder to reach same distance)
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Header
+        VStack(spacing: 0) {
+            // INSTRUCTION
             Text("Pull outward, release to fold back!")
                 .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 28)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             
-            // Progress
+            // PROGRESS BAR
             VStack(spacing: 4) {
                 HStack {
                     Text("Gluten Development")
@@ -35,7 +33,6 @@ struct KneadGameView: View {
                 }
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 20)
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -47,10 +44,11 @@ struct KneadGameView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
                 }
                 .frame(height: 20)
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
-            // Game area
+            // GAME AREA
             GeometryReader { geo in
                 let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
                 
@@ -103,24 +101,16 @@ struct KneadGameView: View {
                                     handleStretchEnd(value: value, center: center)
                                 }
                         )
-                    
-                    // Fold text
-                    if showFoldText {
-                        Text("FOLD!")
-                            .font(.system(size: 36, weight: .black))
-                            .foregroundColor(.white)
-                            .shadow(color: .black, radius: 2)
-                            .position(center)
-                            .transition(.scale.combined(with: .opacity))
-                    }
                 }
             }
             .frame(maxHeight: 450)
             
-            Text("Stretch slowly - the dough is heavy and sticky!")
+            // BOTTOM
+            Text("Pull and release to fold the dough")
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
         }
     }
     
@@ -235,16 +225,7 @@ struct KneadGameView: View {
             foldCount += 1
             glutenLevel = min(1.0, CGFloat(foldCount) / CGFloat(targetFolds))
             
-            // Show fold animation
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                showFoldText = true
-            }
-            
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation { showFoldText = false }
-            }
             
             // Check completion
             if foldCount >= targetFolds {

@@ -20,15 +20,13 @@ struct MixStarterGameView: View {
     let allIngredients = ["flour", "water", "starter"]
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Header
+        VStack(spacing: 0) {
             Text(ingredientsAdded.count < 3 ? "Drag each ingredient into the bowl" : "Swirl your finger through the dough!")
                 .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 28)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             
             // Progress bar (always shown)
             VStack(spacing: 4) {
@@ -40,7 +38,6 @@ struct MixStarterGameView: View {
                 }
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 20)
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -52,8 +49,9 @@ struct MixStarterGameView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
                 }
                 .frame(height: 20)
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
             // Game area
             GeometryReader { geo in
@@ -282,10 +280,11 @@ struct MixStarterGameView: View {
                             .foregroundColor(ingredientsAdded.contains(ingredient) ? KingdomTheme.Colors.buttonSuccess : .gray)
                         Text(ingredient.capitalized)
                             .font(FontStyles.labelSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }
             }
-            .padding(.bottom, 20)
+            .padding(.vertical, 16)
         }
     }
     

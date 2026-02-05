@@ -7,103 +7,72 @@ struct IntroStepView: View {
     @State private var animate = false
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Spacer()
             
+            // Cute bread animation
             ZStack {
                 Circle()
-                    .fill(RadialGradient(colors: [Color.orange.opacity(0.3), Color.clear], center: .center, startRadius: 0, endRadius: 80))
-                    .frame(width: 160, height: 160)
+                    .fill(RadialGradient(colors: [Color.orange.opacity(0.3), Color.clear], center: .center, startRadius: 0, endRadius: 100))
+                    .frame(width: 200, height: 200)
                     .scaleEffect(animate ? 1.1 : 1.0)
                 
-                // Bread loaf
                 BreadLoafShape()
                     .fill(LinearGradient(colors: [Color(red: 0.85, green: 0.65, blue: 0.35), Color(red: 0.7, green: 0.5, blue: 0.25)], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 90, height: 60)
+                    .frame(width: 110, height: 75)
                     .overlay(
-                        // Score marks
-                        VStack(spacing: 8) {
+                        VStack(spacing: 10) {
                             ForEach(0..<3, id: \.self) { _ in
                                 Capsule()
                                     .fill(Color(red: 0.55, green: 0.35, blue: 0.15))
-                                    .frame(width: 50, height: 4)
+                                    .frame(width: 60, height: 5)
                                     .rotationEffect(.degrees(-15))
                             }
                         }
                     )
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     .rotationEffect(.degrees(animate ? 3 : -3))
             }
             .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: animate)
             
-            Text("Let's Make Sourdough!")
-                .font(FontStyles.headingLarge)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
+            Spacer()
             
-            Text("A real baker's journey awaits.")
-                .font(FontStyles.bodyMedium)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                stepRow(num: "1", text: "Grind wheat into flour", icon: "gearshape.2.fill")
-                stepRow(num: "2", text: "Mix the sourdough starter", icon: "plus.circle.fill")
-                stepRow(num: "3", text: "Knead & develop gluten", icon: "hand.raised.fill")
-                stepRow(num: "4", text: "Shape into a boule", icon: "circle.fill")
-                stepRow(num: "5", text: "Score the top", icon: "pencil.tip")
-                stepRow(num: "6", text: "Bake to perfection", icon: "flame.fill")
+            // Simple prompt
+            VStack(spacing: 16) {
+                Text("Would you like to start\nmaking some bread?")
+                    .font(FontStyles.headingMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
             }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.5))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black, lineWidth: 2))
-            )
-            .padding(.horizontal, 30)
+            .padding(.horizontal, 40)
             
             Spacer()
             
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                onStart()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                    Text("Start Baking!")
+            // Buttons
+            VStack(spacing: 12) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onStart()
+                } label: {
+                    Text("Let's Bake")
                         .font(FontStyles.headingSmall)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14).fill(Color.black).offset(x: 4, y: 4)
+                        RoundedRectangle(cornerRadius: 14).fill(KingdomTheme.Colors.buttonWarning)
+                        RoundedRectangle(cornerRadius: 14).stroke(Color.black, lineWidth: 3)
+                    }
+                )
             }
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14).fill(Color.black).offset(x: 4, y: 4)
-                    RoundedRectangle(cornerRadius: 14).fill(KingdomTheme.Colors.buttonWarning)
-                    RoundedRectangle(cornerRadius: 14).stroke(Color.black, lineWidth: 3)
-                }
-            )
             .padding(.horizontal, 30)
-            .padding(.bottom, 30)
+            .padding(.bottom, 40)
         }
         .onAppear { animate = true }
-    }
-    
-    private func stepRow(num: String, text: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            Text(num)
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundColor(.white)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(KingdomTheme.Colors.buttonWarning))
-            
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .frame(width: 20)
-            
-            Text(text)
-                .font(FontStyles.labelMedium)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-        }
     }
 }
 

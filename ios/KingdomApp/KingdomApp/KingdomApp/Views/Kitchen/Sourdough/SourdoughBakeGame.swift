@@ -22,14 +22,13 @@ struct BakeGameView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
             Text(phaseSubtitle)
                 .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 28)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             
             // Progress indicator (matches other steps)
             VStack(spacing: 4) {
@@ -41,7 +40,6 @@ struct BakeGameView: View {
                 }
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 20)
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -53,77 +51,81 @@ struct BakeGameView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
                 }
                 .frame(height: 20)
-                .padding(.horizontal, 20)
             }
-            
-            Spacer()
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
             // Oven view
-            ZStack {
-                // Oven body
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 0.25, green: 0.2, blue: 0.18), Color(red: 0.18, green: 0.13, blue: 0.1)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 300, height: 240)
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.black, lineWidth: 3))
+            GeometryReader { geo in
+                let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
                 
-                // Oven interior (glowing)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        Color(
-                            red: 0.3 + ovenTemp * 0.5,
-                            green: 0.15 + ovenTemp * 0.15,
-                            blue: 0.1
-                        )
-                    )
-                    .frame(width: 260, height: 200)
-                
-                // Heat coils at bottom
-                HStack(spacing: 8) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(red: 1, green: 0.3 + ovenTemp * 0.4, blue: 0.1).opacity(ovenTemp))
-                            .frame(width: 40, height: 8)
-                    }
-                }
-                .offset(y: 85)
-                
-                // Heat waves
-                if ovenTemp > 0.5 {
-                    ForEach(0..<3, id: \.self) { i in
-                        Image(systemName: "waveform")
-                            .font(.system(size: 16))
-                            .foregroundColor(.orange.opacity(0.4 * ovenTemp))
-                            .offset(y: CGFloat(50 + i * 12))
-                    }
-                }
-                
-                // Steam
-                if steamAmount > 0 {
-                    ForEach(0..<Int(steamAmount * 10), id: \.self) { i in
-                        Image(systemName: "cloud.fill")
-                            .font(.system(size: CGFloat.random(in: 12...20)))
-                            .foregroundColor(.white.opacity(0.5 * steamAmount))
-                            .offset(
-                                x: CGFloat.random(in: -80...80),
-                                y: CGFloat.random(in: -70...(-30))
+                ZStack {
+                    // Oven body
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 0.25, green: 0.2, blue: 0.18), Color(red: 0.18, green: 0.13, blue: 0.1)],
+                                startPoint: .top, endPoint: .bottom
                             )
+                        )
+                        .frame(width: 300, height: 240)
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.black, lineWidth: 3))
+                    
+                    // Oven interior (glowing)
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            Color(
+                                red: 0.3 + ovenTemp * 0.5,
+                                green: 0.15 + ovenTemp * 0.15,
+                                blue: 0.1
+                            )
+                        )
+                        .frame(width: 260, height: 200)
+                    
+                    // Heat coils at bottom
+                    HStack(spacing: 8) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(red: 1, green: 0.3 + ovenTemp * 0.4, blue: 0.1).opacity(ovenTemp))
+                                .frame(width: 40, height: 8)
+                        }
                     }
+                    .offset(y: 85)
+                    
+                    // Heat waves
+                    if ovenTemp > 0.5 {
+                        ForEach(0..<3, id: \.self) { i in
+                            Image(systemName: "waveform")
+                                .font(.system(size: 16))
+                                .foregroundColor(.orange.opacity(0.4 * ovenTemp))
+                                .offset(y: CGFloat(50 + i * 12))
+                        }
+                    }
+                    
+                    // Steam
+                    if steamAmount > 0 {
+                        ForEach(0..<Int(steamAmount * 10), id: \.self) { i in
+                            Image(systemName: "cloud.fill")
+                                .font(.system(size: CGFloat.random(in: 12...20)))
+                                .foregroundColor(.white.opacity(0.5 * steamAmount))
+                                .offset(
+                                    x: CGFloat.random(in: -80...80),
+                                    y: CGFloat.random(in: -70...(-30))
+                                )
+                        }
+                    }
+                    
+                    // Bread
+                    bakedBreadView
                 }
-                
-                // Bread
-                bakedBreadView
+                .position(center)
             }
+            .frame(maxHeight: 450)
             
-            Spacer()
-            
-            // Complete button
-            
-            Spacer()
+            Text(bakePhase == .done ? "Your bread is ready!" : "Watch the magic happen...")
+                .font(FontStyles.labelSmall)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .padding(.vertical, 16)
         }
         .onAppear { startBaking() }
     }

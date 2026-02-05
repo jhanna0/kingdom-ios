@@ -18,15 +18,16 @@ struct ShapeGameView: View {
     let targetRotation: CGFloat = 4000 // Multiple full rotations
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
+            // INSTRUCTION
             Text("Rotate around the dough to shape it round!")
                 .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 28)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             
+            // PROGRESS BAR
             VStack(spacing: 4) {
                 HStack {
                     Text("Roundness")
@@ -36,7 +37,6 @@ struct ShapeGameView: View {
                 }
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 20)
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -48,9 +48,11 @@ struct ShapeGameView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
                 }
                 .frame(height: 20)
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
+            // GAME AREA
             GeometryReader { geo in
                 let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
                 
@@ -122,10 +124,10 @@ struct ShapeGameView: View {
             }
             .frame(maxHeight: 450)
             
-            Text("Create surface tension for a perfect rise!")
+            Text("Create surface tension for a perfect rise")
                 .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.bottom, 20)
+                .padding(.vertical, 16)
         }
     }
     

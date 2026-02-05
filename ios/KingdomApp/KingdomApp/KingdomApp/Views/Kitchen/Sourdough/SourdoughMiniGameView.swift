@@ -55,7 +55,7 @@ struct SourdoughMiniGameView: View {
                 
                 Spacer()
                 
-                Text(currentStep == .intro ? "Let's Make Sourdough!" : currentStep.displayName)
+                Text(currentStep == .intro ? "Making Bread" : currentStep.displayName)
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
@@ -71,10 +71,7 @@ struct SourdoughMiniGameView: View {
             progressIndicator
         }
         .padding(.bottom, 12)
-        .background(
-            Color(red: 0.85, green: 0.75, blue: 0.60)
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-        )
+        .background(Color(red: 0.85, green: 0.75, blue: 0.60))
     }
     
     private var progressIndicator: some View {
@@ -256,7 +253,7 @@ enum SourdoughStep: Int, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .intro: return "Let's Make Sourdough!"
+        case .intro: return "Making Bread"
         case .grindWheat: return "Grind Wheat"
         case .mixStarter: return "Mix Starter"
         case .knead: return "Knead Dough"

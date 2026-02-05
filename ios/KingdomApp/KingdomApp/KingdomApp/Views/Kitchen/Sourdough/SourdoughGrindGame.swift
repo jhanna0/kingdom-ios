@@ -25,27 +25,24 @@ struct GrindWheatGameView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Instructions
+        VStack(spacing: 0) {
             Text(gamePhase == .harvest ? "Tap wheat stalks to collect grains" : "Spin the millstone clockwise!")
                 .font(FontStyles.bodyMedium)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 28)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             
             // Progress bar
             VStack(spacing: 4) {
                 HStack {
                     Text("Flour")
-                        .font(FontStyles.labelSmall)
                     Spacer()
                     Text("\(Int(flourAmount))%")
                         .font(FontStyles.labelBold)
                 }
+                .font(FontStyles.labelSmall)
                 .foregroundColor(KingdomTheme.Colors.inkMedium)
-                .padding(.horizontal, 20)
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -57,8 +54,9 @@ struct GrindWheatGameView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 2))
                 }
                 .frame(height: 20)
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
             // Game area
             GeometryReader { geo in
@@ -118,7 +116,7 @@ struct GrindWheatGameView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.bottom, 20)
+            .padding(.vertical, 16)
         }
         .onAppear {
             setupGame()
