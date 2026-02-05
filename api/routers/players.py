@@ -827,15 +827,16 @@ def update_subscriber_settings(
         prefs = UserPreferences(user_id=current_user.id)
         db.add(prefs)
     
-    # Update styles (validate they exist)
-    if settings.icon_style_id is not None:
-        if settings.icon_style_id and settings.icon_style_id not in STYLE_PRESETS:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid icon style: {settings.icon_style_id}")
-        prefs.icon_style = settings.icon_style_id or None
-    if settings.card_style_id is not None:
-        if settings.card_style_id and settings.card_style_id not in STYLE_PRESETS:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid card style: {settings.card_style_id}")
-        prefs.card_style = settings.card_style_id or None
+    # Update styles (validate they exist, empty string or None clears the style)
+    icon_style = settings.icon_style_id if settings.icon_style_id else None
+    if icon_style and icon_style not in STYLE_PRESETS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid icon style: {icon_style}")
+    prefs.icon_style = icon_style
+    
+    card_style = settings.card_style_id if settings.card_style_id else None
+    if card_style and card_style not in STYLE_PRESETS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid card style: {card_style}")
+    prefs.card_style = card_style
     
     # Update title
     if settings.selected_title_achievement_id is not None:

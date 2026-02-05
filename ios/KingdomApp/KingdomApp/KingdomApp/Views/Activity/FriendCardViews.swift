@@ -6,11 +6,17 @@ struct FriendCard: View {
     let friend: Friend
     
     private var avatarBackgroundColor: Color {
-        friend.subscriberCustomization?.iconBackgroundColorValue ?? KingdomTheme.Colors.inkMedium
+        if let customization = friend.subscriberCustomization {
+            return customization.iconBackgroundColorValue
+        }
+        return KingdomTheme.Colors.inkMedium
     }
     
     private var avatarTextColor: Color {
-        friend.subscriberCustomization?.iconTextColorValue ?? .white
+        if let customization = friend.subscriberCustomization {
+            return customization.iconTextColorValue
+        }
+        return .white
     }
     
     private var cardBackgroundColor: Color {
@@ -282,7 +288,7 @@ struct AllFriendActivityView: View {
                 .ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: KingdomTheme.Spacing.small) {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
                     ForEach(activities) { activity in
                         ActivityCard(activity: activity, showUser: true)
                     }

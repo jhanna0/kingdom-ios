@@ -132,8 +132,12 @@ functions:
 
 plugins:
   - serverless-domain-manager
+  - serverless-prune-plugin
 
 custom:
+  prune:
+    automatic: true
+    number: 5
   customDomain:
     http:
       domainName: 'api.kingdoms.ninja'

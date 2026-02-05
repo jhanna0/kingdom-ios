@@ -78,7 +78,7 @@ PRODUCTS = {
         "icon": "heart.fill",
         "color": "imperialGold",
         "subtitle": "Monthly subscription",
-        "description": "Kingdoms is a homemade side project done in my free time. It cost ~$150 to host 100 players per month. By supporting you unlock profile theming and other benefits. Thank you!",
+        "description": "Kingdoms is a homemade side project done in my free time. It costs about $150 to host 100 players per month. By supporting you unlock profile theming and other benefits. Thank you!",
         "benefits": [
             "Support independent development",
             "Help keep the game ad-free",

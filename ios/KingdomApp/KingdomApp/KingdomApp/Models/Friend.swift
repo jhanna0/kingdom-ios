@@ -53,11 +53,11 @@ struct APISubscriberCustomization: Codable {
     
     // Convenience computed properties for backwards compatibility
     var iconBackgroundColorValue: Color {
-        iconStyle?.backgroundColorValue ?? .gray
+        iconStyle?.backgroundColorValue ?? .white
     }
     
     var iconTextColorValue: Color {
-        iconStyle?.textColorValue ?? .white
+        iconStyle?.textColorValue ?? .black
     }
     
     var cardBackgroundColorValue: Color {

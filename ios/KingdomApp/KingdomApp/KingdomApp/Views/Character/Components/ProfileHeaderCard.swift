@@ -60,9 +60,9 @@ struct ProfileHeaderCard: View {
                 
                 Text("\(level)")
                     .font(FontStyles.labelBold)
-                    .foregroundColor(.white)
+                    .foregroundColor(avatarBackgroundColor)
                     .frame(width: 26, height: 26)
-                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 13, shadowOffset: 2, borderWidth: 2)
+                    .brutalistBadge(backgroundColor: avatarTextColor, cornerRadius: 13, shadowOffset: 2, borderWidth: 2)
                     .offset(x: 6, y: 6)
             }
             
@@ -80,23 +80,26 @@ struct ProfileHeaderCard: View {
                     }
                 }
                 
-                if let title = customization?.selectedTitle {
-                    HStack(spacing: 4) {
-                        Image(systemName: title.icon)
-                            .font(.system(size: 12))
-                        Text(title.displayName)
-                            .font(FontStyles.bodySmall)
-                    }
-                    .foregroundColor(cardSecondaryTextColor)
-                }
-                
                 if let kingdom = rulerOf {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
-                            .font(FontStyles.iconSmall)
+                            .font(.system(size: 14))
                             .foregroundColor(KingdomTheme.Colors.imperialGold)
+                            .frame(width: 16)
                         Text("Ruler of \(kingdom)")
-                            .font(FontStyles.bodyMediumBold)
+                            .font(FontStyles.bodySmall)
+                            .foregroundColor(cardSecondaryTextColor)
+                    }
+                }
+                
+                if let title = customization?.selectedTitle {
+                    HStack(spacing: 6) {
+                        Image(systemName: title.icon)
+                            .font(.system(size: 12))
+                            .foregroundColor(cardSecondaryTextColor)
+                            .frame(width: 16)
+                        Text(title.displayName)
+                            .font(FontStyles.bodySmall)
                             .foregroundColor(cardSecondaryTextColor)
                     }
                 }

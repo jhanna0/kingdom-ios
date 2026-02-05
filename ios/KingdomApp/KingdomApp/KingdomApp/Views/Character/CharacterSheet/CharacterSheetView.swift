@@ -76,25 +76,31 @@ struct CharacterSheetView: View {
                     )
                 }
                 
-                // Subscriber customization button (only for subscribers)
+                // Supporter Options section (only for subscribers)
                 if player.isSubscriber {
-                    NavigationLink(destination: SubscriberSettingsView().environmentObject(player)) {
-                        HStack {
-                            Image(systemName: "paintbrush.fill")
-                                .font(FontStyles.iconSmall)
-                            Text("Customize Profile")
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Supporter Benefits")
+                            .font(FontStyles.headingSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        NavigationLink(destination: SubscriberSettingsView().environmentObject(player)) {
+                            HStack {
+                                Image(systemName: "seal.fill")
+                                    .font(FontStyles.iconSmall)
+                                Text("Customize Profile")
+                            }
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
                         }
-                        .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                            cornerRadius: 8,
+                            shadowOffset: 2,
+                            borderWidth: 2
+                        )
                     }
-                    .brutalistBadge(
-                        backgroundColor: KingdomTheme.Colors.imperialGold,
-                        cornerRadius: 8,
-                        shadowOffset: 2,
-                        borderWidth: 2
-                    )
                 }
                 
                 // Settings button

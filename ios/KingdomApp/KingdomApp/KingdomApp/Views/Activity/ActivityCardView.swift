@@ -4,6 +4,20 @@ struct ActivityCard: View {
     let activity: ActivityLogEntry
     let showUser: Bool
     
+    private var iconBackgroundColor: Color {
+        if let customization = activity.subscriberCustomization {
+            return customization.iconBackgroundColorValue
+        }
+        return activity.color
+    }
+    
+    private var iconTextColor: Color {
+        if let customization = activity.subscriberCustomization {
+            return customization.iconTextColorValue
+        }
+        return .white
+    }
+    
     private var cardBackgroundColor: Color {
         activity.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
@@ -20,9 +34,9 @@ struct ActivityCard: View {
         HStack(spacing: 10) {
             Image(systemName: activity.icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(.white)
+                .foregroundColor(iconTextColor)
                 .frame(width: 36, height: 36)
-                .brutalistBadge(backgroundColor: activity.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                .brutalistBadge(backgroundColor: iconBackgroundColor, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
                 
             VStack(alignment: .leading, spacing: 4) {
                 if showUser, let displayName = activity.displayName {
