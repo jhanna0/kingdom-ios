@@ -70,6 +70,49 @@ class AchievementGroup(BaseModel):
     achievements: list[PlayerAchievement]
 
 
+# ============================================================
+# SUBSCRIBER CUSTOMIZATION SCHEMAS (Server-Driven)
+# ============================================================
+
+class TitleData(BaseModel):
+    """Selected achievement title for profile display."""
+    achievement_id: int
+    display_name: str
+    icon: str  # SF Symbol name
+
+
+class StylePreset(BaseModel):
+    """A style preset with background and text colors."""
+    id: str
+    name: str
+    background_color: str  # hex
+    text_color: str        # hex
+
+
+class SubscriberCustomization(BaseModel):
+    """User's selected customization (for rendering their profile/card)."""
+    icon_style: Optional[StylePreset] = None
+    card_style: Optional[StylePreset] = None
+    selected_title: Optional[TitleData] = None
+
+
+class SubscriberSettings(BaseModel):
+    """Full subscriber settings response (for settings screen)."""
+    is_subscriber: bool
+    icon_style: Optional[StylePreset] = None
+    card_style: Optional[StylePreset] = None
+    selected_title: Optional[TitleData] = None
+    available_styles: list[StylePreset] = []
+    available_titles: list[TitleData] = []
+
+
+class SubscriberSettingsUpdate(BaseModel):
+    """Request body for updating subscriber settings."""
+    icon_style_id: Optional[str] = None
+    card_style_id: Optional[str] = None
+    selected_title_achievement_id: Optional[int] = None
+
+
 class PlayerPublicProfile(BaseModel):
     """Public profile for any player - visible to others"""
     # Identity
@@ -101,6 +144,10 @@ class PlayerPublicProfile(BaseModel):
     
     # Claimed achievements grouped by category (for profile display)
     achievement_groups: list[AchievementGroup] = []
+    
+    # Subscriber customization (server-driven)
+    is_subscriber: bool = False
+    subscriber_customization: Optional[SubscriberCustomization] = None
     
     # Achievement stats
     total_checkins: int

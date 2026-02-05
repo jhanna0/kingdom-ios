@@ -4,75 +4,93 @@ import SwiftUI
 
 struct FriendCard: View {
     let friend: Friend
+    
+    private var avatarBackgroundColor: Color {
+        if let customization = friend.subscriberCustomization {
+            return customization.iconBackgroundColorValue
+        }
+        return KingdomTheme.Colors.inkMedium
+    }
+    
+    private var avatarTextColor: Color {
+        if let customization = friend.subscriberCustomization {
+            return customization.iconTextColorValue
+        }
+        return .white
+    }
+    
+    private var cardBackgroundColor: Color {
+        friend.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    private var cardTextColor: Color {
+        friend.subscriberCustomization?.cardTextColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var cardSecondaryTextColor: Color {
+        friend.subscriberCustomization?.cardTextColorValue.opacity(0.7) ?? KingdomTheme.Colors.inkMedium
+    }
 
     var body: some View {
         NavigationLink(destination: PlayerProfileView(userId: friend.friendUserId)) {
             HStack(spacing: 12) {
-                // Avatar with online indicator
                 ZStack(alignment: .bottomTrailing) {
                     Text(String(friend.displayName.prefix(1)).uppercased())
                         .font(FontStyles.headingSmall)
-                        .foregroundColor(.white)
+                        .foregroundColor(avatarTextColor)
                         .frame(width: 48, height: 48)
-                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 12)
+                        .brutalistBadge(backgroundColor: avatarBackgroundColor, cornerRadius: 12)
                     
-                    // Online indicator
                     if let isOnline = friend.isOnline, isOnline {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 14, height: 14)
+                        Circle().fill(Color.green).frame(width: 14, height: 14)
                             .overlay(Circle().stroke(Color.black, lineWidth: 2))
                             .offset(x: 4, y: 4)
                     }
                 }
                 
-                // Friend info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(friend.displayName)
-                        .font(FontStyles.bodyMediumBold)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    HStack(spacing: 6) {
+                        Text(friend.displayName)
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(cardTextColor)
+                        
+                        if friend.subscriberCustomization != nil {
+                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(KingdomTheme.Colors.imperialGold)
+                        }
+                    }
+                    
+                    if let title = friend.subscriberCustomization?.selectedTitle {
+                        HStack(spacing: 4) {
+                            Image(systemName: title.icon).font(.system(size: 10))
+                            Text(title.displayName).font(FontStyles.labelSmall)
+                        }
+                        .foregroundColor(cardSecondaryTextColor)
+                    }
                     
                     HStack(spacing: 8) {
                         if let level = friend.level {
-                            Text("Lv\(level)")
-                                .font(FontStyles.labelSmall)
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
                         }
                         
                         if let activity = friend.activity {
                             HStack(spacing: 4) {
-                                Image(systemName: activity.icon)
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(activityColor(activity.color))
-                                
-                                Text(activity.displayText)
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    .lineLimit(1)
+                                Image(systemName: activity.icon).font(FontStyles.iconMini).foregroundColor(activityColor(activity.color))
+                                Text(activity.displayText).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor).lineLimit(1)
                             }
                         } else if let kingdomName = friend.currentKingdomName {
                             HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .font(FontStyles.iconMini)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                
-                                Text(kingdomName)
-                                    .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                    .lineLimit(1)
+                                Image(systemName: "mappin.circle.fill").font(FontStyles.iconMini).foregroundColor(cardSecondaryTextColor)
+                                Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor).lineLimit(1)
                             }
                         }
                     }
                 }
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(FontStyles.iconSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                Image(systemName: "chevron.right").font(FontStyles.iconSmall).foregroundColor(cardSecondaryTextColor)
             }
             .padding()
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+            .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)
         }
         .buttonStyle(.plain)
         .padding(.horizontal)
@@ -270,7 +288,7 @@ struct AllFriendActivityView: View {
                 .ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: KingdomTheme.Spacing.small) {
+                VStack(spacing: KingdomTheme.Spacing.medium) {
                     ForEach(activities) { activity in
                         ActivityCard(activity: activity, showUser: true)
                     }

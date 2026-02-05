@@ -90,7 +90,43 @@
     ]
   },
   "subscriptionGroups" : [
+    {
+      "id" : "kingdom_supporter",
+      "localizations" : [
 
+      ],
+      "name" : "Kingdom Supporter",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "supporter_monthly",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Customize your profile with themes and titles",
+              "displayName" : "Kingdom Supporter",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.kingdom.sub",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Kingdom Supporter Monthly",
+          "subscriptionGroupID" : "kingdom_supporter",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 3,

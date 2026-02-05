@@ -67,12 +67,14 @@ struct PlayerProfileView: View {
     private func profileContent(_ profile: PlayerPublicProfile) -> some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with name, level, and ruler status
+                // Header with name, level, ruler status, and subscriber customization
                 ProfileHeaderCard(
                     displayName: profile.display_name,
                     level: profile.level,
-                    gold: nil,  // Don't show other players' gold
-                    rulerOf: profile.ruled_kingdom_name  // Backend returns actual ruled kingdom
+                    gold: nil,
+                    rulerOf: profile.ruled_kingdom_name,
+                    customization: profile.subscriber_customization,
+                    isSubscriber: profile.isSubscriber
                 )
                 
                 // Current Activity

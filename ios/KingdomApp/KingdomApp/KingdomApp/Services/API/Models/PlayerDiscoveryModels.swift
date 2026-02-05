@@ -150,6 +150,10 @@ struct PlayerPublicProfile: Codable, Identifiable {
     // Claimed achievements grouped by category
     let achievement_groups: [AchievementGroup]?
     
+    // Subscriber customization (server-driven)
+    let is_subscriber: Bool?
+    let subscriber_customization: APISubscriberCustomization?
+    
     // Achievement stats
     let total_checkins: Int
     let total_conquests: Int
@@ -171,6 +175,11 @@ struct PlayerPublicProfile: Codable, Identifiable {
     
     var totalCombatPower: Int {
         skillTier(for: "attack") + skillTier(for: "defense") + (equipment.weapon_attack_bonus ?? 0) + (equipment.armor_defense_bonus ?? 0)
+    }
+    
+    /// Check if this user is a subscriber
+    var isSubscriber: Bool {
+        is_subscriber ?? false
     }
 }
 

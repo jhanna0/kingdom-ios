@@ -331,8 +331,7 @@ struct MapHUD: View {
                     .foregroundColor(KingdomTheme.Colors.inkDark)
             }
         }
-        .frame(height: 36)
-        .padding(.horizontal, 8)
+        .frame(width: 36, height: 36)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(KingdomTheme.Colors.parchmentLight)

@@ -1,61 +1,78 @@
 import SwiftUI
 
-// MARK: - Activity Card
-
 struct ActivityCard: View {
     let activity: ActivityLogEntry
     let showUser: Bool
     
+    private var iconBackgroundColor: Color {
+        if let customization = activity.subscriberCustomization {
+            return customization.iconBackgroundColorValue
+        }
+        return activity.color
+    }
+    
+    private var iconTextColor: Color {
+        if let customization = activity.subscriberCustomization {
+            return customization.iconTextColorValue
+        }
+        return .white
+    }
+    
+    private var cardBackgroundColor: Color {
+        activity.subscriberCustomization?.cardBackgroundColorValue ?? KingdomTheme.Colors.parchmentLight
+    }
+    
+    private var cardTextColor: Color {
+        activity.subscriberCustomization?.cardTextColorValue ?? KingdomTheme.Colors.inkDark
+    }
+    
+    private var cardSecondaryTextColor: Color {
+        activity.subscriberCustomization?.cardTextColorValue.opacity(0.7) ?? KingdomTheme.Colors.inkMedium
+    }
+    
     var body: some View {
         HStack(spacing: 10) {
-            // Icon with brutalist badge
             Image(systemName: activity.icon)
                 .font(FontStyles.iconSmall)
-                .foregroundColor(.white)
+                .foregroundColor(iconTextColor)
                 .frame(width: 36, height: 36)
-                .brutalistBadge(backgroundColor: activity.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
+                .brutalistBadge(backgroundColor: iconBackgroundColor, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
                 
             VStack(alignment: .leading, spacing: 4) {
-                    // User name if showing friend activity
-                    if showUser, let displayName = activity.displayName {
+                if showUser, let displayName = activity.displayName {
+                    HStack(spacing: 4) {
+                        Text(displayName).font(FontStyles.bodyMediumBold).foregroundColor(cardTextColor)
+                        if activity.subscriberCustomization != nil {
+                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(KingdomTheme.Colors.imperialGold)
+                        }
+                        if let level = activity.userLevel {
+                            Text("Lv\(level)").font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
+                        }
+                    }
+                    
+                    if let title = activity.subscriberCustomization?.selectedTitle {
                         HStack(spacing: 4) {
-                            Text(displayName)
-                            .font(FontStyles.bodyMediumBold)
-                                .foregroundColor(KingdomTheme.Colors.inkDark)
-                            
-                            if let level = activity.userLevel {
-                                Text("Lv\(level)")
-                                .font(FontStyles.labelSmall)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                            Image(systemName: title.icon).font(.system(size: 10))
+                            Text(title.displayName).font(FontStyles.labelSmall)
                         }
-                        }
-                    }
-                    
-                // Activity description from API
-                Text(activity.description)
-                        .font(FontStyles.bodySmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                // Time and location
-                HStack(spacing: 6) {
-                        Text(activity.timeAgo)
-                            .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                        
-                        if let kingdomName = activity.kingdomName {
-                            Text("•")
-                                .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                Text(kingdomName)
-                                    .font(FontStyles.labelSmall)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
+                        .foregroundColor(cardSecondaryTextColor)
                     }
                 }
-                
-                Spacer()
+                    
+                Text(activity.description).font(FontStyles.bodySmall).foregroundColor(cardTextColor)
+                    
+                HStack(spacing: 6) {
+                    Text(activity.timeAgo).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
+                    if let kingdomName = activity.kingdomName {
+                        Text("•").foregroundColor(cardSecondaryTextColor)
+                        Text(kingdomName).font(FontStyles.labelSmall).foregroundColor(cardSecondaryTextColor)
+                    }
+                }
+            }
+            Spacer()
         }
         .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+        .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)
         .padding(.horizontal)
     }
 }

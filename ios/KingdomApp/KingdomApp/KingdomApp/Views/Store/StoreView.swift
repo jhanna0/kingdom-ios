@@ -132,6 +132,13 @@ struct StoreView: View {
                             await purchaseProduct(product)
                         }
                     }
+                    
+                    // Subscriptions at the end
+                    ForEach(store.subscriptionProducts, id: \.id) { product in
+                        SubscriptionCard(product: product, store: store) {
+                            await purchaseSubscription(product)
+                        }
+                    }
                 }
             }
             
@@ -229,6 +236,21 @@ struct StoreView: View {
                 resultIsSuccess = false
                 showingResult = true
             }
+        }
+    }
+    
+    private func purchaseSubscription(_ product: Product) async {
+        let success = await store.purchaseSubscription(product)
+        if success {
+            resultTitle = "Welcome, Supporter!"
+            resultMessage = "You can now customize your profile with themes and titles."
+            resultIsSuccess = true
+            showingResult = true
+        } else if case .failed(let message) = store.lastPurchaseResult {
+            resultTitle = "Purchase Failed"
+            resultMessage = message
+            resultIsSuccess = false
+            showingResult = true
         }
     }
 }
@@ -365,6 +387,105 @@ private struct StoreProductCard: View {
         }
         .buttonStyle(.plain)
         .disabled(isPurchasing || store.isLoading)
+    }
+}
+
+// MARK: - Subscription Card (matches StoreProductCard style)
+
+private struct SubscriptionCard: View {
+    let product: Product
+    @ObservedObject var store: StoreService
+    let onPurchase: () async -> Void
+    
+    @State private var isPurchasing = false
+    
+    private var config: StoreService.ServerProduct? {
+        store.getProductConfig(product.id)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: KingdomTheme.Spacing.small) {
+            // Top row: Icon + Name + Button
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Image(systemName: config?.icon ?? "heart.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.imperialGold,
+                        cornerRadius: 10,
+                        shadowOffset: 2,
+                        borderWidth: 2
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(config?.name ?? product.displayName)
+                            .font(FontStyles.headingSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        if store.isSubscriber {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                        }
+                    }
+                    
+                    Text(config?.subtitle ?? product.description)
+                        .font(FontStyles.labelMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                }
+                
+                Spacer()
+                
+                if !store.isSubscriber {
+                    Button {
+                        Task {
+                            isPurchasing = true
+                            await onPurchase()
+                            isPurchasing = false
+                        }
+                    } label: {
+                        Group {
+                            if isPurchasing || store.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Text(product.displayPrice)
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(minWidth: 60)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.black)
+                                    .offset(x: 2, y: 2)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(KingdomTheme.Colors.buttonSuccess)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.black, lineWidth: 2)
+                                    )
+                            }
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPurchasing || store.isLoading)
+                }
+            }
+            
+            // Description below
+            Text(config?.subscriptionDescription ?? product.description)
+                .font(FontStyles.labelMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+                .padding(.top, KingdomTheme.Spacing.small)
+        }
+        .padding(KingdomTheme.Spacing.medium)
+        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
 }
 

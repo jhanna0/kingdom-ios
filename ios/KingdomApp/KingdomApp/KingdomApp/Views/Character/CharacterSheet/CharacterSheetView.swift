@@ -22,12 +22,14 @@ struct CharacterSheetView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with level and gold
+                // Header with level, gold, and subscriber customization
                 ProfileHeaderCard(
                     displayName: player.name,
                     level: player.level,
                     gold: player.gold,
-                    rulerOf: player.isRuler ? player.currentKingdomName : nil
+                    rulerOf: player.isRuler ? player.currentKingdomName : nil,
+                    customization: player.subscriberCustomization,
+                    isSubscriber: player.isSubscriber
                 )
                 
                 // Combined combat stats and training
@@ -72,6 +74,33 @@ struct CharacterSheetView: View {
                         isLoadingRelocationStatus: isLoadingRelocationStatus,
                         onRelocate: relocateHometown
                     )
+                }
+                
+                // Supporter Options section (only for subscribers)
+                if player.isSubscriber {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Supporter Benefits")
+                            .font(FontStyles.headingSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        NavigationLink(destination: SubscriberSettingsView().environmentObject(player)) {
+                            HStack {
+                                Image(systemName: "seal.fill")
+                                    .font(FontStyles.iconSmall)
+                                Text("Customize Profile")
+                            }
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        }
+                        .brutalistBadge(
+                            backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                            cornerRadius: 8,
+                            shadowOffset: 2,
+                            borderWidth: 2
+                        )
+                    }
                 }
                 
                 // Settings button

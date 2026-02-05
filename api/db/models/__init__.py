@@ -71,6 +71,9 @@ from .purchase import Purchase
 # Book usage tracking
 from .book_usage import BookUsage
 
+# Subscriptions
+from .subscription import Subscription, UserPreferences
+
 __all__ = [
     "User",
     "PlayerState",
@@ -166,5 +169,8 @@ __all__ = [
     "Purchase",
     # Book usage tracking
     "BookUsage",
+    # Subscriptions
+    "Subscription",
+    "UserPreferences",
 ]
 
