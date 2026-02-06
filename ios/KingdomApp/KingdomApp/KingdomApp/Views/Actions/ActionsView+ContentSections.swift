@@ -8,41 +8,13 @@ extension ActionsView {
     
     @ViewBuilder
     func actionStatusContent(status: AllActionStatus) -> some View {
-        // ALL slots rendered dynamically from backend - no duplicates!
-        if isInHomeKingdom {
-            beneficialActionsSection(status: status)
-        } else if isInEnemyKingdom {
-            hostileActionsSection(status: status)
-        } else {
-            InfoCard(
-                title: "Enter a Kingdom",
-                icon: "location.fill",
-                description: "Move to a kingdom to perform actions",
-                color: .orange
-            )
-        }
-    }
-    
-    // MARK: - Beneficial Actions (Home Kingdom)
-    
-    func beneficialActionsSection(status: AllActionStatus) -> some View {
+        // Backend pre-filters slots by player location - we just render what we receive
         Group {
             // Alliance Requests Section (Ruler Only - Critical Priority)
             allianceRequestsSection(status: status)
             
-            // DYNAMIC: Render all home slots from backend
-            ForEach(status.homeSlots) { slot in
-                dynamicSlotSection(slot: slot, status: status)
-            }
-        }
-    }
-    
-    // MARK: - Hostile Actions (Enemy Kingdom)
-    
-    func hostileActionsSection(status: AllActionStatus) -> some View {
-        Group {
-            // DYNAMIC: Render all enemy slots from backend
-            ForEach(status.enemySlots) { slot in
+            // DYNAMIC: Render all slots from backend (already filtered by location)
+            ForEach(status.sortedSlots) { slot in
                 dynamicSlotSection(slot: slot, status: status)
             }
         }

@@ -17,14 +17,15 @@ extension ActionsView {
     @ViewBuilder
     var kingdomContextCard: some View {
         if let kingdom = currentKingdom {
+            let isHome = viewModel.isHomeKingdom(kingdom)
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 // Icon with brutalist badge
-                Image(systemName: isInHomeKingdom ? "crown.fill" : "shield.fill")
+                Image(systemName: isHome ? "crown.fill" : "shield.fill")
                     .font(.title2)
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isInHomeKingdom ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger,
+                        backgroundColor: isHome ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -35,9 +36,9 @@ extension ActionsView {
                         .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text(isInHomeKingdom ? "Your Kingdom" : "Enemy Territory")
+                    Text(isHome ? "Your Kingdom" : "Enemy Territory")
                         .font(FontStyles.labelMedium)
-                        .foregroundColor(isInHomeKingdom ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
+                        .foregroundColor(isHome ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
                 }
                 
                 Spacer()

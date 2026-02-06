@@ -21,11 +21,6 @@ struct ActionsView: View {
     @State var currentTime = Date()
     @State var taskID = UUID()  // Persists across view recreations
     
-    // Cache kingdom status to avoid recalculating on every render
-    @State var isInHomeKingdom: Bool = false
-    @State var isInEnemyKingdom: Bool = false
-    @State var cachedKingdomId: String?
-    
     // Battle state (dynamic - backend tells us what to do)
     @State var showBattleView = false
     @State var isInitiatingBattle = false
@@ -91,7 +86,6 @@ struct ActionsView: View {
         .task(id: taskID) {
             print("🎬 .task TRIGGERED in ActionsView (taskID: \(taskID))")
             await loadActionStatus()
-            updateKingdomStatus()
             startUIUpdateTimer()
         }
         .onDisappear {

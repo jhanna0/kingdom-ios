@@ -374,7 +374,7 @@ def get_action_status(
     
     # Check slot-based cooldowns (PARALLEL ACTIONS!)
     # Each slot can have one action running - different slots can run in parallel
-    from .action_config import get_action_slot, get_all_slot_definitions, get_slots_for_location, SLOT_DEFINITIONS, ACTION_SLOTS
+    from .action_config import get_action_slot, get_all_slot_definitions, SLOT_DEFINITIONS, ACTION_SLOTS
     
     # Map action types to their calculated cooldowns (skill-adjusted where applicable)
     action_cooldown_map = {
@@ -1101,23 +1101,37 @@ def get_action_status(
         can_use_book = slot in BOOK_ELIGIBLE_SLOTS and action_key not in BOOK_INELIGIBLE_ACTIONS
         action_data["can_use_book"] = can_use_book
     
-    # Build slots array with actions for each slot
-    # Frontend renders this dynamically - no hardcoding!
+    # Build slots array - FILTERED by current location
+    # Backend is the single source of truth - frontend just renders what we return
     slots = []
     for slot_def in get_all_slot_definitions():
         slot_id = slot_def["id"]
+        slot_location = slot_def["location"]
+        allow_in_friendly = slot_def.get("allow_in_friendly", False)
+        
+        # FILTER: Only include slots valid for current location
+        # - "any" slots: always show
+        # - "home" slots: show in home kingdom, OR in friendly territory if allow_in_friendly=True
+        # - "enemy" slots: show in non-home, non-friendly territory
+        should_include = False
+        if slot_location == "any":
+            should_include = True
+        elif slot_location == "home":
+            # Show in home kingdom, or in friendly territory if allowed
+            should_include = is_home_kingdom or (allow_in_friendly and is_friendly_territory)
+        elif slot_location == "enemy":
+            # Show in enemy territory (not home, not friendly)
+            should_include = not is_home_kingdom and not is_friendly_territory
+        
+        if not should_include:
+            continue
+        
         # Get actions that belong to this slot
         # Include actions with endpoint OR handler (view_battle uses handler, not endpoint)
         slot_actions = [
             action_key for action_key, action_data in actions.items()
             if action_data.get("slot") == slot_id and (action_data.get("endpoint") or action_data.get("handler"))
         ]
-        
-        # Dynamic location: if slot has allow_in_friendly and we're in friendly (non-home) territory,
-        # set location to "any" so frontend shows it in enemy slots too
-        slot_location = slot_def["location"]
-        if slot_def.get("allow_in_friendly", False) and is_friendly_territory and not is_home_kingdom:
-            slot_location = "any"  # Show in both home and enemy views
         
         slots.append({
             "id": slot_id,
@@ -1126,9 +1140,11 @@ def get_action_status(
             "color_theme": slot_def["color_theme"],
             "display_order": slot_def["display_order"],
             "description": slot_def["description"],
-            "location": slot_location,  # Dynamic based on territory
             "content_type": slot_def["content_type"],  # Tells frontend which renderer to use
             "actions": slot_actions,
+            # Backwards compat: old apps filter by location client-side
+            # Since we pre-filter, just return "any" so old filtering logic includes everything
+            "location": "any",
         })
     
     # Add food cost to property contracts
@@ -1139,12 +1155,9 @@ def get_action_status(
     return {
         "parallel_actions_enabled": True,  # NEW: Signals to frontend that parallel actions are supported
         "slot_cooldowns": slot_cooldowns,  # NEW: Per-slot cooldown status
-        "slots": slots,  # NEW: Full slot metadata for frontend rendering (no hardcoding!)
+        "slots": slots,  # Pre-filtered by backend based on current location - frontend just renders
         "global_cooldown": slot_cooldowns.get("building", {"ready": True, "seconds_remaining": 0}),  # For old clients
         "actions": actions,  # DYNAMIC ACTION LIST
-        # Territory context for slot filtering
-        "is_home_kingdom": is_home_kingdom,  # In player's hometown
-        "is_friendly_territory": is_friendly_territory,  # Home OR same empire OR allied (can farm/patrol)
         # Food system - actions cost food based on cooldown (0.5 food per minute)
         "player_food_total": player_food_total,
         "food_cost_per_minute": 0.4,  # For frontend to calculate costs dynamically (minutes / 2.5)
