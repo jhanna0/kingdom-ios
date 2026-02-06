@@ -1,10 +1,9 @@
 """
-Daily Gathering Limits - Track resources gathered per day per kingdom
+Daily Gathering Limits - Track resources gathered per day (GLOBAL per user)
 Prevents autoclicking abuse by capping resources at 200 * building level per day
 
-With building permits, players can gather in multiple kingdoms:
-- Hometown: uses hometown building level for limits
-- Foreign kingdoms (with permit or allied): uses hometown level for limits, tracked separately
+The daily limit is GLOBAL per user - gathering at any kingdom counts toward the same cap.
+Building permits only control ACCESS to buildings, not additional gathering capacity.
 """
 from sqlalchemy import Column, Integer, BigInteger, String, Date, ForeignKey, PrimaryKeyConstraint, Index
 from datetime import date
@@ -14,19 +13,18 @@ from ..base import Base
 
 class DailyGathering(Base):
     """
-    Tracks daily resource gathering per user per resource type PER KINGDOM.
+    Tracks daily resource gathering per user per resource type.
     Resets at midnight UTC.
     
-    Limit: 200 * HOMETOWN building level per resource per day per kingdom
+    Limit: 200 * HOMETOWN building level per resource per day (GLOBAL)
     - Your limit is always based on YOUR hometown's building level
-    - But you can gather that amount at EACH kingdom you have access to
+    - The limit is shared across all kingdoms (permits only control access)
     
     Example: Hometown has L3 lumbermill (600/day limit)
-    - Can gather 600 wood at hometown
-    - Can gather 600 wood at each allied kingdom (separate pool)
-    - Can gather 600 wood at each kingdom with permit (separate pool)
+    - Can gather 600 wood TOTAL across all kingdoms you have access to
     
-    Composite primary key: (user_id, resource_type, gather_date, kingdom_id)
+    Composite primary key: (user_id, resource_type, gather_date)
+    kingdom_id is stored for analytics but not part of the limit calculation.
     """
     __tablename__ = "daily_gathering"
     
@@ -34,14 +32,13 @@ class DailyGathering(Base):
     resource_type = Column(String(16), nullable=False)  # 'wood', 'iron', 'stone'
     gather_date = Column(Date, nullable=False, default=date.today)
     
-    # Which kingdom this gathering was done in (NULL = legacy data from before permits)
+    # Last kingdom where gathering occurred (for analytics, not part of limit)
     kingdom_id = Column(String, ForeignKey("kingdoms.id"), nullable=True)
     
-    # Amount gathered today at this kingdom
+    # Total amount gathered today (across all kingdoms)
     amount_gathered = Column(Integer, default=0, nullable=False)
     
-    # Composite primary key - now includes kingdom_id
-    # Note: kingdom_id is nullable for backward compatibility with existing data
+    # Composite primary key - does NOT include kingdom_id (limit is global)
     __table_args__ = (
         PrimaryKeyConstraint('user_id', 'resource_type', 'gather_date'),
         Index('idx_daily_gathering_kingdom', 'user_id', 'kingdom_id', 'resource_type', 'gather_date'),

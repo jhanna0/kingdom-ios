@@ -253,15 +253,13 @@ def get_buildings_for_kingdom(
             }
             
             # Check daily gathering limits for gathering-type buildings
-            # Now tracked per-kingdom, with limits based on HOMETOWN building level
+            # Limit is GLOBAL per user based on HOMETOWN building level
             if click_action_meta.get("type") == "gathering" and current_user:
                 resource = click_action_meta.get("resource")
                 if resource:
                     from routers.actions.gathering import get_daily_limit, get_gathered_today, DAILY_LIMIT_PER_LEVEL
-                    # Limit is based on hometown building level, not visited kingdom
                     daily_limit = get_daily_limit(db, current_user, resource)
-                    # Gathering is tracked per-kingdom
-                    gathered_today = get_gathered_today(db, current_user.id, resource, kingdom.id)
+                    gathered_today = get_gathered_today(db, current_user.id, resource)
                     if gathered_today >= daily_limit:
                         click_action["exhausted"] = True
                         
@@ -273,10 +271,11 @@ def get_buildings_for_kingdom(
                         minutes, _ = divmod(remainder, 60)
                         time_str = f"{hours}h {minutes}m"
                         
-                        resource_verb = "chopped" if resource == "wood" else "mined"
-                        resource_name = "wood" if resource == "wood" else "iron"
-                        location_hint = "" if is_hometown else " Try another kingdom!"
-                        click_action["exhausted_message"] = f"You've {resource_verb} all available {resource_name} here today. Resets in {time_str}.{location_hint}"
+                        # Stone/iron share a combined mine limit
+                        if resource == "wood":
+                            click_action["exhausted_message"] = f"You've chopped all available wood for today. Resets in {time_str}."
+                        else:
+                            click_action["exhausted_message"] = f"The mine is exhausted for today. Resets in {time_str}."
                     
                     # Add limit info for UI
                     click_action["daily_limit"] = daily_limit

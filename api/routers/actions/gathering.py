@@ -1,23 +1,19 @@
 """
 Resource Gathering action - Click to gather wood/iron/stone
 1 second backend cooldown to prevent scripted abuse
-Daily limit: 200 * hometown building level per resource PER KINGDOM
+Daily limit: 200 * hometown building level per resource (GLOBAL per user)
 
 With building permits, players can gather in multiple kingdoms:
 - Hometown: free access (subject to catchup)
 - Allied/same empire: free access
 - Other kingdoms: requires permit (10g for 10 minutes)
 
-Limits are ALWAYS based on hometown building level, but tracked per-kingdom.
-So if your hometown has L3 lumbermill (600/day), you can gather:
-- 600 wood at hometown
-- 600 wood at each allied kingdom (separate pool)
-- 600 wood at each kingdom with permit (separate pool)
+The daily limit is GLOBAL - gathering at any kingdom counts toward the same limit.
+Permits only control ACCESS to buildings, not additional gathering capacity.
 """
 import random
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 from datetime import datetime, date, timedelta, time
 from typing import Optional
 
@@ -79,7 +75,9 @@ def get_building_for_resource(resource_type: str) -> str:
 def get_daily_limit(db: Session, user: User, resource_type: str) -> int:
     """
     Get daily gathering limit based on HOMETOWN building level.
-    This limit applies per-kingdom (you get this amount at each kingdom you have access to).
+    This is a GLOBAL limit - gathering at any kingdom counts toward the same daily cap.
+    
+    For mining (stone/iron): they share ONE combined limit = mine_level * 200
     """
     state = user.player_state
     if not state or not state.hometown_kingdom_id:
@@ -92,58 +90,55 @@ def get_daily_limit(db: Session, user: User, resource_type: str) -> int:
     # Get building level based on resource type
     if resource_type == "wood":
         level = getattr(hometown, 'lumbermill_level', 0) or 0
-    elif resource_type == "stone":
-        # Stone unlocks at mine level 1
+    elif resource_type in ("stone", "iron"):
+        # Stone and iron share the same limit based on mine level
         level = getattr(hometown, 'mine_level', 0) or 0
-    elif resource_type == "iron":
-        # Iron unlocks at mine level 2
-        mine_level = getattr(hometown, 'mine_level', 0) or 0
-        level = max(0, mine_level - 1)  # Level 2 mine = level 1 for iron limit
     else:
         level = 0
     
     return level * DAILY_LIMIT_PER_LEVEL
 
 
-def get_gathered_today(db: Session, user_id: int, resource_type: str, kingdom_id: Optional[str] = None) -> int:
+def get_gathered_today(db: Session, user_id: int, resource_type: str) -> int:
     """
-    Get amount gathered today for this resource at a specific kingdom.
-    If kingdom_id is None, returns total across all kingdoms (for backward compatibility).
+    Get total amount gathered today for this resource (across all kingdoms).
+    The daily limit is GLOBAL per user, regardless of which kingdoms they gather at.
+    
+    For mining (stone/iron): returns combined total since they share one limit.
     """
+    from sqlalchemy import func
     today = date.today()
     
-    if kingdom_id:
-        # Per-kingdom tracking (new behavior)
-        record = db.query(DailyGathering).filter(
+    # Stone and iron share the same limit, so sum both
+    if resource_type in ("stone", "iron"):
+        total = db.query(func.sum(DailyGathering.amount_gathered)).filter(
             DailyGathering.user_id == user_id,
-            DailyGathering.resource_type == resource_type,
-            DailyGathering.gather_date == today,
-            DailyGathering.kingdom_id == kingdom_id
-        ).first()
-        return record.amount_gathered if record else 0
+            DailyGathering.resource_type.in_(["stone", "iron"]),
+            DailyGathering.gather_date == today
+        ).scalar()
     else:
-        # Legacy: sum across all kingdoms (for old data without kingdom_id)
-        from sqlalchemy import func
         total = db.query(func.sum(DailyGathering.amount_gathered)).filter(
             DailyGathering.user_id == user_id,
             DailyGathering.resource_type == resource_type,
             DailyGathering.gather_date == today
         ).scalar()
-        return total or 0
+    return total or 0
 
 
 def add_gathered_amount(db: Session, user_id: int, resource_type: str, amount: int, kingdom_id: str):
-    """Add to today's gathered amount for a specific kingdom."""
+    """Add to today's gathered amount. Kingdom tracked for analytics but limit is global."""
     today = date.today()
+    # Look up by PK (user_id, resource_type, gather_date) - NOT by kingdom_id
     record = db.query(DailyGathering).filter(
         DailyGathering.user_id == user_id,
         DailyGathering.resource_type == resource_type,
-        DailyGathering.gather_date == today,
-        DailyGathering.kingdom_id == kingdom_id
+        DailyGathering.gather_date == today
     ).with_for_update().first()
     
     if record:
         record.amount_gathered += amount
+        # Update kingdom_id to most recent (for analytics)
+        record.kingdom_id = kingdom_id
     else:
         record = DailyGathering(
             user_id=user_id,
@@ -170,8 +165,8 @@ def gather_resource(
     - Allied/same empire kingdoms (free)
     - Other kingdoms (requires permit - 10g for 10 minutes)
     
-    Daily limit is based on HOMETOWN building level, but tracked separately per kingdom.
-    So with L3 lumbermill (600/day), you can gather 600 at hometown + 600 at each allied kingdom.
+    Daily limit is GLOBAL based on HOMETOWN building level.
+    Permits only control access, not additional gathering capacity.
     
     Returns tier (black/brown/green/gold) and amount gathered (0-3).
     Resources are automatically added to player inventory.
@@ -278,9 +273,9 @@ def gather_resource(
                 resource_type = "iron"
                 resource_config = GatherConfig.get_resource(resource_type)
     
-    # CHECK DAILY LIMIT - based on HOMETOWN building level, but tracked per-kingdom
+    # CHECK DAILY LIMIT - based on HOMETOWN building level, GLOBAL across all kingdoms
     daily_limit = get_daily_limit(db, current_user, resource_type)
-    gathered_today = get_gathered_today(db, current_user.id, resource_type, target_kingdom_id)
+    gathered_today = get_gathered_today(db, current_user.id, resource_type)
     
     if daily_limit <= 0:
         # No building in hometown = can't gather anywhere
@@ -311,17 +306,21 @@ def gather_resource(
         minutes, _ = divmod(remainder, 60)
         time_str = f"{hours}h {minutes}m"
 
-        # Daily limit reached at THIS kingdom
-        resource_verb = "chopped" if resource_type == "wood" else "quarried" if resource_type == "stone" else "mined"
-        is_hometown = state.hometown_kingdom_id == target_kingdom_id
-        location_hint = "" if is_hometown else " Try another kingdom!"
+        # Daily limit reached (global across all kingdoms)
+        # Stone/iron share a combined mine limit
+        if resource_type == "wood":
+            exhausted_msg = f"You've chopped all available wood for today. Resets in {time_str}."
+        else:
+            # Stone and iron share the mine limit
+            exhausted_msg = f"The mine is exhausted for today. Resets in {time_str}."
+        
         return {
             "resource_type": resource_type,
             "tier": "black", 
             "amount": 0,
             "new_total": get_inventory_amount(db, current_user.id, resource_type),
             "exhausted": True,
-            "exhausted_message": f"You've {resource_verb} all available {resource_type} here today. Resets in {time_str}.{location_hint}"
+            "exhausted_message": exhausted_msg
         }
     
     # Get current amount of this resource from inventory
@@ -330,7 +329,7 @@ def gather_resource(
     # Execute gather roll
     result = _gather_manager.gather(resource_type, current_amount)
     
-    # Add gathered resources to player's inventory AND track daily gathering per-kingdom
+    # Add gathered resources to player's inventory AND track daily gathering
     if result.amount > 0:
         add_inventory_amount(db, current_user.id, resource_type, result.amount)
         add_gathered_amount(db, current_user.id, resource_type, result.amount, target_kingdom_id)
