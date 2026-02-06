@@ -31,8 +31,9 @@ HUNT_COOLDOWN_MINUTES = 30             # Cooldown between hunts #deprecated- ign
 MIN_PARTY_SIZE = 1                     # Solo hunting allowed
 MAX_PARTY_SIZE = 5                     # Maximum hunters
 
-# Hunting Permit (for visitors)
-HUNTING_PERMIT_COST = 10               # Gold cost to buy a permit
+# Hunting Permit (for visitors) - DEPRECATED, use townhall building permit instead
+# Cost is 0 for backward compatibility with old iOS app
+HUNTING_PERMIT_COST = 0                # Free (old iOS compat) - new iOS uses townhall building permit
 HUNTING_PERMIT_DURATION_MINUTES = 10   # How long the permit lasts
 
 
