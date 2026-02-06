@@ -332,12 +332,13 @@ def get_action_status(
             ActionCooldown.expires_at > datetime.utcnow()
         ).count()
     
-    # Get contracts for current kingdom (from UnifiedContract table)
+    # Get contracts for HOMETOWN kingdom (from UnifiedContract table)
+    # Players can ONLY work on building contracts when physically IN their hometown
     contracts = []
-    if state.current_kingdom_id:
+    if state.hometown_kingdom_id and state.current_kingdom_id == state.hometown_kingdom_id:
         # Query UnifiedContract table (not old Contract table!)
         contracts_query = db.query(UnifiedContract).filter(
-            UnifiedContract.kingdom_id == state.current_kingdom_id,
+            UnifiedContract.kingdom_id == state.hometown_kingdom_id,
             UnifiedContract.category == 'kingdom_building',  # Only building contracts
             UnifiedContract.completed_at.is_(None)  # Active contracts only
         ).all()
