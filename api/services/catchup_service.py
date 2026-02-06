@@ -108,8 +108,11 @@ def get_catchup_status(
     """
     Check if a player needs catch-up for a specific building.
     
-    Progress is based on ACTUAL contributions to building contracts.
-    Player works on normal building contracts to make progress.
+    Catchup is per KINGDOM + BUILDING_TYPE combination.
+    
+    Priority order:
+    1. Check building_catchups table first (where catchup work is recorded)
+    2. Fall back to contract_contributions if no catchup record exists
     
     Returns dict with needs_catchup, can_use_building, actions_required/completed/remaining
     """
@@ -137,13 +140,41 @@ def get_catchup_status(
             "reason": "Building not yet constructed"
         }
     
-    # Get actual contributions from building contract work
-    contributions = get_building_contributions(db, user_id, kingdom_id, building_type)
+    # 1. Check building_catchups table first (this is where catchup work is recorded)
+    catchup_record = db.query(BuildingCatchup).filter(
+        BuildingCatchup.user_id == user_id,
+        BuildingCatchup.kingdom_id == kingdom_id,
+        BuildingCatchup.building_type == building_type
+    ).first()
     
-    # Calculate required actions (15 * level, reduced by building skill)
+    if catchup_record:
+        # Record exists with completed_at set → catchup is done
+        if catchup_record.completed_at is not None:
+            return {
+                "needs_catchup": False,
+                "can_use_building": True,
+                "actions_required": catchup_record.actions_required,
+                "actions_completed": catchup_record.actions_completed,
+                "actions_remaining": 0,
+                "reason": "Catch-up completed"
+            }
+        
+        # Record exists but not completed → show progress from building_catchups
+        actions_remaining = max(0, catchup_record.actions_required - catchup_record.actions_completed)
+        return {
+            "needs_catchup": True,
+            "can_use_building": False,
+            "actions_required": catchup_record.actions_required,
+            "actions_completed": catchup_record.actions_completed,
+            "actions_remaining": actions_remaining,
+            "reason": f"Catch-up in progress ({catchup_record.actions_completed}/{catchup_record.actions_required})"
+        }
+    
+    # 2. No catchup record exists → fall back to contract_contributions
+    contributions = get_building_contributions(db, user_id, kingdom_id, building_type)
     actions_required = calculate_catchup_actions(building_level, building_skill)
     
-    # If they've contributed enough, they can use the building
+    # If they've contributed enough via contracts, they can use the building
     if contributions >= actions_required:
         return {
             "needs_catchup": False,
@@ -154,14 +185,14 @@ def get_catchup_status(
             "reason": "Contributed enough to building"
         }
     
-    # Needs more contributions - work on building contracts!
+    # Needs catchup - work on building contracts or start catchup
     return {
         "needs_catchup": True,
         "can_use_building": False,
         "actions_required": actions_required,
         "actions_completed": contributions,
         "actions_remaining": actions_required - contributions,
-        "reason": f"Work on building contracts ({contributions}/{actions_required} contributions)"
+        "reason": f"Needs catch-up ({contributions}/{actions_required} contributions)"
     }
 
 
