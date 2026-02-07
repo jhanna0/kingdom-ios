@@ -54,7 +54,7 @@ router = APIRouter(prefix="/coups", tags=["Coups"])
 
 # ===== Constants =====
 # Eligibility
-COUP_REPUTATION_REQUIREMENT = 500  # Kingdom reputation needed
+COUP_REPUTATION_REQUIREMENT = 1000  # Kingdom reputation needed
 COUP_LEADERSHIP_REQUIREMENT = 3    # T3 leadership needed
 
 # Timing
@@ -811,7 +811,8 @@ def initiate_coup(
     
     Requirements:
     - T3 leadership
-    - 500+ reputation in target kingdom
+    - 1000+ reputation in target kingdom
+    - Must be your hometown kingdom
     - Checked in to kingdom
     - Not the current ruler
     - 30 day cooldown between attempts (per player)
@@ -838,6 +839,13 @@ def initiate_coup(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You must be checked in to this kingdom to initiate a coup"
+        )
+    
+    # Must be in hometown kingdom
+    if state.hometown_kingdom_id != kingdom.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only stage a coup in your hometown kingdom"
         )
     
     # Check leadership requirement (T3+)

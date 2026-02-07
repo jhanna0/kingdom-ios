@@ -662,9 +662,9 @@ SKILLS = {
         "category": "political",
         "description": "Increases voting power and ruler rewards",
         "benefits": {
-            1: ["Vote weight: 1.0", "Can vote on coups (with rep)"],
+            1: ["Vote weight: 1.0", "Can vote on coups (with 500 rep)"],
             2: ["Vote weight: 1.2", "+50% rewards from ruler distributions"],
-            3: ["Vote weight: 1.4", "Can propose coups (300+ rep)"],
+            3: ["Vote weight: 1.4", "Can start coups (with 1000 rep in kingdom)"],
             4: ["Vote weight: 1.6", "+100% rewards from ruler"],
             5: ["Vote weight: 1.8", "-50% coup cost (500g instead of 1000g)"]
         }

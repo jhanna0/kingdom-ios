@@ -678,6 +678,8 @@ def get_action_status(
             coup_ineligibility_reason = "Kingdom has no ruler"
         elif kingdom.ruler_id == current_user.id:
             coup_ineligibility_reason = "You are the ruler"
+        elif state.hometown_kingdom_id != state.current_kingdom_id:
+            coup_ineligibility_reason = "Can only coup in your hometown"
         else:
             # Check for active battle (coup or invasion) first
             from db.models import Battle
