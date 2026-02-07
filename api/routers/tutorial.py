@@ -104,6 +104,8 @@ No. One claim, ever. Want more territory? **Conquer it.**
 **"Can I invade an unruled town?"**
 
 No. Invasions need a defender. Unruled towns can only be claimed by locals.
+
+Once you become ruler, check out your **Empire Management** menu to choose a **Kingdom Building** project, set **Tax Rate**, or to **Make a Decree**!
 """
     ),
     TutorialSection(
