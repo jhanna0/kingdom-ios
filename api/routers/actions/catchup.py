@@ -129,29 +129,33 @@ def start_catchup(
             "message": "You can already use this building"
         }
     
-    # Check if already started
+    # Check if there's already an incomplete catchup for this building
     existing = db.query(BuildingCatchup).filter(
         BuildingCatchup.user_id == current_user.id,
         BuildingCatchup.kingdom_id == state.hometown_kingdom_id,
-        BuildingCatchup.building_type == building_type
+        BuildingCatchup.building_type == building_type,
+        BuildingCatchup.completed_at.is_(None)
     ).first()
     
     if existing:
         return {
             "success": True,
             "already_started": True,
-            "actions_required": status_info["actions_required"],
-            "actions_completed": status_info["actions_completed"],
-            "actions_remaining": status_info["actions_remaining"],
+            "actions_required": existing.actions_required,
+            "actions_completed": existing.actions_completed,
+            "actions_remaining": max(0, existing.actions_required - existing.actions_completed),
             "message": "Already tracking this building"
         }
     
-    # Create catchup record - this makes it appear in Actions view
+    # Create catchup record for the REMAINDER only
+    # actions_required = full requirement - existing contributions - previous catchup work
+    remainder = status_info["actions_remaining"]
+    
     catchup = BuildingCatchup(
         user_id=current_user.id,
         kingdom_id=state.hometown_kingdom_id,
         building_type=building_type,
-        actions_required=calculate_catchup_actions(building_level, state.building_skill or 0),
+        actions_required=max(1, remainder),
         actions_completed=0
     )
     db.add(catchup)
