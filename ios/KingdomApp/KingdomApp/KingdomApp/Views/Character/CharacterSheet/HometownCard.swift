@@ -5,7 +5,7 @@ struct HometownCard: View {
     @ObservedObject var player: Player
     let relocationStatus: RelocationStatusResponse?
     let isLoadingRelocationStatus: Bool
-    let onRelocate: () async -> Void
+    let onRelocate: (@escaping () -> Void) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {

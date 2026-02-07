@@ -264,7 +264,9 @@ struct WorkshopView: View {
                         item: item,
                         blueprintCount: status.blueprintCount,
                         hasWorkshop: status.hasWorkshop,
-                        onStartCraft: { await startCraft(itemId: item.id) }
+                        onStartCraft: { done in
+                            Task { await startCraft(itemId: item.id); done() }
+                        }
                     )
                 } label: {
                     CraftableItemRow(
@@ -504,7 +506,7 @@ struct CraftDetailView: View {
     let item: CraftableItem
     let blueprintCount: Int
     let hasWorkshop: Bool
-    let onStartCraft: () async -> Void
+    let onStartCraft: (@escaping () -> Void) -> Void
     
     @State private var isStarting = false
     @State private var showConfirmation = false
@@ -531,12 +533,9 @@ struct CraftDetailView: View {
             Button("Cancel", role: .cancel) { }
             Button("Craft") {
                 isStarting = true
-                Task {
-                    await onStartCraft()
-                    await MainActor.run {
-                        isStarting = false
-                        dismiss()
-                    }
+                onStartCraft {
+                    isStarting = false
+                    dismiss()
                 }
             }
         } message: {

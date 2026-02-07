@@ -4,7 +4,7 @@ import SwiftUI
 struct RelocationView: View {
     @ObservedObject var player: Player
     let relocationStatus: RelocationStatusResponse?
-    let onRelocate: () async -> Void
+    let onRelocate: (@escaping () -> Void) -> Void
     
     @Environment(\.dismiss) var dismiss
     @State private var isRelocating = false
@@ -56,9 +56,8 @@ struct RelocationView: View {
         .alert("Confirm Relocation", isPresented: $showConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Relocate", role: .destructive) {
-                Task {
-                    isRelocating = true
-                    await onRelocate()
+                isRelocating = true
+                onRelocate {
                     isRelocating = false
                     dismiss()
                 }

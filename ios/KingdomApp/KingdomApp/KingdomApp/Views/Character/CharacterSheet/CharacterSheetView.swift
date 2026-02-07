@@ -72,7 +72,9 @@ struct CharacterSheetView: View {
                         player: player,
                         relocationStatus: relocationStatus,
                         isLoadingRelocationStatus: isLoadingRelocationStatus,
-                        onRelocate: relocateHometown
+                        onRelocate: { done in
+                            Task { await relocateHometown(); done() }
+                        }
                     )
                 }
                 

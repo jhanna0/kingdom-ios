@@ -4,8 +4,8 @@ import SwiftUI
 
 struct AllianceProposalCard: View {
     let alliance: AllianceResponse
-    let onAccept: () async -> Void
-    let onDecline: () async -> Void
+    let onAccept: (@escaping () -> Void) -> Void
+    let onDecline: (@escaping () -> Void) -> Void
     
     @State private var isAccepting = false
     @State private var isDeclining = false
@@ -56,10 +56,7 @@ struct AllianceProposalCard: View {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 Button(action: {
                     isDeclining = true
-                    Task {
-                        await onDecline()
-                        isDeclining = false
-                    }
+                    onDecline { isDeclining = false }
                 }) {
                     Text("Decline")
                         .font(FontStyles.labelBold)
@@ -72,10 +69,7 @@ struct AllianceProposalCard: View {
                 
                 Button(action: {
                     isAccepting = true
-                    Task {
-                        await onAccept()
-                        isAccepting = false
-                    }
+                    onAccept { isAccepting = false }
                 }) {
                     HStack(spacing: 6) {
                         if isAccepting {

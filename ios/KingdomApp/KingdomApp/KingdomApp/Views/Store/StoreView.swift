@@ -128,16 +128,16 @@ struct StoreView: View {
             } else {
                 VStack(spacing: KingdomTheme.Spacing.medium) {
                     ForEach(store.products, id: \.id) { product in
-                        StoreProductCard(product: product, store: store) {
-                            await purchaseProduct(product)
-                        }
+                        StoreProductCard(product: product, store: store, onPurchase: { done in
+                            Task { await purchaseProduct(product); done() }
+                        })
                     }
                     
                     // Subscriptions at the end
                     ForEach(store.subscriptionProducts, id: \.id) { product in
-                        SubscriptionCard(product: product, store: store) {
-                            await purchaseSubscription(product)
-                        }
+                        SubscriptionCard(product: product, store: store, onPurchase: { done in
+                            Task { await purchaseSubscription(product); done() }
+                        })
                     }
                 }
             }
@@ -307,7 +307,7 @@ private struct StoreResourceBadge: View {
 private struct StoreProductCard: View {
     let product: Product
     @ObservedObject var store: StoreService
-    let onPurchase: () async -> Void
+    let onPurchase: (@escaping () -> Void) -> Void
     
     @State private var isPurchasing = false
     
@@ -352,11 +352,8 @@ private struct StoreProductCard: View {
     
     private var priceButton: some View {
         Button {
-            Task {
-                isPurchasing = true
-                await onPurchase()
-                isPurchasing = false
-            }
+            isPurchasing = true
+            onPurchase { isPurchasing = false }
         } label: {
             Group {
                 if isPurchasing || store.isLoading {
@@ -395,7 +392,7 @@ private struct StoreProductCard: View {
 private struct SubscriptionCard: View {
     let product: Product
     @ObservedObject var store: StoreService
-    let onPurchase: () async -> Void
+    let onPurchase: (@escaping () -> Void) -> Void
     
     @State private var isPurchasing = false
     
@@ -440,11 +437,8 @@ private struct SubscriptionCard: View {
                 
                 if !store.isSubscriber {
                     Button {
-                        Task {
-                            isPurchasing = true
-                            await onPurchase()
-                            isPurchasing = false
-                        }
+                        isPurchasing = true
+                        onPurchase { isPurchasing = false }
                     } label: {
                         Group {
                             if isPurchasing || store.isLoading {

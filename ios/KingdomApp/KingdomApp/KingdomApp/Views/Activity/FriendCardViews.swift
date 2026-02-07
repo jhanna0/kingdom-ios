@@ -114,8 +114,8 @@ struct FriendCard: View {
 
 struct FriendRequestCard: View {
     let friend: Friend
-    let onAccept: () async -> Void
-    let onReject: () async -> Void
+    let onAccept: (@escaping () -> Void) -> Void
+    let onReject: (@escaping () -> Void) -> Void
     
     @State private var isProcessing = false
     
@@ -144,10 +144,7 @@ struct FriendRequestCard: View {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onAccept()
-                        isProcessing = false
-                    }
+                    onAccept { isProcessing = false }
                 }) {
                     Text("Accept")
                         .font(FontStyles.labelBold)
@@ -160,10 +157,7 @@ struct FriendRequestCard: View {
                 
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onReject()
-                        isProcessing = false
-                    }
+                    onReject { isProcessing = false }
                 }) {
                     Text("Decline")
                         .font(FontStyles.labelBold)
@@ -185,7 +179,7 @@ struct FriendRequestCard: View {
 
 struct PendingSentCard: View {
     let friend: Friend
-    let onCancel: () async -> Void
+    let onCancel: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -208,9 +202,7 @@ struct PendingSentCard: View {
             Spacer()
             
             Button(action: {
-                Task {
-                    await onCancel()
-                }
+                onCancel()
             }) {
                 Text("Cancel")
                     .font(FontStyles.labelBold)

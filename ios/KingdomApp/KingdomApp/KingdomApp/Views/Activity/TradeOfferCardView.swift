@@ -4,8 +4,8 @@ import SwiftUI
 
 struct TradeOfferCard: View {
     let trade: TradeOffer
-    let onAccept: () async -> Void
-    let onDecline: () async -> Void
+    let onAccept: (@escaping () -> Void) -> Void
+    let onDecline: (@escaping () -> Void) -> Void
     
     @State private var isProcessing = false
     
@@ -66,10 +66,7 @@ struct TradeOfferCard: View {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onAccept()
-                        isProcessing = false
-                    }
+                    onAccept { isProcessing = false }
                 }) {
                     Text("Accept")
                         .font(FontStyles.labelBold)
@@ -82,10 +79,7 @@ struct TradeOfferCard: View {
                 
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onDecline()
-                        isProcessing = false
-                    }
+                    onDecline { isProcessing = false }
                 }) {
                     Text("Decline")
                         .font(FontStyles.labelBold)
@@ -107,7 +101,7 @@ struct TradeOfferCard: View {
 
 struct OutgoingTradeCard: View {
     let trade: TradeOffer
-    let onCancel: () async -> Void
+    let onCancel: (@escaping () -> Void) -> Void
     
     @State private var isProcessing = false
     
@@ -157,10 +151,7 @@ struct OutgoingTradeCard: View {
                 // Cancel button
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onCancel()
-                        isProcessing = false
-                    }
+                    onCancel { isProcessing = false }
                 }) {
                     Text("Cancel")
                         .font(FontStyles.labelBold)
@@ -274,8 +265,8 @@ struct TradeHistoryCard: View {
 
 struct DuelChallengeCard: View {
     let challenge: DuelInvitation
-    let onAccept: () async -> Void
-    let onDecline: () async -> Void
+    let onAccept: (@escaping () -> Void) -> Void
+    let onDecline: (@escaping () -> Void) -> Void
     
     @State private var isProcessing = false
     
@@ -338,10 +329,7 @@ struct DuelChallengeCard: View {
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onAccept()
-                        isProcessing = false
-                    }
+                    onAccept { isProcessing = false }
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark")
@@ -358,10 +346,7 @@ struct DuelChallengeCard: View {
                 
                 Button(action: {
                     isProcessing = true
-                    Task {
-                        await onDecline()
-                        isProcessing = false
-                    }
+                    onDecline { isProcessing = false }
                 }) {
                     Text("Decline")
                         .font(FontStyles.labelBold)

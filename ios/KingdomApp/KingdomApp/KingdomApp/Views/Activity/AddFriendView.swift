@@ -103,8 +103,8 @@ struct AddFriendView: View {
                                 ForEach(searchResults) { user in
                                     UserSearchResultCard(
                                         user: user,
-                                        onAdd: {
-                                            await addFriend(user)
+                                        onAdd: { done in
+                                            Task { await addFriend(user); done() }
                                         }
                                     )
                                 }
@@ -213,7 +213,7 @@ struct AddFriendView: View {
 
 struct UserSearchResultCard: View {
     let user: UserSearchResult
-    let onAdd: () async -> Void
+    let onAdd: (@escaping () -> Void) -> Void
     
     @State private var isAdding = false
     
@@ -266,10 +266,7 @@ struct UserSearchResultCard: View {
             } else {
                 Button(action: {
                     isAdding = true
-                    Task {
-                        await onAdd()
-                        isAdding = false
-                    }
+                    onAdd { isAdding = false }
                 }) {
                     if isAdding {
                         ProgressView()

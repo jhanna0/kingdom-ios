@@ -83,11 +83,11 @@ extension FriendsView {
                                 ForEach(viewModel.pendingReceived) { friend in
                                     FriendRequestCard(
                                         friend: friend,
-                                        onAccept: {
-                                            await viewModel.acceptFriend(friend.id)
+                                        onAccept: { done in
+                                            Task { await viewModel.acceptFriend(friend.id); done() }
                                         },
-                                        onReject: {
-                                            await viewModel.rejectFriend(friend.id)
+                                        onReject: { done in
+                                            Task { await viewModel.rejectFriend(friend.id); done() }
                                         }
                                     )
                                 }
@@ -178,7 +178,7 @@ extension FriendsView {
                                 
                                 ForEach(viewModel.pendingSent) { friend in
                                     PendingSentCard(friend: friend, onCancel: {
-                                        await viewModel.removeFriend(friend.id)
+                                        Task { await viewModel.removeFriend(friend.id) }
                                     })
             }
         }
@@ -264,11 +264,11 @@ extension FriendsView {
             ForEach(viewModel.incomingDuelChallenges) { challenge in
                 DuelChallengeCard(
                     challenge: challenge,
-                    onAccept: {
-                        await viewModel.acceptDuelChallenge(challenge.invitationId)
+                    onAccept: { done in
+                        Task { await viewModel.acceptDuelChallenge(challenge.invitationId); done() }
                     },
-                    onDecline: {
-                        await viewModel.declineDuelChallenge(challenge.invitationId)
+                    onDecline: { done in
+                        Task { await viewModel.declineDuelChallenge(challenge.invitationId); done() }
                     }
                 )
             }
@@ -305,12 +305,15 @@ extension FriendsView {
             ForEach(viewModel.incomingTrades) { trade in
                 TradeOfferCard(
                     trade: trade,
-                    onAccept: {
-                        await viewModel.acceptTrade(trade.id)
-                        NotificationCenter.default.post(name: .playerStateDidChange, object: nil)
+                    onAccept: { done in
+                        Task {
+                            await viewModel.acceptTrade(trade.id)
+                            NotificationCenter.default.post(name: .playerStateDidChange, object: nil)
+                            done()
+                        }
                     },
-                    onDecline: {
-                        await viewModel.declineTrade(trade.id)
+                    onDecline: { done in
+                        Task { await viewModel.declineTrade(trade.id); done() }
                     }
                 )
             }
@@ -340,9 +343,12 @@ extension FriendsView {
             ForEach(viewModel.outgoingTrades) { trade in
                 OutgoingTradeCard(
                     trade: trade,
-                    onCancel: {
-                        await viewModel.cancelTrade(trade.id)
-                        NotificationCenter.default.post(name: .playerStateDidChange, object: nil)
+                    onCancel: { done in
+                        Task {
+                            await viewModel.cancelTrade(trade.id)
+                            NotificationCenter.default.post(name: .playerStateDidChange, object: nil)
+                            done()
+                        }
                     }
                 )
             }
@@ -422,11 +428,11 @@ extension FriendsView {
             ForEach(viewModel.pendingAlliancesReceived) { alliance in
                 AllianceProposalCard(
                     alliance: alliance,
-                    onAccept: {
-                        await viewModel.acceptAlliance(alliance.id)
+                    onAccept: { done in
+                        Task { await viewModel.acceptAlliance(alliance.id); done() }
                     },
-                    onDecline: {
-                        await viewModel.declineAlliance(alliance.id)
+                    onDecline: { done in
+                        Task { await viewModel.declineAlliance(alliance.id); done() }
                     }
                 )
             }

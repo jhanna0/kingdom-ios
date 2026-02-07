@@ -280,14 +280,16 @@ struct AuthenticatedView: View {
                 hasShownInitialKingdom: $hasShownInitialKingdom,
                 kingdomForInfoSheet: $kingdomForInfoSheet,
                 hasUnreadNotifications: $hasUnreadNotifications,
+                pendingFriendRequestCount: $pendingFriendRequestCount,
+                pendingAllianceRequestCount: $pendingAllianceRequestCount,
+                pendingTradeRequestCount: $pendingTradeRequestCount,
+                pendingDuelRequestCount: $pendingDuelRequestCount,
+                claimableAchievements: $claimableAchievements,
                 showTravelNotification: $showTravelNotification,
                 displayedTravelEvent: $displayedTravelEvent,
                 showWeatherToast: $showWeatherToast,
                 currentWeather: $currentWeather,
-                syncRuledKingdomsToPlayer: syncRuledKingdomsToPlayer,
-                loadNotificationBadge: loadNotificationBadge,
-                loadAchievementsBadge: loadAchievementsBadge,
-                loadWeatherForKingdom: loadWeatherForKingdom
+                syncRuledKingdomsToPlayer: syncRuledKingdomsToPlayer
             ))
             .onChange(of: showAchievements) { _, isShowing in
                 // Clear badge count locally when opening achievements sheet
@@ -473,17 +475,6 @@ struct AuthenticatedView: View {
         }
     }
     
-    private func loadAchievementsBadge() async {
-        do {
-            let summary = try await AchievementsAPI().getSummary()
-            await MainActor.run {
-                claimableAchievements = summary.claimable_count
-            }
-        } catch {
-            print("❌ Failed to load achievements badge: \(error)")
-        }
-    }
-    
     /// Sync ruled kingdoms from AppInitService to player (backend is SOURCE OF TRUTH)
     private func syncRuledKingdomsToPlayer() {
         let kingdoms = appInit.ruledKingdoms.map { (id: $0.id, name: $0.name) }
@@ -493,20 +484,6 @@ struct AuthenticatedView: View {
         // Note: is_ruler from /player/state is the primary source, but this ensures consistency
         if !kingdoms.isEmpty && !viewModel.player.isRuler {
             print("⚠️ Ruled kingdoms found but isRuler is false - backend should have set is_ruler=true")
-        }
-    }
-    
-    private func loadWeatherForKingdom(_ kingdomId: String) async {
-        do {
-            let response = try await KingdomAPIService.shared.weather.getKingdomWeather(kingdomId: kingdomId)
-            await MainActor.run {
-                currentWeather = response.weather
-                withAnimation(.easeIn(duration: 0.3)) {
-                    showWeatherToast = true
-                }
-            }
-        } catch {
-            print("⚠️ Weather error: \(error)")
         }
     }
 }
@@ -625,15 +602,17 @@ private struct EventHandlers: ViewModifier {
     @Binding var hasShownInitialKingdom: Bool
     @Binding var kingdomForInfoSheet: Kingdom?
     @Binding var hasUnreadNotifications: Bool
+    @Binding var pendingFriendRequestCount: Int
+    @Binding var pendingAllianceRequestCount: Int
+    @Binding var pendingTradeRequestCount: Int
+    @Binding var pendingDuelRequestCount: Int
+    @Binding var claimableAchievements: Int
     @Binding var showTravelNotification: Bool
     @Binding var displayedTravelEvent: TravelEvent?
     @Binding var showWeatherToast: Bool
     @Binding var currentWeather: WeatherData?
     
     let syncRuledKingdomsToPlayer: () -> Void
-    let loadNotificationBadge: () async -> Void
-    let loadAchievementsBadge: () async -> Void
-    let loadWeatherForKingdom: (String) async -> Void
     
     func body(content: Content) -> some View {
         content
@@ -703,5 +682,45 @@ private struct EventHandlers: ViewModifier {
                 }
             }
             .onChange(of: hasUnreadNotifications) { _, _ in }  // Keep for notification badge updates
+    }
+    
+    private func loadNotificationBadge() async {
+        do {
+            let summary = try await viewModel.apiService.notifications.getSummary()
+            await MainActor.run {
+                hasUnreadNotifications = summary.hasUnread
+                pendingFriendRequestCount = summary.pendingFriendRequests
+                pendingAllianceRequestCount = summary.pendingAllianceRequests
+                pendingTradeRequestCount = summary.pendingTradeRequests
+                pendingDuelRequestCount = summary.pendingDuelRequests
+            }
+        } catch {
+            print("❌ Failed to load notification badge: \(error)")
+        }
+    }
+    
+    private func loadAchievementsBadge() async {
+        do {
+            let summary = try await AchievementsAPI().getSummary()
+            await MainActor.run {
+                claimableAchievements = summary.claimable_count
+            }
+        } catch {
+            print("❌ Failed to load achievements badge: \(error)")
+        }
+    }
+    
+    private func loadWeatherForKingdom(_ kingdomId: String) async {
+        do {
+            let response = try await KingdomAPIService.shared.weather.getKingdomWeather(kingdomId: kingdomId)
+            await MainActor.run {
+                currentWeather = response.weather
+                withAnimation(.easeIn(duration: 0.3)) {
+                    showWeatherToast = true
+                }
+            }
+        } catch {
+            print("⚠️ Weather error: \(error)")
+        }
     }
 }
