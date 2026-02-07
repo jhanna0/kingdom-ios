@@ -488,8 +488,8 @@ struct HuntPhaseView: View {
         masterRollDisplayValue = finalValue
         
         // Haptic when result lands
-        haptic(.success)
-        hapticImpact(.heavy)
+        HapticService.shared.success()
+        HapticService.shared.heavyImpact()
         
         viewModel.finishMasterRollAnimation()
     }
@@ -705,23 +705,11 @@ struct HuntPhaseView: View {
         guard let roll = viewModel.lastRollResult else { return }
         
         if roll.is_critical && roll.is_success {
-            haptic(.success)
-            hapticImpact(.heavy)
+            HapticService.shared.success()
+            HapticService.shared.heavyImpact()
         } else if roll.is_success {
-            hapticImpact(.medium)
+            HapticService.shared.mediumImpact()
         }
-    }
-    
-    private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        #if canImport(UIKit)
-        UINotificationFeedbackGenerator().notificationOccurred(type)
-        #endif
-    }
-    
-    private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
-        #endif
     }
 }
 

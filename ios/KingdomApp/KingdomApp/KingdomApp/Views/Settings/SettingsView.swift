@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var musicService: MusicService
+    @ObservedObject var hapticService = HapticService.shared
     @Environment(\.dismiss) var dismiss
     
     @State private var notificationsEnabled = false
@@ -103,6 +104,28 @@ struct SettingsView: View {
                         Spacer()
                         
                         Toggle("", isOn: $musicService.isSoundEffectsEnabled)
+                            .labelsHidden()
+                            .tint(KingdomTheme.Colors.buttonPrimary)
+                    }
+                    .padding()
+                    .brutalistCard(
+                        backgroundColor: KingdomTheme.Colors.parchmentLight,
+                        cornerRadius: 12
+                    )
+                    
+                    // Haptic Vibration Toggle
+                    HStack {
+                        Image(systemName: hapticService.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("Haptic Vibration")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $hapticService.isHapticsEnabled)
                             .labelsHidden()
                             .tint(KingdomTheme.Colors.buttonPrimary)
                     }
