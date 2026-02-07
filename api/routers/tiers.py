@@ -24,9 +24,10 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 FOOD_COST_PER_COOLDOWN_MINUTE = 0.25  # 0.4 food per minute of cooldown (minutes / 2.5)
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
-BUILDING_BASE_ACTIONS_REQUIRED = 100
-BUILDING_LEVEL_ACTIONS_EXPONENT = 1.7
-BUILDING_POPULATION_ACTIONS_DIVISOR = 30
+
+# NOTE: Building action scaling constants moved to kingdom_service.py
+# Formula: max(100, active_citizens × 13) × level_multiplier
+# See kingdom_service.py for: BUILDING_ACTIONS_PER_CITIZEN, BUILDING_ACTIONS_MINIMUM, BUILDING_LEVEL_MULTIPLIERS
 
 
 def calculate_food_cost(cooldown_minutes: float) -> int:
