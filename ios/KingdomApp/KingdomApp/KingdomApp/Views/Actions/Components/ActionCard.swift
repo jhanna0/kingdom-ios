@@ -99,17 +99,15 @@ struct ActionCard: View {
                 Text("\(blockingActionDisplay) for \(minutes)m \(seconds)s")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !canAffordFood && isEnabled {
                 Text("Need food")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if isReady && isEnabled {
                 Button(action: onAction) {
@@ -123,9 +121,8 @@ struct ActionCard: View {
                 Text("Check in to a kingdom first")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else {
                 // Show simple cooldown for instant actions (scout/infiltrate)
@@ -143,9 +140,8 @@ struct ActionCard: View {
                             .font(FontStyles.labelLarge)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 } else {
                     CooldownTimer(

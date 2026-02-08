@@ -132,24 +132,23 @@ struct WorkshopContractCard: View {
                             Spacer()
                             Button(action: { showBookPopup = true }) {
                                 Image(systemName: "book.fill")
-                                    .font(.system(size: 14, weight: .bold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
-                                    .padding(6)
-                                    .brutalistBadge(backgroundColor: .brown)
+                                    .frame(width: 24, height: 24)
+                                    .brutalistBadge(backgroundColor: .brown, cornerRadius: 6, shadowOffset: 2, borderWidth: 1.5)
                             }
                         }
                     }
                 }
+                .frame(height: 38)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !(status.canAffordFood ?? true) {
                 Text("Need food")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if isReady {
                 Button(action: onAction) {
