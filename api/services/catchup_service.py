@@ -4,7 +4,10 @@ Building Catchup Service
 Handles the catch-up system for players who join after buildings were constructed.
 
 Players must complete catch-up work before using a building's benefits.
-Formula: actions_required = CATCHUP_ACTIONS_PER_LEVEL * building_level * building_skill_reduction
+Formula: actions_required = min(CATCHUP_ACTIONS_PER_LEVEL * building_level, MAX_CATCHUP_ACTIONS) * building_skill_reduction
+
+The MAX_CATCHUP_ACTIONS cap (30) ensures late joiners don't face excessive
+grind for high-level buildings (e.g., level 5 would be 75 actions without cap).
 
 Building skill reduces catch-up actions (same formula as property upgrades):
 - 5% reduction per building skill level
@@ -28,6 +31,10 @@ from db import User, Kingdom, BuildingCatchup, ContractContribution, UnifiedCont
 # Actions required per building level for catch-up
 CATCHUP_ACTIONS_PER_LEVEL = 15
 
+# Maximum catch-up actions required regardless of building level
+# Prevents late joiners from facing 75+ actions for high-level buildings
+MAX_CATCHUP_ACTIONS = 30
+
 # Buildings that DON'T require catch-up (always accessible)
 # All other buildings in BUILDING_TYPES require catch-up
 EXEMPT_BUILDINGS = {"townhall"}
@@ -43,16 +50,22 @@ def calculate_catchup_actions(building_level: int, building_skill: int = 0) -> i
     
     Building skill reduces the requirement (uses centralized reduction from tiers.py).
     
-    Formula: base_actions * building_skill_reduction
+    Formula: min(base_actions, MAX_CATCHUP_ACTIONS) * building_skill_reduction
     Where: base_actions = CATCHUP_ACTIONS_PER_LEVEL * building_level
+    
+    The MAX_CATCHUP_ACTIONS cap ensures late joiners don't face 75+ actions
+    for high-level buildings - keeps it manageable at 30 max (before skill reduction).
     """
     from routers.tiers import get_building_action_reduction
     
     base_actions = CATCHUP_ACTIONS_PER_LEVEL * building_level
     
+    # Cap at MAX_CATCHUP_ACTIONS to be fair to late joiners
+    capped_actions = min(base_actions, MAX_CATCHUP_ACTIONS)
+    
     # Use centralized building skill reduction
     building_reduction = get_building_action_reduction(building_skill)
-    reduced_actions = int(base_actions * building_reduction)
+    reduced_actions = int(capped_actions * building_reduction)
     
     return max(1, reduced_actions)
 
