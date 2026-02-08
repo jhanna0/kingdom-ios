@@ -13,6 +13,7 @@ enum InAppNotificationType {
     case info(message: String)
     case garden(message: String)
     case kitchen(message: String)
+    case resourceReset(buildingType: String, message: String)
     
     var icon: String {
         switch self {
@@ -22,6 +23,8 @@ enum InAppNotificationType {
         case .info: return "info.circle.fill"
         case .garden: return "leaf.fill"
         case .kitchen: return "flame.fill"
+        case .resourceReset(let buildingType, _):
+            return buildingType == "lumbermill" ? "tree.fill" : "mountain.2.fill"
         }
     }
     
@@ -39,6 +42,8 @@ enum InAppNotificationType {
             return "Garden"
         case .kitchen:
             return "Kitchen"
+        case .resourceReset(let buildingType, _):
+            return buildingType == "lumbermill" ? "Lumbermill Ready!" : "Mine Ready!"
         }
     }
     
@@ -55,6 +60,8 @@ enum InAppNotificationType {
         case .garden(let message):
             return message
         case .kitchen(let message):
+            return message
+        case .resourceReset(_, let message):
             return message
         }
     }
@@ -73,6 +80,8 @@ enum InAppNotificationType {
             return KingdomTheme.Colors.buttonSuccess  // Green for garden
         case .kitchen:
             return KingdomTheme.Colors.buttonWarning  // Orange for kitchen
+        case .resourceReset(let buildingType, _):
+            return buildingType == "lumbermill" ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled  // Brown for wood, gray for mine
         }
     }
 }
@@ -140,6 +149,9 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
                 self.show(.garden(message: content.body))
             } else if content.categoryIdentifier == "KITCHEN_BAKING" {
                 self.show(.kitchen(message: content.body))
+            } else if content.categoryIdentifier == "RESOURCE_RESET" {
+                let buildingType = userInfo["building_type"] as? String ?? "mine"
+                self.show(.resourceReset(buildingType: buildingType, message: content.body))
             } else {
                 self.show(.info(message: content.body))
             }

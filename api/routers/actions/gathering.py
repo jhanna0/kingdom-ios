@@ -302,7 +302,8 @@ def gather_resource(
         now_local = datetime.now()
         tomorrow_midnight = datetime.combine(date.today() + timedelta(days=1), time.min)
         remaining = tomorrow_midnight - now_local
-        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+        reset_seconds = int(remaining.total_seconds())
+        hours, remainder = divmod(reset_seconds, 3600)
         minutes, _ = divmod(remainder, 60)
         time_str = f"{hours}h {minutes}m"
 
@@ -320,7 +321,8 @@ def gather_resource(
             "amount": 0,
             "new_total": get_inventory_amount(db, current_user.id, resource_type),
             "exhausted": True,
-            "exhausted_message": exhausted_msg
+            "exhausted_message": exhausted_msg,
+            "reset_seconds": reset_seconds
         }
     
     # Get current amount of this resource from inventory

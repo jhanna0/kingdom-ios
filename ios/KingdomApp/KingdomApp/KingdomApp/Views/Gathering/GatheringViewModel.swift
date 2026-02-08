@@ -100,6 +100,16 @@ class GatheringViewModel: ObservableObject {
             if response.exhausted == true {
                 isExhausted = true
                 exhaustedMessage = response.exhaustedMessage ?? "You've gathered all available resources for today."
+                
+                // Schedule notification for when the resource resets
+                if let resetSeconds = response.resetSeconds, resetSeconds > 0 {
+                    Task {
+                        await NotificationManager.shared.scheduleResourceResetNotification(
+                            resourceType: response.resourceType,
+                            secondsUntilReset: resetSeconds
+                        )
+                    }
+                }
                 return
             }
             
