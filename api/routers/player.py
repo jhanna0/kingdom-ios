@@ -26,7 +26,24 @@ def get_player_pets_data(db: Session, user_id: int) -> list:
 
 
 def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dict:
-    """Calculate all active perks/bonuses for a player"""
+    """Calculate all active perks/bonuses for a player.
+    
+    Pulls skill benefits directly from SKILLS definition in tiers.py - 
+    single source of truth for all skill bonuses.
+    """
+    from routers.tiers import SKILLS
+    
+    # Map skill categories to perk categories for display grouping
+    CATEGORY_MAP = {
+        "combat": "combat",
+        "political": "political",
+        "economy": "building",
+        "espionage": "espionage",
+        "education": "training",
+        "enhancement": "combat",  # Faith buffs apply in combat
+        "civic": "political",     # Philosophy affects reputation/political standing
+    }
+    
     perks = {
         "combat": [],
         "training": [],
@@ -37,28 +54,38 @@ def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dic
         "total_power": 0
     }
     
-    # Get equipped items
-    equipped = get_equipped_items(db, user.id)
-    
-    # Attack skill bonus (T1+ only, T0 is base)
-    if state.attack_power >= 1:
-        perks["combat"].append({
-            "stat": "attack",
-            "bonus": state.attack_power,
-            "source": f"Attack Skill T{state.attack_power}",
-            "source_type": "player_skill"
-        })
-    
-    # Defense skill bonus (T1+ only, T0 is base)
-    if state.defense_power >= 1:
-        perks["combat"].append({
-            "stat": "defense",
-            "bonus": state.defense_power,
-            "source": f"Defense Skill T{state.defense_power}",
-            "source_type": "player_skill"
-        })
+    # Iterate over ALL skills from SKILLS definition
+    for skill_id, skill_data in SKILLS.items():
+        stat_attr = skill_data.get("stat_attribute")
+        if not stat_attr:
+            continue
+            
+        # Get player's current level for this skill
+        skill_level = getattr(state, stat_attr, 0)
+        if skill_level < 1:
+            continue
+        
+        # Get benefits for this tier
+        benefits = skill_data.get("benefits", {}).get(skill_level, [])
+        if not benefits:
+            continue
+        
+        # Determine which perk category this skill belongs to
+        skill_category = skill_data.get("category", "combat")
+        perk_category = CATEGORY_MAP.get(skill_category, "combat")
+        display_name = skill_data.get("display_name", skill_id.capitalize())
+        
+        # Add each benefit as a perk
+        for benefit in benefits:
+            perks[perk_category].append({
+                "description": benefit,
+                "source": f"{display_name} T{skill_level}",
+                "source_type": "player_skill"
+            })
     
     # Equipment bonuses
+    equipped = get_equipped_items(db, user.id)
+    
     if equipped["equipped_weapon"]:
         weapon = equipped["equipped_weapon"]
         bonus = get_stat_bonus_for_tier(weapon.get("tier", 1))
@@ -91,7 +118,7 @@ def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dic
                 "expires_at": format_datetime_iso(state.debuff_expires_at)
             })
     
-    # Kingdom bonuses (if in a kingdom)
+    # Kingdom building bonuses (if in a kingdom)
     if state.current_kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         if kingdom:
@@ -114,108 +141,26 @@ def calculate_player_perks(user: User, state: DBPlayerState, db: Session) -> dic
                     "source_type": "kingdom_building"
                 })
     
-    # Building skill bonuses (T1+ show bonuses, T0 is base)
-    if state.building_skill >= 1:
-        bonus_map = {1: 10, 2: 20, 3: 30, 4: 40, 5: 50}
-        bonus = bonus_map.get(state.building_skill, 0)
-        if bonus > 0:
-            perks["building"].append({
-                "description": f"+{bonus}% gold from building",
-                "source": f"Building Skill T{state.building_skill}",
-                "source_type": "player_skill"
-            })
-    
-    if state.building_skill >= 2:
-        perks["building"].append({
-            "description": "+1 Assist action per day",
-            "source": f"Building Skill T2",
-            "source_type": "player_skill"
-        })
-    
-    if state.building_skill >= 3:
-        perks["building"].append({
-            "description": "10% cooldown refund chance",
-            "source": f"Building Skill T3",
-            "source_type": "player_skill"
-        })
-    
-    if state.building_skill >= 4:
-        perks["building"].append({
-            "description": "25% double progress chance",
-            "source": f"Building Skill T4",
-            "source_type": "player_skill"
-        })
-    
-    if state.building_skill >= 5:
-        perks["building"].append({
-            "description": "Instant complete 1 contract/day",
-            "source": f"Building Skill T5",
-            "source_type": "player_skill"
-        })
-    
-    # Intelligence bonuses (T1+ show bonuses, T0 is base)
-    if state.intelligence >= 1:
-        bonus = (state.intelligence + 1) * 2
-        perks["espionage"].append({
-            "description": f"+{bonus}% sabotage/scout success",
-            "source": f"Intelligence T{state.intelligence}",
-            "source_type": "player_skill"
-        })
-    
-    if state.intelligence >= 5:
-        perks["espionage"].append({
-            "description": "Vault Heist unlocked",
-            "source": "Intelligence T5",
-            "source_type": "player_skill"
-        })
-    
-    # Leadership bonuses (T1+ show bonuses, T0 is base)
-    if state.leadership >= 1:
-        vote_weight = 1.0 + (state.leadership * 0.2)
-        perks["political"].append({
-            "description": f"Vote weight: {vote_weight:.1f}x",
-            "source": f"Leadership T{state.leadership}",
-            "source_type": "player_skill"
-        })
-    
-    if state.leadership >= 1:
-        perks["political"].append({
-            "description": "+50% ruler rewards",
-            "source": "Leadership T1",
-            "source_type": "player_skill"
-        })
-    
-    if state.leadership >= 2:
-        perks["political"].append({
-            "description": "Can propose coups",
-            "source": "Leadership T2",
-            "source_type": "player_skill"
-        })
-    
-    if state.leadership >= 3:
-        perks["political"].append({
-            "description": "+100% ruler rewards",
-            "source": "Leadership T3",
-            "source_type": "player_skill"
-        })
-    
-    if state.leadership >= 5:
-        perks["political"].append({
-            "description": "-50% coup cost",
-            "source": "Leadership T5",
-            "source_type": "player_skill"
-        })
-    
-    # Property bonuses
+    # Property bonuses - pull from PROPERTY_TIERS definition
+    from routers.tiers import PROPERTY_TIERS
     properties = db.query(Property).filter(Property.owner_id == user.id).all()
     for prop in properties:
         kingdom = db.query(Kingdom).filter(Kingdom.id == prop.kingdom_id).first()
         if kingdom:
-            perks["travel"].append({
-                "description": "Free travel, instant arrival",
-                "source": f"Property in {kingdom.name}",
-                "source_type": "property"
-            })
+            prop_tier = prop.tier or 1
+            tier_data = PROPERTY_TIERS.get(prop_tier, {})
+            benefits = tier_data.get("benefits", [])
+            tier_name = tier_data.get("name", f"T{prop_tier} Property")
+            
+            for benefit in benefits:
+                # Skip "All X benefits" entries - those are just references
+                if benefit.startswith("All ") and " benefits" in benefit:
+                    continue
+                perks["travel"].append({
+                    "description": benefit,
+                    "source": f"{tier_name} in {kingdom.name}",
+                    "source_type": "property"
+                })
     
     perks["total_power"] = 0  # Removed - meaningless number
     
@@ -318,7 +263,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
             UserKingdom.user_id == user.id,
             UserKingdom.kingdom_id == state.current_kingdom_id
         ).first()
-        reputation = user_kingdom.local_reputation if user_kingdom else 0
+        reputation = int(user_kingdom.local_reputation) if user_kingdom else 0  # Convert float to int for frontend
         
         # Look up kingdom name
         kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
@@ -847,13 +792,18 @@ def add_experience(
 
 
 @router.post("/reputation/add")
-def add_reputation(
+def add_reputation_endpoint(
     amount: int,
     kingdom_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Add reputation to a specific kingdom (reputation is now per-kingdom in user_kingdoms)"""
+    """Add reputation to a specific kingdom (reputation is now per-kingdom in user_kingdoms)
+    
+    Philosophy bonus is applied automatically.
+    """
+    from routers.actions.utils import award_reputation
+    
     state = get_or_create_player_state(db, current_user)
     
     if not kingdom_id:
@@ -862,33 +812,22 @@ def add_reputation(
             detail="kingdom_id is required. Reputation is now per-kingdom in user_kingdoms table."
         )
     
-    # Update or create user_kingdom record
-    user_kingdom = db.query(UserKingdom).filter(
-        UserKingdom.user_id == current_user.id,
-        UserKingdom.kingdom_id == kingdom_id
-    ).first()
-    
-    if not user_kingdom:
-        user_kingdom = UserKingdom(
-            user_id=current_user.id,
-            kingdom_id=kingdom_id,
-            local_reputation=amount,
-            checkins_count=0,
-            gold_earned=0,
-            gold_spent=0
-        )
-        db.add(user_kingdom)
-    else:
-        user_kingdom.local_reputation += amount
+    # Award reputation with philosophy bonus
+    rep_awarded, new_rep_total = award_reputation(
+        db=db,
+        user_id=current_user.id,
+        kingdom_id=kingdom_id,
+        base_amount=amount,
+        philosophy_level=state.philosophy or 0
+    )
     
     state.updated_at = datetime.utcnow()
     db.commit()
-    db.refresh(user_kingdom)
     
     return {
         "success": True,
         "kingdom_id": kingdom_id,
-        "new_reputation": user_kingdom.local_reputation
+        "new_reputation": new_rep_total  # Already int from helper
     }
 
 

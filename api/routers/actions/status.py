@@ -452,10 +452,9 @@ def get_action_status(
     property_contracts = get_property_contracts_for_status(db, current_user.id, state, kingdom.tax_rate if kingdom else 0, is_ruler, state.current_kingdom_id)
     
     # Calculate expected rewards (accounting for bonuses and taxes)
-    # Farm reward
+    # Farm reward - no gold bonus from building skill (it provides cooldown reduction instead)
     farm_base = FARM_GOLD_REWARD
-    farm_bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
-    farm_gross = int(farm_base * farm_bonus_multiplier)
+    farm_gross = farm_base  # No bonus multiplier
     
     # Patrol reward (reputation only)
     patrol_rep_reward = PATROL_REPUTATION_REWARD
@@ -517,9 +516,7 @@ def get_action_status(
         "food_cost": farm_food_cost,
         "can_afford_food": player_food_total >= farm_food_cost,
         "expected_reward": {
-            "gold_gross": farm_gross,
-            "gold_bonus_multiplier": farm_bonus_multiplier,
-            "building_skill": state.building_skill
+            "gold_gross": farm_gross
         },
         "unlocked": True,
         "action_type": "farm",

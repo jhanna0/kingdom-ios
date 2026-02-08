@@ -435,13 +435,15 @@ def conquer_kingdom(
             old_ruler_state = _get_or_create_player_state(db, old_ruler)
             old_ruler_state.kingdoms_ruled -= 1
             
-            # Lose reputation in this kingdom
-            old_ruler_user_kingdom = db.query(UserKingdom).filter(
-                UserKingdom.user_id == old_ruler_id,
-                UserKingdom.kingdom_id == kingdom.id
-            ).first()
-            if old_ruler_user_kingdom:
-                old_ruler_user_kingdom.local_reputation -= 10
+            # Lose reputation in this kingdom (philosophy reduces loss)
+            from routers.actions.utils import deduct_reputation
+            deduct_reputation(
+                db=db,
+                user_id=old_ruler_id,
+                kingdom_id=kingdom.id,
+                base_amount=10,
+                philosophy_level=old_ruler_state.philosophy or 0
+            )
         
         # Note: No need to update old ruler's user_kingdom record
         # Kingdom.ruler_id being updated is sufficient
@@ -456,24 +458,15 @@ def conquer_kingdom(
     state.total_conquests += 1
     state.experience += 100 * kingdom.level
     
-    # Gain reputation in conquered kingdom
-    new_ruler_user_kingdom = db.query(UserKingdom).filter(
-        UserKingdom.user_id == current_user.id,
-        UserKingdom.kingdom_id == kingdom.id
-    ).first()
-    if new_ruler_user_kingdom:
-        new_ruler_user_kingdom.local_reputation += 20
-    else:
-        # Create new user_kingdom record
-        new_ruler_user_kingdom = UserKingdom(
-            user_id=current_user.id,
-            kingdom_id=kingdom.id,
-            local_reputation=20,
-            checkins_count=0,
-            gold_earned=0,
-            gold_spent=0
-        )
-        db.add(new_ruler_user_kingdom)
+    # Gain reputation in conquered kingdom (philosophy bonus)
+    from routers.actions.utils import award_reputation
+    award_reputation(
+        db=db,
+        user_id=current_user.id,
+        kingdom_id=kingdom.id,
+        base_amount=20,
+        philosophy_level=state.philosophy or 0
+    )
     
     # Update user-kingdom stats
     user_kingdom.times_conquered += 1

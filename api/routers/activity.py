@@ -274,7 +274,7 @@ def _get_kingdom_visit_activities(db: Session, user_id: int, limit: int = 50) ->
             details={
                 "total_visits": uk.checkins_count,
                 "gold_earned": uk.gold_earned,
-                "reputation": uk.local_reputation
+                "reputation": int(uk.local_reputation)  # Convert float to int for frontend
             },
             created_at=uk.last_checkin or uk.first_visited
         ))

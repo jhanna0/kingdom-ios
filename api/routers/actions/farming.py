@@ -65,18 +65,16 @@ def perform_farming(
         )
     
     # Calculate base gold reward
+    # Note: Building skill provides cooldown reduction and refund chance, NOT gold bonus
     base_gold = FARM_GOLD_REWARD
     
-    # Apply building skill bonus (2% per level above 1)
-    bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
-    
-    # Apply tax AFTER bonuses
+    # Apply tax (no gold bonus from building skill)
     net_income, tax_amount, tax_rate, gross_income = apply_kingdom_tax_with_bonus(
         db=db,
         kingdom_id=state.current_kingdom_id,
         player_state=state,
         base_income=base_gold,
-        bonus_multiplier=bonus_multiplier
+        bonus_multiplier=1.0  # No gold bonus from building skill
     )
     
     # Award gold to player

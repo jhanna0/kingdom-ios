@@ -520,7 +520,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                     UserKingdom.user_id == current_user.id,
                     UserKingdom.kingdom_id == kingdom.id
                 ).first()
-                kingdom_rep = user_kingdom_record.local_reputation if user_kingdom_record else 0
+                kingdom_rep = int(user_kingdom_record.local_reputation) if user_kingdom_record else 0  # Convert float to int
                 
                 if player_state_for_coup.leadership < COUP_LEADERSHIP_REQUIREMENT:
                     coup_ineligibility_reason = f"Need T{COUP_LEADERSHIP_REQUIREMENT} leadership (you have T{player_state_for_coup.leadership})"

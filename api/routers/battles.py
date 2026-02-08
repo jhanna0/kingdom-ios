@@ -97,12 +97,12 @@ def _get_player_state(db: Session, user: User) -> PlayerState:
 
 
 def _get_kingdom_reputation(db: Session, user_id: int, kingdom_id: str) -> int:
-    """Get player's reputation in a specific kingdom"""
+    """Get player's reputation in a specific kingdom (as int)"""
     user_kingdom = db.query(UserKingdom).filter(
         UserKingdom.user_id == user_id,
         UserKingdom.kingdom_id == kingdom_id
     ).first()
-    return user_kingdom.local_reputation if user_kingdom else 0
+    return int(user_kingdom.local_reputation) if user_kingdom else 0
 
 
 def _is_at_kingdom(db: Session, user_id: int, kingdom_id: str) -> bool:
@@ -806,6 +806,8 @@ def _apply_battle_outcome_bulk(
             """), {"loser_ids": loser_ids})
             
             # Step 3: Deduct reputation from losers
+            # NOTE: Philosophy bonus not applied here for performance (bulk SQL).
+            # Battles are rare events; philosophy bonus is applied in other rep actions.
             db.execute(text("""
                 UPDATE user_kingdoms
                 SET local_reputation = GREATEST(0, local_reputation - :rep_loss)
@@ -823,6 +825,7 @@ def _apply_battle_outcome_bulk(
                 """), {"gold_share": gold_per_winner, "winner_ids": winner_ids})
             
             # Step 5: Add reputation to winners (upsert)
+            # NOTE: Philosophy bonus not applied here for performance (bulk SQL).
             if winner_ids:
                 db.execute(text("""
                     INSERT INTO user_kingdoms (user_id, kingdom_id, local_reputation)

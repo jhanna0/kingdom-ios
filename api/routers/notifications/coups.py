@@ -18,12 +18,12 @@ def _get_initiator_stats(db: Session, coup: CoupEvent) -> Dict[str, Any]:
     if not initiator or not initiator_state:
         return None
     
-    # Get kingdom reputation
+    # Get kingdom reputation (convert float to int)
     user_kingdom = db.query(UserKingdom).filter(
         UserKingdom.user_id == coup.initiator_id,
         UserKingdom.kingdom_id == coup.kingdom_id
     ).first()
-    kingdom_rep = user_kingdom.local_reputation if user_kingdom else 0
+    kingdom_rep = int(user_kingdom.local_reputation) if user_kingdom else 0
     
     return {
         "level": initiator_state.level,

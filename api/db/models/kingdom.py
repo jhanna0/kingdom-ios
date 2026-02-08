@@ -128,8 +128,8 @@ class UserKingdom(Base):
     times_conquered = Column(Integer, default=0)
     total_reign_duration_hours = Column(Float, default=0.0)
     
-    # Reputation with this specific kingdom
-    local_reputation = Column(Integer, default=0)
+    # Reputation with this specific kingdom (Float for philosophy bonus precision, convert to int for frontend)
+    local_reputation = Column(Float, default=0.0)
     
     # Statistics
     checkins_count = Column(Integer, default=0)
