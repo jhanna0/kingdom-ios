@@ -139,6 +139,7 @@ struct StoreView: View {
                             await purchaseSubscription(product)
                         }
                     }
+                    
                 }
             }
             
@@ -218,12 +219,24 @@ struct StoreView: View {
     // MARK: - Terms
     
     private var termsSection: some View {
-        Text("Payment will be charged to your Apple ID account.")
+        VStack(spacing: KingdomTheme.Spacing.small) {
+            Text("Payment will be charged to your Apple ID account. Review our Terms of Service below:\n")
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Link("Terms of Use", destination: URL(string: "http://legal.kingdoms.ninja/terms")!)
+                Text("•")
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                Link("Privacy Policy", destination: URL(string: "http://legal.kingdoms.ninja/")!)
+            }
             .font(FontStyles.labelTiny)
-            .foregroundColor(KingdomTheme.Colors.inkLight)
-            .multilineTextAlignment(.center)
-            .padding(.top, KingdomTheme.Spacing.small)
+            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+        }
+        .padding(.top, KingdomTheme.Spacing.small)
     }
+    
     
     // MARK: - Purchase
     
