@@ -111,7 +111,7 @@ extension KingdomInfoSheetView {
                     .foregroundColor(KingdomTheme.Colors.buttonSuccess)
             }
             .padding(KingdomTheme.Spacing.medium)
-            .brutalistCard(backgroundColor: KingdomTheme.Colors.buttonSuccess.opacity(0.1), cornerRadius: 12)
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(KingdomTheme.Colors.buttonSuccess, lineWidth: 2)

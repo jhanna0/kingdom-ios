@@ -80,9 +80,6 @@ struct KingdomInfoSheetView: View {
                 
                 // Alliance status banner (if viewing an allied kingdom - not your hometown)
                 allianceStatusBanner
-                
-                // Action buttons - Medieval war council style (backend controls visibility)
-                warActionsSection
             }
             .padding(.top)
         }
