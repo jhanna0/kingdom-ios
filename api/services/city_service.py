@@ -298,6 +298,7 @@ def get_buildings_for_kingdom(
             }
         
         # Get permit info for buildings that require permits (non-hometown)
+        # Only send permit info if the foreign kingdom has built this building (level > 0)
         permit_info = None
         if current_user and level > 0:
             from services.building_permit_service import check_building_access, PERMIT_REQUIRED_BUILDINGS

@@ -276,7 +276,7 @@ def buy_permit(
     state.gold -= PERMIT_COST_GOLD
     
     # Add gold to kingdom treasury
-    kingdom.treasury = (kingdom.treasury or 0) + PERMIT_COST_GOLD
+    kingdom.treasury_gold = (kingdom.treasury_gold or 0) + PERMIT_COST_GOLD
     
     # Create or update permit
     expires_at = datetime.utcnow() + timedelta(minutes=PERMIT_DURATION_MINUTES)

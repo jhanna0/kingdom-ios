@@ -24,7 +24,7 @@ extension KingdomInfoSheetView {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            let sortedBuildings = kingdom.sortedBuildings()
+            let sortedBuildings = (viewModel.kingdoms.first(where: { $0.id == kingdom.id }) ?? kingdom).sortedBuildings()
             
             if sortedBuildings.isEmpty {
                 ProgressView().padding()
@@ -47,14 +47,17 @@ extension KingdomInfoSheetView {
     func buildingRow(building: BuildingMetadata) -> some View {
         let isBuilt = building.level > 0
         let color = Color(hex: building.colorHex) ?? KingdomTheme.Colors.inkMedium
-        // DYNAMIC: Building is clickable if backend says so AND player is inside
-        let isClickable = isPlayerInside && building.isClickable
         // Check if player needs to complete catch-up work
         let needsCatchup = building.needsCatchup && isPlayerInside
-        // Check if player needs a permit (visiting and not allied)
+        // Check if player needs a permit (visiting and not allied) - backend tells us
         let needsPermit = isPlayerInside && (building.permit?.showBuyPermit ?? false)
-        let hasValidPermit = building.permit?.hasValidPermit ?? false
-        let permitBlocked = isPlayerInside && (building.permit?.needsPermit == true && !hasValidPermit && !(building.permit?.canBuyPermit ?? false))
+        // Backend is source of truth for access - if permit info exists, use canAccess
+        // If no permit info, building is accessible (non-permit buildings or hometown)
+        let canAccess = building.permit?.canAccess ?? true
+        // Blocked = can't access AND can't buy a permit to get access
+        let isBlocked = building.permit != nil && !canAccess && !building.permit!.canBuyPermit
+        // Building is clickable if: player inside, has click action, level > 0, AND backend says canAccess
+        let isClickable = isPlayerInside && building.isClickable && canAccess
         
         let content = HStack(spacing: 10) {
             // Icon with level badge - brutalist style
@@ -98,18 +101,16 @@ extension KingdomInfoSheetView {
                             .cornerRadius(4)
                     }
                     
-                    // Show permit badge if player needs to buy one
-                    if needsPermit {
-                        if let permit = building.permit {
-                            Text("\(permit.permitCost)g")
-                                .font(.system(size: 8, weight: .black))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(KingdomTheme.Colors.gold)
-                                .cornerRadius(4)
-                        }
-                    } else if hasValidPermit, let permit = building.permit {
+                    // Show permit badge - backend tells us what to show
+                    if needsPermit, let permit = building.permit {
+                        Text("\(permit.permitCost)g")
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(KingdomTheme.Colors.gold)
+                            .cornerRadius(4)
+                    } else if let permit = building.permit, permit.hasValidPermit {
                         Text("\(permit.permitMinutesRemaining)m")
                             .font(.system(size: 8, weight: .black))
                             .foregroundColor(.white)
@@ -125,17 +126,20 @@ extension KingdomInfoSheetView {
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         .lineLimit(1)
-                } else if permitBlocked, let permit = building.permit {
+                } else if isBlocked, let permit = building.permit {
+                    // Blocked - can't access and can't buy permit
                     Text(permit.reason)
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.buttonDanger)
                         .lineLimit(1)
                 } else if needsPermit, let permit = building.permit {
+                    // Can buy permit
                     Text("Permit: \(permit.permitCost)g for \(permit.permitDurationMinutes)m")
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.gold)
                         .lineLimit(1)
-                } else if hasValidPermit, let permit = building.permit {
+                } else if let permit = building.permit, permit.hasValidPermit {
+                    // Has active permit
                     Text("Permit active • \(permit.permitMinutesRemaining)m remaining")
                         .font(FontStyles.labelTiny)
                         .foregroundColor(KingdomTheme.Colors.buttonSuccess)
@@ -155,11 +159,16 @@ extension KingdomInfoSheetView {
                 Image(systemName: "hammer.fill")
                     .font(FontStyles.iconMini)
                     .foregroundColor(KingdomTheme.Colors.buttonWarning)
+            } else if isBlocked {
+                // Blocked - show lock icon
+                Image(systemName: "lock.fill")
+                    .font(FontStyles.iconMini)
+                    .foregroundColor(KingdomTheme.Colors.buttonDanger)
             } else if needsPermit {
                 Image(systemName: "ticket.fill")
                     .font(FontStyles.iconMini)
                     .foregroundColor(KingdomTheme.Colors.gold)
-            } else if isClickable || hasValidPermit {
+            } else if isClickable {
                 Image(systemName: "chevron.right")
                     .font(FontStyles.iconMini)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -186,7 +195,7 @@ extension KingdomInfoSheetView {
                 permitBuilding = building
             } label: { content }
             .buttonStyle(.plain)
-        } else if (isClickable || hasValidPermit), let clickAction = building.clickAction {
+        } else if isClickable, let clickAction = building.clickAction {
             Button {
                 // Check if building is exhausted (daily limit reached)
                 if clickAction.exhausted, let message = clickAction.exhaustedMessage {

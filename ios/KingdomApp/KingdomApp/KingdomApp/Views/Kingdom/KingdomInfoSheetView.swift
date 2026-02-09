@@ -121,10 +121,10 @@ struct KingdomInfoSheetView: View {
                     kingdom: kingdom,
                     onDismiss: { permitBuilding = nil },
                     onPurchased: {
-                        // Refresh kingdom data after purchasing permit
+                        // Refresh this specific kingdom's data after purchasing permit
                         permitBuilding = nil
                         Task {
-                            await viewModel.refreshKingdomData()
+                            await viewModel.refreshKingdom(id: kingdom.id)
                         }
                     }
                 )

@@ -202,7 +202,7 @@ def purchase_permit(
         permit_minutes_remaining=permit.minutes_remaining if permit else 0,
         gold_spent=PERMIT_COST_GOLD,
         player_gold=int(state.gold),
-        treasury_gold=int(kingdom.treasury or 0),
+        treasury_gold=int(kingdom.treasury_gold or 0),
     )
 
 
