@@ -196,6 +196,7 @@ def _serialize_hunt(hunt_session) -> dict:
             "critical_rolls": p.critical_rolls,
             "meat_earned": p.meat_earned,
             "items_earned": p.items_earned,
+            "phase_rolls_used": p.phase_rolls_used.copy(),
         }
     
     def serialize_round_result(r: "PhaseRoundResult") -> dict:
@@ -303,6 +304,7 @@ def _deserialize_hunt(data: dict) -> "HuntSession":
             critical_rolls=d.get("critical_rolls", 0),
             meat_earned=d.get("meat_earned", 0),
             items_earned=d.get("items_earned", []),
+            phase_rolls_used=d.get("phase_rolls_used", {}),
         )
     
     def deserialize_round_result(d: dict) -> PhaseRoundResult:
