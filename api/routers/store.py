@@ -367,7 +367,22 @@ async def redeem_purchase(
         if not config.DEV_MODE:
             raise HTTPException(status_code=400, detail="Failed to verify purchase")
     
-    # 5. Set purchase date
+    # 5. Sandbox purchases grant nothing (TestFlight testing only)
+    if environment == "Sandbox":
+        print(f"🧪 Sandbox purchase - no resources granted (user {current_user.id}, {request.product_id})")
+        return RedeemResponse(
+            success=True,
+            message="Sandbox purchase verified (no resources in test mode)",
+            display_message="Test purchase successful! No resources in test mode.",
+            gold_granted=0,
+            meat_granted=0,
+            books_granted=0,
+            new_gold_total=int(state.gold or 0),
+            new_meat_total=get_player_meat(db, current_user.id),
+            new_book_total=get_player_books(db, current_user.id)
+        )
+    
+    # 6. Set purchase date
     purchase_date = datetime.now(timezone.utc)
     
     # 6. Grant resources

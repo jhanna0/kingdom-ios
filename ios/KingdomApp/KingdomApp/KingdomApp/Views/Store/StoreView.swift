@@ -48,7 +48,7 @@ struct StoreView: View {
                                   (notification.userInfo?["meat_granted"] as? Int ?? 0) +
                                   (notification.userInfo?["books_granted"] as? Int ?? 0)
                     
-                    resultTitle = granted > 0 ? "Purchase Successful!" : "Already Owned"
+                    resultTitle = "Success!"
                     resultMessage = displayMessage
                     resultIsSuccess = granted > 0  // Only dismiss if something was granted
                     showingResult = true
