@@ -255,8 +255,8 @@ struct StoreView: View {
     private func purchaseSubscription(_ product: Product) async {
         let success = await store.purchaseSubscription(product)
         if success {
-            resultTitle = "Welcome, Supporter!"
-            resultMessage = "You can now customize your profile with themes and titles."
+            resultTitle = "Thank you!"
+            resultMessage = "You can now customize your profile (bottom of character sheet) with themes and titles."
             resultIsSuccess = true
             showingResult = true
         } else if case .failed(let message) = store.lastPurchaseResult {
