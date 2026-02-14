@@ -591,6 +591,147 @@ def set_activity_status(state, status: Optional[str] = None):
     state.current_activity_status = status
 
 
+def get_philosophy_rep_bonus(philosophy_level: int) -> float:
+    """Get reputation bonus multiplier from philosophy skill.
+    
+    Philosophy gives +10% reputation per level (T1-T5).
+    Returns multiplier (e.g., 1.3 for T3 = +30% bonus).
+    """
+    if philosophy_level <= 0:
+        return 1.0
+    return 1.0 + (philosophy_level * 0.10)
+
+
+def get_philosophy_rep_loss_reduction(philosophy_level: int) -> float:
+    """Get reputation loss reduction from philosophy skill.
+    
+    Philosophy reduces rep loss by 10% per level (T1-T5).
+    Returns multiplier (e.g., 0.7 for T3 = -30% loss).
+    """
+    if philosophy_level <= 0:
+        return 1.0
+    return max(0.5, 1.0 - (philosophy_level * 0.10))  # Cap at 50% reduction
+
+
+def award_reputation(
+    db: Session,
+    user_id: int,
+    kingdom_id: str,
+    base_amount: int,
+    philosophy_level: int = 0,
+    apply_bonus: bool = True
+) -> tuple[float, int]:
+    """Award reputation to a user in a specific kingdom, applying philosophy bonus.
+    
+    Args:
+        db: Database session
+        user_id: The user's ID
+        kingdom_id: The kingdom to award rep in
+        base_amount: Base reputation amount (before bonus)
+        philosophy_level: Player's philosophy skill level (0-5)
+        apply_bonus: Whether to apply philosophy bonus (False for penalties)
+        
+    Returns:
+        Tuple of (actual_amount_added, new_total_as_int)
+    """
+    from db.models.kingdom import UserKingdom
+    
+    # Calculate final amount with philosophy bonus
+    if apply_bonus and base_amount > 0:
+        multiplier = get_philosophy_rep_bonus(philosophy_level)
+        final_amount = base_amount * multiplier
+    else:
+        final_amount = float(base_amount)
+    
+    # Get or create user_kingdom record
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == user_id,
+        UserKingdom.kingdom_id == kingdom_id
+    ).first()
+    
+    if user_kingdom:
+        user_kingdom.local_reputation += final_amount
+    else:
+        user_kingdom = UserKingdom(
+            user_id=user_id,
+            kingdom_id=kingdom_id,
+            local_reputation=final_amount,
+            checkins_count=0,
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(user_kingdom)
+        db.flush()
+    
+    return (final_amount, int(user_kingdom.local_reputation))
+
+
+def deduct_reputation(
+    db: Session,
+    user_id: int,
+    kingdom_id: str,
+    base_amount: int,
+    philosophy_level: int = 0,
+    apply_reduction: bool = True
+) -> tuple[float, int]:
+    """Deduct reputation from a user in a specific kingdom, applying philosophy reduction.
+    
+    Philosophy reduces reputation LOSS (not gains).
+    
+    Args:
+        db: Database session
+        user_id: The user's ID
+        kingdom_id: The kingdom to deduct rep from
+        base_amount: Base reputation loss (positive number)
+        philosophy_level: Player's philosophy skill level (0-5)
+        apply_reduction: Whether to apply philosophy loss reduction
+        
+    Returns:
+        Tuple of (actual_amount_deducted, new_total_as_int)
+    """
+    from db.models.kingdom import UserKingdom
+    
+    # Calculate final amount with philosophy reduction
+    if apply_reduction and base_amount > 0:
+        multiplier = get_philosophy_rep_loss_reduction(philosophy_level)
+        final_amount = base_amount * multiplier
+    else:
+        final_amount = float(base_amount)
+    
+    # Get or create user_kingdom record
+    user_kingdom = db.query(UserKingdom).filter(
+        UserKingdom.user_id == user_id,
+        UserKingdom.kingdom_id == kingdom_id
+    ).first()
+    
+    if user_kingdom:
+        user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - final_amount)
+    else:
+        # Create with negative rep (capped at 0)
+        user_kingdom = UserKingdom(
+            user_id=user_id,
+            kingdom_id=kingdom_id,
+            local_reputation=max(0, -final_amount),
+            checkins_count=0,
+            gold_earned=0,
+            gold_spent=0
+        )
+        db.add(user_kingdom)
+        db.flush()
+    
+    return (final_amount, int(user_kingdom.local_reputation))
+
+
+def get_reputation_as_int(user_kingdom) -> int:
+    """Get reputation as integer for frontend display.
+    
+    Use this when reading reputation for API responses.
+    """
+    if user_kingdom is None:
+        return 0
+    return int(user_kingdom.local_reputation or 0)
+
+
 def get_activity_icon_color(action_type: str) -> tuple[str, str]:
     """Get icon and color for an action type. Returns (icon, color)."""
     mapping = {

@@ -591,22 +591,7 @@ def create_hunt(
             message="You must be in the kingdom to start a hunt",
             hunt=None,
         )
-    
-    # Check if this is hometown OR has valid permit
-    is_hometown = player_state.hometown_kingdom_id == request.kingdom_id
-    has_valid_permit = (
-        player_state.hunting_permit_kingdom_id == request.kingdom_id and
-        player_state.hunting_permit_expires_at and
-        player_state.hunting_permit_expires_at > datetime.utcnow()
-    )
-    
-    if not is_hometown and not has_valid_permit:
-        return HuntResponse(
-            success=False,
-            message="You need a hunting permit to hunt in this kingdom! (10g for 10 minutes)",
-            hunt=None,
-        )
-    
+
     # Check if player already has an active hunt - auto-abandon it
     existing = manager.get_active_hunt_for_player(db, user.id)
     if existing:

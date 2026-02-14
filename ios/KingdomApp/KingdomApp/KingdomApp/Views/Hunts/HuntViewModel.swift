@@ -37,10 +37,6 @@ class HuntViewModel: ObservableObject {
     @Published var preview: HuntPreviewResponse?
     @Published var currentPhaseResult: PhaseResultData?
     
-    // Permit status (for visitors)
-    @Published var permitStatus: HuntingPermitStatusResponse?
-    @Published var isBuyingPermit = false
-    
     // Roll reveal tracking (legacy)
     @Published var rollsRevealed: Set<Int> = []
     
@@ -505,46 +501,12 @@ class HuntViewModel: ObservableObject {
         currentKingdomId = kingdomId
         uiState = .loading
         do {
-            // Check permit status and active hunt in parallel
-            async let permitTask = KingdomAPIService.shared.hunts.getPermitStatus(kingdomId: kingdomId)
-            async let huntTask = KingdomAPIService.shared.hunts.getActiveHunt(kingdomId: kingdomId)
-            
-            let (permitResponse, huntResponse) = try await (permitTask, huntTask)
-            
-            permitStatus = permitResponse
+            let huntResponse = try await KingdomAPIService.shared.hunts.getActiveHunt(kingdomId: kingdomId)
             hunt = huntResponse.active_hunt
             syncUIState()
         } catch {
             hunt = nil
             uiState = .noHunt
-        }
-    }
-    
-    func loadPermitStatus(kingdomId: String) async {
-        do {
-            permitStatus = try await KingdomAPIService.shared.hunts.getPermitStatus(kingdomId: kingdomId)
-        } catch {
-            print("Failed to load permit status: \(error)")
-        }
-    }
-    
-    func buyPermit(kingdomId: String) async -> Bool {
-        isBuyingPermit = true
-        defer { isBuyingPermit = false }
-        
-        do {
-            let response = try await KingdomAPIService.shared.hunts.buyPermit(kingdomId: kingdomId)
-            if response.success {
-                // Reload permit status
-                await loadPermitStatus(kingdomId: kingdomId)
-                return true
-            } else {
-                // Silently handle - button will just not work
-                return false
-            }
-        } catch {
-            // Silently handle network errors
-            return false
         }
     }
     

@@ -220,6 +220,34 @@ class CityAPI {
                         )
                     }
                     
+                    // Convert permit info if present
+                    let permitInfo: BuildingPermitInfo? = building.permit.map {
+                        // Parse ISO date string to Date
+                        var expiresAt: Date? = nil
+                        if let expiresStr = $0.permit_expires_at {
+                            let formatter = ISO8601DateFormatter()
+                            formatter.formatOptions = [.withInternetDateTime]
+                            expiresAt = formatter.date(from: expiresStr)
+                        }
+                        
+                        return BuildingPermitInfo(
+                            canAccess: $0.can_access,
+                            reason: $0.reason,
+                            isHometown: $0.is_hometown,
+                            isAllied: $0.is_allied,
+                            needsPermit: $0.needs_permit,
+                            hasValidPermit: $0.has_valid_permit,
+                            permitExpiresAt: expiresAt,
+                            permitMinutesRemaining: $0.permit_minutes_remaining,
+                            hometownHasBuilding: $0.hometown_has_building,
+                            hometownBuildingLevel: $0.hometown_building_level,
+                            hasActiveCatchup: $0.has_active_catchup,
+                            canBuyPermit: $0.can_buy_permit,
+                            permitCost: $0.permit_cost,
+                            permitDurationMinutes: $0.permit_duration_minutes
+                        )
+                    }
+                    
                     // Store full metadata
                     kingdom.buildingMetadata[building.type] = BuildingMetadata(
                         type: building.type,
@@ -234,6 +262,7 @@ class CityAPI {
                         upgradeCost: upgradeCost,
                         clickAction: clickAction,
                         catchup: catchupInfo,
+                        permit: permitInfo,
                         tierName: building.tier_name,
                         tierBenefit: building.tier_benefit,
                         allTiers: allTiers

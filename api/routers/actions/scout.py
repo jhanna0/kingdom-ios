@@ -462,27 +462,22 @@ def scout_enemy_kingdom(
 # ============================================================
 
 def _apply_caught_penalties(db: Session, user: User, state: PlayerState):
-    """Apply penalties when caught scouting. Uses state.current_kingdom_id as target."""
+    """Apply penalties when caught scouting. Uses state.current_kingdom_id as target.
+    
+    Philosophy reduces reputation loss.
+    """
+    from .utils import deduct_reputation
+    
     target_kingdom_id = state.current_kingdom_id
     
-    # Lose reputation in target kingdom
-    user_kingdom = db.query(UserKingdom).filter(
-        UserKingdom.user_id == user.id,
-        UserKingdom.kingdom_id == target_kingdom_id
-    ).first()
-    
-    if user_kingdom:
-        user_kingdom.local_reputation -= CAUGHT_REP_LOSS_TARGET
-    else:
-        user_kingdom = UserKingdom(
-            user_id=user.id,
-            kingdom_id=target_kingdom_id,
-            local_reputation=-CAUGHT_REP_LOSS_TARGET,
-            checkins_count=0,
-            gold_earned=0,
-            gold_spent=0
-        )
-        db.add(user_kingdom)
+    # Lose reputation in target kingdom (philosophy reduces loss)
+    deduct_reputation(
+        db=db,
+        user_id=user.id,
+        kingdom_id=target_kingdom_id,
+        base_amount=CAUGHT_REP_LOSS_TARGET,
+        philosophy_level=state.philosophy or 0
+    )
     
 
 
@@ -609,24 +604,16 @@ def _apply_outcome(db: Session, user: User, state: PlayerState, kingdom: Kingdom
 
 
 def _award_home_reputation(db: Session, state: PlayerState, rep_amount: int):
-    """Award reputation at player's home kingdom."""
-    home_uk = db.query(UserKingdom).filter(
-        UserKingdom.user_id == state.user_id,
-        UserKingdom.kingdom_id == state.hometown_kingdom_id
-    ).first()
+    """Award reputation at player's home kingdom with philosophy bonus."""
+    from .utils import award_reputation
     
-    if home_uk:
-        home_uk.local_reputation += rep_amount
-    else:
-        home_uk = UserKingdom(
-            user_id=state.user_id,
-            kingdom_id=state.hometown_kingdom_id,
-            local_reputation=rep_amount,
-            checkins_count=0,
-            gold_earned=0,
-            gold_spent=0
-        )
-        db.add(home_uk)
+    award_reputation(
+        db=db,
+        user_id=state.user_id,
+        kingdom_id=state.hometown_kingdom_id,
+        base_amount=rep_amount,
+        philosophy_level=state.philosophy or 0
+    )
 
 
 # ============================================================

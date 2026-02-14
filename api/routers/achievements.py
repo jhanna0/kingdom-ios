@@ -264,10 +264,17 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
     for row in fish_results:
         catch_count = int(row.catch_count)
         total_fish += catch_count
-        if row.fish_id == "pet_fish":
-            progress["pet_fish_caught"] = catch_count
         progress[f"catch_{row.fish_id}"] = catch_count
     progress["fish_caught"] = total_fish
+    
+    # Pet fish achievement: check inventory directly (player owns pet fish)
+    pet_fish_query = text("""
+        SELECT COALESCE(quantity, 0) as quantity
+        FROM player_inventory
+        WHERE user_id = :user_id AND item_id = 'pet_fish'
+    """)
+    pet_fish_result = db.execute(pet_fish_query, {"user_id": user_id}).first()
+    progress["pet_fish_caught"] = int(pet_fish_result.quantity) if pet_fish_result else 0
     
     # Foraging finds by item type
     foraging_finds_query = text("""

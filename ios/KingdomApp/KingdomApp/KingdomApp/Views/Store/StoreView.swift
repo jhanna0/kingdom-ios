@@ -48,7 +48,7 @@ struct StoreView: View {
                                   (notification.userInfo?["meat_granted"] as? Int ?? 0) +
                                   (notification.userInfo?["books_granted"] as? Int ?? 0)
                     
-                    resultTitle = granted > 0 ? "Purchase Successful!" : "Already Owned"
+                    resultTitle = "Success!"
                     resultMessage = displayMessage
                     resultIsSuccess = granted > 0  // Only dismiss if something was granted
                     showingResult = true
@@ -139,6 +139,7 @@ struct StoreView: View {
                             await purchaseSubscription(product)
                         }
                     }
+                    
                 }
             }
             
@@ -218,12 +219,24 @@ struct StoreView: View {
     // MARK: - Terms
     
     private var termsSection: some View {
-        Text("Payment will be charged to your Apple ID account.")
+        VStack(spacing: KingdomTheme.Spacing.small) {
+            Text("Payment will be charged to your Apple ID account. Review our Terms of Service below:\n")
+                .font(FontStyles.labelTiny)
+                .foregroundColor(KingdomTheme.Colors.inkLight)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: KingdomTheme.Spacing.medium) {
+                Link("Terms of Use", destination: URL(string: "http://legal.kingdoms.ninja/terms")!)
+                Text("•")
+                    .foregroundColor(KingdomTheme.Colors.inkLight)
+                Link("Privacy Policy", destination: URL(string: "http://legal.kingdoms.ninja/")!)
+            }
             .font(FontStyles.labelTiny)
-            .foregroundColor(KingdomTheme.Colors.inkLight)
-            .multilineTextAlignment(.center)
-            .padding(.top, KingdomTheme.Spacing.small)
+            .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+        }
+        .padding(.top, KingdomTheme.Spacing.small)
     }
+    
     
     // MARK: - Purchase
     
@@ -242,8 +255,8 @@ struct StoreView: View {
     private func purchaseSubscription(_ product: Product) async {
         let success = await store.purchaseSubscription(product)
         if success {
-            resultTitle = "Welcome, Supporter!"
-            resultMessage = "You can now customize your profile with themes and titles."
+            resultTitle = "Thank you!"
+            resultMessage = "You can now customize your profile (bottom of character sheet) with themes and titles."
             resultIsSuccess = true
             showingResult = true
         } else if case .failed(let message) = store.lastPurchaseResult {

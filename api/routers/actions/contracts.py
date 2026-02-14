@@ -180,15 +180,15 @@ def work_on_contract(
     db.add(contribution)
     
     # Calculate reward - use the ruler-set action_reward
+    # Note: Building skill provides cooldown reduction and refund chance, NOT gold bonus
     base_gold = contract.action_reward or 0
-    bonus_multiplier = 1.0 + (max(0, state.building_skill - 1) * 0.02)
     
     net_income, tax_amount, tax_rate, gross_income = apply_kingdom_tax_with_bonus(
         db=db,
         kingdom_id=contract.kingdom_id,
         player_state=state,
         base_income=base_gold,
-        bonus_multiplier=bonus_multiplier
+        bonus_multiplier=1.0  # No gold bonus from building skill
     )
     
     state.gold += net_income

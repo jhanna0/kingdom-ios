@@ -162,18 +162,6 @@ struct HuntStartView: View {
     let kingdomId: String
     let kingdomName: String
     
-    private var needsPermit: Bool {
-        viewModel.permitStatus?.needs_permit ?? false
-    }
-    
-    private var hasValidPermit: Bool {
-        viewModel.permitStatus?.has_valid_permit ?? false
-    }
-    
-    private var canHunt: Bool {
-        viewModel.permitStatus?.can_hunt ?? true
-    }
-    
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -212,15 +200,6 @@ struct HuntStartView: View {
                         }
                         .padding(.top, 24)
                         
-                        // Hunting Permit Card (for visitors)
-                        if needsPermit {
-                            HuntingPermitCard(
-                                viewModel: viewModel,
-                                kingdomId: kingdomId,
-                                kingdomName: kingdomName
-                            )
-                        }
-                        
                         // Probability Preview
                         if let preview = viewModel.preview {
                             HuntPreviewCard(preview: preview)
@@ -241,111 +220,25 @@ struct HuntStartView: View {
                         .fill(Color.black)
                         .frame(height: 3)
                     
-                    if needsPermit && !hasValidPermit {
-                        // Show "Buy Permit" button
-                        Button {
-                            Task {
-                                await viewModel.buyPermit(kingdomId: kingdomId)
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                if viewModel.isBuyingPermit {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "scroll.fill")
-                                    Text("Buy Hunting Permit (\(viewModel.permitStatus?.permit_cost ?? 10)g)")
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
+                    Button {
+                        Task {
+                            await viewModel.createHunt(kingdomId: kingdomId)
                         }
-                        .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.gold, fullWidth: true))
-                        .disabled(viewModel.isBuyingPermit)
-                        .padding(.horizontal, KingdomTheme.Spacing.large)
-                        .padding(.vertical, KingdomTheme.Spacing.medium)
-                    } else {
-                        // Show "Start Hunt" button
-                        Button {
-                            Task {
-                                await viewModel.createHunt(kingdomId: kingdomId)
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text("Start Hunt")
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 14, weight: .bold))
-                            }
-                            .frame(maxWidth: .infinity)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Start Hunt")
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .bold))
                         }
-                        .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
-                        .padding(.horizontal, KingdomTheme.Spacing.large)
-                        .padding(.vertical, KingdomTheme.Spacing.medium)
+                        .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.brutalist(backgroundColor: KingdomTheme.Colors.buttonSuccess, fullWidth: true))
+                    .padding(.horizontal, KingdomTheme.Spacing.large)
+                    .padding(.vertical, KingdomTheme.Spacing.medium)
                 }
                 .background(KingdomTheme.Colors.parchmentLight.ignoresSafeArea(edges: .bottom))
             }
         }
-    }
-}
-
-// MARK: - Hunting Permit Card
-
-struct HuntingPermitCard: View {
-    @ObservedObject var viewModel: HuntViewModel
-    let kingdomId: String
-    let kingdomName: String
-    
-    private var hasValidPermit: Bool {
-        viewModel.permitStatus?.has_valid_permit ?? false
-    }
-    
-    private var minutesRemaining: Int {
-        viewModel.permitStatus?.minutes_remaining ?? 0
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: hasValidPermit ? "checkmark.seal.fill" : "scroll.fill")
-                    .font(FontStyles.headingSmall)
-                    .foregroundColor(hasValidPermit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.gold)
-                
-                Text("HUNTING PERMIT")
-                    .font(FontStyles.labelBlackNano)
-                    .tracking(2)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                Spacer()
-                
-                if hasValidPermit {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock.fill")
-                            .font(FontStyles.iconMini)
-                        Text("\(minutesRemaining)m left")
-                            .font(FontStyles.statMedium)
-                    }
-                    .foregroundColor(KingdomTheme.Colors.buttonSuccess)
-                }
-            }
-            
-            if hasValidPermit {
-                Text("You have permission to hunt in \(kingdomName)!")
-                    .font(FontStyles.labelSmall)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("You're visiting \(kingdomName)")
-                        .font(FontStyles.labelSmall)
-                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                    
-                    Text("Hunting permit 10g for 10 minutes.")
-                        .font(FontStyles.labelTiny)
-                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                }
-            }
-        }
-        .padding(14)
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
     }
 }
 

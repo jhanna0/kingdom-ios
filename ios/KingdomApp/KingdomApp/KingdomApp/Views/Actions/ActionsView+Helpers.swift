@@ -31,25 +31,6 @@ extension ActionsView {
         // Timer will be deallocated when view disappears
     }
     
-    // MARK: - Kingdom Status
-    
-    func updateKingdomStatus() {
-        guard let kingdom = currentKingdom else {
-            isInHomeKingdom = false
-            isInEnemyKingdom = false
-            cachedKingdomId = nil
-            return
-        }
-        
-        // Only recalculate if kingdom changed
-        if cachedKingdomId != kingdom.id {
-            cachedKingdomId = kingdom.id
-            isInHomeKingdom = viewModel.isHomeKingdom(kingdom)
-            isInEnemyKingdom = !isInHomeKingdom
-            print("♻️ Updated kingdom status cache for \(kingdom.name)")
-        }
-    }
-    
     // MARK: - Slot Cooldown Helpers
     
     /// Get cooldown info for a specific action's slot

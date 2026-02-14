@@ -219,10 +219,10 @@ INSERT INTO achievement_definitions
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order)
 VALUES
     ('catch_legendary_carp', 1, 3, '{"gold": 150}', 'Legend Finder I', 'Catch 3 legendary carp', 'sparkles', 'fishing', 240),
-    ('catch_legendary_carp', 2, 5, '{"gold": 300}', 'Legend Finder II', 'Catch 5 legendary carp', 'sparkles', 'fishing', 241),
-    ('catch_legendary_carp', 3, 10, '{"gold": 600}', 'Legend Finder III', 'Catch 10 legendary carp', 'sparkles', 'fishing', 242),
-    ('catch_legendary_carp', 4, 25, '{"gold": 1500}', 'Legend Finder IV', 'Catch 25 legendary carp', 'sparkles', 'fishing', 243),
-    ('catch_legendary_carp', 5, 50, '{"gold": 3000}', 'Legend Finder V', 'Catch 50 legendary carp', 'sparkles', 'fishing', 244)
+    ('catch_legendary_carp', 2, 5, '{"gold": 250}', 'Legend Finder II', 'Catch 5 legendary carp', 'sparkles', 'fishing', 241),
+    ('catch_legendary_carp', 3, 10, '{"gold": 400}', 'Legend Finder III', 'Catch 10 legendary carp', 'sparkles', 'fishing', 242),
+    ('catch_legendary_carp', 4, 25, '{"gold": 600}', 'Legend Finder IV', 'Catch 25 legendary carp', 'sparkles', 'fishing', 243),
+    ('catch_legendary_carp', 5, 50, '{"gold": 1000}', 'Legend Finder V', 'Catch 50 legendary carp', 'sparkles', 'fishing', 244)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,

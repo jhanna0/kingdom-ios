@@ -19,7 +19,6 @@ struct SubscriberSettingsView: View {
                     iconStyleSection
                     cardStyleSection
                     titleSection
-                    saveButton
                 }
                 Spacer(minLength: 40)
             }
@@ -124,43 +123,37 @@ struct SubscriberSettingsView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(viewModel.availableTitles, id: \.achievementId) { title in
+                        let isSelected = viewModel.selectedTitle?.achievementId == title.achievementId
                         Button {
                             viewModel.selectedTitle = title
                         } label: {
                             HStack {
-                                Image(systemName: title.icon).font(.system(size: 20)).foregroundColor(KingdomTheme.Colors.imperialGold).frame(width: 32)
-                                Text(title.displayName).font(FontStyles.bodyMedium).foregroundColor(KingdomTheme.Colors.inkDark)
+                                Image(systemName: title.icon)
+                                    .font(.system(size: 20))
+                                    .foregroundColor(KingdomTheme.Colors.imperialGold)
+                                    .frame(width: 32)
+                                Text(title.displayName)
+                                    .font(isSelected ? FontStyles.bodyMediumBold : FontStyles.bodyMedium)
+                                    .foregroundColor(KingdomTheme.Colors.inkDark)
                                 Spacer()
-                                if viewModel.selectedTitle?.achievementId == title.achievementId {
-                                    Image(systemName: "checkmark").foregroundColor(KingdomTheme.Colors.buttonSuccess)
+                                if isSelected {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(KingdomTheme.Colors.buttonSuccess)
                                 }
                             }
                             .padding(.horizontal, 16).padding(.vertical, 12)
                         }
                         .buttonStyle(.plain)
-                        if title.achievementId != viewModel.availableTitles.last?.achievementId { Divider() }
+                        if title.achievementId != viewModel.availableTitles.last?.achievementId {
+                            Divider().padding(.horizontal, 16)
+                        }
                     }
                 }
-                .background(KingdomTheme.Colors.parchmentLight)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
             }
         }
     }
     
-    private var saveButton: some View {
-        Button {
-            viewModel.saveSettings()
-        } label: {
-            HStack {
-                if viewModel.isSaving { ProgressView().tint(.white) }
-                else { Image(systemName: "checkmark"); Text("Save Changes") }
-            }
-            .font(FontStyles.bodyMediumBold).foregroundColor(.white)
-            .frame(maxWidth: .infinity).padding(.vertical, 14)
-        }
-        .brutalistBadge(backgroundColor: viewModel.hasChanges ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.disabled, cornerRadius: 10)
-        .disabled(!viewModel.hasChanges || viewModel.isSaving)
-    }
 }
 
 // MARK: - Style Grid (shows preset style swatches with brutalist styling)
@@ -261,6 +254,18 @@ class SubscriberSettingsViewModel: ObservableObject {
     private var originalIconStyleId: String?
     private var originalCardStyleId: String?
     private var originalTitleId: Int?
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        Publishers.CombineLatest3($selectedIconStyle, $selectedCardStyle, $selectedTitle)
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { [weak self] _, _, _ in
+                guard let self, self.hasChanges, !self.isSaving else { return }
+                self.saveSettings()
+            }
+            .store(in: &cancellables)
+    }
     
     var isSubscriber: Bool { settings?.isSubscriber ?? false }
     var availableStyles: [APIStylePreset] { settings?.availableStyles ?? [] }

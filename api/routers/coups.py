@@ -54,7 +54,7 @@ router = APIRouter(prefix="/coups", tags=["Coups"])
 
 # ===== Constants =====
 # Eligibility
-COUP_REPUTATION_REQUIREMENT = 500  # Kingdom reputation needed
+COUP_REPUTATION_REQUIREMENT = 1000  # Kingdom reputation needed
 COUP_LEADERSHIP_REQUIREMENT = 3    # T3 leadership needed
 
 # Timing
@@ -127,13 +127,13 @@ def _check_kingdom_cooldown(db: Session, kingdom_id: str) -> Tuple[bool, str]:
 
 
 def _get_kingdom_reputation(db: Session, user_id: int, kingdom_id: str) -> int:
-    """Get player's reputation in a specific kingdom from user_kingdoms table"""
+    """Get player's reputation in a specific kingdom from user_kingdoms table (as int)"""
     from db.models import UserKingdom
     user_kingdom = db.query(UserKingdom).filter(
         UserKingdom.user_id == user_id,
         UserKingdom.kingdom_id == kingdom_id
     ).first()
-    return user_kingdom.local_reputation if user_kingdom else 0
+    return int(user_kingdom.local_reputation) if user_kingdom else 0
 
 
 def _get_initiator_stats(db: Session, initiator_id: int, kingdom_id: str) -> InitiatorStats:
@@ -285,13 +285,15 @@ def _apply_coup_outcome(
         state.gold -= gold_taken
         gold_pool += gold_taken
         
-        # Lose reputation
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        if user_kingdom:
-            user_kingdom.local_reputation = max(0, user_kingdom.local_reputation - LOSER_REP_LOSS)
+        # Lose reputation (philosophy reduces loss)
+        from routers.actions.utils import deduct_reputation
+        deduct_reputation(
+            db=db,
+            user_id=user.id,
+            kingdom_id=kingdom.id,
+            base_amount=LOSER_REP_LOSS,
+            philosophy_level=state.philosophy or 0
+        )
         
         # NO skill loss for coups - only gold and rep
     
@@ -308,20 +310,15 @@ def _apply_coup_outcome(
         # Get share of loser gold
         state.gold += gold_per_winner
         
-        # Gain reputation
-        user_kingdom = db.query(UserKingdom).filter(
-            UserKingdom.user_id == user.id,
-            UserKingdom.kingdom_id == kingdom.id
-        ).first()
-        if not user_kingdom:
-            user_kingdom = UserKingdom(
-                user_id=user.id,
-                kingdom_id=kingdom.id,
-                local_reputation=WINNER_REP_GAIN
-            )
-            db.add(user_kingdom)
-        else:
-            user_kingdom.local_reputation += WINNER_REP_GAIN
+        # Gain reputation (philosophy bonus)
+        from routers.actions.utils import award_reputation
+        award_reputation(
+            db=db,
+            user_id=user.id,
+            kingdom_id=kingdom.id,
+            base_amount=WINNER_REP_GAIN,
+            philosophy_level=state.philosophy or 0
+        )
     
     # Handle ruler change if attackers won
     old_ruler_id = kingdom.ruler_id
@@ -811,7 +808,8 @@ def initiate_coup(
     
     Requirements:
     - T3 leadership
-    - 500+ reputation in target kingdom
+    - 1000+ reputation in target kingdom
+    - Must be your hometown kingdom
     - Checked in to kingdom
     - Not the current ruler
     - 30 day cooldown between attempts (per player)
@@ -838,6 +836,13 @@ def initiate_coup(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You must be checked in to this kingdom to initiate a coup"
+        )
+    
+    # Must be in hometown kingdom
+    if state.hometown_kingdom_id != kingdom.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only stage a coup in your hometown kingdom"
         )
     
     # Check leadership requirement (T3+)

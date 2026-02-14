@@ -84,11 +84,22 @@ struct ForagingView: View {
             }
             lastRevealedCount = newValue
         }
-        .onChange(of: viewModel.revealedTargetCount) { _, newValue in
-            if newValue > lastFoundCount {
+        .onChange(of: viewModel.revealedTargetCount) { oldCount, newCount in
+            if newCount > lastFoundCount {
                 hapticImpact(.medium)
             }
-            lastFoundCount = newValue
+            lastFoundCount = newCount
+            
+            // Show streak popup when we hit the winning match count (3rd target revealed)
+            // Only if backend says we have a streak bonus to show
+            if newCount >= viewModel.matchesToWin && oldCount < viewModel.matchesToWin {
+                if viewModel.shouldShowStreakPopup && !showStreakPopup {
+                    // Small delay so player sees the winning tile first
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showStreakPopup = true
+                    }
+                }
+            }
         }
         .onChange(of: viewModel.foundSeedTrail) { _, found in
             if found {
@@ -103,12 +114,6 @@ struct ForagingView: View {
         }
         .onChange(of: isResetting) { _, _ in
             recomputePulsingPositions()
-        }
-        .onChange(of: viewModel.shouldShowStreakPopup) { _, shouldShow in
-            // Backend tells us exactly when to show the popup
-            if shouldShow && !showStreakPopup {
-                showStreakPopup = true
-            }
         }
     }
     
@@ -374,7 +379,7 @@ struct ForagingView: View {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             viewModel.reveal(position: position)
                         }
-                        try? await Task.sleep(nanoseconds: 260_000_000)
+                        try? await Task.sleep(nanoseconds: 80_000_000)
                         isRevealing = false
                     }
                 }

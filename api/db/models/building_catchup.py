@@ -40,10 +40,10 @@ class BuildingCatchup(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)  # Set when actions_completed >= actions_required
     
-    # Ensure one catchup record per user per kingdom per building
+    # Allow multiple catchup records per user per building (one per level-up)
     __table_args__ = (
-        UniqueConstraint('user_id', 'kingdom_id', 'building_type', name='unique_user_kingdom_building_catchup'),
         Index('idx_catchup_user_kingdom', 'user_id', 'kingdom_id'),
+        Index('idx_catchup_user_kingdom_building', 'user_id', 'kingdom_id', 'building_type'),
         Index('idx_catchup_incomplete', 'user_id', 'completed_at'),
     )
     

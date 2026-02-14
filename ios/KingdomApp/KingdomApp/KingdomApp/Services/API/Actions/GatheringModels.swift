@@ -16,6 +16,7 @@ struct GatherResponse: Codable {
     let haptic: String?           // "medium", "heavy", or null
     let exhausted: Bool?          // True if daily limit reached
     let exhaustedMessage: String? // Message to show when exhausted
+    let resetSeconds: Int?        // Seconds until daily limit resets (when exhausted)
     
     enum CodingKeys: String, CodingKey {
         case success
@@ -26,6 +27,7 @@ struct GatherResponse: Codable {
         case newTotal = "new_total"
         case exhausted
         case exhaustedMessage = "exhausted_message"
+        case resetSeconds = "reset_seconds"
     }
     
     /// Get SwiftUI Color from theme color name

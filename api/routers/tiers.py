@@ -24,9 +24,10 @@ BUILDING_BASE_CONSTRUCTION_COST = 1000
 FOOD_COST_PER_COOLDOWN_MINUTE = 0.25  # 0.4 food per minute of cooldown (minutes / 2.5)
 BUILDING_LEVEL_COST_EXPONENT = 1.7
 BUILDING_POPULATION_COST_DIVISOR = 50
-BUILDING_BASE_ACTIONS_REQUIRED = 100
-BUILDING_LEVEL_ACTIONS_EXPONENT = 1.7
-BUILDING_POPULATION_ACTIONS_DIVISOR = 30
+
+# NOTE: Building action scaling constants moved to kingdom_service.py
+# Formula: max(100, active_citizens × 13) × level_multiplier
+# See kingdom_service.py for: BUILDING_ACTIONS_PER_CITIZEN, BUILDING_ACTIONS_MINIMUM, BUILDING_LEVEL_MULTIPLIERS
 
 
 def calculate_food_cost(cooldown_minutes: float) -> int:
@@ -632,13 +633,13 @@ SKILLS = {
         "stat_attribute": "attack_power",  # PlayerState model attribute
         "icon": "bolt.fill",
         "category": "combat",
-        "description": "Increases coup success chance and damage dealt",
+        "description": "Increases hit chance and damage dealt",
         "benefits": {
-            1: ["+1 Attack Power in coups", "Increases coup success chance"],
-            2: ["+2 Attack Power in coups", "Increases coup success chance"],
-            3: ["+3 Attack Power in coups", "Increases coup success chance"],
-            4: ["+4 Attack Power in coups", "Increases coup success chance"],
-            5: ["+5 Attack Power in coups", "Increases coup success chance"]
+            1: ["+1 Attack Power and Hit Chance in combat"],
+            2: ["+2 Attack Power and Hit Chance in combat"],
+            3: ["+3 Attack Power and Hit Chance in combat"],
+            4: ["+4 Attack Power and Hit Chance in combat"],
+            5: ["+5 Attack Power and Hit Chance in combat"]
         }
     },
     "defense": {
@@ -646,13 +647,13 @@ SKILLS = {
         "stat_attribute": "defense_power",
         "icon": "shield.fill",
         "category": "combat",
-        "description": "Reduces coup damage taken",
+        "description": "Reduces damage taken in combat",
         "benefits": {
-            1: ["+1 Defense Power in coups", "Reduces coup damage taken"],
-            2: ["+2 Defense Power in coups", "Reduces coup damage taken"],
-            3: ["+3 Defense Power in coups", "Reduces coup damage taken"],
-            4: ["+4 Defense Power in coups", "Reduces coup damage taken"],
-            5: ["+5 Defense Power in coups", "Reduces coup damage taken"]
+            1: ["+1 Defense Power and slows enemy capture in combat"],
+            2: ["+2 Defense Power and slows enemy capture in combat"],
+            3: ["+3 Defense Power and slows enemy capture in combat"],
+            4: ["+4 Defense Power and slows enemy capture in combat"],
+            5: ["+5 Defense Power and slows enemy capture in combat"]
         }
     },
     "leadership": {
@@ -660,13 +661,13 @@ SKILLS = {
         "stat_attribute": "leadership",
         "icon": "crown.fill",
         "category": "political",
-        "description": "Increases voting power and ruler rewards",
+        "description": "Increases voting power and combat coordination",
         "benefits": {
-            1: ["Vote weight: 1.0", "Can vote on coups (with rep)"],
-            2: ["Vote weight: 1.2", "+50% rewards from ruler distributions"],
-            3: ["Vote weight: 1.4", "Can propose coups (300+ rep)"],
-            4: ["Vote weight: 1.6", "+100% rewards from ruler"],
-            5: ["Vote weight: 1.8", "-50% coup cost (500g instead of 1000g)"]
+            1: ["Vote weight: 1.0", "Can vote on coups (with 500 rep)"],
+            2: ["Vote weight: 1.2", "Stronger push in combat"],
+            3: ["Vote weight: 1.4", "Can start coups (with 1000 rep in kingdom)", "Stronger push in combat"],
+            4: ["Vote weight: 1.6", "Stronger push in combat"],
+            5: ["Vote weight: 1.8", "Stronger push in combat"]
         }
     },
     "building": {
@@ -724,7 +725,7 @@ SKILLS = {
         "stat_attribute": "faith",
         "icon": "hands.sparkles.fill",
         "category": "enhancement",
-        "description": "Provides random battle bonuses",
+        "description": "Provides combat buffs and increases odds",
         "benefits": {
             1: ["5% chance: random ally in battle gets +1 attack OR enemy gets -1 attack"],
             2: ["10% chance: random ally gets +2 attack OR enemy gets -2 defense"],
@@ -733,7 +734,7 @@ SKILLS = {
             5: ["25% chance: Revive 3 allies or smite 3 enemies during a battle"]
         }
     },
-    "philosophy": {
+    "philosophy": { # could be cool to have perk that exchanges rep for gold?
         "display_name": "Philosophy",
         "stat_attribute": "philosophy",
         "icon": "book.fill",
@@ -742,9 +743,9 @@ SKILLS = {
         "benefits": {
             1: ["+10% reputation from all actions", "-10% reputation loss from failed coups"],
             2: ["+20% reputation from all actions", "-20% reputation loss from failed coups"],
-            3: ["+30% reputation from all actions", "Check-ins award 2x reputation", "-30% rep loss from fails"],
+            3: ["+30% reputation from all actions", "-30% rep loss from fails"],
             4: ["+40% reputation from all actions", "-40% reputation loss from failed actions"],
-            5: ["+50% reputation from all actions", "-50% reputation loss", "Unlock: Start coup votes in kingdoms where you have 100+ rep (instead of 150)"]
+            5: ["+50% reputation from all actions", "-50% reputation loss"]
         }
     },
     "merchant": {

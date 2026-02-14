@@ -419,12 +419,12 @@ def get_players_in_kingdom(
         activity = _get_player_activity(db, state)
         is_ruler = kingdom.ruler_id == user.id
         
-        # Get per-kingdom reputation from user_kingdoms table
+        # Get per-kingdom reputation from user_kingdoms table (convert float to int for frontend)
         user_kingdom = db.query(UserKingdom).filter(
             UserKingdom.user_id == user.id,
             UserKingdom.kingdom_id == kingdom_id
         ).first()
-        reputation = user_kingdom.local_reputation if user_kingdom else 0
+        reputation = int(user_kingdom.local_reputation) if user_kingdom else 0
         
         players.append(PlayerInKingdom(
             id=user.id,
@@ -554,14 +554,14 @@ def get_active_players(
             if kingdom:
                 is_ruler = kingdom.ruler_id == user.id
         
-        # Get per-kingdom reputation from user_kingdoms table (for current kingdom)
+        # Get per-kingdom reputation from user_kingdoms table (for current kingdom, convert float to int)
         reputation = 0
         if state.current_kingdom_id:
             user_kingdom = db.query(UserKingdom).filter(
                 UserKingdom.user_id == user.id,
                 UserKingdom.kingdom_id == state.current_kingdom_id
             ).first()
-            reputation = user_kingdom.local_reputation if user_kingdom else 0
+            reputation = int(user_kingdom.local_reputation) if user_kingdom else 0
         
         players.append(PlayerInKingdom(
             id=user.id,
@@ -621,14 +621,14 @@ def get_player_profile(
     activity = _get_player_activity(db, state)
     equipment = _get_player_equipment(db, user.id)
     
-    # Get per-kingdom reputation (for current kingdom)
+    # Get per-kingdom reputation (for current kingdom, convert float to int)
     reputation = 0
     if state.current_kingdom_id:
         user_kingdom = db.query(UserKingdom).filter(
             UserKingdom.user_id == user.id,
             UserKingdom.kingdom_id == state.current_kingdom_id
         ).first()
-        reputation = user_kingdom.local_reputation if user_kingdom else 0
+        reputation = int(user_kingdom.local_reputation) if user_kingdom else 0
     
     # Compute stats from other tables
     

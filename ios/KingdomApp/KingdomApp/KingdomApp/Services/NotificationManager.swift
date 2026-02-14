@@ -309,6 +309,72 @@ class NotificationManager {
         print("🗑️ Cancelled all kitchen baking notifications")
     }
     
+    // MARK: - Resource Reset Notifications (Lumbermill/Mine)
+    
+    /// Schedule a notification for when a resource building resets (daily limit)
+    /// - Parameters:
+    ///   - resourceType: The resource type ("wood", "stone", "iron")
+    ///   - secondsUntilReset: Seconds until the daily limit resets
+    func scheduleResourceResetNotification(resourceType: String, secondsUntilReset: Int) async {
+        // Don't schedule if too short (less than 5 minutes)
+        guard secondsUntilReset > 300 else {
+            print("⏭️ Skipping resource reset notification - too short (\(secondsUntilReset)s)")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule resource reset notification - permission not granted")
+            return
+        }
+        
+        // Use building-based identifier (wood = lumbermill, stone/iron = mine)
+        let buildingType = resourceType == "wood" ? "lumbermill" : "mine"
+        let identifier = "resource_reset_\(buildingType)"
+        
+        let content = UNMutableNotificationContent()
+        if resourceType == "wood" {
+            content.title = "Lumbermill Ready!"
+            content.body = "The lumbermill has replenished. You may chop wood again!"
+        } else {
+            content.title = "Mine Ready!"
+            content.body = "The mine has replenished. You may mine ore again!"
+        }
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "RESOURCE_RESET"
+        content.userInfo = ["resource_type": resourceType, "building_type": buildingType]
+        
+        // Cancel existing notification for this building (don't stack)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(secondsUntilReset), repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let hours = secondsUntilReset / 3600
+            let minutes = (secondsUntilReset % 3600) / 60
+            print("✅ Scheduled \(buildingType) reset notification in \(hours)h \(minutes)m")
+        } catch {
+            print("❌ Error scheduling resource reset notification: \(error)")
+        }
+    }
+    
+    /// Cancel resource reset notification for a specific building
+    func cancelResourceResetNotification(buildingType: String) {
+        let identifier = "resource_reset_\(buildingType)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        print("🗑️ Cancelled \(buildingType) reset notification")
+    }
+    
+    /// Cancel all resource reset notifications
+    func cancelAllResourceResetNotifications() {
+        let identifiers = ["resource_reset_lumbermill", "resource_reset_mine"]
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        print("🗑️ Cancelled all resource reset notifications")
+    }
+    
     // MARK: - Cancel Notifications
     
     /// Cancel all action cooldown notifications

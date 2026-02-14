@@ -77,6 +77,10 @@ class HuntParticipant:
     meat_earned: int = 0
     items_earned: List[str] = field(default_factory=list)
     
+    # Per-phase roll tracking - prevents players from rolling more than their stat allows
+    # Key is phase name (e.g., "track", "strike", "blessing"), value is rolls used
+    phase_rolls_used: Dict[str, int] = field(default_factory=dict)
+    
     def to_dict(self) -> dict:
         return {
             "player_id": self.player_id,
@@ -89,7 +93,30 @@ class HuntParticipant:
             "critical_rolls": self.critical_rolls,
             "meat_earned": self.meat_earned,
             "items_earned": self.items_earned,
+            "phase_rolls_used": self.phase_rolls_used.copy(),
         }
+    
+    def get_rolls_used_in_phase(self, phase: "HuntPhase") -> int:
+        """Get the number of rolls this player has used in the given phase."""
+        return self.phase_rolls_used.get(phase.value, 0)
+    
+    def get_max_rolls_for_phase(self, phase: "HuntPhase", config: dict) -> int:
+        """Get the maximum rolls this player can make in the given phase based on their stat."""
+        stat_name = config.get("stat", "intelligence")
+        stat_value = self.stats.get(stat_name, 0)
+        # Each player gets 1 + stat_level rolls
+        return 1 + stat_value
+    
+    def can_roll_in_phase(self, phase: "HuntPhase", config: dict) -> bool:
+        """Check if this player can still roll in the given phase."""
+        rolls_used = self.get_rolls_used_in_phase(phase)
+        max_rolls = self.get_max_rolls_for_phase(phase, config)
+        return rolls_used < max_rolls
+    
+    def record_roll_in_phase(self, phase: "HuntPhase") -> None:
+        """Record that this player made a roll in the given phase."""
+        phase_key = phase.value
+        self.phase_rolls_used[phase_key] = self.phase_rolls_used.get(phase_key, 0) + 1
 
 
 @dataclass
@@ -709,6 +736,16 @@ class HuntManager:
         stat_name = config.get("stat", "intelligence")
         stat_value = participant.stats.get(stat_name, 0)
         
+        # SECURITY: Validate player hasn't exceeded their individual roll limit for this phase
+        # Each player gets (1 + stat_level) rolls per phase
+        if not participant.can_roll_in_phase(state.phase, config):
+            player_max_rolls = participant.get_max_rolls_for_phase(state.phase, config)
+            rolls_used = participant.get_rolls_used_in_phase(state.phase)
+            return {
+                "success": False, 
+                "message": f"You have used all your rolls for this phase ({rolls_used}/{player_max_rolls})"
+            }
+        
         # NEW SYSTEM: Flat hit chance, not scaled by stat!
         # Stat level determines NUMBER of rolls, not success chance
         roll_value = self.rng.random()
@@ -755,6 +792,9 @@ class HuntManager:
         if is_critical:
             participant.critical_rolls += 1
         
+        # Record this roll against the player's per-phase limit
+        participant.record_roll_in_phase(state.phase)
+        
         # Record round
         state.round_results.append(round_result)
         state.rounds_completed += 1
@@ -763,6 +803,11 @@ class HuntManager:
         # Save to database
         self.save_hunt(db, session)
         
+        # Calculate player's remaining rolls for this phase
+        player_rolls_used = participant.get_rolls_used_in_phase(state.phase)
+        player_max_rolls = participant.get_max_rolls_for_phase(state.phase, config)
+        player_rolls_remaining = player_max_rolls - player_rolls_used
+        
         return {
             "success": True,
             "roll_result": round_result.to_dict(),
@@ -770,6 +815,10 @@ class HuntManager:
             "phase_update": phase_update,
             "hunt": session.to_dict(),
             "effective_hit_chance": int(effective_hit_chance * 100),  # Player's actual hit chance with bonuses
+            # Per-player roll tracking
+            "player_rolls_used": player_rolls_used,
+            "player_max_rolls": player_max_rolls,
+            "player_rolls_remaining": player_rolls_remaining,
         }
     
     def _get_roll_message(self, roll_result, config: dict) -> str:

@@ -39,6 +39,7 @@ struct SlotCooldown: Codable {
 
 /// Slot definition from backend - frontend renders these dynamically!
 /// NO hardcoding of slot names, icons, or colors allowed.
+/// Backend pre-filters slots by player location - frontend just renders what it receives.
 struct SlotInfo: Codable, Identifiable {
     let id: String
     let displayName: String
@@ -46,7 +47,6 @@ struct SlotInfo: Codable, Identifiable {
     let colorTheme: String
     let displayOrder: Int
     let description: String?
-    let location: String  // "home", "enemy", or "any"
     let contentType: String  // "actions", "training_contracts", "building_contracts" - tells frontend which renderer to use
     let actions: [String]  // Action keys that belong to this slot
     
@@ -57,7 +57,6 @@ struct SlotInfo: Codable, Identifiable {
         case colorTheme = "color_theme"
         case displayOrder = "display_order"
         case description
-        case location
         case contentType = "content_type"
         case actions
     }
@@ -245,22 +244,11 @@ struct AllActionStatus: Codable {
         case pendingAllianceRequests = "pending_alliance_requests"
     }
     
-    // Helper to get slots for a specific location
-    func slotsForLocation(_ location: String) -> [SlotInfo] {
+    // Get all slots sorted by display order
+    // Backend pre-filters by location - frontend just renders what it receives
+    var sortedSlots: [SlotInfo] {
         guard let allSlots = slots else { return [] }
-        return allSlots
-            .filter { $0.location == "any" || $0.location == location }
-            .sorted { $0.displayOrder < $1.displayOrder }
-    }
-    
-    // Get home kingdom slots (beneficial actions)
-    var homeSlots: [SlotInfo] {
-        slotsForLocation("home")
-    }
-    
-    // Get enemy kingdom slots (hostile actions)
-    var enemySlots: [SlotInfo] {
-        slotsForLocation("enemy")
+        return allSlots.sorted { $0.displayOrder < $1.displayOrder }
     }
 }
 

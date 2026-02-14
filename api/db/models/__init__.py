@@ -55,6 +55,9 @@ from .duel import DuelMatch, DuelInvitation, DuelAction, DuelStats, DuelStatus, 
 # Building Catchup system
 from .building_catchup import BuildingCatchup
 
+# Building Permits (temporary access for visitors)
+from .building_permit import BuildingPermit
+
 # Daily gathering limits (anti-autoclick)
 from .daily_gathering import DailyGathering
 
@@ -155,6 +158,8 @@ __all__ = [
     "DuelPairingHistory",
     # Building Catchup
     "BuildingCatchup",
+    # Building Permits
+    "BuildingPermit",
     # Daily gathering limits
     "DailyGathering",
     # Garden system

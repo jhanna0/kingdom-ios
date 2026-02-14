@@ -4,7 +4,10 @@ Building Catchup Service
 Handles the catch-up system for players who join after buildings were constructed.
 
 Players must complete catch-up work before using a building's benefits.
-Formula: actions_required = CATCHUP_ACTIONS_PER_LEVEL * building_level * building_skill_reduction
+Formula: actions_required = min(CATCHUP_ACTIONS_PER_LEVEL * building_level, MAX_CATCHUP_ACTIONS) * building_skill_reduction
+
+The MAX_CATCHUP_ACTIONS cap (30) ensures late joiners don't face excessive
+grind for high-level buildings (e.g., level 5 would be 75 actions without cap).
 
 Building skill reduces catch-up actions (same formula as property upgrades):
 - 5% reduction per building skill level
@@ -28,6 +31,10 @@ from db import User, Kingdom, BuildingCatchup, ContractContribution, UnifiedCont
 # Actions required per building level for catch-up
 CATCHUP_ACTIONS_PER_LEVEL = 15
 
+# Maximum catch-up actions required regardless of building level
+# Prevents late joiners from facing 75+ actions for high-level buildings
+MAX_CATCHUP_ACTIONS = 30
+
 # Buildings that DON'T require catch-up (always accessible)
 # All other buildings in BUILDING_TYPES require catch-up
 EXEMPT_BUILDINGS = {"townhall"}
@@ -43,16 +50,22 @@ def calculate_catchup_actions(building_level: int, building_skill: int = 0) -> i
     
     Building skill reduces the requirement (uses centralized reduction from tiers.py).
     
-    Formula: base_actions * building_skill_reduction
+    Formula: min(base_actions, MAX_CATCHUP_ACTIONS) * building_skill_reduction
     Where: base_actions = CATCHUP_ACTIONS_PER_LEVEL * building_level
+    
+    The MAX_CATCHUP_ACTIONS cap ensures late joiners don't face 75+ actions
+    for high-level buildings - keeps it manageable at 30 max (before skill reduction).
     """
     from routers.tiers import get_building_action_reduction
     
     base_actions = CATCHUP_ACTIONS_PER_LEVEL * building_level
     
+    # Cap at MAX_CATCHUP_ACTIONS to be fair to late joiners
+    capped_actions = min(base_actions, MAX_CATCHUP_ACTIONS)
+    
     # Use centralized building skill reduction
     building_reduction = get_building_action_reduction(building_skill)
-    reduced_actions = int(base_actions * building_reduction)
+    reduced_actions = int(capped_actions * building_reduction)
     
     return max(1, reduced_actions)
 
@@ -108,10 +121,15 @@ def get_catchup_status(
     """
     Check if a player needs catch-up for a specific building.
     
-    Progress is based on ACTUAL contributions to building contracts.
-    Player works on normal building contracts to make progress.
+    ALWAYS sums BOTH sources of progress:
+    - contract_contributions: actions done on normal building contracts
+    - building_catchups: actions done on dedicated catchup contracts
     
-    Returns dict with needs_catchup, can_use_building, actions_required/completed/remaining
+    total_progress = contract_contributions + sum(all catchup records actions_completed)
+    requirement = 15 * building_level * skill_reduction
+    
+    If total_progress >= requirement → can use building
+    If total_progress < requirement → needs catchup for the remainder
     """
     building_type = building_type.lower()
     
@@ -137,31 +155,37 @@ def get_catchup_status(
             "reason": "Building not yet constructed"
         }
     
-    # Get actual contributions from building contract work
+    # ALWAYS sum both sources of progress
     contributions = get_building_contributions(db, user_id, kingdom_id, building_type)
     
-    # Calculate required actions (15 * level, reduced by building skill)
+    catchup_actions = db.query(func.coalesce(func.sum(BuildingCatchup.actions_completed), 0)).filter(
+        BuildingCatchup.user_id == user_id,
+        BuildingCatchup.kingdom_id == kingdom_id,
+        BuildingCatchup.building_type == building_type
+    ).scalar() or 0
+    
+    total_progress = contributions + catchup_actions
     actions_required = calculate_catchup_actions(building_level, building_skill)
     
-    # If they've contributed enough, they can use the building
-    if contributions >= actions_required:
+    if total_progress >= actions_required:
         return {
             "needs_catchup": False,
             "can_use_building": True,
             "actions_required": actions_required,
-            "actions_completed": contributions,
+            "actions_completed": total_progress,
             "actions_remaining": 0,
             "reason": "Contributed enough to building"
         }
     
-    # Needs more contributions - work on building contracts!
+    # Needs catchup for the remainder
+    actions_remaining = actions_required - total_progress
     return {
         "needs_catchup": True,
         "can_use_building": False,
         "actions_required": actions_required,
-        "actions_completed": contributions,
-        "actions_remaining": actions_required - contributions,
-        "reason": f"Work on building contracts ({contributions}/{actions_required} contributions)"
+        "actions_completed": total_progress,
+        "actions_remaining": actions_remaining,
+        "reason": f"Needs catch-up ({total_progress}/{actions_required})"
     }
 
 
@@ -174,27 +198,45 @@ def get_or_create_catchup(
     building_skill: int = 0
 ) -> BuildingCatchup:
     """
-    Get or create a catch-up record for a player-building combination.
+    Get existing incomplete catchup or create a new one for the remainder.
     
-    Args:
-        building_skill: Player's building skill level (reduces actions required)
+    actions_required is set to (requirement - existing progress) so the
+    catchup contract only covers what the player still needs to do.
     """
+    building_type = building_type.lower()
+    
+    # Return existing incomplete catchup if there is one
     catchup = db.query(BuildingCatchup).filter(
         BuildingCatchup.user_id == user_id,
         BuildingCatchup.kingdom_id == kingdom_id,
-        BuildingCatchup.building_type == building_type.lower()
+        BuildingCatchup.building_type == building_type,
+        BuildingCatchup.completed_at.is_(None)
     ).first()
     
-    if not catchup:
-        catchup = BuildingCatchup(
-            user_id=user_id,
-            kingdom_id=kingdom_id,
-            building_type=building_type.lower(),
-            actions_required=calculate_catchup_actions(building_level, building_skill),
-            actions_completed=0
-        )
-        db.add(catchup)
-        db.flush()
+    if catchup:
+        return catchup
+    
+    # Calculate remainder: requirement minus all existing progress
+    contributions = get_building_contributions(db, user_id, kingdom_id, building_type)
+    catchup_actions = db.query(func.coalesce(func.sum(BuildingCatchup.actions_completed), 0)).filter(
+        BuildingCatchup.user_id == user_id,
+        BuildingCatchup.kingdom_id == kingdom_id,
+        BuildingCatchup.building_type == building_type
+    ).scalar() or 0
+    
+    total_progress = contributions + catchup_actions
+    full_requirement = calculate_catchup_actions(building_level, building_skill)
+    remainder = max(1, full_requirement - total_progress)
+    
+    catchup = BuildingCatchup(
+        user_id=user_id,
+        kingdom_id=kingdom_id,
+        building_type=building_type,
+        actions_required=remainder,
+        actions_completed=0
+    )
+    db.add(catchup)
+    db.flush()
     
     return catchup
 

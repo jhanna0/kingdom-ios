@@ -663,7 +663,7 @@ def get_property_status(
             UserKingdom.user_id == current_user.id,
             UserKingdom.kingdom_id == state.current_kingdom_id
         ).first()
-        current_kingdom_reputation = user_kingdom.local_reputation if user_kingdom else 0
+        current_kingdom_reputation = int(user_kingdom.local_reputation) if user_kingdom else 0  # Convert float to int
     
     # Purchase validation flags
     # NOTE: With pay-per-action system, no upfront gold required to start
@@ -760,12 +760,12 @@ def purchase_land(
             detail="Player state not found"
         )
     
-    # Check reputation requirement - get from user_kingdoms for this kingdom
+    # Check reputation requirement - get from user_kingdoms for this kingdom (convert float to int)
     user_kingdom = db.query(UserKingdom).filter(
         UserKingdom.user_id == current_user.id,
         UserKingdom.kingdom_id == request.kingdom_id
     ).first()
-    current_reputation = user_kingdom.local_reputation if user_kingdom else 0
+    current_reputation = int(user_kingdom.local_reputation) if user_kingdom else 0
     
     if current_reputation < 500:
         raise HTTPException(

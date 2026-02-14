@@ -423,7 +423,7 @@ def get_user_kingdoms(db: Session, user_id: int) -> dict:
             "kingdom_id": uk.kingdom_id,
             "kingdom_name": uk.kingdom.name if uk.kingdom else "Unknown",
             "times_conquered": uk.times_conquered,
-            "local_reputation": uk.local_reputation,
+            "local_reputation": int(uk.local_reputation),  # Convert float to int for frontend
             "checkins_count": uk.checkins_count,
             "last_checkin": uk.last_checkin,
             "first_visited": uk.first_visited,

@@ -267,7 +267,7 @@ SLOT_DEFINITIONS = {
         "color_theme": "inkMedium",
         "display_order": 2,
         "description": "Construct and upgrade infrastructure. You may only build ONE project at a time.",
-        "location": "home",  # Home kingdom only
+        "location": "any",  # Show everywhere - contracts are filtered by current_kingdom_id on backend
         "content_type": "building_contracts",  # Kingdom + property contracts
     },
     "economy": {

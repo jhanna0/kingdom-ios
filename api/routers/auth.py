@@ -267,14 +267,14 @@ def get_my_stats(
     ).scalar() or 0
     
     # Get reputation from hometown kingdom (or 0 if not available)
-    # NOTE: Reputation is now per-kingdom in user_kingdoms table
+    # NOTE: Reputation is now per-kingdom in user_kingdoms table (convert float to int)
     hometown_reputation = 0
     if state and state.hometown_kingdom_id:
         user_kingdom = db.query(UserKingdom).filter(
             UserKingdom.user_id == current_user.id,
             UserKingdom.kingdom_id == state.hometown_kingdom_id
         ).first()
-        hometown_reputation = user_kingdom.local_reputation if user_kingdom else 0
+        hometown_reputation = int(user_kingdom.local_reputation) if user_kingdom else 0
     
     return UserStats(
         user_id=current_user.id,

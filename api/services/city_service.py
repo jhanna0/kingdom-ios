@@ -253,11 +253,12 @@ def get_buildings_for_kingdom(
             }
             
             # Check daily gathering limits for gathering-type buildings
-            if click_action_meta.get("type") == "gathering" and current_user and is_hometown:
+            # Limit is GLOBAL per user based on HOMETOWN building level
+            if click_action_meta.get("type") == "gathering" and current_user:
                 resource = click_action_meta.get("resource")
                 if resource:
                     from routers.actions.gathering import get_daily_limit, get_gathered_today, DAILY_LIMIT_PER_LEVEL
-                    daily_limit = level * DAILY_LIMIT_PER_LEVEL
+                    daily_limit = get_daily_limit(db, current_user, resource)
                     gathered_today = get_gathered_today(db, current_user.id, resource)
                     if gathered_today >= daily_limit:
                         click_action["exhausted"] = True
@@ -270,9 +271,16 @@ def get_buildings_for_kingdom(
                         minutes, _ = divmod(remainder, 60)
                         time_str = f"{hours}h {minutes}m"
                         
-                        resource_verb = "chopped" if resource == "wood" else "mined"
-                        resource_name = "wood" if resource == "wood" else "iron"
-                        click_action["exhausted_message"] = f"You've {resource_verb} all available {resource_name} for today. Resets in {time_str}."
+                        # Stone/iron share a combined mine limit
+                        if resource == "wood":
+                            click_action["exhausted_message"] = f"You've chopped all available wood for today. Resets in {time_str}."
+                        else:
+                            click_action["exhausted_message"] = f"The mine is exhausted for today. Resets in {time_str}."
+                    
+                    # Add limit info for UI
+                    click_action["daily_limit"] = daily_limit
+                    click_action["gathered_today"] = gathered_today
+                    click_action["remaining_today"] = max(0, daily_limit - gathered_today)
         
         # Get catch-up info ONLY for hometown (you can only contribute to your hometown's buildings)
         catchup_info = None
@@ -289,6 +297,32 @@ def get_buildings_for_kingdom(
                 "actions_remaining": catchup_status["actions_remaining"]
             }
         
+        # Get permit info for buildings that require permits (non-hometown)
+        # Only send permit info if the foreign kingdom has built this building (level > 0)
+        permit_info = None
+        if current_user and level > 0:
+            from services.building_permit_service import check_building_access, PERMIT_REQUIRED_BUILDINGS
+            if building_type in PERMIT_REQUIRED_BUILDINGS:
+                player_state = current_user.player_state
+                if player_state:
+                    access = check_building_access(db, current_user, player_state, kingdom, building_type)
+                    permit_info = {
+                        "can_access": access["can_access"],
+                        "reason": access["reason"],
+                        "is_hometown": access["is_hometown"],
+                        "is_allied": access["is_allied"],
+                        "needs_permit": access["needs_permit"],
+                        "has_valid_permit": access["has_valid_permit"],
+                        "permit_expires_at": access["permit_expires_at"].isoformat() + "Z" if access["permit_expires_at"] else None,
+                        "permit_minutes_remaining": access["permit_minutes_remaining"],
+                        "hometown_has_building": access["hometown_has_building"],
+                        "hometown_building_level": access["hometown_building_level"],
+                        "has_active_catchup": access["has_active_catchup"],
+                        "can_buy_permit": access["can_buy_permit"],
+                        "permit_cost": access["permit_cost"],
+                        "permit_duration_minutes": access["permit_duration_minutes"],
+                    }
+        
         buildings.append({
             "type": building_type,
             "display_name": building_meta["display_name"],
@@ -302,6 +336,7 @@ def get_buildings_for_kingdom(
             "upgrade_cost": upgrade_cost,
             "click_action": click_action,
             "catchup": catchup_info,
+            "permit": permit_info,
             "tier_name": tier_name,
             "tier_benefit": tier_benefit,
             "all_tiers": all_tiers
@@ -486,7 +521,7 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
                     UserKingdom.user_id == current_user.id,
                     UserKingdom.kingdom_id == kingdom.id
                 ).first()
-                kingdom_rep = user_kingdom_record.local_reputation if user_kingdom_record else 0
+                kingdom_rep = int(user_kingdom_record.local_reputation) if user_kingdom_record else 0  # Convert float to int
                 
                 if player_state_for_coup.leadership < COUP_LEADERSHIP_REQUIREMENT:
                     coup_ineligibility_reason = f"Need T{COUP_LEADERSHIP_REQUIREMENT} leadership (you have T{player_state_for_coup.leadership})"

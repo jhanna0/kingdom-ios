@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from db import get_db, User
 from routers.auth import get_current_user
 from config import DEV_MODE
-from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, get_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status
+from .utils import check_and_set_slot_cooldown_atomic, format_datetime_iso, calculate_cooldown, get_cooldown, set_cooldown, check_and_deduct_food_cost, set_activity_status, award_reputation
 from .constants import WORK_BASE_COOLDOWN, PATROL_DURATION_MINUTES, PATROL_REPUTATION_REWARD, PATROL_COOLDOWN
 
 
@@ -85,28 +85,14 @@ def start_patrol(
         # DEV_MODE: no locking, just set cooldown
         set_cooldown(db, current_user.id, "patrol", patrol_end)
     
-    # Award reputation to user_kingdoms table
-    from db.models.kingdom import UserKingdom
-    user_kingdom = db.query(UserKingdom).filter(
-        UserKingdom.user_id == current_user.id,
-        UserKingdom.kingdom_id == state.current_kingdom_id
-    ).first()
-    
-    if user_kingdom:
-        user_kingdom.local_reputation += PATROL_REPUTATION_REWARD
-    else:
-        # Create new user_kingdom record
-        user_kingdom = UserKingdom(
-            user_id=current_user.id,
-            kingdom_id=state.current_kingdom_id,
-            local_reputation=PATROL_REPUTATION_REWARD,
-            times_conquered=0,
-            total_reign_duration_hours=0.0,
-            checkins_count=0,
-            gold_earned=0,
-            gold_spent=0
-        )
-        db.add(user_kingdom)
+    # Award reputation with philosophy bonus
+    rep_awarded, new_rep_total = award_reputation(
+        db=db,
+        user_id=current_user.id,
+        kingdom_id=state.current_kingdom_id,
+        base_amount=PATROL_REPUTATION_REWARD,
+        philosophy_level=state.philosophy or 0
+    )
     
     # NOTE: We intentionally don't log patrol to activity_log because:
     # 1. It happens every 10 minutes (would spam the feed)
@@ -126,7 +112,7 @@ def start_patrol(
         "food_remaining": food_result["food_remaining"],
         "rewards": {
             "gold": None,
-            "reputation": PATROL_REPUTATION_REWARD,
+            "reputation": int(rep_awarded),  # Convert to int for frontend
             "experience": None,
             "iron": None
         }

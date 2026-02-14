@@ -18,6 +18,7 @@ Security:
 
 import os
 import time
+import httpx
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -78,7 +79,7 @@ PRODUCTS = {
         "icon": "heart.fill",
         "color": "imperialGold",
         "subtitle": "Monthly subscription",
-        "description": "Kingdoms is a homemade side project done in my free time. It costs about $150 to host 100 players per month. By supporting you unlock profile theming and other benefits. Thank you!",
+        "description": "Kingdoms is a homemade project done built in free time. It costs about $150 to host 100 players per month. By supporting you unlock profile theming, displaying your pets & achievments pubicly, and other benefits. Thank you!",
         "benefits": [
             "Support independent development",
             "Help keep the game ad-free",
@@ -190,13 +191,17 @@ async def verify_transaction_with_apple(transaction_id: str, use_sandbox: bool =
     
     Returns transaction info if valid, raises exception if invalid.
     """
+    env = "Sandbox" if use_sandbox else "Production"
     base_url = APPLE_SANDBOX_URL if use_sandbox else APPLE_PRODUCTION_URL
     url = f"{base_url}/inApps/v1/transactions/{transaction_id}"
     
+    print(f"🍎 Verifying transaction {transaction_id} with Apple ({env})")
+    
     try:
         token = generate_apple_jwt()
+        print(f"🍎 JWT generated successfully")
     except ValueError as e:
-        print(f"⚠️ Apple credentials not configured: {e}")
+        print(f"❌ Apple credentials not configured: {e}")
         # In dev mode, allow unverified purchases
         if config.DEV_MODE:
             return {"dev_mode": True, "verified": False}
@@ -208,16 +213,21 @@ async def verify_transaction_with_apple(transaction_id: str, use_sandbox: bool =
             headers={"Authorization": f"Bearer {token}"}
         )
     
+    print(f"🍎 Apple response: {response.status_code}")
+    
     if response.status_code == 404:
-        # Transaction not found - try sandbox if we tried production
+        # Transaction not found - try sandbox if we tried production (TestFlight users)
         if not use_sandbox:
+            print(f"🍎 Transaction not found in Production, trying Sandbox")
             return await verify_transaction_with_apple(transaction_id, use_sandbox=True)
+        print(f"❌ Transaction {transaction_id} not found in Production or Sandbox")
         raise HTTPException(status_code=400, detail="Transaction not found")
     
     if response.status_code != 200:
         print(f"❌ Apple API error: {response.status_code} - {response.text}")
         raise HTTPException(status_code=400, detail="Failed to verify transaction with Apple")
     
+    print(f"✅ Transaction {transaction_id} verified with Apple ({env})")
     data = response.json()
     
     # The response contains a JWS-signed transaction
@@ -357,7 +367,22 @@ async def redeem_purchase(
         if not config.DEV_MODE:
             raise HTTPException(status_code=400, detail="Failed to verify purchase")
     
-    # 5. Set purchase date
+    # 5. Sandbox purchases grant nothing (TestFlight testing only)
+    if environment == "Sandbox":
+        print(f"🧪 Sandbox purchase - no resources granted (user {current_user.id}, {request.product_id})")
+        return RedeemResponse(
+            success=True,
+            message="Sandbox purchase verified (no resources in test mode)",
+            display_message="Test purchase successful! No resources in test mode.",
+            gold_granted=0,
+            meat_granted=0,
+            books_granted=0,
+            new_gold_total=int(state.gold or 0),
+            new_meat_total=get_player_meat(db, current_user.id),
+            new_book_total=get_player_books(db, current_user.id)
+        )
+    
+    # 6. Set purchase date
     purchase_date = datetime.now(timezone.utc)
     
     # 6. Grant resources
@@ -864,13 +889,24 @@ async def redeem_subscription(
     if product.get("type") != "subscription":
         raise HTTPException(status_code=400, detail="Product is not a subscription")
     
-    # 2. Parse expiration date
+    # 2. Verify with Apple
+    try:
+        verification = await verify_transaction_with_apple(request.transaction_id)
+        print(f"✅ Subscription transaction verified ({verification.get('environment', 'Unknown')})")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Apple verification failed for subscription: {e}")
+        if not config.DEV_MODE:
+            raise HTTPException(status_code=400, detail="Failed to verify subscription")
+    
+    # 3. Parse expiration date
     try:
         expires_at = datetime.fromisoformat(request.expires_at.replace("Z", "+00:00"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid expires_at format")
     
-    # 3. Check for existing subscription by original_transaction_id (renewal case)
+    # 4. Check for existing subscription by original_transaction_id (renewal case)
     existing = db.query(Subscription).filter(
         Subscription.original_transaction_id == request.original_transaction_id
     ).first()

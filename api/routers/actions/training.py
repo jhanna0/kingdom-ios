@@ -68,12 +68,15 @@ def get_training_costs(
     total_skill_points = get_total_skill_points(state)
     current_stats = get_all_skill_values(state)
     
-    # Get kingdom education level for training bonus
+    # Get kingdom education level for training bonus (only if player has catchup done)
     education_level = 0
     if state.current_kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
-        if kingdom:
-            education_level = kingdom.education_level
+        if kingdom and kingdom.education_level > 0:
+            from services.catchup_service import get_catchup_status
+            edu_status = get_catchup_status(db, current_user.id, kingdom.id, "education", kingdom.education_level, state.building_skill or 0)
+            if edu_status["can_use_building"]:
+                education_level = kingdom.education_level
     
     science_level = state.science or 1
     
@@ -214,13 +217,16 @@ def purchase_training(
     target_tier = info["target_tier"]
     gold_per_action = info["gold_per_action"]
     
-    # Get kingdom education level for training bonus
+    # Get kingdom education level for training bonus (only if player has catchup done)
     education_level = 0
     kingdom = None
     if state.current_kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
-        if kingdom:
-            education_level = kingdom.education_level
+        if kingdom and kingdom.education_level > 0:
+            from services.catchup_service import get_catchup_status
+            edu_status = get_catchup_status(db, current_user.id, kingdom.id, "education", kingdom.education_level, state.building_skill or 0)
+            if edu_status["can_use_building"]:
+                education_level = kingdom.education_level
     
     # Get total skill points (affects actions required)
     total_skill_points = get_total_skill_points(state)

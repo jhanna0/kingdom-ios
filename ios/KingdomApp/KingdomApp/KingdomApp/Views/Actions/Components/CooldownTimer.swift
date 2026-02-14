@@ -54,26 +54,15 @@ struct CooldownTimer: View {
                 if let onBookTap = onBookTap {
                     Button(action: onBookTap) {
                         Image(systemName: "book.fill")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.black)
-                                        .offset(x: 2, y: 2)
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(KingdomTheme.Colors.buttonPrimary)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(Color.black, lineWidth: 2)
-                                        )
-                                }
-                            )
+                            .frame(width: 24, height: 24)
+                            .brutalistBadge(backgroundColor: .brown, cornerRadius: 6, shadowOffset: 2, borderWidth: 1.5)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
             }
+            .frame(height: 38)
             
             // Progress bar - brutalist style
             GeometryReader { geometry in
