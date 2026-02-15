@@ -185,7 +185,7 @@ def get_kingdom(
     current_user: User = Depends(get_current_user_optional)
 ):
     """Get kingdom details with building upgrade costs and catchup info"""
-    from services.kingdom_service import get_active_citizens_count
+    from services.kingdom_service import get_active_citizens_count, check_ruler_abandonment
     from services.city_service import get_buildings_for_kingdom
     from db.models import PlayerState
     
@@ -196,6 +196,9 @@ def get_kingdom(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kingdom not found"
         )
+    
+    # Check for ruler abandonment (rulers who haven't logged in for 60+ days)
+    check_ruler_abandonment(db, kingdom)
     
     # Get ruler name from User if kingdom has a ruler
     ruler_name = None

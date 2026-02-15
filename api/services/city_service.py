@@ -390,6 +390,10 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     kingdoms = db.query(Kingdom).filter(Kingdom.id.in_(osm_ids)).all()
     existing_ids = {k.id for k in kingdoms}
     
+    # Check for ruler abandonment (rulers who haven't logged in for 60+ days)
+    from services.kingdom_service import check_ruler_abandonment_batch
+    check_ruler_abandonment_batch(db, kingdoms)
+    
     # Get user's current location and hometown (which kingdom they're in)
     user_current_kingdom_id = None
     user_hometown_kingdom_id = None

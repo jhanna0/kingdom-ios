@@ -106,6 +106,8 @@ No. One claim, ever. Want more territory? **Conquer it.**
 No. Invasions need a defender. Unruled towns can only be claimed by locals.
 
 Once you become ruler, check out your **Empire Management** menu to choose a **Kingdom Building** project, set **Tax Rate**, or to **Make a Decree**!
+
+**As a Ruler, if you do not tend to your kingdom within 60 days, you will be automatically overthrown!**
 """
     ),
     TutorialSection(

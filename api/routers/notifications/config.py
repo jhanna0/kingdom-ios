@@ -132,6 +132,10 @@ NOTIFICATION_TYPES = {
         "icon": "scroll.fill",
         "color": "inkMedium"
     },
+    "reign_abandoned": {
+        "icon": "figure.walk.departure",
+        "color": "buttonWarning"
+    },
     
     # Trade notifications (Merchant skill)
     "trade_offer_received": {

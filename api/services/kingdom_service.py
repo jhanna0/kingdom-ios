@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 import math
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
-from db import PlayerState, User
+from db import PlayerState, User, Kingdom
+from db.models.kingdom_history import KingdomHistory
+from db.models.kingdom_event import KingdomEvent
 from routers.tiers import (
     BUILDING_BASE_CONSTRUCTION_COST,
     BUILDING_LEVEL_COST_EXPONENT,
@@ -19,6 +21,9 @@ BUILDING_ACTIONS_PER_CITIZEN = 13  # Actions per active citizen
 BUILDING_ACTIONS_MINIMUM = 100  # Minimum actions for any building
 BUILDING_LEVEL_MULTIPLIERS = {1: 1.0, 2: 1.5, 3: 2.0, 4: 2.5, 5: 3.0}  # Per-level scaling
 ACTIVE_CITIZEN_DAYS = 7  # Days since last login to count as "active"
+
+# Ruler abandonment threshold
+RULER_ABANDONMENT_DAYS = 60  # Days without login before ruler abandons their reign
 
 
 def get_active_citizens_count(db: Session, kingdom_id: str) -> int:
@@ -80,3 +85,148 @@ def calculate_actions_required(building_type: str, building_level: int, active_c
     # Apply farm reduction (kingdom building reduces actions)
     farm_multiplier = get_farm_action_reduction(farm_level)
     return max(BUILDING_ACTIONS_MINIMUM, int(raw_actions * farm_multiplier))
+
+
+def check_ruler_abandonment(db: Session, kingdom: Kingdom) -> Optional[Tuple[int, str]]:
+    """
+    Check if a kingdom's ruler has abandoned their reign (no login in 60+ days).
+    
+    If abandoned:
+    - Sets kingdom.ruler_id to None
+    - Closes the KingdomHistory entry with event_type 'abandoned'
+    - Creates a KingdomEvent notification for citizens
+    - Commits the changes
+    
+    Returns:
+        Tuple of (old_ruler_id, old_ruler_name) if abandonment occurred, None otherwise
+    """
+    if not kingdom.ruler_id:
+        return None
+    
+    # Get the ruler
+    ruler = db.query(User).filter(User.id == kingdom.ruler_id).first()
+    if not ruler:
+        return None
+    
+    # Check if ruler has been inactive for 60+ days
+    if not ruler.last_login:
+        # No login recorded - treat as abandoned if kingdom is old enough
+        if kingdom.ruler_started_at:
+            days_since_start = (datetime.utcnow() - kingdom.ruler_started_at).days
+            if days_since_start < RULER_ABANDONMENT_DAYS:
+                return None
+        else:
+            return None
+    else:
+        days_since_login = (datetime.utcnow() - ruler.last_login).days
+        if days_since_login < RULER_ABANDONMENT_DAYS:
+            return None
+    
+    # Ruler has abandoned their reign
+    now = datetime.utcnow()
+    old_ruler_id = kingdom.ruler_id
+    old_ruler_name = ruler.display_name
+    
+    # Close the current KingdomHistory entry
+    # Query matches: kingdom_id + ruler_id + ended_at is NULL (current reign)
+    current_history = db.query(KingdomHistory).filter(
+        KingdomHistory.kingdom_id == kingdom.id,
+        KingdomHistory.ruler_id == old_ruler_id,
+        KingdomHistory.ended_at.is_(None)
+    ).first()
+    if current_history:
+        current_history.ended_at = now
+    
+    # Clear the ruler from the kingdom
+    kingdom.ruler_id = None
+    kingdom.ruler_started_at = None
+    kingdom.last_activity = now
+    
+    # Create a kingdom event with special title for abandonment notifications
+    # The notification system will detect "Ruler Abandoned" prefix for special styling
+    event = KingdomEvent(
+        kingdom_id=kingdom.id,
+        title="Ruler Abandoned Throne",
+        description=f"{old_ruler_name} has abandoned their reign after 60 days of absence. The throne is now vacant and can be claimed by a citizen."
+    )
+    db.add(event)
+    
+    db.commit()
+    
+    return (old_ruler_id, old_ruler_name)
+
+
+def check_ruler_abandonment_batch(db: Session, kingdoms: List[Kingdom]) -> Dict[str, Tuple[int, str]]:
+    """
+    Check multiple kingdoms for ruler abandonment in a batch-optimized way.
+    
+    Returns:
+        Dict mapping kingdom_id -> (old_ruler_id, old_ruler_name) for kingdoms where abandonment occurred
+    """
+    if not kingdoms:
+        return {}
+    
+    # Filter to kingdoms with rulers
+    kingdoms_with_rulers = [k for k in kingdoms if k.ruler_id]
+    if not kingdoms_with_rulers:
+        return {}
+    
+    # Batch fetch all rulers
+    ruler_ids = [k.ruler_id for k in kingdoms_with_rulers]
+    rulers = db.query(User).filter(User.id.in_(ruler_ids)).all()
+    rulers_by_id = {u.id: u for u in rulers}
+    
+    # Check each kingdom
+    now = datetime.utcnow()
+    cutoff = now - timedelta(days=RULER_ABANDONMENT_DAYS)
+    abandonments = {}
+    
+    for kingdom in kingdoms_with_rulers:
+        ruler = rulers_by_id.get(kingdom.ruler_id)
+        if not ruler:
+            continue
+        
+        # Check if ruler is inactive
+        is_abandoned = False
+        if not ruler.last_login:
+            # No login recorded - check if kingdom is old enough
+            if kingdom.ruler_started_at and kingdom.ruler_started_at < cutoff:
+                is_abandoned = True
+        elif ruler.last_login < cutoff:
+            is_abandoned = True
+        
+        if not is_abandoned:
+            continue
+        
+        # Process abandonment
+        old_ruler_id = kingdom.ruler_id
+        old_ruler_name = ruler.display_name
+        
+        # Close the current KingdomHistory entry
+        current_history = db.query(KingdomHistory).filter(
+            KingdomHistory.kingdom_id == kingdom.id,
+            KingdomHistory.ruler_id == old_ruler_id,
+            KingdomHistory.ended_at.is_(None)
+            ).first()
+        if current_history:
+            current_history.ended_at = now
+        
+        # Clear the ruler from the kingdom
+        kingdom.ruler_id = None
+        kingdom.ruler_started_at = None
+        kingdom.last_activity = now
+        
+        # Create a kingdom event
+        event = KingdomEvent(
+            kingdom_id=kingdom.id,
+            title="Ruler Abandoned Throne",
+            description=f"{old_ruler_name} has abandoned their reign after 60 days of absence. The throne is now vacant and can be claimed by a citizen."
+        )
+        db.add(event)
+        
+        abandonments[kingdom.id] = (old_ruler_id, old_ruler_name)
+    
+    if abandonments:
+        db.commit()
+    
+    return abandonments
