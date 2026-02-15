@@ -218,6 +218,7 @@ private struct SweetspotView: View {
     let position: CGPoint
     let size: CGFloat
     let isHit: Bool?
+    let visualType: String
     
     @State private var scale: CGFloat = 1.0
     
@@ -225,7 +226,8 @@ private struct SweetspotView: View {
         if let hit = isHit {
             return hit ? KingdomTheme.Colors.buttonSuccess : KingdomTheme.Colors.buttonDanger
         }
-        return KingdomTheme.Colors.buttonDanger
+        // Use gold on tree (brown) for better contrast, red on rock (gray)
+        return visualType == "tree" ? KingdomTheme.Colors.imperialGold : KingdomTheme.Colors.buttonDanger
     }
     
     var body: some View {
@@ -469,7 +471,8 @@ struct GatheringView: View {
                 SweetspotView(
                     position: sweetspotPosition,
                     size: sweetspotSize,
-                    isHit: sweetspotHit
+                    isHit: sweetspotHit,
+                    visualType: viewModel.visualType
                 )
                 
                 // Fading paths (completed strokes)

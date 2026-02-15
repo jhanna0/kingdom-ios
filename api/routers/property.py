@@ -351,7 +351,52 @@ def deduct_resource_costs(db: Session, user_id: int, resource_costs: list):
         deduct_inventory_amount(db, user_id, resource_id, amount)
 
 
-def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
+def _get_room_badges(db: "Session", user_id: int) -> dict:
+    """Get badge count for each room.
+    
+    Returns dict of room_id -> int (badge count)
+    """
+    from db.models.garden import GardenSlot
+    from db.models.kitchen import OvenSlot
+    from datetime import datetime, timezone
+    
+    badges = {}
+    
+    # Garden: count plants that can be watered
+    garden_slots = db.query(GardenSlot).filter(
+        GardenSlot.user_id == user_id,
+        GardenSlot.status == "growing"
+    ).all()
+    
+    now = datetime.now(timezone.utc)
+    garden_count = 0
+    for slot in garden_slots:
+        if slot.last_watered_at:
+            # Can water if 4+ hours since last watering
+            hours_since = (now - slot.last_watered_at.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+            if hours_since >= 4:
+                garden_count += 1
+    if garden_count > 0:
+        badges["garden"] = garden_count
+    
+    # Kitchen: count bread ready to collect
+    ready_bread_count = db.query(OvenSlot).filter(
+        OvenSlot.user_id == user_id,
+        OvenSlot.status == "ready"
+    ).count()
+    if ready_bread_count > 0:
+        badges["kitchen"] = ready_bread_count
+    
+    return badges
+
+
+def _get_property_badge_count(db: "Session", user_id: int) -> int:
+    """Get total badge count for property (sum of all room badges)."""
+    badges = _get_room_badges(db, user_id)
+    return sum(badges.values())
+
+
+def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None, user_id: int = None) -> list:
     """Get list of rooms available to use at this property.
     
     Reads from PROPERTY_TIERS config - no hardcoding!
@@ -362,8 +407,15 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
     Args:
         tier: Property tier level
         built_rooms: List of room IDs that have been built via completed contracts.
+        db: Database session (optional, for badge calculation)
+        user_id: User ID (optional, for badge calculation)
     """
     from routers.tiers import PROPERTY_TIERS
+    
+    # Get badge status for rooms if db/user provided
+    room_badges = {}
+    if db and user_id:
+        room_badges = _get_room_badges(db, user_id)
     
     rooms = []
     
@@ -375,7 +427,8 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
             "icon": "shield.checkered",
             "color": "royalBlue",
             "description": "Sacrifice equipment to protect your property",
-            "route": "/fortify"
+            "route": "/fortify",
+            "has_badge": room_badges.get("fortification", False)
         })
         rooms.append({
             "id": "garden",
@@ -383,7 +436,8 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
             "icon": "leaf.fill",
             "color": "buttonSuccess",
             "description": "Plant seeds and grow your garden",
-            "route": "/garden"
+            "route": "/garden",
+            "has_badge": room_badges.get("garden", False)
         })
     
     # Check all options from config for rooms to show
@@ -412,7 +466,8 @@ def get_available_rooms(tier: int, built_rooms: list[str]) -> list:
                     "icon": opt.get("icon", "questionmark"),
                     "color": opt.get("color", "inkMedium"),
                     "description": opt.get("description", ""),
-                    "route": opt.get("route")
+                    "route": opt.get("route"),
+                    "has_badge": room_badges.get(opt_id, False)
                 })
                 seen_ids.add(opt_id)
     
@@ -583,7 +638,7 @@ def get_property_status(
     for p in properties:
         prop_dict = property_to_response(p).model_dump()
         built_rooms = built_rooms_by_property.get(str(p.id), [])
-        prop_dict["available_rooms"] = get_available_rooms(p.tier, built_rooms)
+        prop_dict["available_rooms"] = get_available_rooms(p.tier, built_rooms, db, current_user.id)
         prop_dict["built_rooms"] = built_rooms  # List of room IDs that are built
         
         # Available options to build at next tier (only if not already built)

@@ -32,6 +32,7 @@ struct NotificationSummary: Codable {
     let pendingAllianceRequests: Int
     let pendingTradeRequests: Int
     let pendingDuelRequests: Int
+    let propertyBadgeCount: Int?
     
     enum CodingKeys: String, CodingKey {
         case hasUnread = "has_unread"
@@ -39,6 +40,7 @@ struct NotificationSummary: Codable {
         case pendingAllianceRequests = "pending_alliance_requests"
         case pendingTradeRequests = "pending_trade_requests"
         case pendingDuelRequests = "pending_duel_requests"
+        case propertyBadgeCount = "property_badge_count"
     }
 }
 

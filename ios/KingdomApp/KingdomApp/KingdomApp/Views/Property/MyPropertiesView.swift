@@ -344,22 +344,38 @@ struct MyPropertiesView: View {
     }
     
     private func inlineRoomContent(_ room: PropertyAPI.PropertyRoom) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: room.icon)
-                .font(FontStyles.iconMedium)
-                .foregroundColor(.white)
-                .frame(width: 36, height: 36)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.black)
-                            .offset(x: 2, y: 2)
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(colorFromString(room.color))
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.black, lineWidth: 1.5)
-                    }
-                )
+        let hasBadge = room.has_badge ?? false
+        
+        return HStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: room.icon)
+                    .font(FontStyles.iconMedium)
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.black)
+                                .offset(x: 2, y: 2)
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(colorFromString(room.color))
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.black, lineWidth: 1.5)
+                        }
+                    )
+                
+                // Badge indicator
+                if hasBadge {
+                    Circle()
+                        .fill(KingdomTheme.Colors.royalBlue)
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 1.5)
+                        )
+                        .offset(x: 4, y: -4)
+                }
+            }
             
             Text(room.name)
                 .font(FontStyles.headingSmall)

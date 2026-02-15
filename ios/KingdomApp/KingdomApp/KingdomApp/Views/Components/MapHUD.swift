@@ -30,6 +30,7 @@ struct MapHUD: View {
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
     var pendingFriendRequests: Int = 0
+    @Binding var propertyBadgeCount: Int
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
     @State private var showTutorial = false
@@ -177,11 +178,13 @@ struct MapHUD: View {
                         showActions = true
                     }
                     
-                    // Properties (icon only)
+                    // Properties (icon only) - badge shows if any room needs attention
                     BrutalistIconButton(
                         icon: "house.fill",
-                        backgroundColor: KingdomTheme.Colors.buttonSuccess
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        badgeCount: propertyBadgeCount
                     ) {
+                        propertyBadgeCount = 0
                         showProperties = true
                     }
                     

@@ -230,6 +230,7 @@ struct AuthenticatedView: View {
     @State private var pendingAllianceRequestCount: Int = 0
     @State private var pendingTradeRequestCount: Int = 0
     @State private var pendingDuelRequestCount: Int = 0
+    @State private var propertyBadgeCount: Int = 0
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
     @State private var displayedTravelEvent: TravelEvent?
@@ -335,7 +336,8 @@ struct AuthenticatedView: View {
                 showActions: $showActions,
                 showProperties: $showProperties,
                 showActivity: $showActivity,
-                pendingFriendRequests: pendingFriendRequestCount + pendingAllianceRequestCount + pendingTradeRequestCount + pendingDuelRequestCount
+                pendingFriendRequests: pendingFriendRequestCount + pendingAllianceRequestCount + pendingTradeRequestCount + pendingDuelRequestCount,
+                propertyBadgeCount: $propertyBadgeCount
             )
             
             coupBadgeOverlay
@@ -479,6 +481,7 @@ struct AuthenticatedView: View {
                 pendingAllianceRequestCount = summary.pendingAllianceRequests
                 pendingTradeRequestCount = summary.pendingTradeRequests
                 pendingDuelRequestCount = summary.pendingDuelRequests
+                propertyBadgeCount = summary.propertyBadgeCount ?? 0
             }
         } catch {
             print("❌ Failed to load notification badge: \(error)")

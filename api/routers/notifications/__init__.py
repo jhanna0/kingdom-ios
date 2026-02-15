@@ -149,12 +149,17 @@ def get_quick_summary(
     # Duel challenges are shown in Arena, not in Friends badge
     # Users complained about badge spam from duels
     
+    # Check for property badges (garden needs water, kitchen bread ready)
+    from routers.property import _get_property_badge_count
+    property_badge_count = _get_property_badge_count(db, current_user.id)
+    
     return {
         "has_unread": has_unread,
         "pending_friend_requests": pending_friend_requests,
         "pending_alliance_requests": pending_alliance_requests,
         "pending_trade_requests": pending_trade_requests,
-        "pending_duel_requests": 0  # Don't contribute to badge - duels have their own UI
+        "pending_duel_requests": 0,  # Don't contribute to badge - duels have their own UI
+        "property_badge_count": property_badge_count
     }
 
 

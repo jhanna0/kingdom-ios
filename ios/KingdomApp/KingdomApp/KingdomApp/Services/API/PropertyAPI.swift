@@ -14,6 +14,7 @@ class PropertyAPI {
         let color: String
         let description: String
         let route: String
+        let has_badge: Bool?
     }
     
     struct AvailableOption: Codable {
