@@ -380,6 +380,7 @@ struct AuthenticatedView: View {
     private var overlaysLayer: some View {
         claimCelebrationOverlay
         popupNotificationOverlay
+        serverPromptOverlay
         travelNotificationOverlay
         weatherToastOverlay
         // In-app notifications use UIWindow overlay (InAppNotificationManager)
@@ -410,6 +411,17 @@ struct AuthenticatedView: View {
                 onDismiss: { appInit.popupNotification = nil }
             )
             .zIndex(1001)
+        }
+    }
+    
+    @ViewBuilder
+    private var serverPromptOverlay: some View {
+        if let prompt = appInit.serverPrompt {
+            ServerPromptPopup(
+                prompt: prompt,
+                onDismiss: { appInit.dismissServerPrompt(prompt) }
+            )
+            .zIndex(1002)
         }
     }
     

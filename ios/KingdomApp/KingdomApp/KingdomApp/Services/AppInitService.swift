@@ -17,6 +17,9 @@ class AppInitService: ObservableObject {
     /// Generic popup notification - backend tells us when to show via show_popup field
     @Published var popupNotification: AppNotification?
     
+    /// Server-driven prompt popup (feedback, polls, etc.) - backend controls content via URL
+    @Published var serverPrompt: ServerPrompt?
+    
     /// Legacy: Set when user becomes ruler via coup - triggers celebration popup
     @Published var coupCelebrationKingdom: String?
     
@@ -74,6 +77,9 @@ class AppInitService: ObservableObject {
             
             // Show important notifications
             await showImportantNotifications(updates.notifications)
+            
+            // Check for server-driven prompts (feedback, polls, etc.)
+            await checkServerPrompt()
             
         } catch {
             errorMessage = "Failed to load user data: \(error.localizedDescription)"
@@ -138,6 +144,48 @@ class AppInitService: ObservableObject {
         notifications.removeAll { $0.id == notification.id }
         unreadCount = notifications.filter { $0.priority == "high" }.count
     }
+    
+    // MARK: - Server Prompts (Feedback, Polls, etc.)
+    
+    /// Check if backend has a prompt to show (feedback request, poll, etc.)
+    @MainActor
+    private func checkServerPrompt() async {
+        do {
+            let response: ServerPromptCheckResponse = try await apiClient.execute(
+                apiClient.request(endpoint: "/prompts/check")
+            )
+            
+            if let prompt = response.prompt, !prompt.isEmpty {
+                print("📋 Server prompt available: \(prompt.id)")
+                serverPrompt = prompt
+            }
+        } catch {
+            // Silent fail - prompts are optional
+            print("⚠️ Failed to check server prompts: \(error)")
+        }
+    }
+    
+    /// Dismiss a server prompt (tells backend user saw it)
+    func dismissServerPrompt(_ prompt: ServerPrompt) {
+        serverPrompt = nil
+        
+        // Tell backend user dismissed it
+        Task {
+            do {
+                let _: EmptyResponse = try await apiClient.execute(
+                    apiClient.request(endpoint: "/prompts/dismiss", method: "POST", body: ["prompt_id": prompt.id])
+                )
+                print("✅ Server prompt dismissed: \(prompt.id)")
+            } catch {
+                print("⚠️ Failed to dismiss server prompt: \(error)")
+            }
+        }
+    }
+}
+
+/// Empty response for endpoints that just return success
+private struct EmptyResponse: Codable {
+    let success: Bool?
 }
 
 // MARK: - Models
