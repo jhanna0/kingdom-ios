@@ -50,9 +50,7 @@ struct KingdomInfoSheetView: View {
                 kingdomOverviewCard
                 
                 // Kingdom Buildings with Town Hall & Market nav links
-                if !kingdom.isUnclaimed {
-                    kingdomBuildingsCard
-                }
+                kingdomBuildingsCard
                 
                 // Military Strength / Intelligence
                 MilitaryStrengthCard(

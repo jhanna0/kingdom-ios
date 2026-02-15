@@ -24,14 +24,20 @@ extension KingdomInfoSheetView {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            let sortedBuildings = (viewModel.kingdoms.first(where: { $0.id == kingdom.id }) ?? kingdom).sortedBuildings()
-            
-            if sortedBuildings.isEmpty {
-                ProgressView().padding()
+            if kingdom.isUnclaimed {
+                Text("This kingdom has no ruler and has not been built yet")
+                    .font(FontStyles.bodySmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
             } else {
-                VStack(spacing: 8) {
-                    ForEach(sortedBuildings, id: \.type) { building in
-                        buildingRow(building: building)
+                let sortedBuildings = (viewModel.kingdoms.first(where: { $0.id == kingdom.id }) ?? kingdom).sortedBuildings()
+                
+                if sortedBuildings.isEmpty {
+                    ProgressView().padding()
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(sortedBuildings, id: \.type) { building in
+                            buildingRow(building: building)
+                        }
                     }
                 }
             }
