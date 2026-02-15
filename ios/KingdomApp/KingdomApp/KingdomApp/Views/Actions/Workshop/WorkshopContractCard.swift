@@ -85,7 +85,7 @@ struct WorkshopContractCard: View {
                 }
             }
             
-            // Progress bar
+            // Progress bar with color based on progress
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
@@ -95,7 +95,7 @@ struct WorkshopContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.buttonWarning)
+                            .fill(KingdomTheme.Colors.progressColor(for: contract.progress))
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

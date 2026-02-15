@@ -163,6 +163,24 @@ struct KingdomTheme {
             }
         }
         
+        /// Progress bar color based on completion percentage
+        /// < 25%: red (just started)
+        /// < 50%: orange/brown (early progress)
+        /// < 75%: gold/yellow (getting there)
+        /// >= 75%: green (almost done)
+        static func progressColor(for progress: Double) -> Color {
+            switch progress {
+            case ..<0.25:
+                return buttonDanger
+            case 0.25..<0.50:
+                return buttonWarning
+            case 0.50..<0.75:
+                return imperialGold
+            default:
+                return buttonSuccess
+            }
+        }
+        
         /// Map ANY color name from API to SwiftUI Color
         /// Handles: theme colors, standard SwiftUI colors, and hex codes
         static func color(fromThemeName name: String) -> Color {

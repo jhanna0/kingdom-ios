@@ -19,6 +19,11 @@ struct CooldownTimer: View {
         return min(max(elapsed / Double(total), 0), 1.0)
     }
     
+    /// Progress bar color based on completion percentage
+    var progressColor: Color {
+        KingdomTheme.Colors.progressColor(for: progress)
+    }
+    
     var formattedTime: String {
         let hours = secondsRemaining / 3600
         let minutes = (secondsRemaining % 3600) / 60
@@ -64,7 +69,7 @@ struct CooldownTimer: View {
             }
             .frame(height: 38)
             
-            // Progress bar - brutalist style
+            // Progress bar - brutalist style with color based on progress
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
@@ -73,7 +78,7 @@ struct CooldownTimer: View {
                         .brutalistProgressBar()
                     
                     Rectangle()
-                        .fill(KingdomTheme.Colors.buttonWarning)
+                        .fill(progressColor)
                         .frame(width: max(0, geometry.size.width * progress - 4), height: 8)
                         .offset(x: 2)
                         .animation(.linear(duration: 0.5), value: progress)

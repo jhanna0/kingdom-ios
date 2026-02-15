@@ -121,7 +121,7 @@ struct PropertyUpgradeContractCard: View {
             // Cost Row (food + resources + gold per action) - property upgrades have no rewards
             ActionCostRewardRowWithTax(costs: contract.buildCostItems(), goldCost: contract.buildGoldCostItem(), rewards: [])
             
-            // Progress bar - brutalist style
+            // Progress bar - brutalist style with color based on progress
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
@@ -131,7 +131,7 @@ struct PropertyUpgradeContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.buttonSuccess)
+                            .fill(KingdomTheme.Colors.progressColor(for: contract.progress))
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

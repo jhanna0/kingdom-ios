@@ -144,7 +144,7 @@ struct TrainingContractCard: View {
             // Cost and Reward Row (with tax support for pay-per-action)
             ActionCostRewardRowWithTax(costs: buildCostItems(), goldCost: buildGoldCost(), rewards: status.buildRewardItems())
             
-            // Progress bar - brutalist style
+            // Progress bar - brutalist style with color based on progress
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
@@ -154,7 +154,7 @@ struct TrainingContractCard: View {
                     
                     ZStack {
                         Rectangle()
-                            .fill(KingdomTheme.Colors.inkMedium)
+                            .fill(KingdomTheme.Colors.progressColor(for: contract.progress))
                             .frame(width: max(0, geometry.size.width * contract.progress - 4), height: 8)
                             .offset(x: 2)
                         

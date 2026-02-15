@@ -82,20 +82,6 @@ struct AuthView: View {
                         )
                     }
                     
-                    // Dev login button
-                    #if DEBUG
-                    Button(action: {
-                        Task {
-                            await authManager.signInWithApple(userID: "appletest", email: nil, name: nil)
-                        }
-                    }) {
-                        Text("🧪 Dev Login (Apple the Wise)")
-                            .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                    }
-                    #endif
                 }
                 .padding(KingdomTheme.Spacing.xxLarge)
                 .brutalistCard(
