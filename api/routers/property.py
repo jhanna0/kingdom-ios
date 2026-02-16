@@ -428,7 +428,7 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
             "color": "royalBlue",
             "description": "Sacrifice equipment to protect your property",
             "route": "/fortify",
-            "has_badge": room_badges.get("fortification", False)
+            "has_badge": room_badges.get("fortification", 0) > 0
         })
         rooms.append({
             "id": "garden",
@@ -437,7 +437,7 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
             "color": "buttonSuccess",
             "description": "Plant seeds and grow your garden",
             "route": "/garden",
-            "has_badge": room_badges.get("garden", False)
+            "has_badge": room_badges.get("garden", 0) > 0
         })
     
     # Check all options from config for rooms to show
@@ -467,7 +467,7 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
                     "color": opt.get("color", "inkMedium"),
                     "description": opt.get("description", ""),
                     "route": opt.get("route"),
-                    "has_badge": room_badges.get(opt_id, False)
+                    "has_badge": room_badges.get(opt_id, 0) > 0
                 })
                 seen_ids.add(opt_id)
     

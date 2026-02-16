@@ -161,6 +161,24 @@ class AuthManager: ObservableObject {
         GameEventManager.shared.disconnect()
     }
     
+    /// Delete the user's account (soft delete on server)
+    @MainActor
+    func deleteAccount() async throws {
+        guard authToken != nil else {
+            throw APIError.unauthorized
+        }
+        
+        struct DeleteResponse: Codable {
+            let message: String
+        }
+        
+        let request = apiClient.request(endpoint: "/auth/me", method: "DELETE")
+        let _: DeleteResponse = try await apiClient.execute(request)
+        
+        // Account deleted successfully, log out locally
+        logout()
+    }
+    
     @MainActor
     func retryAuth() async {
         hasCriticalError = false
