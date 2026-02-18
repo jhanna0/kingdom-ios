@@ -67,9 +67,11 @@ class FishingViewModel: ObservableObject {
     private var pendingSession: FishingSession?
     
     // Animation timing
-    private let rollAnimationDelay: UInt64 = 1_200_000_000  // Time between rolls (1.2s)
-    private let masterRollDelay: UInt64 = 700_000_000       // Pause before master roll (0.7s)
-    private let feedbackDelay: UInt64 = 1_600_000_000       // Time on escaped/idle before resetting
+    private let rollAnimationDelay: Double = 1.2   // Time between rolls
+    private let firstRollDelay: Double = 0.75      // Shorter delay before first roll
+    private let masterRollDelay: Double = 0.7      // Pause before master roll
+    private let feedbackDelay: Double = 1.6        // Time on escaped/idle before resetting
+    private let lootPause: Double = 0.55           // Brief pause before loot animation
     
     // API
     private var fishingAPI: FishingAPI?
@@ -191,7 +193,7 @@ class FishingViewModel: ObservableObject {
         switch uiState {
         case .loading: return "Wading in..."
         case .idle: return "Cast your line."
-        case .casting: return currentRoll?.message ?? "Line’s out..."
+        case .casting: return currentRoll?.message ?? "Line's out..."
         case .fishFound:
             if let fish = currentFishData {
                 return "\(fish.icon ?? "🐟") \(fish.name ?? "Fish") on the line!"
@@ -294,7 +296,7 @@ class FishingViewModel: ObservableObject {
             currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            await animateRolls()
+            animateRolls()
         } catch {
             uiState = .error("Cast failed: \(error.localizedDescription)")
         }
@@ -321,7 +323,7 @@ class FishingViewModel: ObservableObject {
             currentRollIndex = -1
             currentSlots = response.result.base_slots ?? response.result.final_slots
             
-            await animateRolls()
+            animateRolls()
         } catch {
             uiState = .error("Reel failed: \(error.localizedDescription)")
         }
@@ -339,11 +341,11 @@ class FishingViewModel: ObservableObject {
         // Start loot animation
         uiState = .looting
         
-        // Animate to result
-        Task {
-            try? await Task.sleep(nanoseconds: 550_000_000) // Brief pause before animation
-            masterRollValue = lootResult.master_roll
-            shouldAnimateMasterRoll = true
+        // Animate to result (uses wall-clock time, runs in background)
+        DispatchQueue.main.asyncAfter(deadline: .now() + lootPause) { [weak self] in
+            guard let self = self else { return }
+            self.masterRollValue = lootResult.master_roll
+            self.shouldAnimateMasterRoll = true
         }
     }
     
@@ -362,9 +364,9 @@ class FishingViewModel: ObservableObject {
         uiState = .idle
     }
     
-    // MARK: - Roll Animation
+    // MARK: - Roll Animation (uses DispatchQueue for background execution)
     
-    private func animateRolls() async {
+    private func animateRolls() {
         guard let result = currentPhaseResult else { return }
         
         if let baseSlots = result.base_slots {
@@ -374,24 +376,31 @@ class FishingViewModel: ObservableObject {
         }
         currentRollIndex = -1
         
+        // Schedule each roll at absolute times from now
+        var delay: Double = 0
         for (index, roll) in currentRolls.enumerated() {
-            // Slightly shorter delay before first roll
-            let delay: UInt64 = index == 0 ? 750_000_000 : rollAnimationDelay
-            try? await Task.sleep(nanoseconds: delay)
-            currentRollIndex = index
+            delay += (index == 0) ? firstRollDelay : rollAnimationDelay
             
-            if let slotsAfter = roll.slots_after, roll.is_success {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                    currentSlots = slotsAfter
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self = self else { return }
+                self.currentRollIndex = index
+                
+                if let slotsAfter = roll.slots_after, roll.is_success {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                        self.currentSlots = slotsAfter
+                    }
                 }
             }
         }
         
-        try? await Task.sleep(nanoseconds: masterRollDelay)
-        
-        uiState = .masterRollAnimation
-        masterRollValue = result.master_roll
-        shouldAnimateMasterRoll = true
+        // Schedule master roll after all individual rolls
+        delay += masterRollDelay
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self else { return }
+            self.uiState = .masterRollAnimation
+            self.masterRollValue = result.master_roll
+            self.shouldAnimateMasterRoll = true
+        }
     }
     
     func onMasterRollAnimationComplete() {
@@ -415,9 +424,9 @@ class FishingViewModel: ObservableObject {
         
         if result.phase == "cast" {
             if result.outcome == "no_bite" {
-                showFeedback(state: .idle, thenLoot: false)
+                showFeedback(state: .idle)
             } else {
-                showFeedback(state: .fishFound, thenLoot: false)
+                showFeedback(state: .fishFound)
             }
         } else {
             // Reel phase
@@ -426,26 +435,26 @@ class FishingViewModel: ObservableObject {
                 // DON'T apply pending session yet - wait until loot animation completes
                 // so meat count doesn't spoil the reveal
                 currentLootResult = result.outcome_display.loot
-                showFeedback(state: .caught, thenLoot: false)
+                showFeedback(state: .caught)
             } else {
                 // Escaped - apply session now (no loot animation coming)
                 if let pending = pendingSession {
                     session = pending
                     pendingSession = nil
                 }
-                showFeedback(state: .escaped, thenLoot: false)
+                showFeedback(state: .escaped)
             }
         }
     }
     
-    private func showFeedback(state: UIState, thenLoot: Bool) {
+    private func showFeedback(state: UIState) {
         uiState = state
         
         if state == .escaped || state == .idle {
-            Task {
-                try? await Task.sleep(nanoseconds: feedbackDelay)
-                masterRollValue = 0
-                uiState = .idle
+            DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDelay) { [weak self] in
+                guard let self = self else { return }
+                self.masterRollValue = 0
+                self.uiState = .idle
             }
         }
         // caught stays until user presses Loot
