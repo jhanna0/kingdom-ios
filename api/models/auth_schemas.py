@@ -26,27 +26,8 @@ class AppleSignIn(BaseModel):
     # In production, apple_user_id is extracted from the verified identity_token
     apple_user_id: str  # Required for backwards compatibility / dev mode
     email: Optional[str] = None
-    display_name: Optional[str] = None
+    display_name: Optional[str] = None  # Ignored - backend generates medieval usernames
     device_id: Optional[str] = None  # iOS identifierForVendor for multi-account detection
-    
-    @field_validator('display_name')
-    @classmethod
-    def validate_display_name(cls, v: Optional[str]) -> Optional[str]:
-        """Validate and sanitize display name"""
-        if v is None:
-            return v
-        
-        from utils.validation import validate_username, sanitize_username
-        
-        # Sanitize first
-        v = sanitize_username(v)
-        
-        # Then validate
-        is_valid, error_msg = validate_username(v)
-        if not is_valid:
-            raise ValueError(error_msg)
-        
-        return v
 
 
 class TokenResponse(BaseModel):
