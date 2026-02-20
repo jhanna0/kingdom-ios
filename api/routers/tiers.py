@@ -678,13 +678,13 @@ SKILLS = {
         "description": "Reduces building cooldowns",
         "benefits": {
             1: ["-5% building cooldowns"],
-            2: ["-7.5% building cooldowns"],
-            3: ["-10% building cooldowns"],
-            4: ["-12.5% building cooldowns", "5% chance to refund building cooldown"],
-            5: ["-15% building cooldowns", "10% chance to refund building cooldown"]
+            2: ["-10% building cooldowns"],
+            3: ["-15% building cooldowns"],
+            4: ["-20% building cooldowns", "5% chance to refund building cooldown"],
+            5: ["-25% building cooldowns", "10% chance to refund building cooldown"]
         },
         "mechanics": {
-            "cooldown_reduction": {1: 0.05, 2: 0.075, 3: 0.10, 4: 0.125, 5: 0.15},
+            "cooldown_reduction": {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
@@ -710,13 +710,13 @@ SKILLS = {
         "description": "Reduces skill training cooldowns",
         "benefits": {
             1: ["-5% training cooldowns"],
-            2: ["-7.5% training cooldowns"],
-            3: ["-10% training cooldowns"],
-            4: ["-12.5% training cooldowns", "5% chance to refund training cooldown"],
-            5: ["-15% training cooldowns", "10% chance to refund training cooldown"]
+            2: ["-10% training cooldowns"],
+            3: ["-15% training cooldowns"],
+            4: ["-20% training cooldowns", "5% chance to refund training cooldown"],
+            5: ["-25% training cooldowns", "10% chance to refund training cooldown"]
         },
         "mechanics": {
-            "cooldown_reduction": {1: 0.05, 2: 0.075, 3: 0.10, 4: 0.125, 5: 0.15},
+            "cooldown_reduction": {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
