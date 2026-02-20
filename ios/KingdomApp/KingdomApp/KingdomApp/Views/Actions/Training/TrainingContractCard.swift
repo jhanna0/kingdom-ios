@@ -226,7 +226,7 @@ struct TrainingContractCard: View {
             } else {
                 CooldownTimer(
                     secondsRemaining: calculatedSecondsRemaining,
-                    totalSeconds: Int(status.cooldownMinutes ?? 120 * 60),
+                    totalSeconds: Int((status.cooldownMinutes ?? 90) * 60),
                     onBookTap: status.canUseBook == true ? { showBookPopup = true } : nil
                 )
             }

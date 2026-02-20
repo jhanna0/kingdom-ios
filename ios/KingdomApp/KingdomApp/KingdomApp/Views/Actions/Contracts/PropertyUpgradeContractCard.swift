@@ -98,8 +98,8 @@ struct PropertyUpgradeContractCard: View {
                         
                         Spacer()
                         
-                        // Cooldown time with hourglass (2 hours for property upgrades)
-                        cooldownBadge(minutes: 120)
+                        // Cooldown time with hourglass (from backend)
+                        cooldownBadge(minutes: contract.cooldownMinutes ?? 90)
                     }
                     
                     HStack(spacing: 4) {

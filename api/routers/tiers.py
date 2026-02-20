@@ -38,7 +38,7 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
     Examples (at 0.4 food/min):
     - 10 min cooldown (farm, patrol): 4 food
     - 30 min cooldown (scout): 12 food  
-    - 120 min cooldown (work, training, crafting): 48 food
+    - 90 min cooldown (work, training, crafting): 36 food
     
     Returns integer (floored, minimum 1)
     """
@@ -61,14 +61,14 @@ TRAINING_GOLD_BASE = 20          # Base gold per action
 TRAINING_GOLD_PER_TIER = 18      # Additional gold per target tier
 TRAINING_GOLD_PER_POINT = 3      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
-TRAINING_ACTIONS_PER_TIER = 12   # Extra actions per current tier level (specializing is hard)
+TRAINING_ACTIONS_PER_TIER = 10   # Extra actions per current tier level (specializing is hard)
 TRAINING_ACTIONS_PER_POINT = 1.5 # Extra actions per total skill point owned (diversifying costs more)
 TRAINING_MIN_ACTIONS = 10         # Floor (never fewer than this)
 TRAINING_MAX_ACTIONS = 500       # Cap (never more than this)
 
 
 # gold = 20 + (target_tier × 18) + (total_skill_points × 3)
-# actions = 10 + (current_tier × 12) + (total_skill_points × 1.5)
+# actions = 10 + (current_tier × 10) + (total_skill_points × 1.5)
 
 def calculate_training_gold_per_action(target_tier: int, total_skill_points: int = 0) -> float:
     """Gold cost per training action.
@@ -101,7 +101,7 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
     Examples:
     - 0→1, 1st skill (tier=0, points=0): 10 + 0 + 0 = 10 actions
     - 0→1, 7th skill (tier=0, points=6): 10 + 0 + 9 = 19 actions
-    - 4→5, with 9 total points: 10 + 48 + 13 = 71 actions
+    - 4→5, with 9 total points: 10 + 40 + 13 = 63 actions
     """
     actions = int(
         TRAINING_BASE_ACTIONS 

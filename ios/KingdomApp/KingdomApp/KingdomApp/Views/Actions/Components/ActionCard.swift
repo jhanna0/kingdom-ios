@@ -146,7 +146,7 @@ struct ActionCard: View {
                 } else {
                     CooldownTimer(
                         secondsRemaining: calculatedSecondsRemaining,
-                        totalSeconds: Int((status.cooldownMinutes ?? 120) * 60)
+                        totalSeconds: Int((status.cooldownMinutes ?? 90) * 60)
                     )
                 }
             }

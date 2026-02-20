@@ -198,6 +198,8 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
     from routers.tiers import get_property_per_action_costs
     from routers.resources import RESOURCES
     from db.models.inventory import PlayerInventory
+    from .action_config import ACTION_TYPES
+    from .utils import calculate_cooldown
     
     # Rulers don't pay tax
     effective_tax_rate = 0 if is_ruler else current_tax_rate
@@ -259,6 +261,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
         can_afford_gold = player_state.gold >= gold_cost_with_tax
         
+        # Calculate cooldown (skill-adjusted) - uses building skill
+        base_cooldown = ACTION_TYPES["property_upgrade"]["cooldown_minutes"]
+        cooldown_minutes = calculate_cooldown(base_cooldown, player_state.building_skill)
+        
         # Look up option name for display
         from routers.property import get_option_name
         option_name = get_option_name(contract.tier, contract.option_id) if contract.tier and contract.option_id else None
@@ -281,7 +287,8 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "endpoint": f"/actions/work-property/{contract.id}",
             "per_action_costs": per_action_costs,
-            "can_afford": can_afford  # Can player afford the per-action costs?
+            "can_afford": can_afford,  # Can player afford the per-action costs?
+            "cooldown_minutes": cooldown_minutes  # Skill-adjusted cooldown for display
         })
     
     return result

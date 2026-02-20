@@ -18,8 +18,8 @@ from routers.tiers import (
 
 # Building action scaling constants
 BUILDING_ACTIONS_PER_CITIZEN = 10  # Actions per active citizen
-BUILDING_ACTIONS_MINIMUM = 50  # Minimum actions for any building
-BUILDING_LEVEL_MULTIPLIERS = {1: 1.0, 2: 1.2, 3: 1.4, 4: 1.6, 5: 2.0}  # Per-level scaling
+BUILDING_ACTIONS_MINIMUM = 75  # Minimum actions for any building
+BUILDING_LEVEL_MULTIPLIERS = {1: 1.0, 2: 1.4, 3: 1.8, 4: 2.2, 5: 2.6}  # Per-level scaling
 ACTIVE_CITIZEN_DAYS = 7  # Days since last login to count as "active"
 
 # Ruler abandonment threshold

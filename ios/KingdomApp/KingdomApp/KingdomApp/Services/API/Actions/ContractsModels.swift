@@ -62,6 +62,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
     let canAfford: Bool?  // Can player afford the per-action costs?
     let foodCost: Int?  // Food cost per action (0.5 per minute of cooldown)
     let canAffordFood: Bool?  // Can player afford the food cost?
+    let cooldownMinutes: Double?  // Skill-adjusted cooldown from backend
     
     // NEW: Pay-per-action gold system
     let goldPerAction: Double?  // Gold cost per action (before tax)
@@ -86,6 +87,7 @@ struct PropertyUpgradeContract: Codable, Identifiable {
         case canAfford = "can_afford"
         case foodCost = "food_cost"
         case canAffordFood = "can_afford_food"
+        case cooldownMinutes = "cooldown_minutes"
         case goldPerAction = "gold_per_action"
         case currentTaxRate = "current_tax_rate"
         case canAffordGold = "can_afford_gold"
