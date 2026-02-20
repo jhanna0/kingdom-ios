@@ -6,8 +6,8 @@ Handles the catch-up system for players who join after buildings were constructe
 Players must complete catch-up work before using a building's benefits.
 Formula: actions_required = min(CATCHUP_ACTIONS_PER_LEVEL * building_level, MAX_CATCHUP_ACTIONS) * building_skill_reduction
 
-The MAX_CATCHUP_ACTIONS cap (30) ensures late joiners don't face excessive
-grind for high-level buildings (e.g., level 5 would be 75 actions without cap).
+The MAX_CATCHUP_ACTIONS cap (20) ensures late joiners don't face excessive
+grind for high-level buildings (e.g., level 5 would be 50 actions without cap).
 
 Building skill reduces catch-up actions (same formula as property upgrades):
 - 5% reduction per building skill level
@@ -29,11 +29,11 @@ from db import User, Kingdom, BuildingCatchup, ContractContribution, UnifiedCont
 # ============================================================
 
 # Actions required per building level for catch-up
-CATCHUP_ACTIONS_PER_LEVEL = 15
+CATCHUP_ACTIONS_PER_LEVEL = 10
 
 # Maximum catch-up actions required regardless of building level
-# Prevents late joiners from facing 75+ actions for high-level buildings
-MAX_CATCHUP_ACTIONS = 30
+# Prevents late joiners from facing excessive actions for high-level buildings
+MAX_CATCHUP_ACTIONS = 20
 
 # Buildings that DON'T require catch-up (always accessible)
 # All other buildings in BUILDING_TYPES require catch-up
@@ -53,8 +53,8 @@ def calculate_catchup_actions(building_level: int, building_skill: int = 0) -> i
     Formula: min(base_actions, MAX_CATCHUP_ACTIONS) * building_skill_reduction
     Where: base_actions = CATCHUP_ACTIONS_PER_LEVEL * building_level
     
-    The MAX_CATCHUP_ACTIONS cap ensures late joiners don't face 75+ actions
-    for high-level buildings - keeps it manageable at 30 max (before skill reduction).
+    The MAX_CATCHUP_ACTIONS cap ensures late joiners don't face 50+ actions
+    for high-level buildings - keeps it manageable at 20 max (before skill reduction).
     """
     from routers.tiers import get_building_action_reduction
     
@@ -126,7 +126,7 @@ def get_catchup_status(
     - building_catchups: actions done on dedicated catchup contracts
     
     total_progress = contract_contributions + sum(all catchup records actions_completed)
-    requirement = 15 * building_level * skill_reduction
+    requirement = 10 * building_level * skill_reduction
     
     If total_progress >= requirement → can use building
     If total_progress < requirement → needs catchup for the remainder

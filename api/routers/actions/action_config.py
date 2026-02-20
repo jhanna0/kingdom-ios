@@ -33,7 +33,7 @@ ACTION_TYPES = {
         "icon": "hammer.fill",
         "description": "Build kingdom infrastructure",
         "category": "beneficial",
-        "cooldown_minutes": 120,  # 2 hours
+        "cooldown_minutes": 90,  # 1.5 hours
         "theme_color": "inkMedium",
         "display_order": 10,
         "endpoint": "/actions/contracts/{contract_id}/work",
@@ -94,7 +94,7 @@ ACTION_TYPES = {
         "icon": "figure.run",
         "description": "Train your skills",
         "category": "training",
-        "cooldown_minutes": 120,  # 2 hours
+        "cooldown_minutes": 90,  # 1.5 hours
         "theme_color": "buttonPrimary",
         "display_order": 1,
         "endpoint": "/actions/training/{contract_id}/work",
@@ -113,7 +113,7 @@ ACTION_TYPES = {
         "icon": "wrench.and.screwdriver.fill",
         "description": "Craft weapons and armor",
         "category": "crafting",
-        "cooldown_minutes": 120,  # 2 hours
+        "cooldown_minutes": 90,  # 1.5 hours
         "theme_color": "inkMedium",
         "display_order": 1,
         "endpoint": "/actions/crafting",
@@ -129,7 +129,7 @@ ACTION_TYPES = {
         "icon": "house.fill",
         "description": "Work on upgrading your property",
         "category": "property",
-        "cooldown_minutes": 120,  # 2 hours
+        "cooldown_minutes": 90,  # 1.5 hours
         "theme_color": "buttonPrimary",
         "display_order": 1,
         "endpoint": "/actions/work-property/{contract_id}",

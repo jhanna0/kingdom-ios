@@ -57,18 +57,18 @@ def calculate_food_cost(cooldown_minutes: float) -> int:
 # Gold formula: BASE + (target_tier × PER_TIER)
 # Actions formula: BASE + (current_tier × PER_TIER) + (total_points × PER_POINT)
 
-TRAINING_GOLD_BASE = 25          # Base gold per action
-TRAINING_GOLD_PER_TIER = 22      # Additional gold per target tier
-TRAINING_GOLD_PER_POINT = 5      # Additional gold per total skill point owned
+TRAINING_GOLD_BASE = 20          # Base gold per action
+TRAINING_GOLD_PER_TIER = 18      # Additional gold per target tier
+TRAINING_GOLD_PER_POINT = 3      # Additional gold per total skill point owned
 TRAINING_BASE_ACTIONS = 10       # Minimum actions for any training
 TRAINING_ACTIONS_PER_TIER = 12   # Extra actions per current tier level (specializing is hard)
-TRAINING_ACTIONS_PER_POINT = 2.5 # Extra actions per total skill point owned (diversifying costs more)
+TRAINING_ACTIONS_PER_POINT = 1.5 # Extra actions per total skill point owned (diversifying costs more)
 TRAINING_MIN_ACTIONS = 10         # Floor (never fewer than this)
 TRAINING_MAX_ACTIONS = 500       # Cap (never more than this)
 
 
-# gold = 25 + (target_tier × 25) + (total_skill_points × 6)
-# actions = 10 + (current_tier × 10) + (total_skill_points × 2
+# gold = 20 + (target_tier × 18) + (total_skill_points × 3)
+# actions = 10 + (current_tier × 12) + (total_skill_points × 1.5)
 
 def calculate_training_gold_per_action(target_tier: int, total_skill_points: int = 0) -> float:
     """Gold cost per training action.
@@ -79,12 +79,12 @@ def calculate_training_gold_per_action(target_tier: int, total_skill_points: int
     Formula: BASE + (target_tier × PER_TIER) + (total_points × PER_POINT)
     
     Examples (with 0 skill points):
-    - Tier 1 (0→1): 10 + 10 + 0 = 20g per action
-    - Tier 2 (1→2): 10 + 20 + 0 = 30g per action
+    - Tier 1 (0→1): 20 + 18 + 0 = 38g per action
+    - Tier 2 (1→2): 20 + 36 + 0 = 56g per action
     
     Examples (with 6 skill points, training 7th skill):
-    - Tier 1 (0→1): 10 + 10 + 24 = 44g per action
-    - Tier 2 (1→2): 10 + 20 + 24 = 54g per action
+    - Tier 1 (0→1): 20 + 18 + 18 = 56g per action
+    - Tier 2 (1→2): 20 + 36 + 18 = 74g per action
     """
     return TRAINING_GOLD_BASE + (target_tier * TRAINING_GOLD_PER_TIER) + (total_skill_points * TRAINING_GOLD_PER_POINT)
 
@@ -100,8 +100,8 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
     
     Examples:
     - 0→1, 1st skill (tier=0, points=0): 10 + 0 + 0 = 10 actions
-    - 0→1, 7th skill (tier=0, points=6): 10 + 0 + 12 = 22 actions
-    - 4→5, with 9 total points: 10 + 40 + 18 = 68 actions
+    - 0→1, 7th skill (tier=0, points=6): 10 + 0 + 9 = 19 actions
+    - 4→5, with 9 total points: 10 + 48 + 13 = 71 actions
     """
     actions = int(
         TRAINING_BASE_ACTIONS 
