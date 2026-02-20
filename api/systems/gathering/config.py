@@ -98,12 +98,14 @@ TIER_PROBABILITIES = {
 
 
 # ============================================================
-# SKILL BONUSES (future enhancement)
+# BUILDING LEVEL PROBABILITY SCALING
 # ============================================================
-# Higher skill could reduce "black" probability
-# Not implemented yet - keeping it simple for now
+# Higher building level reduces black chance and increases green chance
+# Level 1: base probabilities (15% black, 50% brown, 35% green)
+# Level 5: 0% black, 50% brown, 50% green (guaranteed resource every tap)
+# Each level removes 3.75% from black and adds to green
 
-SKILL_BONUS_PER_LEVEL = 0.02  # Future: +2% better odds per skill level
+BLACK_REDUCTION_PER_LEVEL = 0.0375  # 3.75% reduction per level above 1
 
 
 # ============================================================

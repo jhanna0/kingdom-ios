@@ -83,8 +83,9 @@ def calculate_actions_required(building_type: str, building_level: int, active_c
     raw_actions = base_actions * level_multiplier
     
     # Apply farm reduction (kingdom building reduces actions)
+    # Note: farm reduction can bring actions below the minimum - that's the benefit of having a farm
     farm_multiplier = get_farm_action_reduction(farm_level)
-    return max(BUILDING_ACTIONS_MINIMUM, int(raw_actions * farm_multiplier))
+    return int(raw_actions * farm_multiplier)
 
 
 def check_ruler_abandonment(db: Session, kingdom: Kingdom) -> Optional[Tuple[int, str]]:

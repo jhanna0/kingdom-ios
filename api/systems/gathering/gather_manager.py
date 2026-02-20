@@ -14,6 +14,7 @@ from .config import (
     GATHER_TIERS,
     TIER_ORDER,
     TIER_PROBABILITIES,
+    BLACK_REDUCTION_PER_LEVEL,
 )
 
 
@@ -68,13 +69,14 @@ class GatherManager:
         """
         self.rng = random.Random(seed)
     
-    def gather(self, resource_type: str, current_amount: int = 0) -> GatherResult:
+    def gather(self, resource_type: str, current_amount: int = 0, building_level: int = 1) -> GatherResult:
         """
         Execute a single gather action.
         
         Args:
-            resource_type: "wood" or "iron"
+            resource_type: "wood", "stone", or "iron"
             current_amount: Player's current amount of this resource
+            building_level: Level of the relevant building (lumbermill for wood, mine for stone/iron)
             
         Returns:
             GatherResult with tier, amount, and new total
@@ -83,8 +85,8 @@ class GatherManager:
         if resource_type not in RESOURCE_TYPES:
             raise ValueError(f"Invalid resource type: {resource_type}")
         
-        # Roll for tier
-        tier = self._roll_tier()
+        # Roll for tier (building level affects probabilities)
+        tier = self._roll_tier(building_level)
         tier_config = GATHER_TIERS[tier]
         
         # Calculate new total
@@ -101,23 +103,45 @@ class GatherManager:
             haptic=tier_config.get("haptic"),
         )
     
-    def _roll_tier(self) -> str:
+    def _roll_tier(self, building_level: int = 1) -> str:
         """
         Roll for a gather tier using weighted random.
         
+        Building level affects probabilities:
+        - Level 1: 15% black, 50% brown, 35% green (base)
+        - Level 5: 0% black, 50% brown, 50% green (guaranteed resource)
+        Each level above 1 reduces black by 3.75% and increases green by 3.75%
+        
+        Args:
+            building_level: Level of the building (1-5)
+            
         Returns:
-            Tier name: "black", "brown", "green", or "gold"
+            Tier name: "black", "brown", or "green"
         """
+        # Clamp building level to valid range
+        level = max(1, min(5, building_level))
+        
+        # Calculate adjusted probabilities based on building level
+        # Each level above 1 shifts 3.75% from black to green
+        levels_above_base = level - 1
+        black_reduction = levels_above_base * BLACK_REDUCTION_PER_LEVEL
+        
+        adjusted_probs = {
+            "black": max(0, TIER_PROBABILITIES["black"] - black_reduction),
+            "brown": TIER_PROBABILITIES["brown"],  # Stays at 50%
+            "green": TIER_PROBABILITIES["green"] + black_reduction,
+        }
+        
         roll = self.rng.random()  # 0.0 to 1.0
         
         cumulative = 0.0
         for tier in TIER_ORDER:
-            cumulative += TIER_PROBABILITIES[tier]
+            cumulative += adjusted_probs[tier]
             if roll < cumulative:
                 return tier
         
         # Fallback (shouldn't happen if probabilities sum to 1.0)
-        return TIER_ORDER[0]
+        return TIER_ORDER[-1]
     
     def get_resource_info(self, resource_type: str) -> Optional[dict]:
         """Get info about a resource type for display"""

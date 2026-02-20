@@ -328,8 +328,15 @@ def gather_resource(
     # Get current amount of this resource from inventory
     current_amount = get_inventory_amount(db, current_user.id, resource_type)
     
-    # Execute gather roll
-    result = _gather_manager.gather(resource_type, current_amount)
+    # Get building level for probability scaling (lumbermill for wood, mine for stone/iron)
+    hometown = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
+    if resource_type == "wood":
+        building_level = getattr(hometown, 'lumbermill_level', 1) or 1 if hometown else 1
+    else:
+        building_level = getattr(hometown, 'mine_level', 1) or 1 if hometown else 1
+    
+    # Execute gather roll (building level affects tier probabilities)
+    result = _gather_manager.gather(resource_type, current_amount, building_level)
     
     # Add gathered resources to player's inventory AND track daily gathering
     if result.amount > 0:
