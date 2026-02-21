@@ -237,7 +237,7 @@ Rulers can declare war on other kingdoms. Win and absorb them into your empire.
 3. **First to capture 3 wins**
 
 **To declare:** Be a ruler, physically visit the target first.
-**To join:** Must have visited that kingdom once, then fight from anywhere.
+**To join the war:** Go to the kingdom you're invading, then you can attack.
 
 **Walls matter.** They boost defender defense.
 

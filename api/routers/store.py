@@ -859,6 +859,7 @@ class RedeemSubscriptionRequest(BaseModel):
     transaction_id: str
     original_transaction_id: str
     expires_at: str  # ISO format datetime
+    is_restore: bool = False  # True if this is a restore/sync, not a fresh purchase
 
 
 class RedeemSubscriptionResponse(BaseModel):
@@ -889,48 +890,65 @@ async def redeem_subscription(
     if product.get("type") != "subscription":
         raise HTTPException(status_code=400, detail="Product is not a subscription")
     
-    # 2. Verify with Apple
-    try:
-        verification = await verify_transaction_with_apple(request.transaction_id)
-        print(f"✅ Subscription transaction verified ({verification.get('environment', 'Unknown')})")
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Apple verification failed for subscription: {e}")
-        if not config.DEV_MODE:
-            raise HTTPException(status_code=400, detail="Failed to verify subscription")
+    # 2. Verify with Apple (skip for restores - StoreKit already verified locally)
+    verification = None
+    if request.is_restore:
+        print(f"🔄 Restore/sync request - trusting StoreKit local verification")
+        print(f"   Transaction ID: {request.transaction_id}")
+        print(f"   Original ID: {request.original_transaction_id}")
+    else:
+        try:
+            verification = await verify_transaction_with_apple(request.transaction_id)
+            environment = verification.get('environment', 'Unknown')
+            print(f"✅ Subscription transaction verified ({environment})")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"❌ Apple verification failed for subscription: {e}")
+            if not config.DEV_MODE:
+                raise HTTPException(status_code=400, detail="Failed to verify subscription")
     
-    # 3. Parse expiration date
+    # 3. Parse expiration date from client (StoreKit provides accurate expiration)
     try:
         expires_at = datetime.fromisoformat(request.expires_at.replace("Z", "+00:00"))
+        print(f"📅 Expiration: {expires_at}")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid expires_at format")
     
-    # 4. Check for existing subscription by original_transaction_id (renewal case)
+    # 4. Check for existing subscription by user_id (one subscription per user)
     existing = db.query(Subscription).filter(
-        Subscription.original_transaction_id == request.original_transaction_id
+        Subscription.user_id == current_user.id
     ).first()
     
     if existing:
-        # Renewal - update expiration on existing row
-        if existing.user_id != current_user.id:
-            raise HTTPException(status_code=400, detail="Subscription belongs to another user")
-        
-        existing.expires_at = expires_at
-        db.commit()
-        
-        print(f"🔄 Subscription renewed for user {current_user.id} ({current_user.display_name})")
-        print(f"   Product: {product['name']}")
-        print(f"   Expires: {expires_at}")
-        
-        return RedeemSubscriptionResponse(
-            success=True,
-            message="Subscription renewed!",
-            is_subscriber=True,
-            expires_at=expires_at.isoformat()
-        )
+        # User already has a subscription - only extend if new date is later
+        if expires_at > existing.expires_at:
+            existing.expires_at = expires_at
+            existing.original_transaction_id = request.original_transaction_id
+            existing.product_id = request.product_id
+            db.commit()
+            
+            print(f"🔄 Subscription extended for user {current_user.id} ({current_user.display_name})")
+            print(f"   Product: {product['name']}")
+            print(f"   New expiration: {expires_at}")
+            
+            return RedeemSubscriptionResponse(
+                success=True,
+                message="Subscription extended!",
+                is_subscriber=True,
+                expires_at=expires_at.isoformat()
+            )
+        else:
+            print(f"⏭️ Subscription not extended - existing expires later ({existing.expires_at} > {expires_at})")
+            return RedeemSubscriptionResponse(
+                success=True,
+                message="You already have an active subscription!",
+                is_subscriber=True,
+                expires_at=existing.expires_at.isoformat()
+            )
     
-    # 4. New subscription - create new row (for history tracking)
+    # 5. New subscription - create row for this user
     subscription = Subscription(
         user_id=current_user.id,
         product_id=request.product_id,
