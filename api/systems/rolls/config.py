@@ -14,13 +14,13 @@ Base success chance scales with player stat level (1-10).
 # NEW SYSTEM: Stat level = number of rolls, flat hit chance per roll
 # This creates exciting variance - more rolls = more chances to shift!
 #
-# Example at 15% per roll:
-#   Level 1: 1 roll  → 15% chance of any shift
-#   Level 5: 5 rolls → 56% chance of ≥1 shift, 16% chance of ≥2
-#   Level 10: 10 rolls → 80% chance of ≥1 shift, 46% chance of ≥2
+# Example at 20% per roll:
+#   Level 1: 1 roll  → 20% chance of any shift
+#   Level 5: 5 rolls → 67% chance of ≥1 shift, 26% chance of ≥2
+#   Level 10: 10 rolls → 89% chance of ≥1 shift, 62% chance of ≥2
 
 # Flat hit chance per roll (stat level determines NUMBER of rolls, not chance)
-ROLL_HIT_CHANCE = 0.15           # 15% chance per roll - low but exciting!
+ROLL_HIT_CHANCE = 0.20           # 20% chance per roll - balanced excitement!
 
 # Legacy formula constants (kept for backwards compatibility)
 ROLL_BASE_CHANCE = 0.15          # Base chance at stat level 0

@@ -762,6 +762,9 @@ class HuntManager:
         
         is_success = roll_value < effective_hit_chance
         
+        # Update state's effective hit chance so to_dict() returns the correct value for this player
+        state.effective_hit_chance_percent = int(effective_hit_chance * 100)
+        
         # Critical: top 25% of successes are critical (extra shift!)
         is_critical = is_success and roll_value < (effective_hit_chance * 0.25)
         

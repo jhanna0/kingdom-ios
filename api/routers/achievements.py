@@ -64,6 +64,8 @@ CATEGORY_CONFIG = {
     
     # Meta
     "progression": {"display_name": "Progression", "icon": "star.fill", "color": "gold", "order": 200},
+    "reputation": {"display_name": "Reputation", "icon": "star.fill", "color": "buttonPrimary", "order": 210},
+    "social": {"display_name": "Social", "icon": "person.2.fill", "color": "buttonSuccess", "order": 220},
     "general": {"display_name": "General", "icon": "trophy.fill", "color": "inkMedium", "order": 999},
 }
 
@@ -84,6 +86,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["coups_failed"] = state.coups_failed or 0
         progress["kingdoms_ruled"] = state.kingdoms_ruled or 0
         progress["player_level"] = state.level or 1
+        progress["gold_held"] = int(state.gold or 0)
         
         total_skills = (
             (state.attack_power or 0) + (state.defense_power or 0) +
@@ -100,6 +103,14 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         SELECT
             -- Checkins
             COALESCE((SELECT SUM(checkins_count) FROM user_kingdoms WHERE user_id = :user_id), 0) as total_checkins,
+            
+            -- Reputation (in current kingdom)
+            COALESCE((SELECT local_reputation FROM user_kingdoms uk 
+                      JOIN player_state ps ON ps.user_id = uk.user_id 
+                      WHERE uk.user_id = :user_id AND uk.kingdom_id = ps.current_kingdom_id), 0) as reputation_earned,
+            
+            -- Friends (count accepted friendships)
+            COALESCE((SELECT COUNT(*) FROM friends WHERE (user_id = :user_id OR friend_user_id = :user_id) AND status = 'accepted'), 0) as friends_made,
             
             -- Foraging sessions
             COALESCE((SELECT COUNT(*) FROM foraging_sessions WHERE user_id = :user_id AND status = 'collected'), 0) as foraging_completed,
@@ -159,6 +170,9 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
     combined_result = db.execute(combined_query, {"user_id": user_id}).first()
     if combined_result:
         progress["total_checkins"] = int(combined_result.total_checkins)
+        progress["checkins_completed"] = int(combined_result.total_checkins)
+        progress["reputation_earned"] = int(combined_result.reputation_earned)
+        progress["friends_made"] = int(combined_result.friends_made)
         progress["foraging_completed"] = int(combined_result.foraging_completed)
         progress["direct_trades"] = int(combined_result.direct_trades)
         progress["market_trades"] = int(combined_result.market_trades)

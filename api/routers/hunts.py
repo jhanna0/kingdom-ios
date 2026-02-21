@@ -943,7 +943,7 @@ def execute_roll(
     # Override phase_state hit_chance with player's actual effective hit chance
     phase_state = result.get("phase_state")
     if phase_state and "display" in phase_state:
-        player_hit_chance = result.get("effective_hit_chance", 15)
+        player_hit_chance = result.get("effective_hit_chance", 20)
         phase_state["display"]["hit_chance"] = player_hit_chance
         phase_state["effective_hit_chance_percent"] = player_hit_chance
     
@@ -1218,7 +1218,7 @@ def get_hunt_status(
     
     # Calculate player-specific effective hit chance (includes their item bonuses)
     if session.current_phase_state:
-        from systems.hunting.config import ROLL_HIT_CHANCE
+        from systems.rolls.config import ROLL_HIT_CHANCE
         
         effective_hit_chance = ROLL_HIT_CHANCE
         phase = session.current_phase_state.phase

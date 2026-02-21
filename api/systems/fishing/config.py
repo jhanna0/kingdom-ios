@@ -26,7 +26,7 @@ from typing import Dict, List, Optional
 ROLL_ANIMATION_DELAY_MS = 400
 
 # Base chance per roll to succeed (same as hunting)
-ROLL_HIT_CHANCE = 0.15  # 15% flat chance per roll
+ROLL_HIT_CHANCE = 0.20  # 20% flat chance per roll
 
 
 # ============================================================

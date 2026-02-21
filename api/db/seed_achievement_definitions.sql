@@ -14,7 +14,12 @@ VALUES
     ('hunt_squirrel', 2, 100, '{"gold": 50}', 'Squirrel Chaser II', 'Hunt 100 squirrels', 'leaf.fill', 'hunting', 101),
     ('hunt_squirrel', 3, 250, '{"gold": 100}', 'Squirrel Chaser III', 'Hunt 250 squirrels', 'leaf.fill', 'hunting', 102),
     ('hunt_squirrel', 4, 500, '{"gold": 200}', 'Squirrel Chaser IV', 'Hunt 500 squirrels', 'leaf.fill', 'hunting', 103),
-    ('hunt_squirrel', 5, 1000, '{"gold": 500}', 'Squirrel Chaser V', 'Hunt 1000 squirrels', 'leaf.fill', 'hunting', 104)
+    ('hunt_squirrel', 5, 1000, '{"gold": 500}', 'Squirrel Chaser V', 'Hunt 1000 squirrels', 'leaf.fill', 'hunting', 104),
+    ('hunt_squirrel', 6, 2500, '{"gold": 750}', 'Squirrel Chaser VI', 'Hunt 2500 squirrels', 'leaf.fill', 'hunting', 105),
+    ('hunt_squirrel', 7, 5000, '{"gold": 1000}', 'Squirrel Chaser VII', 'Hunt 5000 squirrels', 'leaf.fill', 'hunting', 106),
+    ('hunt_squirrel', 8, 10000, '{"gold": 1500}', 'Squirrel Chaser VIII', 'Hunt 10000 squirrels', 'leaf.fill', 'hunting', 107),
+    ('hunt_squirrel', 9, 25000, '{"gold": 2000}', 'Squirrel Chaser IX', 'Hunt 25000 squirrels', 'leaf.fill', 'hunting', 108),
+    ('hunt_squirrel', 10, 50000, '{"gold": 3000}', 'Squirrel Chaser X', 'Hunt 50000 squirrels', 'leaf.fill', 'hunting', 109)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -32,7 +37,12 @@ VALUES
     ('hunt_rabbit', 2, 100, '{"gold": 50}', 'Rabbit Hunter II', 'Hunt 100 rabbits', 'hare.fill', 'hunting', 111),
     ('hunt_rabbit', 3, 250, '{"gold": 100}', 'Rabbit Hunter III', 'Hunt 250 rabbits', 'hare.fill', 'hunting', 112),
     ('hunt_rabbit', 4, 500, '{"gold": 200}', 'Rabbit Hunter IV', 'Hunt 500 rabbits', 'hare.fill', 'hunting', 113),
-    ('hunt_rabbit', 5, 1000, '{"gold": 500}', 'Rabbit Hunter V', 'Hunt 1000 rabbits', 'hare.fill', 'hunting', 114)
+    ('hunt_rabbit', 5, 1000, '{"gold": 500}', 'Rabbit Hunter V', 'Hunt 1000 rabbits', 'hare.fill', 'hunting', 114),
+    ('hunt_rabbit', 6, 2500, '{"gold": 750}', 'Rabbit Hunter VI', 'Hunt 2500 rabbits', 'hare.fill', 'hunting', 115),
+    ('hunt_rabbit', 7, 5000, '{"gold": 1000}', 'Rabbit Hunter VII', 'Hunt 5000 rabbits', 'hare.fill', 'hunting', 116),
+    ('hunt_rabbit', 8, 10000, '{"gold": 1500}', 'Rabbit Hunter VIII', 'Hunt 10000 rabbits', 'hare.fill', 'hunting', 117),
+    ('hunt_rabbit', 9, 25000, '{"gold": 2000}', 'Rabbit Hunter IX', 'Hunt 25000 rabbits', 'hare.fill', 'hunting', 118),
+    ('hunt_rabbit', 10, 50000, '{"gold": 3000}', 'Rabbit Hunter X', 'Hunt 50000 rabbits', 'hare.fill', 'hunting', 119)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -50,7 +60,12 @@ VALUES
     ('hunt_deer', 2, 50, '{"gold": 100}', 'Deer Stalker II', 'Hunt 50 deer', 'leaf.circle.fill', 'hunting', 121),
     ('hunt_deer', 3, 100, '{"gold": 200}', 'Deer Stalker III', 'Hunt 100 deer', 'leaf.circle.fill', 'hunting', 122),
     ('hunt_deer', 4, 250, '{"gold": 500}', 'Deer Stalker IV', 'Hunt 250 deer', 'leaf.circle.fill', 'hunting', 123),
-    ('hunt_deer', 5, 500, '{"gold": 1000}', 'Deer Stalker V', 'Hunt 500 deer', 'leaf.circle.fill', 'hunting', 124)
+    ('hunt_deer', 5, 500, '{"gold": 1000}', 'Deer Stalker V', 'Hunt 500 deer', 'leaf.circle.fill', 'hunting', 124),
+    ('hunt_deer', 6, 1000, '{"gold": 1500}', 'Deer Stalker VI', 'Hunt 1000 deer', 'leaf.circle.fill', 'hunting', 125),
+    ('hunt_deer', 7, 2500, '{"gold": 2000}', 'Deer Stalker VII', 'Hunt 2500 deer', 'leaf.circle.fill', 'hunting', 126),
+    ('hunt_deer', 8, 5000, '{"gold": 2500}', 'Deer Stalker VIII', 'Hunt 5000 deer', 'leaf.circle.fill', 'hunting', 127),
+    ('hunt_deer', 9, 10000, '{"gold": 3000}', 'Deer Stalker IX', 'Hunt 10000 deer', 'leaf.circle.fill', 'hunting', 128),
+    ('hunt_deer', 10, 25000, '{"gold": 4000}', 'Deer Stalker X', 'Hunt 25000 deer', 'leaf.circle.fill', 'hunting', 129)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -68,7 +83,12 @@ VALUES
     ('hunt_boar', 2, 25, '{"gold": 150}', 'Boar Slayer II', 'Hunt 25 boars', 'pawprint.fill', 'hunting', 131),
     ('hunt_boar', 3, 50, '{"gold": 300}', 'Boar Slayer III', 'Hunt 50 boars', 'pawprint.fill', 'hunting', 132),
     ('hunt_boar', 4, 100, '{"gold": 600}', 'Boar Slayer IV', 'Hunt 100 boars', 'pawprint.fill', 'hunting', 133),
-    ('hunt_boar', 5, 250, '{"gold": 1500}', 'Boar Slayer V', 'Hunt 250 boars', 'pawprint.fill', 'hunting', 134)
+    ('hunt_boar', 5, 250, '{"gold": 1500}', 'Boar Slayer V', 'Hunt 250 boars', 'pawprint.fill', 'hunting', 134),
+    ('hunt_boar', 6, 500, '{"gold": 2000}', 'Boar Slayer VI', 'Hunt 500 boars', 'pawprint.fill', 'hunting', 135),
+    ('hunt_boar', 7, 1000, '{"gold": 2500}', 'Boar Slayer VII', 'Hunt 1000 boars', 'pawprint.fill', 'hunting', 136),
+    ('hunt_boar', 8, 2500, '{"gold": 3000}', 'Boar Slayer VIII', 'Hunt 2500 boars', 'pawprint.fill', 'hunting', 137),
+    ('hunt_boar', 9, 5000, '{"gold": 4000}', 'Boar Slayer IX', 'Hunt 5000 boars', 'pawprint.fill', 'hunting', 138),
+    ('hunt_boar', 10, 10000, '{"gold": 5000}', 'Boar Slayer X', 'Hunt 10000 boars', 'pawprint.fill', 'hunting', 139)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -86,7 +106,12 @@ VALUES
     ('hunt_bear', 2, 10, '{"gold": 200}', 'Bear Slayer II', 'Hunt 10 bears', 'flame.fill', 'hunting', 141),
     ('hunt_bear', 3, 25, '{"gold": 500}', 'Bear Slayer III', 'Hunt 25 bears', 'flame.fill', 'hunting', 142),
     ('hunt_bear', 4, 50, '{"gold": 1000}', 'Bear Slayer IV', 'Hunt 50 bears', 'flame.fill', 'hunting', 143),
-    ('hunt_bear', 5, 100, '{"gold": 2500}', 'Bear Slayer V', 'Hunt 100 bears', 'flame.fill', 'hunting', 144)
+    ('hunt_bear', 5, 100, '{"gold": 2500}', 'Bear Slayer V', 'Hunt 100 bears', 'flame.fill', 'hunting', 144),
+    ('hunt_bear', 6, 250, '{"gold": 3000}', 'Bear Slayer VI', 'Hunt 250 bears', 'flame.fill', 'hunting', 145),
+    ('hunt_bear', 7, 500, '{"gold": 3500}', 'Bear Slayer VII', 'Hunt 500 bears', 'flame.fill', 'hunting', 146),
+    ('hunt_bear', 8, 1000, '{"gold": 4000}', 'Bear Slayer VIII', 'Hunt 1000 bears', 'flame.fill', 'hunting', 147),
+    ('hunt_bear', 9, 2500, '{"gold": 4500}', 'Bear Slayer IX', 'Hunt 2500 bears', 'flame.fill', 'hunting', 148),
+    ('hunt_bear', 10, 5000, '{"gold": 5000}', 'Bear Slayer X', 'Hunt 5000 bears', 'flame.fill', 'hunting', 149)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -104,7 +129,12 @@ VALUES
     ('hunt_moose', 2, 5, '{"gold": 300}', 'Moose Hunter II', 'Hunt 5 moose', 'crown.fill', 'hunting', 151),
     ('hunt_moose', 3, 10, '{"gold": 600}', 'Moose Hunter III', 'Hunt 10 moose', 'crown.fill', 'hunting', 152),
     ('hunt_moose', 4, 25, '{"gold": 1500}', 'Moose Hunter IV', 'Hunt 25 moose', 'crown.fill', 'hunting', 153),
-    ('hunt_moose', 5, 50, '{"gold": 3000}', 'Moose Hunter V', 'Hunt 50 moose', 'crown.fill', 'hunting', 154)
+    ('hunt_moose', 5, 50, '{"gold": 3000}', 'Moose Hunter V', 'Hunt 50 moose', 'crown.fill', 'hunting', 154),
+    ('hunt_moose', 6, 100, '{"gold": 3500}', 'Moose Hunter VI', 'Hunt 100 moose', 'crown.fill', 'hunting', 155),
+    ('hunt_moose', 7, 250, '{"gold": 4000}', 'Moose Hunter VII', 'Hunt 250 moose', 'crown.fill', 'hunting', 156),
+    ('hunt_moose', 8, 500, '{"gold": 4500}', 'Moose Hunter VIII', 'Hunt 500 moose', 'crown.fill', 'hunting', 157),
+    ('hunt_moose', 9, 1000, '{"gold": 5000}', 'Moose Hunter IX', 'Hunt 1000 moose', 'crown.fill', 'hunting', 158),
+    ('hunt_moose', 10, 2500, '{"gold": 5500}', 'Moose Hunter X', 'Hunt 2500 moose', 'crown.fill', 'hunting', 159)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -150,7 +180,12 @@ VALUES
     ('catch_minnow', 2, 100, '{"gold": 50}', 'Minnow Catcher II', 'Catch 100 minnows', 'fish.fill', 'fishing', 201),
     ('catch_minnow', 3, 250, '{"gold": 100}', 'Minnow Catcher III', 'Catch 250 minnows', 'fish.fill', 'fishing', 202),
     ('catch_minnow', 4, 500, '{"gold": 200}', 'Minnow Catcher IV', 'Catch 500 minnows', 'fish.fill', 'fishing', 203),
-    ('catch_minnow', 5, 1000, '{"gold": 500}', 'Minnow Catcher V', 'Catch 1000 minnows', 'fish.fill', 'fishing', 204)
+    ('catch_minnow', 5, 1000, '{"gold": 500}', 'Minnow Catcher V', 'Catch 1000 minnows', 'fish.fill', 'fishing', 204),
+    ('catch_minnow', 6, 2500, '{"gold": 750}', 'Minnow Catcher VI', 'Catch 2500 minnows', 'fish.fill', 'fishing', 205),
+    ('catch_minnow', 7, 5000, '{"gold": 1000}', 'Minnow Catcher VII', 'Catch 5000 minnows', 'fish.fill', 'fishing', 206),
+    ('catch_minnow', 8, 10000, '{"gold": 1500}', 'Minnow Catcher VIII', 'Catch 10000 minnows', 'fish.fill', 'fishing', 207),
+    ('catch_minnow', 9, 25000, '{"gold": 2000}', 'Minnow Catcher IX', 'Catch 25000 minnows', 'fish.fill', 'fishing', 208),
+    ('catch_minnow', 10, 50000, '{"gold": 3000}', 'Minnow Catcher X', 'Catch 50000 minnows', 'fish.fill', 'fishing', 209)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -168,7 +203,12 @@ VALUES
     ('catch_bass', 2, 100, '{"gold": 50}', 'Bass Fisher II', 'Catch 100 bass', 'fish.fill', 'fishing', 211),
     ('catch_bass', 3, 250, '{"gold": 100}', 'Bass Fisher III', 'Catch 250 bass', 'fish.fill', 'fishing', 212),
     ('catch_bass', 4, 500, '{"gold": 200}', 'Bass Fisher IV', 'Catch 500 bass', 'fish.fill', 'fishing', 213),
-    ('catch_bass', 5, 1000, '{"gold": 500}', 'Bass Fisher V', 'Catch 1000 bass', 'fish.fill', 'fishing', 214)
+    ('catch_bass', 5, 1000, '{"gold": 500}', 'Bass Fisher V', 'Catch 1000 bass', 'fish.fill', 'fishing', 214),
+    ('catch_bass', 6, 2500, '{"gold": 750}', 'Bass Fisher VI', 'Catch 2500 bass', 'fish.fill', 'fishing', 215),
+    ('catch_bass', 7, 5000, '{"gold": 1000}', 'Bass Fisher VII', 'Catch 5000 bass', 'fish.fill', 'fishing', 216),
+    ('catch_bass', 8, 10000, '{"gold": 1500}', 'Bass Fisher VIII', 'Catch 10000 bass', 'fish.fill', 'fishing', 217),
+    ('catch_bass', 9, 25000, '{"gold": 2000}', 'Bass Fisher IX', 'Catch 25000 bass', 'fish.fill', 'fishing', 218),
+    ('catch_bass', 10, 50000, '{"gold": 3000}', 'Bass Fisher X', 'Catch 50000 bass', 'fish.fill', 'fishing', 219)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -186,7 +226,12 @@ VALUES
     ('catch_salmon', 2, 50, '{"gold": 100}', 'Salmon Seeker II', 'Catch 50 salmon', 'fish.fill', 'fishing', 221),
     ('catch_salmon', 3, 100, '{"gold": 200}', 'Salmon Seeker III', 'Catch 100 salmon', 'fish.fill', 'fishing', 222),
     ('catch_salmon', 4, 250, '{"gold": 500}', 'Salmon Seeker IV', 'Catch 250 salmon', 'fish.fill', 'fishing', 223),
-    ('catch_salmon', 5, 500, '{"gold": 1000}', 'Salmon Seeker V', 'Catch 500 salmon', 'fish.fill', 'fishing', 224)
+    ('catch_salmon', 5, 500, '{"gold": 1000}', 'Salmon Seeker V', 'Catch 500 salmon', 'fish.fill', 'fishing', 224),
+    ('catch_salmon', 6, 1000, '{"gold": 1500}', 'Salmon Seeker VI', 'Catch 1000 salmon', 'fish.fill', 'fishing', 225),
+    ('catch_salmon', 7, 2500, '{"gold": 2000}', 'Salmon Seeker VII', 'Catch 2500 salmon', 'fish.fill', 'fishing', 226),
+    ('catch_salmon', 8, 5000, '{"gold": 2500}', 'Salmon Seeker VIII', 'Catch 5000 salmon', 'fish.fill', 'fishing', 227),
+    ('catch_salmon', 9, 10000, '{"gold": 3000}', 'Salmon Seeker IX', 'Catch 10000 salmon', 'fish.fill', 'fishing', 228),
+    ('catch_salmon', 10, 25000, '{"gold": 4000}', 'Salmon Seeker X', 'Catch 25000 salmon', 'fish.fill', 'fishing', 229)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -204,7 +249,12 @@ VALUES
     ('catch_catfish', 2, 25, '{"gold": 150}', 'Catfish Hunter II', 'Catch 25 catfish', 'fish.fill', 'fishing', 231),
     ('catch_catfish', 3, 50, '{"gold": 300}', 'Catfish Hunter III', 'Catch 50 catfish', 'fish.fill', 'fishing', 232),
     ('catch_catfish', 4, 100, '{"gold": 600}', 'Catfish Hunter IV', 'Catch 100 catfish', 'fish.fill', 'fishing', 233),
-    ('catch_catfish', 5, 250, '{"gold": 1500}', 'Catfish Hunter V', 'Catch 250 catfish', 'fish.fill', 'fishing', 234)
+    ('catch_catfish', 5, 250, '{"gold": 1500}', 'Catfish Hunter V', 'Catch 250 catfish', 'fish.fill', 'fishing', 234),
+    ('catch_catfish', 6, 500, '{"gold": 2000}', 'Catfish Hunter VI', 'Catch 500 catfish', 'fish.fill', 'fishing', 235),
+    ('catch_catfish', 7, 1000, '{"gold": 2500}', 'Catfish Hunter VII', 'Catch 1000 catfish', 'fish.fill', 'fishing', 236),
+    ('catch_catfish', 8, 2500, '{"gold": 3000}', 'Catfish Hunter VIII', 'Catch 2500 catfish', 'fish.fill', 'fishing', 237),
+    ('catch_catfish', 9, 5000, '{"gold": 4000}', 'Catfish Hunter IX', 'Catch 5000 catfish', 'fish.fill', 'fishing', 238),
+    ('catch_catfish', 10, 10000, '{"gold": 5000}', 'Catfish Hunter X', 'Catch 10000 catfish', 'fish.fill', 'fishing', 239)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -222,7 +272,12 @@ VALUES
     ('catch_legendary_carp', 2, 5, '{"gold": 250}', 'Legend Finder II', 'Catch 5 legendary carp', 'sparkles', 'fishing', 241),
     ('catch_legendary_carp', 3, 10, '{"gold": 400}', 'Legend Finder III', 'Catch 10 legendary carp', 'sparkles', 'fishing', 242),
     ('catch_legendary_carp', 4, 25, '{"gold": 600}', 'Legend Finder IV', 'Catch 25 legendary carp', 'sparkles', 'fishing', 243),
-    ('catch_legendary_carp', 5, 50, '{"gold": 1000}', 'Legend Finder V', 'Catch 50 legendary carp', 'sparkles', 'fishing', 244)
+    ('catch_legendary_carp', 5, 50, '{"gold": 1000}', 'Legend Finder V', 'Catch 50 legendary carp', 'sparkles', 'fishing', 244),
+    ('catch_legendary_carp', 6, 100, '{"gold": 1500}', 'Legend Finder VI', 'Catch 100 legendary carp', 'sparkles', 'fishing', 245),
+    ('catch_legendary_carp', 7, 250, '{"gold": 2000}', 'Legend Finder VII', 'Catch 250 legendary carp', 'sparkles', 'fishing', 246),
+    ('catch_legendary_carp', 8, 500, '{"gold": 3000}', 'Legend Finder VIII', 'Catch 500 legendary carp', 'sparkles', 'fishing', 247),
+    ('catch_legendary_carp', 9, 1000, '{"gold": 4000}', 'Legend Finder IX', 'Catch 1000 legendary carp', 'sparkles', 'fishing', 248),
+    ('catch_legendary_carp', 10, 2500, '{"gold": 5000}', 'Legend Finder X', 'Catch 2500 legendary carp', 'sparkles', 'fishing', 249)
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -244,7 +299,9 @@ VALUES
     ('fish_caught', 3, 1000, '{"gold": 200}', 'Expert Angler', 'Catch 1000 fish', 'fish.fill', 'fishing', 252, 'Total fish caught (any type)'),
     ('fish_caught', 4, 2500, '{"gold": 500}', 'Master Angler', 'Catch 2500 fish', 'fish.fill', 'fishing', 253, 'Total fish caught (any type)'),
     ('fish_caught', 5, 5000, '{"gold": 1000}', 'Veteran Angler', 'Catch 5000 fish', 'fish.fill', 'fishing', 254, 'Total fish caught (any type)'),
-    ('fish_caught', 6, 10000, '{"gold": 2500}', 'Legendary Angler', 'Catch 10000 fish', 'fish.fill', 'fishing', 255, 'Total fish caught (any type)')
+    ('fish_caught', 6, 10000, '{"gold": 2500}', 'Legendary Angler', 'Catch 10000 fish', 'fish.fill', 'fishing', 255, 'Total fish caught (any type)'),
+    ('fish_caught', 7, 25000, '{"gold": 3500}', 'Mythic Angler', 'Catch 25000 fish', 'fish.fill', 'fishing', 256, 'Total fish caught (any type)'),
+    ('fish_caught', 8, 50000, '{"gold": 5000}', 'Eternal Angler', 'Catch 50000 fish', 'fish.fill', 'fishing', 257, 'Total fish caught (any type)')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -1050,6 +1107,136 @@ VALUES
     ('kingdoms_visited', 4, 50, '{"gold": 500}', 'World Traveler IV', 'Visit 50 different kingdoms', 'map.fill', 'exploration', 953, 'Kingdoms visited'),
     ('kingdoms_visited', 5, 100, '{"gold": 1000}', 'World Traveler V', 'Visit 100 different kingdoms', 'map.fill', 'exploration', 954, 'Kingdoms visited'),
     ('kingdoms_visited', 6, 250, '{"gold": 2500}', 'Globe Trotter', 'Visit 250 different kingdoms', 'map.fill', 'exploration', 955, 'Kingdoms visited')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- Check-ins
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('checkins_completed', 1, 50, '{"gold": 50}', 'I Was Here', 'Check in 50 times', 'location.circle.fill', 'exploration', 1010, 'Total check-ins'),
+    ('checkins_completed', 2, 150, '{"gold": 100}', 'Frequent Flyer', 'Check in 150 times', 'location.circle.fill', 'exploration', 1011, 'Total check-ins'),
+    ('checkins_completed', 3, 500, '{"gold": 250}', 'The Usual', 'Check in 500 times', 'location.circle.fill', 'exploration', 1012, 'Total check-ins'),
+    ('checkins_completed', 4, 1500, '{"gold": 500}', 'Come Here Often?', 'Check in 1,500 times', 'location.circle.fill', 'exploration', 1013, 'Total check-ins'),
+    ('checkins_completed', 5, 5000, '{"gold": 1000}', 'Do You Even Leave?', 'Check in 5,000 times', 'location.circle.fill', 'exploration', 1014, 'Total check-ins'),
+    ('checkins_completed', 6, 15000, '{"gold": 2500}', 'Touched Grass 15000x', 'Check in 15,000 times', 'location.circle.fill', 'exploration', 1015, 'Total check-ins'),
+    ('checkins_completed', 7, 50000, '{"gold": 5000}', 'I Live Here Now', 'Check in 50,000 times', 'location.circle.fill', 'exploration', 1016, 'Total check-ins')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- =====================================================
+-- REPUTATION ACHIEVEMENTS
+-- =====================================================
+
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('reputation_earned', 1, 500, '{"gold": 100}', 'Resident', 'Earn 500 reputation', 'star.fill', 'reputation', 1000, 'Reputation in current kingdom'),
+    ('reputation_earned', 2, 1000, '{"gold": 250}', 'Citizen', 'Earn 1000 reputation', 'star.fill', 'reputation', 1001, 'Reputation in current kingdom'),
+    ('reputation_earned', 3, 15000, '{"gold": 1500}', 'Notable', 'Earn 15000 reputation', 'star.fill', 'reputation', 1002, 'Reputation in current kingdom'),
+    ('reputation_earned', 4, 25000, '{"gold": 3000}', 'Champion', 'Earn 25000 reputation', 'star.fill', 'reputation', 1003, 'Reputation in current kingdom'),
+    ('reputation_earned', 5, 50000, '{"gold": 5000}', 'Legendary', 'Earn 50000 reputation', 'star.fill', 'reputation', 1004, 'Reputation in current kingdom')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- =====================================================
+-- SOCIAL ACHIEVEMENTS
+-- =====================================================
+
+-- Friends Made
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('friends_made', 1, 5, '{"gold": 50}', 'Small Talk', 'Make 5 friends', 'person.2.fill', 'social', 1020, 'Friends made'),
+    ('friends_made', 2, 15, '{"gold": 150}', 'Mr. Popular', 'Make 15 friends', 'person.2.fill', 'social', 1021, 'Friends made'),
+    ('friends_made', 3, 30, '{"gold": 300}', 'Mrs. Popular', 'Make 30 friends', 'person.2.fill', 'social', 1022, 'Friends made'),
+    ('friends_made', 4, 50, '{"gold": 600}', 'Deep Network', 'Make 50 friends', 'person.2.fill', 'social', 1023, 'Friends made'),
+    ('friends_made', 5, 100, '{"gold": 1500}', 'The Man', 'Make 100 friends', 'person.2.fill', 'social', 1024, 'Friends made'),
+    ('friends_made', 6, 250, '{"gold": 3000}', 'I Have 250 Friends', 'Make 250 friends', 'person.2.fill', 'social', 1025, 'Friends made')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- =====================================================
+-- PROGRESSION ACHIEVEMENTS
+-- =====================================================
+
+-- Gold Held
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('gold_held', 1, 1000, '{"gold": 100}', 'Piggy Bank', 'Hold 1,000 gold', 'g.circle.fill', 'progression', 1030, 'Gold held at once'),
+    ('gold_held', 2, 2500, '{"gold": 250}', 'Stacking Paper', 'Hold 2,500 gold', 'g.circle.fill', 'progression', 1031, 'Gold held at once'),
+    ('gold_held', 3, 5000, '{"gold": 500}', 'Money Bags', 'Hold 5,000 gold', 'g.circle.fill', 'progression', 1032, 'Gold held at once'),
+    ('gold_held', 4, 10000, '{"gold": 1000}', 'Baller', 'Hold 10,000 gold', 'g.circle.fill', 'progression', 1033, 'Gold held at once'),
+    ('gold_held', 5, 50000, '{"gold": 5000}', 'Fat Stacks', 'Hold 50,000 gold', 'g.circle.fill', 'progression', 1034, 'Gold held at once'),
+    ('gold_held', 6, 1000000, '{"gold": 25000}', 'Literally A Millionaire', 'Hold 1,000,000 gold', 'g.circle.fill', 'progression', 1035, 'Gold held at once')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- Player Level
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('player_level', 1, 3, '{"gold": 50}', 'Tutorial Island', 'Reach level 3', 'star.circle.fill', 'progression', 1040, 'Player level reached'),
+    ('player_level', 2, 5, '{"gold": 500}', 'High Five', 'Reach level 5', 'star.circle.fill', 'progression', 1041, 'Player level reached'),
+    ('player_level', 3, 8, '{"gold": 1000}', 'Gr8', 'Reach level 8', 'star.circle.fill', 'progression', 1042, 'Player level reached'),
+    ('player_level', 4, 10, '{"gold": 2000}', '10th B-Day', 'Reach level 10', 'star.circle.fill', 'progression', 1043, 'Player level reached'),
+    ('player_level', 5, 12, '{"gold": 3000}', 'Dirty Dozen', 'Reach level 12', 'star.circle.fill', 'progression', 1044, 'Player level reached'),
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
+-- Total Skill Points
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('total_skill_points', 1, 5, '{"gold": 50}', 'Trying It', 'Earn 5 total skill points', 'chart.bar.fill', 'progression', 1050, 'Total skill points earned'),
+    ('total_skill_points', 2, 10, '{"gold": 150}', 'Spreading Out', 'Earn 10 total skill points', 'chart.bar.fill', 'progression', 1051, 'Total skill points earned'),
+    ('total_skill_points', 3, 20, '{"gold": 300}', 'Well Rounded', 'Earn 20 total skill points', 'chart.bar.fill', 'progression', 1052, 'Total skill points earned'),
+    ('total_skill_points', 4, 30, '{"gold": 750}', 'Swiss Army Knife', 'Earn 30 total skill points', 'chart.bar.fill', 'progression', 1053, 'Total skill points earned'),
+    ('total_skill_points', 5, 40, '{"gold": 1500}', 'Almost There', 'Earn 40 total skill points', 'chart.bar.fill', 'progression', 1054, 'Total skill points earned'),
+    ('total_skill_points', 6, 45, '{"gold": 3000}', 'Maxed Main BTW', 'Earn 45 total skill points', 'chart.bar.fill', 'progression', 1055, 'Total skill points earned')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
