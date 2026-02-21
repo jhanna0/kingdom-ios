@@ -16,7 +16,7 @@ class StoreService: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastPurchaseResult: PurchaseResult?
-    @Published private(set) var isSubscriber: Bool = false  // Active subscription status
+    @Published private(set) var isSubscriber: Bool? = nil  // nil = loading, true/false = confirmed
     
     /// Server-side product configuration
     struct ServerProduct: Decodable {
@@ -399,6 +399,7 @@ class StoreService: ObservableObject {
             await MainActor.run {
                 self.isSubscriber = hasActiveEntitlement
             }
+            return
         }
     }
     
@@ -421,8 +422,8 @@ class StoreService: ObservableObject {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
                 
-                // Send to backend
-                let success = await deliverSubscription(transaction)
+                // Send to backend (new purchase, not sync)
+                let success = await deliverSubscription(transaction, isNewPurchase: true)
                 
                 await transaction.finish()
                 
@@ -461,7 +462,8 @@ class StoreService: ObservableObject {
     }
     
     /// Deliver subscription to backend
-    private func deliverSubscription(_ transaction: Transaction) async -> Bool {
+    /// - Parameter isNewPurchase: true if this is a fresh purchase, false if sync/restore
+    private func deliverSubscription(_ transaction: Transaction, isNewPurchase: Bool = false) async -> Bool {
         print("⭐ Delivering subscription: \(transaction.productID)")
         print("   Transaction ID: \(transaction.id)")
         print("   Expires: \(transaction.expirationDate?.description ?? "N/A")")
@@ -486,8 +488,10 @@ class StoreService: ObservableObject {
                     self.isSubscriber = true
                 }
                 
-                // Notify the app
-                NotificationCenter.default.post(name: .subscriptionActivated, object: nil)
+                // Only notify for new purchases, not syncs
+                if isNewPurchase {
+                    NotificationCenter.default.post(name: .subscriptionActivated, object: nil)
+                }
                 
                 return true
             } else {

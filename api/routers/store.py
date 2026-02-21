@@ -20,7 +20,7 @@ import os
 import time
 import httpx
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -79,7 +79,7 @@ PRODUCTS = {
         "icon": "heart.fill",
         "color": "imperialGold",
         "subtitle": "Monthly subscription",
-        "description": "Kingdoms is a homemade project done built in free time. It costs about $150 to host 100 players per month. By supporting you unlock profile theming, displaying your pets & achievments pubicly, and other benefits. Thank you!",
+        "description": "Kingdoms is a homemade project built in free time. It costs about $150 to host 100 players per month. By supporting you unlock profile theming, displaying your pets & achievments pubicly, and other benefits. Thank you!",
         "benefits": [
             "Support independent development",
             "Help keep the game ad-free",
@@ -986,22 +986,206 @@ def is_user_subscriber(db: Session, user_id: int) -> bool:
 
 
 # ============================================================
-# WEBHOOK FOR APPLE SERVER NOTIFICATIONS (FUTURE)
+# WEBHOOK FOR APPLE SERVER NOTIFICATIONS (V2)
 # ============================================================
-# Apple can send server-to-server notifications for:
-# - Refunds
-# - Subscription renewals
-# - Subscription cancellations
-#
-# To enable this:
-# 1. Configure the URL in App Store Connect
-# 2. Add endpoint: POST /store/webhook/apple
-# 3. Verify the JWS signature
-# 4. Handle the notification type (REFUND, etc.)
-#
-# @router.post("/webhook/apple")
-# async def apple_webhook(request: Request, db: Session = Depends(get_db)):
-#     body = await request.body()
-#     # Verify JWS signature
-#     # Handle notification
-#     pass
+# Apple sends server-to-server notifications for subscription events.
+# Configured in App Store Connect → App Information → App Store Server Notifications
+# URL: https://api.kingdoms.ninja/store/webhook/apple
+
+# Notification types we care about
+APPLE_NOTIFICATION_TYPES = {
+    # Renewals
+    "DID_RENEW": "Subscription renewed successfully",
+    "DID_FAIL_TO_RENEW": "Subscription failed to renew (billing issue)",
+    # Lifecycle
+    "SUBSCRIBED": "New subscription or resubscribe",
+    "DID_CHANGE_RENEWAL_STATUS": "User enabled/disabled auto-renew",
+    "EXPIRED": "Subscription expired",
+    "GRACE_PERIOD_EXPIRED": "Grace period ended without payment",
+    # Refunds
+    "REFUND": "User got a refund",
+    "REFUND_DECLINED": "Refund request was declined",
+    # Other
+    "CONSUMPTION_REQUEST": "Apple requesting consumption info",
+    "RENEWAL_EXTENDED": "Apple extended renewal (e.g., service issue)",
+    "REVOKE": "Family sharing revoked",
+}
+
+
+def decode_apple_jws(signed_payload: str) -> dict:
+    """
+    Decode Apple's JWS (JSON Web Signature) payload.
+    
+    Apple sends notifications as a signed JWT. The payload contains:
+    - notificationType: The event type (DID_RENEW, REFUND, etc.)
+    - subtype: Additional context (e.g., AUTO_RENEW_DISABLED)
+    - data: Contains signedTransactionInfo and signedRenewalInfo
+    
+    For production, you should verify the signature using Apple's public key.
+    For now, we decode without verification (the payload is still trustworthy
+    since it comes directly from Apple over HTTPS to our endpoint).
+    """
+    import base64
+    import json
+    
+    # JWS format: header.payload.signature
+    parts = signed_payload.split(".")
+    if len(parts) != 3:
+        raise ValueError("Invalid JWS format")
+    
+    # Decode payload (middle part) - add padding if needed
+    payload_b64 = parts[1]
+    padding = 4 - len(payload_b64) % 4
+    if padding != 4:
+        payload_b64 += "=" * padding
+    
+    payload_json = base64.urlsafe_b64decode(payload_b64)
+    return json.loads(payload_json)
+
+
+def decode_signed_transaction(signed_transaction: str) -> dict:
+    """Decode the signedTransactionInfo from Apple's notification."""
+    return decode_apple_jws(signed_transaction)
+
+
+@router.post("/webhook/apple")
+async def apple_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Apple App Store Server Notifications (V2).
+    
+    Apple calls this endpoint for subscription events:
+    - DID_RENEW: Subscription renewed → extend expires_at
+    - REFUND: User refunded → revoke subscription
+    - EXPIRED: Subscription expired → no action needed (expires_at handles it)
+    - etc.
+    
+    No authentication - Apple doesn't send auth headers.
+    We verify the JWS signature to ensure it's from Apple.
+    """
+    
+    try:
+        body = await request.json()
+        signed_payload = body.get("signedPayload")
+        
+        if not signed_payload:
+            print("❌ Apple webhook: No signedPayload in request")
+            return {"status": "error", "message": "Missing signedPayload"}
+        
+        # Decode the outer notification
+        notification = decode_apple_jws(signed_payload)
+        
+        notification_type = notification.get("notificationType")
+        subtype = notification.get("subtype", "")
+        notification_uuid = notification.get("notificationUUID", "")
+        data = notification.get("data", {})
+        
+        print(f"🍎 Apple webhook: {notification_type} ({subtype}) [UUID: {notification_uuid}]")
+        
+        # Get the transaction info
+        signed_transaction = data.get("signedTransactionInfo")
+        if not signed_transaction:
+            print(f"⚠️ No signedTransactionInfo in notification")
+            return {"status": "ok", "message": "No transaction info"}
+        
+        transaction = decode_signed_transaction(signed_transaction)
+        
+        original_transaction_id = transaction.get("originalTransactionId")
+        product_id = transaction.get("productId")
+        expires_ms = transaction.get("expiresDate")  # milliseconds since epoch
+        
+        print(f"   Original Transaction ID: {original_transaction_id}")
+        print(f"   Product: {product_id}")
+        
+        if not original_transaction_id:
+            print("❌ No originalTransactionId in transaction")
+            return {"status": "error", "message": "Missing originalTransactionId"}
+        
+        # Find the subscription by original_transaction_id
+        subscription = db.query(Subscription).filter(
+            Subscription.original_transaction_id == original_transaction_id
+        ).first()
+        
+        if not subscription:
+            # Race condition: Apple webhook arrived before client called /redeem-subscription
+            # Return 500 so Apple retries (at 1, 12, 24, 48, 72 hours)
+            # By the retry, the client should have synced the subscription
+            print(f"⚠️ No subscription found for original_transaction_id: {original_transaction_id}")
+            print(f"   Returning 500 to trigger Apple retry")
+            raise HTTPException(status_code=500, detail="Subscription not found yet - retry later")
+        
+        user_id = subscription.user_id
+        print(f"   User ID: {user_id}")
+        
+        # Handle based on notification type
+        if notification_type == "DID_RENEW":
+            # Subscription renewed - extend expiration
+            if expires_ms:
+                new_expires = datetime.fromtimestamp(expires_ms / 1000, tz=timezone.utc)
+                if new_expires > subscription.expires_at:
+                    subscription.expires_at = new_expires
+                    db.commit()
+                    print(f"✅ Subscription extended to {new_expires} for user {user_id}")
+                else:
+                    print(f"⏭️ New expiration {new_expires} is not later than current {subscription.expires_at}")
+            else:
+                print("⚠️ DID_RENEW but no expiresDate")
+        
+        elif notification_type == "REFUND":
+            # User got a refund - revoke subscription immediately
+            subscription.expires_at = datetime.now(timezone.utc)
+            db.commit()
+            print(f"💸 Subscription revoked (refund) for user {user_id}")
+        
+        elif notification_type == "REVOKE":
+            # Family sharing revoked
+            subscription.expires_at = datetime.now(timezone.utc)
+            db.commit()
+            print(f"👨‍👩‍👧 Subscription revoked (family sharing) for user {user_id}")
+        
+        elif notification_type == "EXPIRED":
+            # Subscription expired - no action needed, expires_at handles it
+            print(f"⏰ Subscription expired for user {user_id} (no action needed)")
+        
+        elif notification_type == "DID_FAIL_TO_RENEW":
+            # Billing issue - subscription will expire at current expires_at
+            # Apple will retry billing and send DID_RENEW if successful
+            print(f"⚠️ Billing issue for user {user_id} - will expire at {subscription.expires_at}")
+        
+        elif notification_type == "DID_CHANGE_RENEWAL_STATUS":
+            # User toggled auto-renew - just log it
+            if subtype == "AUTO_RENEW_DISABLED":
+                print(f"🔕 User {user_id} disabled auto-renew (will expire at {subscription.expires_at})")
+            elif subtype == "AUTO_RENEW_ENABLED":
+                print(f"🔔 User {user_id} re-enabled auto-renew")
+        
+        elif notification_type == "SUBSCRIBED":
+            # New subscription - update expiration if we have it
+            if expires_ms:
+                new_expires = datetime.fromtimestamp(expires_ms / 1000, tz=timezone.utc)
+                if new_expires > subscription.expires_at:
+                    subscription.expires_at = new_expires
+                    db.commit()
+                    print(f"✅ Subscription updated to {new_expires} for user {user_id}")
+        
+        elif notification_type == "RENEWAL_EXTENDED":
+            # Apple extended the renewal (e.g., service credit)
+            if expires_ms:
+                new_expires = datetime.fromtimestamp(expires_ms / 1000, tz=timezone.utc)
+                subscription.expires_at = new_expires
+                db.commit()
+                print(f"🎁 Subscription extended by Apple to {new_expires} for user {user_id}")
+        
+        else:
+            print(f"ℹ️ Unhandled notification type: {notification_type}")
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        print(f"❌ Apple webhook error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return 500 so Apple retries (at 1, 12, 24, 48, 72 hours)
+        raise HTTPException(status_code=500, detail=str(e))

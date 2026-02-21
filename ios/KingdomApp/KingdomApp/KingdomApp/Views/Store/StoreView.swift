@@ -437,7 +437,7 @@ private struct SubscriptionCard: View {
                             .font(FontStyles.headingSmall)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        if store.isSubscriber {
+                        if store.isSubscriber == true {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(KingdomTheme.Colors.buttonSuccess)
@@ -451,7 +451,7 @@ private struct SubscriptionCard: View {
                 
                 Spacer()
                 
-                if !store.isSubscriber {
+                if store.isSubscriber == false {
                     Button {
                         Task {
                             isPurchasing = true
