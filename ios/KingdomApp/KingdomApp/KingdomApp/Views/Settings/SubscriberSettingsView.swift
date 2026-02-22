@@ -167,7 +167,7 @@ private struct StyleGrid: View {
     
     var body: some View {
         LazyVGrid(columns: columns, spacing: 12) {
-            // Default/None option
+            // Default/None option (parchment/ink colors for both icon and card)
             Button { selectedStyle = nil } label: {
                 VStack(spacing: 6) {
                     if isCard {
@@ -180,9 +180,9 @@ private struct StyleGrid: View {
                     } else {
                         Text("A")
                             .font(FontStyles.headingSmall)
-                            .foregroundColor(.black)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
                             .frame(width: 48, height: 48)
-                            .brutalistBadge(backgroundColor: .white, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
+                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12, shadowOffset: 2, borderWidth: 2)
                     }
                     Text("Default")
                         .font(FontStyles.labelSmall)

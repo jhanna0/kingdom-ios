@@ -52,12 +52,13 @@ struct APISubscriberCustomization: Codable {
     }
     
     // Convenience computed properties for backwards compatibility
+    // Default colors match the parchment/ink theme
     var iconBackgroundColorValue: Color {
-        iconStyle?.backgroundColorValue ?? .white
+        iconStyle?.backgroundColorValue ?? KingdomTheme.Colors.parchmentLight
     }
     
     var iconTextColorValue: Color {
-        iconStyle?.textColorValue ?? .black
+        iconStyle?.textColorValue ?? KingdomTheme.Colors.inkDark
     }
     
     var cardBackgroundColorValue: Color {

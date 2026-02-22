@@ -520,8 +520,8 @@ def work_on_property_upgrade(
                 property_obj.last_upgraded = datetime.utcnow()
             
             # Log property completion to activity feed
-            from routers.tiers import PROPERTY_TIERS
-            tier_name = PROPERTY_TIERS.get(contract.tier, {}).get("name", f"T{contract.tier}")
+            from routers.property import get_option_name, get_tier_name
+            tier_name = get_option_name(contract.tier, contract.option_id) if contract.option_id else get_tier_name(contract.tier)
             log_activity(
                 db=db,
                 user_id=current_user.id,
@@ -535,8 +535,8 @@ def work_on_property_upgrade(
             )
     else:
         # Log property work to activity feed
-        from routers.tiers import PROPERTY_TIERS
-        tier_name = PROPERTY_TIERS.get(contract.tier, {}).get("name", f"T{contract.tier}")
+        from routers.property import get_option_name, get_tier_name
+        tier_name = get_option_name(contract.tier, contract.option_id) if contract.option_id else get_tier_name(contract.tier)
         log_activity(
             db=db,
             user_id=current_user.id,

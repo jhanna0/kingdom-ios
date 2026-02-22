@@ -51,6 +51,9 @@ class UserPreferences(Base):
 # =============================================================================
 
 STYLE_PRESETS = {
+    # Classic
+    "black_on_white": {"background": "#FFFFFF", "text": "#000000", "name": "Marble"},
+    
     # Royal / Luxury
     "royal_purple": {"background": "#4C1D95", "text": "#F5D742", "name": "Royal Purple"},
     "imperial_gold": {"background": "#78350F", "text": "#FCD34D", "name": "Imperial Gold"},
