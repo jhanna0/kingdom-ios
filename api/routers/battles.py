@@ -30,6 +30,7 @@ from systems.battle.config import (
     # Cooldowns
     COUP_PLAYER_COOLDOWN_DAYS,
     COUP_KINGDOM_COOLDOWN_DAYS,
+    COUP_RULER_PROTECTION_DAYS,
     INVASION_KINGDOM_COOLDOWN_DAYS,
     INVASION_AFTER_COUP_COOLDOWN_DAYS,
     BATTLE_BUFFER_DAYS,
@@ -1295,6 +1296,16 @@ def initiate_coup(
     if kingdom.ruler_id == current_user.id:
         raise HTTPException(status_code=400, detail="You already rule this kingdom")
     
+    # Check ruler has been in power for at least 7 days (new ruler protection)
+    if kingdom.ruler_started_at:
+        ruler_tenure = datetime.utcnow() - kingdom.ruler_started_at
+        if ruler_tenure.days < COUP_RULER_PROTECTION_DAYS:
+            days_remaining = COUP_RULER_PROTECTION_DAYS - ruler_tenure.days
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot coup: Ruler has only been in power for {ruler_tenure.days} days. Must wait at least {COUP_RULER_PROTECTION_DAYS} days ({days_remaining} days remaining)."
+            )
+    
     if state.current_kingdom_id != kingdom.id:
         raise HTTPException(status_code=400, detail="You must be checked in to this kingdom to initiate a coup")
     
@@ -1414,6 +1425,16 @@ def declare_invasion(
     # Target must have a ruler
     if not target_kingdom.ruler_id:
         raise HTTPException(status_code=400, detail="Cannot invade a kingdom with no ruler")
+    
+    # Check ruler has been in power for at least 30 days (new ruler protection)
+    if target_kingdom.ruler_started_at:
+        ruler_tenure = datetime.utcnow() - target_kingdom.ruler_started_at
+        if ruler_tenure.days < 30:
+            days_remaining = 30 - ruler_tenure.days
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot invade: Ruler has only been in power for {ruler_tenure.days} days. Must wait at least 30 days ({days_remaining} days remaining)."
+            )
     
     # Can't invade yourself
     if target_kingdom.ruler_id == current_user.id:

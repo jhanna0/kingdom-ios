@@ -478,6 +478,7 @@ def resolve_invasion(
         initiator_state = _get_player_state(db, initiator)
         
         target.ruler_id = initiator.id
+        target.ruler_started_at = datetime.utcnow()
         target.empire_id = attacking.empire_id or attacking.id
         
         new_ruler_id = initiator.id

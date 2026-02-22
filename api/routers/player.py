@@ -1077,6 +1077,7 @@ def relocate_hometown(
                 if old_empire_id != new_empire_id:
                     will_lose_ruler_status = True
                     old_hometown.ruler_id = None
+                    old_hometown.ruler_started_at = None
                     print(f"👑❌ {current_user.display_name} lost ruler status in {old_hometown.name} due to relocation")
     
     # Update hometown

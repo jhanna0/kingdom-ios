@@ -684,7 +684,14 @@ def get_action_status(
             coup_ineligibility_reason = "You are the ruler"
         elif state.hometown_kingdom_id != state.current_kingdom_id:
             coup_ineligibility_reason = "Can only coup in your hometown"
-        else:
+        elif kingdom.ruler_started_at:
+            # Check 7-day new ruler protection
+            ruler_tenure = datetime.utcnow() - kingdom.ruler_started_at
+            if ruler_tenure.days < 7:
+                days_remaining = 7 - ruler_tenure.days
+                coup_ineligibility_reason = f"Ruler protected for {days_remaining} more days"
+        
+        if not coup_ineligibility_reason:
             # Check for active battle (coup or invasion) first
             from db.models import Battle
             active_battle = db.query(Battle).filter(
@@ -773,7 +780,15 @@ def get_action_status(
                 invasion_ineligibility_reason = "Must rule a kingdom to invade"
             elif not kingdom.ruler_id:
                 invasion_ineligibility_reason = "Cannot invade unruled kingdom"
-            else:
+            elif kingdom.ruler_started_at:
+                # Check 30-day new ruler protection
+                from datetime import datetime
+                ruler_tenure = datetime.utcnow() - kingdom.ruler_started_at
+                if ruler_tenure.days < 30:
+                    days_remaining = 30 - ruler_tenure.days
+                    invasion_ineligibility_reason = f"Ruler protected for {days_remaining} more days"
+            
+            if not invasion_ineligibility_reason:
                 # Check empire - can't invade own empire
                 my_kingdom_id = fiefs_ruled[0] if fiefs_ruled else None
                 if my_kingdom_id:

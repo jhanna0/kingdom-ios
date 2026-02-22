@@ -179,6 +179,7 @@ COUP_JOIN_REPUTATION_REQUIREMENT = 100  # Min rep to JOIN a coup (not initiate)
 # Coup cooldowns
 COUP_PLAYER_COOLDOWN_DAYS = 30       # Days between coup attempts per player
 COUP_KINGDOM_COOLDOWN_DAYS = 7       # Days between coups in same kingdom
+COUP_RULER_PROTECTION_DAYS = 7       # New rulers protected from coups for 7 days
 
 # Invasion cooldowns
 INVASION_KINGDOM_COOLDOWN_DAYS = 30  # Days before a kingdom can be invaded again

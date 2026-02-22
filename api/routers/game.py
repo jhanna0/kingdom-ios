@@ -304,6 +304,7 @@ def create_kingdom(
         # If kingdom exists but is unclaimed, claim it
         if existing.ruler_id is None:
             existing.ruler_id = current_user.id
+            existing.ruler_started_at = datetime.utcnow()
             existing.last_activity = datetime.utcnow()
             
             # Reset empire status - this becomes a NEW independent empire
@@ -337,6 +338,7 @@ def create_kingdom(
         name=name,
         city_boundary_osm_id=city_boundary_osm_id,
         ruler_id=current_user.id,
+        ruler_started_at=datetime.utcnow(),
         empire_id=city_boundary_osm_id,  # New independent empire
         original_kingdom_id=city_boundary_osm_id,  # Original city identity
         population=1,
@@ -453,6 +455,7 @@ def conquer_kingdom(
     
     # Set new ruler
     kingdom.ruler_id = current_user.id
+    kingdom.ruler_started_at = datetime.utcnow()
     kingdom.last_activity = datetime.utcnow()
     
     # Update new ruler state

@@ -831,6 +831,16 @@ def initiate_coup(
             detail="You already rule this kingdom"
         )
     
+    # Check ruler has been in power for at least 7 days (new ruler protection)
+    if kingdom.ruler_started_at:
+        ruler_tenure = datetime.utcnow() - kingdom.ruler_started_at
+        if ruler_tenure.days < 7:
+            days_remaining = 7 - ruler_tenure.days
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot coup: Ruler has only been in power for {ruler_tenure.days} days. Must wait at least 7 days ({days_remaining} days remaining)."
+            )
+    
     # Check if checked in
     if state.current_kingdom_id != kingdom.id:
         raise HTTPException(
