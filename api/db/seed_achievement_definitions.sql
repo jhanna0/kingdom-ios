@@ -1135,7 +1135,7 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
     description = EXCLUDED.description,
     icon = EXCLUDED.icon,
     category = EXCLUDED.category,
-    display_order = EXCLUDED.display_order,
+    display_order = EXCLUDED.disphowlay_order,
     type_display_name = EXCLUDED.type_display_name;
 
 -- =====================================================
