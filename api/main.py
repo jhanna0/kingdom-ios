@@ -68,6 +68,7 @@ PUBLIC_ROUTES = {
     "/auth/demo-login",    # Demo login for App Store review
     "/app-config",         # App config (version check)
     "/store/products",     # IAP product list (needed before auth)
+    "/store/webhook/apple",  # Apple Server Notifications (no auth - Apple signs payload)
     "/docs",               # Swagger docs (dev only)
     "/openapi.json",       # OpenAPI schema
     "/",                   # Root

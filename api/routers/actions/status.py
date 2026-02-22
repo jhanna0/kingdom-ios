@@ -782,7 +782,6 @@ def get_action_status(
                 invasion_ineligibility_reason = "Cannot invade unruled kingdom"
             elif kingdom.ruler_started_at:
                 # Check 30-day new ruler protection
-                from datetime import datetime
                 ruler_tenure = datetime.utcnow() - kingdom.ruler_started_at
                 if ruler_tenure.days < 30:
                     days_remaining = 30 - ruler_tenure.days
