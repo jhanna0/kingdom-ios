@@ -661,6 +661,9 @@ private struct EventHandlers: ViewModifier {
                 async let badgeTask: () = loadNotificationBadge()  // /notifications/summary
                 async let achievementTask: () = loadAchievementsBadge()  // /achievements/summary
                 
+                // Sync subscription status with backend (handles missed webhook renewals)
+                _ = StoreService.shared
+                
                 // Wait for all to complete
                 await initTask
                 await badgeTask
