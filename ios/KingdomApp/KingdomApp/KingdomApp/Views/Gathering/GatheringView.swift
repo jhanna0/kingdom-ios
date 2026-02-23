@@ -414,49 +414,83 @@ struct GatheringView: View {
     
     private var statsRow: some View {
         HStack(spacing: KingdomTheme.Spacing.medium) {
-            // Session gathered
-            HStack(spacing: 8) {
-                Image(systemName: viewModel.resourceIcon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(resourceColor)
-                
-                Text("\(viewModel.sessionGathered)")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-                    .monospacedDigit()
+            // Inventory badges (relevant to building type)
+            if let inv = viewModel.inventory {
+                if viewModel.visualType == "tree" {
+                    inventoryBadge(item: inv.wood)
+                } else {
+                    inventoryBadge(item: inv.stone)
+                    inventoryBadge(item: inv.iron)
+                }
             }
-            .padding(.horizontal, KingdomTheme.Spacing.large)
-            .padding(.vertical, KingdomTheme.Spacing.medium)
-            .brutalistBadge(
-                backgroundColor: KingdomTheme.Colors.parchmentLight,
-                cornerRadius: 12,
-                borderWidth: 2
-            )
+            
+            // Remaining until exhausted
+            if let remaining = viewModel.remaining {
+                HStack(spacing: 4) {
+                    Text("\(remaining)")
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .monospacedDigit()
+                    
+                    Text("left")
+                        .font(FontStyles.bodySmall)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                }
+                .padding(.horizontal, KingdomTheme.Spacing.small)
+                .padding(.vertical, 6)
+                .brutalistBadge(
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 8,
+                    borderWidth: 1.5
+                )
+            }
             
             Spacer()
             
             // Combo counter
             if comboCount > 1 {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(KingdomTheme.Colors.buttonWarning)
                     
                     Text("\(comboCount)x")
-                        .font(FontStyles.headingSmall)
+                        .font(FontStyles.bodySmall)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .monospacedDigit()
                 }
-                .padding(.horizontal, KingdomTheme.Spacing.medium)
-                .padding(.vertical, KingdomTheme.Spacing.small)
+                .padding(.horizontal, KingdomTheme.Spacing.small)
+                .padding(.vertical, 6)
                 .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.imperialGold.opacity(0.3),
-                    cornerRadius: 10,
-                    borderWidth: 2
+                    backgroundColor: KingdomTheme.Colors.parchmentLight,
+                    cornerRadius: 8,
+                    borderWidth: 1.5
                 )
                 .transition(.scale.combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.3), value: comboCount)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.remaining)
+    }
+    
+    private func inventoryBadge(item: GatherInventoryItem) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: item.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(item.themeColor)
+            
+            Text("\(item.amount)")
+                .font(FontStyles.bodySmall)
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, KingdomTheme.Spacing.small)
+        .padding(.vertical, 6)
+        .brutalistBadge(
+            backgroundColor: KingdomTheme.Colors.parchmentLight,
+            cornerRadius: 8,
+            borderWidth: 1.5
+        )
     }
     
     // MARK: - Canvas (drawing area)

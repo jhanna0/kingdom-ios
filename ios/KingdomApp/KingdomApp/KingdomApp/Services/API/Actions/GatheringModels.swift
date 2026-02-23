@@ -17,6 +17,9 @@ struct GatherResponse: Codable {
     let exhausted: Bool?          // True if daily limit reached
     let exhaustedMessage: String? // Message to show when exhausted
     let resetSeconds: Int?        // Seconds until daily limit resets (when exhausted)
+    let inventory: GatherInventory? // Current inventory totals for all resources
+    let remaining: Int?           // Remaining gathers until exhausted for this resource
+    let dailyLimit: Int?          // Daily limit for this resource
     
     enum CodingKeys: String, CodingKey {
         case success
@@ -28,6 +31,8 @@ struct GatherResponse: Codable {
         case exhausted
         case exhaustedMessage = "exhausted_message"
         case resetSeconds = "reset_seconds"
+        case inventory, remaining
+        case dailyLimit = "daily_limit"
     }
     
     /// Get SwiftUI Color from theme color name
@@ -35,6 +40,22 @@ struct GatherResponse: Codable {
         guard let color = color else { return .gray }
         return KingdomTheme.Colors.color(fromThemeName: color)
     }
+}
+
+struct GatherInventoryItem: Codable {
+    let amount: Int
+    let icon: String
+    let color: String
+    
+    var themeColor: Color {
+        KingdomTheme.Colors.color(fromThemeName: color)
+    }
+}
+
+struct GatherInventory: Codable {
+    let wood: GatherInventoryItem
+    let stone: GatherInventoryItem
+    let iron: GatherInventoryItem
 }
 
 // MARK: - Gather Config Response

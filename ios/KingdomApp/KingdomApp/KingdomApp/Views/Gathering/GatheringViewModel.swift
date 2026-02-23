@@ -42,6 +42,13 @@ class GatheringViewModel: ObservableObject {
     @Published var isExhausted: Bool = false
     @Published var exhaustedMessage: String = ""
     
+    // Inventory totals (all resources)
+    @Published var inventory: GatherInventory?
+    
+    // Remaining until exhausted for current resource
+    @Published var remaining: Int?
+    @Published var dailyLimit: Int?
+    
     private let apiService = KingdomAPIService.shared
     
     // MARK: - Computed Properties
@@ -121,6 +128,13 @@ class GatheringViewModel: ObservableObject {
             
             // Update session stats
             sessionGathered += response.amount
+            
+            // Update inventory and remaining
+            if let inv = response.inventory {
+                inventory = inv
+            }
+            remaining = response.remaining
+            dailyLimit = response.dailyLimit
             
             // Trigger animation
             triggerResultAnimation(amount: response.amount, color: response.tierColor)

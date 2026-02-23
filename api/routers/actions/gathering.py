@@ -338,14 +338,48 @@ def gather_resource(
     # Execute gather roll (building level affects tier probabilities)
     result = _gather_manager.gather(resource_type, current_amount, building_level)
     
+    # Cap the gather amount to remaining daily limit
+    remaining_before = daily_limit - gathered_today
+    actual_amount = min(result.amount, remaining_before)
+    
     # Add gathered resources to player's inventory AND track daily gathering
-    if result.amount > 0:
-        add_inventory_amount(db, current_user.id, resource_type, result.amount)
-        add_gathered_amount(db, current_user.id, resource_type, result.amount, target_kingdom_id)
+    if actual_amount > 0:
+        add_inventory_amount(db, current_user.id, resource_type, actual_amount)
+        add_gathered_amount(db, current_user.id, resource_type, actual_amount, target_kingdom_id)
+        # Update result to reflect capped amount
+        result.amount = actual_amount
+        result.new_total = current_amount + actual_amount
     
     db.commit()
     
-    return result.to_dict()
+    # Build response with inventory totals and remaining
+    response = result.to_dict()
+    
+    # Get inventory totals with resource metadata (icon, color from resources.py)
+    from routers.resources import RESOURCES
+    
+    def build_inventory_item(res_id: str) -> dict:
+        res_config = RESOURCES.get(res_id, {})
+        return {
+            "amount": get_inventory_amount(db, current_user.id, res_id),
+            "icon": res_config.get("icon", "questionmark"),
+            "color": res_config.get("color", "gray"),
+        }
+    
+    response["inventory"] = {
+        "wood": build_inventory_item("wood"),
+        "stone": build_inventory_item("stone"),
+        "iron": build_inventory_item("iron"),
+    }
+    
+    # Calculate remaining until exhausted
+    # Note: gathered_today was calculated before the gather, so add actual_amount
+    new_gathered_today = gathered_today + actual_amount
+    remaining = max(0, daily_limit - new_gathered_today)
+    response["remaining"] = remaining
+    response["daily_limit"] = daily_limit
+    
+    return response
 
 
 @router.get("/gather/config")
