@@ -370,6 +370,25 @@ async def redeem_purchase(
     # 5. Sandbox purchases grant nothing (TestFlight testing only)
     if environment == "Sandbox":
         print(f"🧪 Sandbox purchase - no resources granted (user {current_user.id}, {request.product_id})")
+        
+        # Record sandbox purchase to prevent duplicate redemption attempts
+        purchase = Purchase(
+            user_id=current_user.id,
+            product_id=request.product_id,
+            transaction_id=request.transaction_id,
+            original_transaction_id=request.original_transaction_id,
+            price_usd=0,  # No charge for sandbox
+            gold_granted=0,
+            meat_granted=0,
+            books_granted=0,
+            environment="Sandbox",
+            verified_with_apple=verified_with_apple,
+            verification_error=None,
+            purchased_at=datetime.now(timezone.utc),
+        )
+        db.add(purchase)
+        db.commit()
+        
         return RedeemResponse(
             success=True,
             message="Sandbox purchase verified (no resources in test mode)",

@@ -120,8 +120,8 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
 
 PROPERTY_GOLD_BASE = 40          # Higher than training (permanent investment)
 PROPERTY_GOLD_PER_TIER = 35      # Scales faster than training
-PROPERTY_BASE_ACTIONS = 10       # Base actions for tier 1
-PROPERTY_ACTIONS_PER_TIER = 10   # Extra actions per tier
+PROPERTY_BASE_ACTIONS = 8        # Base actions for tier 1
+PROPERTY_ACTIONS_PER_TIER = 6    # Extra actions per tier
 
 
 def calculate_property_gold_per_action(tier: int) -> float:
