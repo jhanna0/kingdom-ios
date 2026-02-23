@@ -571,7 +571,9 @@ private struct SheetModifiers: ViewModifier {
                     CharacterSheetView(player: viewModel.player)
                 }
             }
-            .sheet(item: $kingdomForInfoSheet) { kingdom in
+            .sheet(item: $kingdomForInfoSheet, onDismiss: {
+                Task { await viewModel.refreshPlayerFromBackend() }
+            }) { kingdom in
                 KingdomInfoSheetView(
                     kingdom: kingdom,
                     player: viewModel.player,
