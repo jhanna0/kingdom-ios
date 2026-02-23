@@ -53,9 +53,6 @@ class ChickenSlot(Base):
     last_played_at = Column(DateTime, nullable=True)
     last_cleaned_at = Column(DateTime, nullable=True)
     
-    # Legacy field (keeping for backwards compat, will be removed)
-    last_cared_at = Column(DateTime, nullable=True)
-    care_cycles = Column(Integer, default=0)
     
     # Egg production
     last_egg_collected_at = Column(DateTime, nullable=True)

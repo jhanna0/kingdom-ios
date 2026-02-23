@@ -531,8 +531,6 @@ def hatch_egg(
     slot.hatched_at = None
     slot.name = None
     slot.happiness = 0
-    slot.last_cared_at = None
-    slot.care_cycles = 0
     slot.eggs_available = 0
     slot.total_eggs_laid = 0
     
