@@ -370,7 +370,7 @@ struct ChickenCoopView: View {
             return (formatTimer(seconds: slot.secondsUntilHatch), KingdomTheme.Colors.imperialGold)
         } else if slot.isAlive {
             if slot.canCollect {
-                return ("Egg ready!", KingdomTheme.Colors.buttonSuccess)
+                return ("Eggs!", KingdomTheme.Colors.buttonSuccess)
             } else if slot.needsAttention == true {
                 return ("Needs care", KingdomTheme.Colors.buttonWarning)
             } else if slot.isHappy {
@@ -559,6 +559,7 @@ struct ChickenCoopView: View {
     private func performCollect(slotIndex: Int) {
         Task {
             selectedSlot = nil
+            selectedSlot = nil
             await collectEggs(slotIndex: slotIndex)
         }
     }
@@ -665,18 +666,17 @@ struct ChickenCoopView: View {
             HapticService.shared.notification(.success)
             await refreshCoopStatus()
             
-            // Show result with rewards
-            var message = "Collected \(response.eggsCollected) egg\(response.eggsCollected == 1 ? "" : "s")!"
+            // Update selected slot so sheet reflects the change
+            if let updatedSlot = status?.slots.first(where: { $0.slotIndex == slotIndex }) {
+                selectedSlot = updatedSlot
+            }
+            
             if response.rareEggsGained > 0 {
-                message += "\n\nYou found \(response.rareEggsGained) RARE EGG\(response.rareEggsGained == 1 ? "" : "S")!"
                 HapticService.shared.notification(.success)
             }
-            if response.meatGained > 0 {
-                message += "\n+\(response.meatGained) meat"
-            }
-            showResult(success: true, message: message)
         } catch {
-            showResult(success: false, message: error.localizedDescription)
+            // Silent fail - just haptic
+            HapticService.shared.notification(.error)
         }
         
         actionInProgress = nil

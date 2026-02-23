@@ -127,10 +127,50 @@ struct ChickenDetailSheet: View {
             // The animated chicken
             TamagotchiChickenView(
                 isHappy: slot.isHappy,
-                hasEgg: slot.canCollect
+                hasEgg: slot.canCollect,
+                currentAnimation: currentAnimation
             )
+            
+            // Action animation overlay
+            if let animation = currentAnimation {
+                actionAnimationOverlay(animation: animation)
+            }
         }
         .frame(height: 140)
+    }
+    
+    @ViewBuilder
+    private func actionAnimationOverlay(animation: ChickenActionAnimation) -> some View {
+        switch animation {
+        case .feeding:
+            FeedingAnimationView()
+        case .playing:
+            PlayingAnimationView()
+        case .cleaning:
+            CleaningAnimationView()
+        }
+    }
+    
+    private func triggerAnimation(for actionId: String) {
+        let animation: ChickenActionAnimation? = switch actionId {
+        case "feed": .feeding
+        case "play": .playing
+        case "clean": .cleaning
+        default: nil
+        }
+        
+        guard let animation = animation else { return }
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            currentAnimation = animation
+        }
+        
+        // Clear animation after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentAnimation = nil
+            }
+        }
     }
     
     // MARK: - Mini Stat Bars
@@ -187,6 +227,7 @@ struct ChickenDetailSheet: View {
     
     private func tamagotchiButton(action: ChickenAction) -> some View {
         Button {
+            triggerAnimation(for: action.actionId)
             onAction(action.actionId)
         } label: {
             VStack(spacing: 6) {
@@ -313,17 +354,180 @@ struct TamagotchiButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Chicken Action Animation
+
+enum ChickenActionAnimation {
+    case feeding
+    case playing
+    case cleaning
+}
+
+// MARK: - Feeding Animation View
+
+struct FeedingAnimationView: View {
+    @State private var seedPositions: [(x: CGFloat, y: CGFloat, delay: Double)] = [
+        (-20, -30, 0.0), (0, -35, 0.1), (20, -28, 0.2),
+        (-15, -20, 0.15), (10, -25, 0.25)
+    ]
+    @State private var showSeeds = false
+    @State private var seedsFalling = false
+    
+    var body: some View {
+        ZStack {
+            ForEach(0..<seedPositions.count, id: \.self) { i in
+                Circle()
+                    .fill(Color(red: 0.8, green: 0.6, blue: 0.3))
+                    .frame(width: 8, height: 8)
+                    .offset(
+                        x: seedPositions[i].x,
+                        y: showSeeds ? (seedsFalling ? 40 : seedPositions[i].y) : -60
+                    )
+                    .opacity(showSeeds ? (seedsFalling ? 0 : 1) : 0)
+                    .animation(
+                        .easeOut(duration: 0.3).delay(seedPositions[i].delay),
+                        value: showSeeds
+                    )
+                    .animation(
+                        .easeIn(duration: 0.4).delay(seedPositions[i].delay + 0.3),
+                        value: seedsFalling
+                    )
+            }
+        }
+        .onAppear {
+            showSeeds = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                seedsFalling = true
+            }
+        }
+    }
+}
+
+// MARK: - Playing Animation View
+
+struct PlayingAnimationView: View {
+    @State private var hearts: [(x: CGFloat, y: CGFloat, scale: CGFloat)] = [
+        (-25, -40, 0.8), (25, -45, 1.0), (0, -55, 0.9)
+    ]
+    @State private var showHearts = false
+    @State private var heartsFloating = false
+    
+    var body: some View {
+        ZStack {
+            ForEach(0..<hearts.count, id: \.self) { i in
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 20 * hearts[i].scale))
+                    .foregroundColor(Color(red: 0.9, green: 0.3, blue: 0.4))
+                    .offset(
+                        x: hearts[i].x,
+                        y: showHearts ? (heartsFloating ? hearts[i].y - 30 : hearts[i].y) : hearts[i].y + 20
+                    )
+                    .opacity(showHearts ? (heartsFloating ? 0 : 1) : 0)
+                    .scaleEffect(showHearts ? 1 : 0.3)
+                    .animation(
+                        .spring(response: 0.4, dampingFraction: 0.6).delay(Double(i) * 0.15),
+                        value: showHearts
+                    )
+                    .animation(
+                        .easeOut(duration: 0.8).delay(Double(i) * 0.1),
+                        value: heartsFloating
+                    )
+            }
+        }
+        .onAppear {
+            showHearts = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                heartsFloating = true
+            }
+        }
+    }
+}
+
+// MARK: - Cleaning Animation View
+
+struct CleaningAnimationView: View {
+    @State private var bubbles: [(x: CGFloat, y: CGFloat, size: CGFloat, delay: Double)] = [
+        (-30, 0, 12, 0.0), (30, -10, 10, 0.1), (-15, -25, 8, 0.2),
+        (20, 15, 14, 0.15), (0, -15, 11, 0.25), (-25, 20, 9, 0.3)
+    ]
+    @State private var showBubbles = false
+    @State private var bubblesPopping = false
+    
+    var body: some View {
+        ZStack {
+            ForEach(0..<bubbles.count, id: \.self) { i in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [.white.opacity(0.9), Color(red: 0.7, green: 0.85, blue: 1.0).opacity(0.6)],
+                            center: .topLeading,
+                            startRadius: 0,
+                            endRadius: bubbles[i].size
+                        )
+                    )
+                    .frame(width: bubbles[i].size, height: bubbles[i].size)
+                    .overlay(
+                        Circle()
+                            .stroke(Color(red: 0.6, green: 0.8, blue: 1.0).opacity(0.5), lineWidth: 1)
+                    )
+                    .offset(
+                        x: bubbles[i].x,
+                        y: showBubbles ? bubbles[i].y - (bubblesPopping ? 20 : 0) : bubbles[i].y + 30
+                    )
+                    .opacity(showBubbles ? (bubblesPopping ? 0 : 1) : 0)
+                    .scaleEffect(showBubbles ? (bubblesPopping ? 1.5 : 1) : 0.3)
+                    .animation(
+                        .spring(response: 0.35, dampingFraction: 0.6).delay(bubbles[i].delay),
+                        value: showBubbles
+                    )
+                    .animation(
+                        .easeOut(duration: 0.3).delay(bubbles[i].delay),
+                        value: bubblesPopping
+                    )
+            }
+            
+            // Sparkles
+            ForEach(0..<4, id: \.self) { i in
+                Image(systemName: "sparkle")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(red: 0.4, green: 0.7, blue: 1.0))
+                    .offset(
+                        x: CGFloat([-35, 35, -20, 25][i]),
+                        y: CGFloat([-35, -30, 10, 5][i])
+                    )
+                    .opacity(bubblesPopping ? 1 : 0)
+                    .scaleEffect(bubblesPopping ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.3, dampingFraction: 0.5).delay(Double(i) * 0.1),
+                        value: bubblesPopping
+                    )
+            }
+        }
+        .onAppear {
+            showBubbles = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                bubblesPopping = true
+            }
+        }
+    }
+}
+
 // MARK: - Tamagotchi Chicken View
 
 struct TamagotchiChickenView: View {
     let isHappy: Bool
     let hasEgg: Bool
+    var currentAnimation: ChickenActionAnimation? = nil
     
     @State private var bounce = false
     @State private var wiggle = false
     @State private var wingFlap = false
     @State private var headBob = false
     @State private var blinkEyes = false
+    
+    // Action-specific animation states
+    @State private var isEating = false
+    @State private var isPlayJumping = false
+    @State private var isShaking = false
     
     // Colors
     private let bodyColor = Color(red: 1.0, green: 0.92, blue: 0.75)
@@ -356,32 +560,95 @@ struct TamagotchiChickenView: View {
                     chickenWing
                         .position(x: centerX + 18, y: centerY + (wingFlap && isHappy ? 0 : 8))
                     
-                    // Head
+                    // Head - pecks down when eating
                     chickenHead
-                        .position(x: centerX - 18, y: centerY - 30 + (headBob && isHappy ? -5 : 0))
+                        .position(x: centerX - 18, y: centerY - 30 + (headBob && isHappy ? -5 : 0) + (isEating ? 15 : 0))
                     
                     // Comb
                     chickenComb
-                        .position(x: centerX - 18, y: centerY - 60 + (headBob && isHappy ? -5 : 0))
+                        .position(x: centerX - 18, y: centerY - 60 + (headBob && isHappy ? -5 : 0) + (isEating ? 15 : 0))
                     
                     // Eyes
                     chickenEyes
-                        .position(x: centerX - 18, y: centerY - 32 + (headBob && isHappy ? -5 : 0))
+                        .position(x: centerX - 18, y: centerY - 32 + (headBob && isHappy ? -5 : 0) + (isEating ? 15 : 0))
                     
                     // Beak
                     chickenBeak
-                        .position(x: centerX - 42, y: centerY - 25 + (headBob && isHappy ? -5 : 0))
+                        .position(x: centerX - 42, y: centerY - 25 + (headBob && isHappy ? -5 : 0) + (isEating ? 15 : 0))
                     
                     // Feet
                     chickenFeet
                         .position(x: centerX, y: centerY + 45)
                 }
-                .offset(y: bounce ? -6 : 0)
+                .offset(y: bounce ? -6 : (isPlayJumping ? -20 : 0))
                 .rotationEffect(.degrees(wiggle && isHappy ? 2 : (wiggle ? -2 : 0)))
+                .rotationEffect(.degrees(isShaking ? 5 : 0))
+                .animation(.easeInOut(duration: 0.1).repeatCount(isShaking ? 10 : 0, autoreverses: true), value: isShaking)
             }
         }
         .onAppear {
             startAnimations()
+        }
+        .onChange(of: currentAnimation) { _, newAnimation in
+            handleActionAnimation(newAnimation)
+        }
+    }
+    
+    private func handleActionAnimation(_ animation: ChickenActionAnimation?) {
+        guard let animation = animation else { return }
+        
+        switch animation {
+        case .feeding:
+            // Pecking animation
+            peckAnimation()
+        case .playing:
+            // Jump animation
+            jumpAnimation()
+        case .cleaning:
+            // Shake animation
+            shakeAnimation()
+        }
+    }
+    
+    private func peckAnimation() {
+        // Peck down and up repeatedly
+        for i in 0..<4 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.25) {
+                withAnimation(.easeInOut(duration: 0.12)) {
+                    isEating = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        isEating = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func jumpAnimation() {
+        // Happy jumps
+        for i in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.35) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                    isPlayJumping = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                        isPlayJumping = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func shakeAnimation() {
+        // Shake off the bubbles
+        withAnimation {
+            isShaking = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            isShaking = false
         }
     }
     

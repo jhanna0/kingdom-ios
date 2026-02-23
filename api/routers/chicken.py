@@ -202,30 +202,28 @@ def check_and_update_slot_status(slot: ChickenSlot, db: Session = None) -> tuple
             just_hatched = True
     
     # Update stat decay for alive chickens (Tamagotchi style - same rate for all)
+    # Stats decay from 100 based on time since last action (not cumulative)
     if slot.status == ChickenStatus.ALIVE:
         decay_hours = config["decay_hours"]
         decay_amount = config["decay_amount"]
         
-        # Decay hunger
+        # Decay hunger - calculate from 100 based on time since last fed
         if slot.last_fed_at:
             hours_since = (now - slot.last_fed_at).total_seconds() / 3600
             decay_periods = int(hours_since / decay_hours)
-            if decay_periods > 0:
-                slot.hunger = max(0, slot.hunger - (decay_periods * decay_amount))
+            slot.hunger = max(0, 100 - (decay_periods * decay_amount))
         
-        # Decay happiness
+        # Decay happiness - calculate from 100 based on time since last played
         if slot.last_played_at:
             hours_since = (now - slot.last_played_at).total_seconds() / 3600
             decay_periods = int(hours_since / decay_hours)
-            if decay_periods > 0:
-                slot.happiness = max(0, slot.happiness - (decay_periods * decay_amount))
+            slot.happiness = max(0, 100 - (decay_periods * decay_amount))
         
-        # Decay cleanliness
+        # Decay cleanliness - calculate from 100 based on time since last cleaned
         if slot.last_cleaned_at:
             hours_since = (now - slot.last_cleaned_at).total_seconds() / 3600
             decay_periods = int(hours_since / decay_hours)
-            if decay_periods > 0:
-                slot.cleanliness = max(0, slot.cleanliness - (decay_periods * decay_amount))
+            slot.cleanliness = max(0, 100 - (decay_periods * decay_amount))
     
     # Check egg production - all stats must be good
     min_stat = config["min_stat_for_eggs"]
