@@ -69,8 +69,8 @@ class FishingViewModel: ObservableObject {
     // Animation timing
     private let rollAnimationDelay: Double = 1.2   // Time between rolls
     private let firstRollDelay: Double = 0.75      // Shorter delay before first roll
-    private let masterRollDelay: Double = 0.7      // Pause before master roll
-    private let feedbackDelay: Double = 1.6        // Time on escaped/idle before resetting
+    private let masterRollDelay: Double = 0.3      // Pause before master roll
+    private let feedbackDelay: Double = 0.6        // Time on escaped/idle before resetting
     private let lootPause: Double = 0.55           // Brief pause before loot animation
     
     // API
@@ -359,6 +359,8 @@ class FishingViewModel: ObservableObject {
     func collect() {
         currentLootResult = nil
         masterRollValue = 0
+        currentRolls = []
+        currentRollIndex = -1
         currentBarType = .cast
         currentSlots = baseCastSlots
         uiState = .idle
@@ -450,10 +452,14 @@ class FishingViewModel: ObservableObject {
     private func showFeedback(state: UIState) {
         uiState = state
         
-        if state == .escaped || state == .idle {
+        if state == .idle {
+            currentRolls = []
+            currentRollIndex = -1
+        } else if state == .escaped {
             DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDelay) { [weak self] in
                 guard let self = self else { return }
-                self.masterRollValue = 0
+                self.currentRolls = []
+                self.currentRollIndex = -1
                 self.uiState = .idle
             }
         }

@@ -155,12 +155,12 @@ class HuntViewModel: ObservableObject {
             // Determine current state from phase_state (only on initial load)
             if let phaseState = hunt.phase_state {
                 if phaseState.is_resolved {
-                    // Phase resolved - if there's a next phase, show its intro
-                    if let next = nextPhase {
-                        uiState = .phaseIntro(next)
-                    } else {
-                        uiState = .results
-                    }
+                    // Phase already resolved - show the result so user can tap Continue
+                    masterRollFinalValue = phaseState.resolution_roll ?? 0
+                    dropTableSlots = phaseState.drop_table_slots ?? [:]
+                    dropTableOdds = phaseState.dropTableOdds
+                    roundResults = phaseState.round_results
+                    uiState = .masterRollComplete(phaseState.huntPhase)
                 } else if phaseState.rounds_completed > 0 {
                     // Already started rolling - active phase
                     uiState = .phaseActive(phaseState.huntPhase)

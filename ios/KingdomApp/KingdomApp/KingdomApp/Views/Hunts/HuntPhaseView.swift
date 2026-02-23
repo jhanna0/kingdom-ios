@@ -441,6 +441,11 @@ struct HuntPhaseView: View {
                 masterRollAnimationStarted = true
                 Task { await runMasterRollAnimation() }
             }
+            // If resuming with a completed master roll, show the marker at final position
+            else if viewModel.masterRollFinalValue > 0 && !viewModel.shouldAnimateMasterRoll {
+                showMasterRollMarker = true
+                masterRollDisplayValue = viewModel.masterRollFinalValue
+            }
         }
         .onChange(of: viewModel.shouldAnimateMasterRoll) { _, shouldAnimate in
             if shouldAnimate && !masterRollAnimationStarted {
