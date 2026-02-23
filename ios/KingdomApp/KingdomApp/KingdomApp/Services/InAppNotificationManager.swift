@@ -14,6 +14,7 @@ enum InAppNotificationType {
     case garden(message: String)
     case kitchen(message: String)
     case resourceReset(buildingType: String, message: String)
+    case chickenHatch(message: String)
     
     var icon: String {
         switch self {
@@ -25,6 +26,7 @@ enum InAppNotificationType {
         case .kitchen: return "flame.fill"
         case .resourceReset(let buildingType, _):
             return buildingType == "lumbermill" ? "tree.fill" : "mountain.2.fill"
+        case .chickenHatch: return "oval.fill"
         }
     }
     
@@ -42,6 +44,8 @@ enum InAppNotificationType {
             return "Garden"
         case .kitchen:
             return "Kitchen"
+        case .chickenHatch:
+            return "Egg Hatched!"
         case .resourceReset(let buildingType, _):
             return buildingType == "lumbermill" ? "Lumbermill Ready!" : "Mine Ready!"
         }
@@ -63,6 +67,8 @@ enum InAppNotificationType {
             return message
         case .resourceReset(_, let message):
             return message
+        case .chickenHatch(let message):
+            return message
         }
     }
     
@@ -82,6 +88,8 @@ enum InAppNotificationType {
             return KingdomTheme.Colors.buttonWarning  // Orange for kitchen
         case .resourceReset(let buildingType, _):
             return buildingType == "lumbermill" ? KingdomTheme.Colors.buttonPrimary : KingdomTheme.Colors.disabled  // Brown for wood, gray for mine
+        case .chickenHatch:
+            return KingdomTheme.Colors.imperialGold
         }
     }
 }
@@ -152,6 +160,8 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
             } else if content.categoryIdentifier == "RESOURCE_RESET" {
                 let buildingType = userInfo["building_type"] as? String ?? "mine"
                 self.show(.resourceReset(buildingType: buildingType, message: content.body))
+            } else if content.categoryIdentifier == "CHICKEN_HATCH" {
+                self.show(.chickenHatch(message: content.body))
             } else {
                 self.show(.info(message: content.body))
             }

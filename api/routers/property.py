@@ -387,6 +387,37 @@ def _get_room_badges(db: "Session", user_id: int) -> dict:
     if ready_bread_count > 0:
         badges["kitchen"] = ready_bread_count
     
+    # Chicken Coop: badge when any stat below 50% OR eggs to collect OR egg ready to hatch
+    from db.models.chicken import ChickenSlot, ChickenStatus
+    from datetime import timedelta
+    
+    INCUBATION_HOURS = 24
+    BADGE_THRESHOLD = 50
+    
+    chicken_slots = db.query(ChickenSlot).filter(
+        ChickenSlot.user_id == user_id
+    ).all()
+    
+    chicken_count = 0
+    for slot in chicken_slots:
+        if slot.status == ChickenStatus.INCUBATING and slot.incubation_started_at:
+            # Check if egg is ready to hatch
+            hatch_time = slot.incubation_started_at.replace(tzinfo=timezone.utc) + timedelta(hours=INCUBATION_HOURS)
+            if now >= hatch_time:
+                chicken_count += 1
+        elif slot.status == ChickenStatus.ALIVE:
+            # Check if eggs available to collect
+            if slot.eggs_available and slot.eggs_available > 0:
+                chicken_count += 1
+            # Check if any stat needs attention (below threshold)
+            elif (slot.hunger is not None and slot.hunger < BADGE_THRESHOLD) or \
+                 (slot.happiness is not None and slot.happiness < BADGE_THRESHOLD) or \
+                 (slot.cleanliness is not None and slot.cleanliness < BADGE_THRESHOLD):
+                chicken_count += 1
+    
+    if chicken_count > 0:
+        badges["chicken_coop"] = chicken_count
+    
     return badges
 
 
@@ -470,6 +501,18 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
                     "has_badge": room_badges.get(opt_id, 0) > 0
                 })
                 seen_ids.add(opt_id)
+    
+    # Tier 4+ gets chicken coop (Beautiful Maison) - added last
+    if tier >= 4:
+        rooms.append({
+            "id": "chicken_coop",
+            "name": "Chicken Coop",
+            "icon": "oval.fill",
+            "color": "imperialGold",
+            "description": "Hatch eggs and raise chickens",
+            "route": "/chicken",
+            "has_badge": room_badges.get("chicken_coop", 0) > 0
+        })
     
     return rooms
 

@@ -48,6 +48,10 @@ struct ActionIconHelper {
             return "trophy.fill"
         case "harvest":
             return "leaf.fill"
+        case "chicken_hatched":
+            return "oval.fill"
+        case "collect_eggs":
+            return "oval.fill"
         case "foraging_find", "rare_loot":
             return "sparkles"
         case "hunt_kill", "hunt":
@@ -202,6 +206,10 @@ struct ActionIconHelper {
             return KingdomTheme.Colors.imperialGold // Gold for achievements
         case "harvest":
             return KingdomTheme.Colors.buttonSuccess // Green for gardening
+        case "chicken_hatched":
+            return KingdomTheme.Colors.buttonWarning // Orange for chickens
+        case "collect_eggs":
+            return KingdomTheme.Colors.buttonWarning // Orange for chickens
         case "foraging_find", "rare_loot":
             return KingdomTheme.Colors.imperialGold // Gold for rare finds
         case "hunt_kill", "hunt":

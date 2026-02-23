@@ -232,7 +232,7 @@ PROPERTY_TIERS = {
                 "icon": "building.columns.fill",
                 "description": "Animals & Gardens",
                 "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
-                "resource_ratios": [{"resource": "wood", "ratio": 0.55}, {"resource": "iron", "ratio": 0.45}],
+                "resource_ratios": [{"resource": "wood", "ratio": 0.45}, {"resource": "iron", "ratio": 0.55}],
             }
         ]
     },
