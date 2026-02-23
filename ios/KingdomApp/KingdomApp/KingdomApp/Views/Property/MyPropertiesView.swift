@@ -333,6 +333,11 @@ struct MyPropertiesView: View {
                 inlineRoomContent(room)
             }
             .buttonStyle(.plain)
+        } else if room.route == "/chicken" {
+            NavigationLink(destination: ChickenCoopView()) {
+                inlineRoomContent(room)
+            }
+            .buttonStyle(.plain)
         } else if room.route == "/fortify", let prop = property {
             NavigationLink(destination: FortificationView(player: player, property: prop)) {
                 inlineRoomContent(room)

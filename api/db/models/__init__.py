@@ -68,6 +68,9 @@ from .garden import GardenSlot, PlantStatus, PlantType
 from .kitchen import OvenSlot, OvenStatus
 from .kitchen_history import KitchenHistory
 
+# Chicken coop system
+from .chicken import ChickenSlot, ChickenStatus
+
 # In-app purchases
 from .purchase import Purchase
 
@@ -170,6 +173,9 @@ __all__ = [
     "OvenSlot",
     "OvenStatus",
     "KitchenHistory",
+    # Chicken coop system
+    "ChickenSlot",
+    "ChickenStatus",
     # In-app purchases
     "Purchase",
     # Book usage tracking

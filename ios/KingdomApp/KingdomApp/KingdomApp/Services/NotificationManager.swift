@@ -309,6 +309,109 @@ class NotificationManager {
         print("🗑️ Cancelled all kitchen baking notifications")
     }
     
+    // MARK: - Chicken Coop Notifications
+    
+    /// Schedule a notification for when an egg hatches
+    /// - Parameters:
+    ///   - slotIndex: The chicken slot index (0-3)
+    ///   - secondsUntilHatch: Seconds until the egg hatches
+    func scheduleChickenHatchNotification(slotIndex: Int, secondsUntilHatch: Int) async {
+        guard secondsUntilHatch > 60 else {
+            print("⏭️ Skipping chicken notification - too short (\(secondsUntilHatch)s)")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule chicken notification - permission not granted")
+            return
+        }
+        
+        let identifier = "chicken_hatch_\(slotIndex)"
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Egg Hatched! 🥚"
+        content.body = "A new chicken has hatched in your coop! Give it a name."
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "CHICKEN_HATCH"
+        content.userInfo = ["slot_index": slotIndex]
+        
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(secondsUntilHatch), repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let hours = secondsUntilHatch / 3600
+            let minutes = (secondsUntilHatch % 3600) / 60
+            print("✅ Scheduled chicken hatch notification for slot \(slotIndex) in \(hours)h \(minutes)m")
+        } catch {
+            print("❌ Error scheduling chicken notification: \(error)")
+        }
+    }
+    
+    /// Schedule a notification for when a chicken can be cared for again
+    /// - Parameters:
+    ///   - slotIndex: The chicken slot index (0-3)
+    ///   - secondsUntilCare: Seconds until the chicken can be cared for
+    func scheduleChickenCareNotification(slotIndex: Int, secondsUntilCare: Int) async {
+        guard secondsUntilCare > 60 else {
+            print("⏭️ Skipping chicken care notification - too short (\(secondsUntilCare)s)")
+            return
+        }
+        
+        let hasPermission = await checkPermission()
+        guard hasPermission else {
+            print("⚠️ Cannot schedule chicken care notification - permission not granted")
+            return
+        }
+        
+        let identifier = "chicken_care_\(slotIndex)"
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Chicken Needs Care! 🐔"
+        content.body = "Your chicken is ready for some attention. Keep it happy!"
+        content.sound = UNNotificationSound.default
+        content.badge = 1
+        content.categoryIdentifier = "CHICKEN_CARE"
+        content.userInfo = ["slot_index": slotIndex]
+        
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(secondsUntilCare), repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let hours = secondsUntilCare / 3600
+            let minutes = (secondsUntilCare % 3600) / 60
+            print("✅ Scheduled chicken care notification for slot \(slotIndex) in \(hours)h \(minutes)m")
+        } catch {
+            print("❌ Error scheduling chicken care notification: \(error)")
+        }
+    }
+    
+    /// Cancel chicken hatch notification for a specific slot
+    func cancelChickenNotification(slotIndex: Int) {
+        let hatchIdentifier = "chicken_hatch_\(slotIndex)"
+        let careIdentifier = "chicken_care_\(slotIndex)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [hatchIdentifier, careIdentifier])
+        print("🗑️ Cancelled chicken notifications for slot \(slotIndex)")
+    }
+    
+    /// Cancel all chicken notifications
+    func cancelAllChickenNotifications() {
+        var identifiers: [String] = []
+        for i in 0..<4 {
+            identifiers.append("chicken_hatch_\(i)")
+            identifiers.append("chicken_care_\(i)")
+        }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        print("🗑️ Cancelled all chicken notifications")
+    }
+    
     // MARK: - Resource Reset Notifications (Lumbermill/Mine)
     
     /// Schedule a notification for when a resource building resets (daily limit)

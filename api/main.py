@@ -41,7 +41,7 @@ class ISO8601JSONResponse(JSONResponse):
         ).encode("utf-8")
 
 from db import init_db, SessionLocal
-from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden, feedback, achievements, empire, permits, store, kitchen, prompts
+from routers import cities, game, auth, player, contracts, notifications, actions, intelligence, alliances, players, friends, activity, tiers, app_config, weather, market, resources, hunts, incidents, battles, tutorial, duels, trades, fishing, workshop, equipment, foraging, science, garden, feedback, achievements, empire, permits, store, kitchen, prompts, chicken
 from routers import property as property_router
 import config  # Import to trigger dev mode message
 
@@ -245,6 +245,7 @@ app.include_router(empire.router)  # Empire management (treasury, fund transfers
 app.include_router(permits.router)  # Building permits for visitors
 app.include_router(store.router)  # In-app purchases (StoreKit 2)
 app.include_router(prompts.router)  # Server-driven popups (feedback, polls, etc.)
+app.include_router(chicken.router)  # Chicken coop - hatch eggs, raise chickens
 
 
 # ===== WebSocket Endpoint (Local Development) =====
