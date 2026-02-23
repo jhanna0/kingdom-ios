@@ -644,7 +644,7 @@ struct ChickenCoopView: View {
         
         do {
             let response = try await chickenAPI.performAction(slotIndex: slotIndex, action: action)
-            HapticService.shared.notification(.success)
+            HapticService.shared.lightImpact()
             
             // Update the selected slot with new data so sheet stays updated
             selectedSlot = response.slot

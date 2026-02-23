@@ -10,6 +10,7 @@ struct ChickenDetailSheet: View {
     let onName: () -> Void
     
     @Environment(\.dismiss) var dismiss
+    @State private var currentAnimation: ChickenActionAnimation? = nil
     
     // LCD screen colors
     private let lcdBackground = Color(red: 0.68, green: 0.78, blue: 0.62)
@@ -243,8 +244,8 @@ struct ChickenDetailSheet: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    buttonColor(for: action.actionId).opacity(0.9),
-                                    buttonColor(for: action.actionId)
+                                    (action.enabled ? buttonColor(for: action.actionId) : Color.gray).opacity(0.9),
+                                    action.enabled ? buttonColor(for: action.actionId) : Color.gray
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -256,7 +257,7 @@ struct ChickenDetailSheet: View {
                     // Icon
                     Image(systemName: action.icon)
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.white.opacity(action.enabled ? 1 : 0.5))
                 }
                 
                 // Label
@@ -276,6 +277,7 @@ struct ChickenDetailSheet: View {
             }
         }
         .buttonStyle(TamagotchiButtonStyle())
+        .disabled(!action.enabled)
     }
     
     private func buttonColor(for actionId: String) -> Color {
@@ -859,9 +861,9 @@ struct TamagotchiChickenView: View {
             needsAttention: false,
             minStatForEggs: 50,
             actions: [
-                ChickenAction(actionId: "feed", label: "Feed", icon: "fork.knife", stat: "hunger", goldCost: 5, restoreAmount: 25),
-                ChickenAction(actionId: "play", label: "Play", icon: "heart.fill", stat: "happiness", goldCost: 5, restoreAmount: 25),
-                ChickenAction(actionId: "clean", label: "Clean", icon: "sparkles", stat: "cleanliness", goldCost: 5, restoreAmount: 25)
+                ChickenAction(actionId: "feed", label: "Feed", icon: "fork.knife", stat: "hunger", goldCost: 5, restoreAmount: 25, enabled: true),
+                ChickenAction(actionId: "play", label: "Play", icon: "heart.fill", stat: "happiness", goldCost: 5, restoreAmount: 25, enabled: true),
+                ChickenAction(actionId: "clean", label: "Clean", icon: "sparkles", stat: "cleanliness", goldCost: 5, restoreAmount: 25, enabled: true)
             ],
             eggsAvailable: 2,
             totalEggsLaid: 15,

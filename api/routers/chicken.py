@@ -336,9 +336,11 @@ def slot_to_response(slot: ChickenSlot) -> dict:
         actions_config = config["actions"]
         min_stat = config["min_stat_for_eggs"]
         
-        # Build actions array - no cooldowns, always available
+        # Build actions array - disabled if stat is already at 100
         actions = []
         for action_id, action_cfg in actions_config.items():
+            stat_name = action_cfg["stat"]
+            current_stat = getattr(slot, stat_name, 0)
             actions.append({
                 "id": action_id,
                 "label": action_cfg["label"],
@@ -346,6 +348,7 @@ def slot_to_response(slot: ChickenSlot) -> dict:
                 "stat": action_cfg["stat"],
                 "gold_cost": action_cfg["gold_cost"],
                 "restore_amount": action_cfg["restore_amount"],
+                "enabled": current_stat < 100,
             })
         
         # Calculate egg timing (only if no eggs available and all stats good)

@@ -164,12 +164,14 @@ struct ChickenAction: Codable, Identifiable {
     let stat: String
     let goldCost: Int
     let restoreAmount: Int
+    let enabled: Bool
     
     enum CodingKeys: String, CodingKey {
         case actionId = "id"
         case label, icon, stat
         case goldCost = "gold_cost"
         case restoreAmount = "restore_amount"
+        case enabled
     }
 }
 
