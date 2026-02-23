@@ -258,8 +258,7 @@ struct CharacterSheetView: View {
                     await loadRelocationStatus()
                 }
                 
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+                HapticService.shared.success()
             }
         } catch {
             await MainActor.run {
@@ -267,8 +266,7 @@ struct CharacterSheetView: View {
                 errorMessage = error.localizedDescription
                 showError = true
                 
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
+                HapticService.shared.error()
             }
         }
     }
@@ -285,8 +283,7 @@ struct CharacterSheetView: View {
                 await MainActor.run {
                     player.updateFromAPIState(playerState)
                     
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
+                    HapticService.shared.success()
                     
                     print("✅ Purchased \(type) training contract: \(response.actionsRequired) actions required")
                 }
@@ -296,8 +293,7 @@ struct CharacterSheetView: View {
                     errorMessage = error.localizedDescription
                     showError = true
                     
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
+                    HapticService.shared.error()
                 }
             }
         }
@@ -315,8 +311,7 @@ struct CharacterSheetView: View {
                 await MainActor.run {
                     player.updateFromAPIState(playerState)
                     
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
+                    HapticService.shared.success()
                     
                     print("✅ Purchased tier \(tier) \(equipmentType) craft: \(response.actionsRequired) actions required")
                 }
@@ -326,8 +321,7 @@ struct CharacterSheetView: View {
                     errorMessage = error.localizedDescription
                     showError = true
                     
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
+                    HapticService.shared.error()
                 }
             }
         }

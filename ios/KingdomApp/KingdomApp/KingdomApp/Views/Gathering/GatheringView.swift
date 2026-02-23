@@ -610,7 +610,7 @@ struct GatheringView: View {
             sweetspotHit = true
             
             // Haptic
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            HapticService.shared.heavyImpact()
             
             // Hit effect
             hitEffects.append(HitEffect(position: sweetspotPosition, isSuccess: true))
@@ -646,7 +646,7 @@ struct GatheringView: View {
         // If we didn't hit anything this stroke
         if !hasHitThisStroke && currentPath.count > 5 {
             // Miss feedback
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            HapticService.shared.lightImpact()
             
             // Reset combo
             comboCount = 0

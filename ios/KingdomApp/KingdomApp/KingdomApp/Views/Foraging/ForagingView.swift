@@ -591,12 +591,11 @@ struct ForagingView: View {
     // MARK: - Haptics
     
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
+        HapticService.shared.notification(type)
     }
     
     private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        HapticService.shared.impact(style)
     }
 }
 

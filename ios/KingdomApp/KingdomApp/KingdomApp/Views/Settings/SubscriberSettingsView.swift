@@ -16,6 +16,7 @@ struct SubscriberSettingsView: View {
                     subscribeSection
                 } else {
                     previewSection
+                    usernameSection
                     iconStyleSection
                     cardStyleSection
                     titleSection
@@ -27,11 +28,108 @@ struct SubscriberSettingsView: View {
         .background(KingdomTheme.Colors.parchment.ignoresSafeArea())
         .navigationTitle("Customize Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.loadSettings() }
+        .task {
+            await viewModel.loadSettings()
+            await viewModel.loadUsernameStatus()
+        }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") { }
         } message: {
             Text(viewModel.errorMessage ?? "An error occurred")
+        }
+        .alert("Change Username", isPresented: $viewModel.showUsernamePrompt) {
+            TextField("New username", text: $viewModel.newUsernameInput)
+            Button("Cancel", role: .cancel) {
+                viewModel.newUsernameInput = ""
+            }
+            Button("Change") {
+                Task { await viewModel.changeUsername() }
+            }
+        } message: {
+            Text("Enter your new username. You can only change it once every 30 days.")
+        }
+        .alert("Success", isPresented: $viewModel.showUsernameSuccess) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.usernameSuccessMessage ?? "Username changed!")
+        }
+    }
+    
+    private var usernameSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Username").font(FontStyles.headingSmall).foregroundColor(KingdomTheme.Colors.inkDark)
+            
+            VStack(spacing: 12) {
+                // Current username display
+                HStack {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        .frame(width: 32)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.usernameStatus?.current_username ?? player.name)
+                            .font(FontStyles.bodyMediumBold)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        if let status = viewModel.usernameStatus {
+                            if status.is_ruler {
+                                Text("Rulers cannot change their name")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                            } else if !status.can_change {
+                                Text("Available in \(status.days_until_available) days")
+                                    .font(FontStyles.labelSmall)
+                                    .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Change button or lock icon
+                    if let status = viewModel.usernameStatus {
+                        if status.is_ruler {
+                            // Locked for rulers
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(KingdomTheme.Colors.imperialGold)
+                                .padding(8)
+                                .background(KingdomTheme.Colors.imperialGold.opacity(0.15))
+                                .clipShape(Circle())
+                        } else if status.can_change {
+                            // Can change
+                            Button {
+                                viewModel.newUsernameInput = status.current_username
+                                viewModel.showUsernamePrompt = true
+                            } label: {
+                                Text("Change")
+                                    .font(FontStyles.labelSmall)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(KingdomTheme.Colors.buttonPrimary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        } else {
+                            // On cooldown
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(KingdomTheme.Colors.inkSubtle)
+                                .padding(8)
+                                .background(KingdomTheme.Colors.inkSubtle.opacity(0.15))
+                                .clipShape(Circle())
+                        }
+                    } else if viewModel.isLoadingUsername {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
         }
     }
     
@@ -251,6 +349,14 @@ class SubscriberSettingsViewModel: ObservableObject {
     @Published var selectedCardStyle: APIStylePreset?
     @Published var selectedTitle: APITitleData?
     
+    // Username change state
+    @Published var usernameStatus: UsernameStatusResponse?
+    @Published var isLoadingUsername = false
+    @Published var showUsernamePrompt = false
+    @Published var newUsernameInput = ""
+    @Published var showUsernameSuccess = false
+    @Published var usernameSuccessMessage: String?
+    
     private var originalIconStyleId: String?
     private var originalCardStyleId: String?
     private var originalTitleId: Int?
@@ -326,6 +432,36 @@ class SubscriberSettingsViewModel: ObservableObject {
                 showError = true
             }
             isSaving = false
+        }
+    }
+    
+    @MainActor
+    func loadUsernameStatus() async {
+        isLoadingUsername = true
+        do {
+            usernameStatus = try await KingdomAPIService.shared.player.getUsernameStatus()
+        } catch {
+            // Silently fail - username section just won't show status
+            print("Failed to load username status: \(error)")
+        }
+        isLoadingUsername = false
+    }
+    
+    @MainActor
+    func changeUsername() async {
+        let trimmed = newUsernameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        do {
+            let response = try await KingdomAPIService.shared.player.changeUsername(to: trimmed)
+            usernameSuccessMessage = response.message
+            showUsernameSuccess = true
+            newUsernameInput = ""
+            // Reload status to get updated cooldown
+            await loadUsernameStatus()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
         }
     }
 }

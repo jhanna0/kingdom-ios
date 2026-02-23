@@ -213,7 +213,7 @@ struct KneadGameView: View {
         
         // Haptic based on stretch
         if Int(dist) % 30 == 0 && dist > 40 {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: min(1, dist / 120))
+            HapticService.shared.lightImpact()
         }
     }
     
@@ -225,7 +225,7 @@ struct KneadGameView: View {
             foldCount += 1
             glutenLevel = min(1.0, CGFloat(foldCount) / CGFloat(targetFolds))
             
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            HapticService.shared.heavyImpact()
             
             // Check completion
             if foldCount >= targetFolds {

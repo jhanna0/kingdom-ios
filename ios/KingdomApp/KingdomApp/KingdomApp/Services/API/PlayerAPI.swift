@@ -242,6 +242,29 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - Username Change
+    
+    /// Get username change status (cooldown, ruler check)
+    func getUsernameStatus() async throws -> UsernameStatusResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/auth/username")
+        return try await client.execute(request)
+    }
+    
+    /// Change username (30-day cooldown, rulers cannot change)
+    func changeUsername(to newUsername: String) async throws -> UsernameChangeResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let body = UsernameChangeRequest(new_username: newUsername)
+        let request = try client.request(endpoint: "/auth/username", method: "PUT", body: body)
+        return try await client.execute(request)
+    }
+    
 }
 
 // MARK: - Relocation Response Models
@@ -260,6 +283,29 @@ struct RelocationResponse: Codable {
     let old_hometown_name: String
     let lost_ruler_status: Bool
     let next_relocation_available: String
+}
+
+// MARK: - Username Change Models
+
+struct UsernameStatusResponse: Codable {
+    let current_username: String
+    let can_change: Bool
+    let is_ruler: Bool
+    let days_until_available: Int
+    let cooldown_days: Int
+    let last_changed: String?
+    let message: String?
+}
+
+struct UsernameChangeRequest: Codable {
+    let new_username: String
+}
+
+struct UsernameChangeResponse: Codable {
+    let success: Bool
+    let new_username: String
+    let message: String
+    let next_change_available: String
 }
 
 // MARK: - Subscriber Settings Response (see SubscriberSettingsView.swift)

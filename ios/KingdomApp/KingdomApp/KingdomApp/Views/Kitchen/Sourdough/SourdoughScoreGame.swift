@@ -156,7 +156,7 @@ struct ScorableLoaf: View {
                 .onChanged { value in
                     currentPath.append(value.location)
                     if currentPath.count % 4 == 0 {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.2)
+                        HapticService.shared.lightImpact()
                     }
                 }
                 .onEnded { _ in
@@ -164,7 +164,7 @@ struct ScorableLoaf: View {
                         paths.append(currentPath)
                         if !hasDrawing {
                             hasDrawing = true
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            HapticService.shared.mediumImpact()
                             onComplete()
                         }
                     }

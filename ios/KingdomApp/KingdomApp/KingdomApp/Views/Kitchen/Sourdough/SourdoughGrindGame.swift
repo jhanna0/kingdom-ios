@@ -97,7 +97,7 @@ struct GrindWheatGameView: View {
                         withAnimation(.spring()) {
                             gamePhase = .grind
                         }
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        HapticService.shared.mediumImpact()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.right.circle.fill")
@@ -348,7 +348,7 @@ struct GrindWheatGameView: View {
             wheatStalks[index].isHarvested = true
         }
         
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        HapticService.shared.lightImpact()
         
         // Spawn grains that fall to basket
         for i in 0..<grainsPerStalk {
@@ -382,7 +382,7 @@ struct GrindWheatGameView: View {
         // Add to mill after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             grainsInMill += 1
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            HapticService.shared.softImpact()
             
             // Remove grain visual
             if let idx = looseGrains.firstIndex(where: { $0.id == grain.id }) {
@@ -428,7 +428,7 @@ struct GrindWheatGameView: View {
             
             // Haptic
             if Int(millRotation) % 30 == 0 {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                HapticService.shared.lightImpact()
             }
             
             // Check win

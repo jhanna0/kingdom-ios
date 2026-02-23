@@ -208,8 +208,12 @@ def get_kingdom(
             ruler_name = ruler.display_name
     
     # CALCULATE LIVE: Count players in kingdom RIGHT NOW
-    checked_in_count = db.query(PlayerState).filter(
-        PlayerState.current_kingdom_id == kingdom.id
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    checked_in_count = db.query(PlayerState).join(
+        User, PlayerState.user_id == User.id
+    ).filter(
+        PlayerState.current_kingdom_id == kingdom.id,
+        User.last_login >= cutoff
     ).count()
     
     # CALCULATE LIVE: Count active citizens (alive citizens whose hometown is this kingdom)

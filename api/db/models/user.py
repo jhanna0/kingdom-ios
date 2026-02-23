@@ -35,6 +35,9 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     last_login = Column(DateTime, nullable=True)
     
+    # Username change tracking (30-day cooldown)
+    last_username_change = Column(DateTime, nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -163,8 +163,7 @@ struct SkillDetailView: View {
                                     }
                                     
                                     // Haptic feedback
-                                    let generator = UINotificationFeedbackGenerator()
-                                    generator.notificationOccurred(.success)
+                                    HapticService.shared.success()
                                     
                                     // Dismiss toast and view after delay
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {

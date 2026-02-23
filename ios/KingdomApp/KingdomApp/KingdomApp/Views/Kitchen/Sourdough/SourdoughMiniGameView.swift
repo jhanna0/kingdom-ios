@@ -183,8 +183,7 @@ struct SourdoughMiniGameView: View {
     }
     
     private func completeStep(score: Int) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.shared.success()
         
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             showStepComplete = true

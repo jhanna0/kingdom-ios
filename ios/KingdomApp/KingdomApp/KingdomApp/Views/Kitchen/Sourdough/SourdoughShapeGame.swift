@@ -203,7 +203,7 @@ struct ShapeGameView: View {
         }
         
         if Int(totalRotation) % 50 == 0 {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            HapticService.shared.lightImpact()
         }
         
         if shapeProgress >= 1.0 {

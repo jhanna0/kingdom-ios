@@ -15,13 +15,17 @@ This ensures:
 - Token contains only stable identifier (apple_user_id), not mutable data
 """
 from typing import Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from db import get_db
 from db.models.user import User
-from db.models.kingdom import UserKingdom
+from db.models.kingdom import UserKingdom, Kingdom
+from utils.validation import validate_username, sanitize_username
 from models.auth_schemas import (
     AppleSignIn,
     TokenResponse,
@@ -307,6 +311,171 @@ def delete_my_account(
     db.commit()
     
     return {"message": "Account deleted successfully"}
+
+
+# ===== Username Change =====
+
+USERNAME_CHANGE_COOLDOWN_DAYS = 30
+
+
+class UsernameStatusResponse(BaseModel):
+    """Username change status"""
+    current_username: str
+    can_change: bool
+    is_ruler: bool
+    days_until_available: int
+    cooldown_days: int = USERNAME_CHANGE_COOLDOWN_DAYS
+    last_changed: Optional[datetime] = None
+    message: Optional[str] = None
+
+
+class UsernameChangeRequest(BaseModel):
+    """Request to change username"""
+    new_username: str
+
+
+class UsernameChangeResponse(BaseModel):
+    """Response after username change"""
+    success: bool
+    new_username: str
+    message: str
+    next_change_available: datetime
+
+
+@router.get("/username", response_model=UsernameStatusResponse)
+def get_username_status(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current username and change eligibility status.
+    
+    Rules:
+    - Must be a subscriber
+    - Rulers cannot change their username (their name is public)
+    - Non-rulers can change once every 30 days
+    """
+    from routers.store import is_user_subscriber
+    
+    # Check subscriber status first
+    if not is_user_subscriber(db, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Username changes are a subscriber-only feature."
+        )
+    
+    # Check if user is a ruler of any kingdom
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).count()
+    is_ruler = ruled_kingdoms > 0
+    
+    # Calculate cooldown status
+    can_change = True
+    days_until_available = 0
+    message = None
+    
+    if is_ruler:
+        can_change = False
+        message = "Rulers cannot change their username."
+    elif current_user.last_username_change:
+        cooldown_end = current_user.last_username_change + timedelta(days=USERNAME_CHANGE_COOLDOWN_DAYS)
+        if datetime.utcnow() < cooldown_end:
+            can_change = False
+            days_until_available = (cooldown_end - datetime.utcnow()).days + 1
+            message = f"You can change your username again in {days_until_available} days."
+    
+    return UsernameStatusResponse(
+        current_username=current_user.display_name,
+        can_change=can_change,
+        is_ruler=is_ruler,
+        days_until_available=days_until_available,
+        last_changed=current_user.last_username_change,
+        message=message
+    )
+
+
+@router.put("/username", response_model=UsernameChangeResponse)
+def change_username(
+    request: UsernameChangeRequest,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change the current user's username.
+    
+    Rules:
+    - Must be a subscriber
+    - Rulers cannot change their username
+    - Must wait 30 days between changes
+    - Username must be 3-20 characters
+    - Only letters, numbers, and single spaces allowed
+    - Username must be unique (case-insensitive)
+    """
+    from routers.store import is_user_subscriber
+    
+    # Check subscriber status first
+    if not is_user_subscriber(db, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Username changes are a subscriber-only feature."
+        )
+    
+    # Check if user is a ruler
+    ruled_kingdoms = db.query(Kingdom).filter(Kingdom.ruler_id == current_user.id).count()
+    if ruled_kingdoms > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rulers cannot change their username. Your name is known throughout the realm!"
+        )
+    
+    # Check cooldown
+    if current_user.last_username_change:
+        cooldown_end = current_user.last_username_change + timedelta(days=USERNAME_CHANGE_COOLDOWN_DAYS)
+        if datetime.utcnow() < cooldown_end:
+            days_left = (cooldown_end - datetime.utcnow()).days + 1
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"You can change your username again in {days_left} days."
+            )
+    
+    # Sanitize and validate new username
+    new_username = sanitize_username(request.new_username)
+    is_valid, error_msg = validate_username(new_username)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    
+    # Check if username is taken (case-insensitive)
+    existing = db.query(User).filter(
+        func.lower(User.display_name) == func.lower(new_username),
+        User.id != current_user.id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The name '{new_username}' is already taken."
+        )
+    
+    # Update username
+    old_username = current_user.display_name
+    current_user.display_name = new_username
+    current_user.last_username_change = datetime.utcnow()
+    current_user.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    next_change = current_user.last_username_change + timedelta(days=USERNAME_CHANGE_COOLDOWN_DAYS)
+    
+    print(f"📝 [USERNAME] User {current_user.id} changed name: '{old_username}' -> '{new_username}'")
+    
+    return UsernameChangeResponse(
+        success=True,
+        new_username=new_username,
+        message=f"Your name has been changed to '{new_username}'!",
+        next_change_available=next_change
+    )
 
 
 # ===== Health Check =====

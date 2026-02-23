@@ -1184,8 +1184,7 @@ struct MyPropertiesView: View {
                     isPurchasingUpgrade = false
                     
                     // Haptic feedback
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
+                    HapticService.shared.success()
                 }
                 
                 // Reload data
@@ -1196,8 +1195,7 @@ struct MyPropertiesView: View {
                     errorMessage = error.localizedDescription
                     showError = true
                     
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
+                    HapticService.shared.error()
                 }
                 print("❌ Failed to start upgrade: \(error)")
             }

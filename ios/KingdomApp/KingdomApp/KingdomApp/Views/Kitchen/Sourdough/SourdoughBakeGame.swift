@@ -248,7 +248,7 @@ struct BakeGameView: View {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         isComplete = true
                     }
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    HapticService.shared.success()
                     
                     // Auto-complete after showing the done state briefly
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {

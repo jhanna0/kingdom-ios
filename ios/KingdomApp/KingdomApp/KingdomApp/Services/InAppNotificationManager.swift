@@ -209,8 +209,7 @@ class InAppNotificationManager: NSObject, ObservableObject, UNUserNotificationCe
         currentNotification = notification
         
         // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.shared.success()
         
         // Create the toast view
         let toastView = InAppNotificationToastView(

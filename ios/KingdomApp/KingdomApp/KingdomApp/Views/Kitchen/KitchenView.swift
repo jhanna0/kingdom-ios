@@ -716,8 +716,7 @@ struct KitchenView: View {
             showResultOverlay = true
         }
         
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(success ? .success : .error)
+        HapticService.shared.notification(success ? .success : .error)
     }
 }
 

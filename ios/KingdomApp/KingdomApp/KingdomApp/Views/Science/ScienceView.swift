@@ -886,7 +886,7 @@ struct ScienceView: View {
     }
     
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        UINotificationFeedbackGenerator().notificationOccurred(type)
+        HapticService.shared.notification(type)
     }
     
     // MARK: - Winnings Popup

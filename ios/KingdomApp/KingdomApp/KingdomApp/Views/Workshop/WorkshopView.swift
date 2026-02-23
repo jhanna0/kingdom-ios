@@ -373,8 +373,7 @@ struct WorkshopView: View {
                     showResultOverlay = true
                 }
                 
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(response.success ? .success : .error)
+                HapticService.shared.notification(response.success ? .success : .error)
             }
         } catch {
             await MainActor.run {
@@ -384,8 +383,7 @@ struct WorkshopView: View {
                     showResultOverlay = true
                 }
                 
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
+                HapticService.shared.error()
             }
         }
     }

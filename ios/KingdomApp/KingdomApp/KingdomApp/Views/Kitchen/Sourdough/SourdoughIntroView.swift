@@ -52,7 +52,7 @@ struct IntroStepView: View {
             // Buttons
             VStack(spacing: 12) {
                 Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    HapticService.shared.mediumImpact()
                     onStart()
                 } label: {
                     Text("Let's Bake")

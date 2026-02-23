@@ -228,7 +228,7 @@ PROPERTY_TIERS = {
         "options": [
             {
                 "id": "beautiful_property",
-                "name": "Beautiful Property",
+                "name": "Beautiful Maison",
                 "icon": "building.columns.fill",
                 "description": "Animals & Gardens",
                 "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],

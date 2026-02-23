@@ -70,7 +70,7 @@ struct MixStarterGameView: View {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 ingredientsAdded.insert("flour")
                             }
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            HapticService.shared.mediumImpact()
                             spawnIngredientSplash(type: "flour", center: bowlCenter)
                         }
                         .position(x: 70, y: 70)
@@ -81,7 +81,7 @@ struct MixStarterGameView: View {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 ingredientsAdded.insert("water")
                             }
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            HapticService.shared.mediumImpact()
                             spawnIngredientSplash(type: "water", center: bowlCenter)
                         }
                         .position(x: geo.size.width - 70, y: 70)
@@ -92,7 +92,7 @@ struct MixStarterGameView: View {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 ingredientsAdded.insert("starter")
                             }
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            HapticService.shared.mediumImpact()
                             spawnIngredientSplash(type: "starter", center: bowlCenter)
                         }
                         .position(x: geo.size.width / 2, y: 60)
@@ -328,7 +328,7 @@ struct MixStarterGameView: View {
         
         // Haptic
         if Int(mixingProgress * 100) % 5 == 0 {
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            HapticService.shared.softImpact()
         }
         
         // Check completion

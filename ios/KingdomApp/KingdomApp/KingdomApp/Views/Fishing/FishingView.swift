@@ -962,20 +962,16 @@ struct FishingView: View {
     }
     
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        #if canImport(UIKit)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
-        #endif
+        HapticService.shared.notification(type)
     }
     
     private func hapticImpact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
-        #endif
+        HapticService.shared.impact(style)
     }
     
     /// Rapid-fire burst of heavy haptics for the BITE moment
     private func biteHapticBurst() {
+        guard HapticService.shared.isHapticsEnabled else { return }
         #if canImport(UIKit)
         let heavy = UIImpactFeedbackGenerator(style: .heavy)
         let rigid = UIImpactFeedbackGenerator(style: .rigid)
