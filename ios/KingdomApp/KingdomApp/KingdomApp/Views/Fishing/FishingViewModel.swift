@@ -467,17 +467,11 @@ class FishingViewModel: ObservableObject {
         uiState = state
         
         if state == .idle {
-            // Reset animation state when returning to idle
-            shouldAnimateMasterRoll = false
-            masterRollValue = 0
             currentRolls = []
             currentRollIndex = -1
         } else if state == .escaped {
             DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDelay) { [weak self] in
                 guard let self = self else { return }
-                // Reset animation state when returning to idle after escape
-                self.shouldAnimateMasterRoll = false
-                self.masterRollValue = 0
                 self.currentRolls = []
                 self.currentRollIndex = -1
                 self.uiState = .idle

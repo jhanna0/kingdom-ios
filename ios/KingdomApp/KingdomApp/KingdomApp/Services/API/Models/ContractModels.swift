@@ -8,6 +8,8 @@ struct APIPerActionCost: Codable {
     let amount: Int
     let display_name: String
     let icon: String
+    let color: String?
+    let can_afford: Bool?
 }
 
 struct APIContract: Codable {
@@ -39,6 +41,9 @@ struct APIContract: Codable {
     
     // Per-action resource costs (NEW - required during each work action)
     let per_action_costs: [APIPerActionCost]?
+    
+    // Resource affordability (can player afford per-action costs?)
+    let can_afford: Bool?
     
     // Custom endpoint (for catchup contracts)
     let endpoint: String?

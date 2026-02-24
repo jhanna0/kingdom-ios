@@ -339,6 +339,13 @@ def get_action_status(
             ActionCooldown.expires_at > datetime.utcnow()
         ).count()
     
+    # Pre-fetch inventory for resource affordability checks (used by both building and property contracts)
+    from db.models.inventory import PlayerInventory
+    inventory_items = db.query(PlayerInventory).filter(
+        PlayerInventory.user_id == current_user.id
+    ).all()
+    inventory_map = {item.item_id: item.quantity for item in inventory_items}
+    
     # Get contracts for HOMETOWN kingdom (from UnifiedContract table)
     # Players can ONLY work on building contracts when physically IN their hometown
     contracts = []
@@ -349,7 +356,7 @@ def get_action_status(
             UnifiedContract.category == 'kingdom_building',  # Only building contracts
             UnifiedContract.completed_at.is_(None)  # Active contracts only
         ).all()
-        contracts = [contract_to_response(c, db) for c in contracts_query]
+        contracts = [contract_to_response(c, db, inventory_map) for c in contracts_query]
         
         # Add catchup contracts as building contracts (unique name: "Expand {building}")
         catchup_list = get_catchup_contracts_for_status(db, current_user.id, state)

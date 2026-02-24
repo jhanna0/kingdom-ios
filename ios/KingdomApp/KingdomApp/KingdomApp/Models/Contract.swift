@@ -9,6 +9,14 @@ struct ContractPerActionCost: Codable, Hashable {
     let amount: Int
     let displayName: String
     let icon: String
+    let color: String?
+    let canAfford: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case resource, amount, icon, color
+        case displayName = "display_name"
+        case canAfford = "can_afford"
+    }
 }
 
 struct Contract: Identifiable, Codable, Hashable {
@@ -40,6 +48,9 @@ struct Contract: Identifiable, Codable, Hashable {
     
     // Per-action resource costs (NEW - resources required each work action)
     let perActionCosts: [ContractPerActionCost]?
+    
+    // Resource affordability (can player afford per-action costs?)
+    let canAfford: Bool?
     
     // Custom endpoint (for contracts with dedicated endpoints like catchup)
     let endpoint: String?
@@ -185,6 +196,7 @@ struct Contract: Identifiable, Codable, Hashable {
             rewardPool: upfrontCost,
             actionReward: actionReward,
             perActionCosts: nil,
+            canAfford: nil,
             endpoint: nil,
             createdBy: createdBy,
             createdAt: Date(),

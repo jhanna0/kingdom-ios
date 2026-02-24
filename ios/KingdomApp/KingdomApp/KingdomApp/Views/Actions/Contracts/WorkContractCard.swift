@@ -43,9 +43,34 @@ struct WorkContractCard: View {
         return Int(remaining)
     }
     
+    var canAffordFood: Bool {
+        status.canAffordFood ?? true
+    }
+    
+    var canAffordResources: Bool {
+        contract.canAfford ?? true
+    }
+    
+    var canAffordAll: Bool {
+        canAffordFood && canAffordResources
+    }
+    
     var isReady: Bool {
-        let canAffordFood = status.canAffordFood ?? true
-        return !globalCooldownActive && canAffordFood && (status.ready || calculatedSecondsRemaining <= 0)
+        return !globalCooldownActive && canAffordAll && (status.ready || calculatedSecondsRemaining <= 0)
+    }
+    
+    /// Returns the specific resource name that's missing, with priority: food > resources
+    var missingResourceName: String {
+        if !canAffordFood {
+            return "Food"
+        }
+        // Check individual resources - find first one that can't be afforded
+        if let costs = contract.perActionCosts {
+            for cost in costs where cost.canAfford == false {
+                return cost.displayName
+            }
+        }
+        return "Resources"
     }
     
     // Build cost items for this contract (food + resources)
@@ -65,11 +90,12 @@ struct WorkContractCard: View {
         // Per-action resource costs from contract
         if let costs = contract.perActionCosts {
             for cost in costs {
+                let costColor = cost.color.map { KingdomTheme.Colors.color(fromThemeName: $0) } ?? KingdomTheme.Colors.buttonWarning
                 items.append(CostItem(
                     icon: cost.icon,
                     amount: cost.amount,
-                    color: KingdomTheme.Colors.buttonWarning,
-                    canAfford: true  // Resource affordability checked elsewhere
+                    color: costColor,
+                    canAfford: cost.canAfford ?? true
                 ))
             }
         }
@@ -204,8 +230,8 @@ struct WorkContractCard: View {
                 .frame(height: 38)
                 .padding(.horizontal, 12)
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
-            } else if !(status.canAffordFood ?? true) {
-                Text("Need food")
+            } else if !canAffordAll {
+                Text("Need \(missingResourceName.lowercased())")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity, minHeight: 38)

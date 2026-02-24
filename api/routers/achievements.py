@@ -136,6 +136,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             -- Gathering
             COALESCE((SELECT SUM(amount_gathered) FROM daily_gathering WHERE user_id = :user_id AND resource_type = 'wood'), 0) as wood_gathered,
             COALESCE((SELECT SUM(amount_gathered) FROM daily_gathering WHERE user_id = :user_id AND resource_type = 'iron'), 0) as iron_gathered,
+            COALESCE((SELECT SUM(amount_gathered) FROM daily_gathering WHERE user_id = :user_id AND resource_type = 'stone'), 0) as stone_gathered,
             
             -- Fortification stats
             COALESCE((SELECT items_sacrificed FROM player_fortification_stats WHERE user_id = :user_id), 0) as items_sacrificed,
@@ -186,6 +187,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["blueprints_earned"] = int(combined_result.blueprints_earned)
         progress["wood_gathered"] = int(combined_result.wood_gathered)
         progress["iron_gathered"] = int(combined_result.iron_gathered)
+        progress["stone_gathered"] = int(combined_result.stone_gathered)
         progress["items_sacrificed"] = int(combined_result.items_sacrificed)
         progress["max_fortification"] = int(combined_result.max_fortification)
         progress["empire_size"] = int(combined_result.empire_size)

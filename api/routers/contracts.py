@@ -28,8 +28,14 @@ from services.kingdom_service import (
 )
 
 
-def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
-    """Convert UnifiedContract to response dict"""
+def contract_to_response(contract: UnifiedContract, db: Session = None, inventory_map: dict = None) -> dict:
+    """Convert UnifiedContract to response dict.
+    
+    Args:
+        contract: The contract to convert
+        db: Database session for querying contributions
+        inventory_map: Optional dict of {item_id: quantity} for checking affordability
+    """
     # Count contributions
     actions_completed = 0
     action_contributions = {}
@@ -54,6 +60,7 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
     building_icon = None
     building_display_name = None
     per_action_costs = []
+    can_afford_all = True
     
     if contract.type in BUILDING_TYPES:
         building_data = BUILDING_TYPES[contract.type]
@@ -69,12 +76,18 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
             for cost in raw_per_action_costs:
                 resource_id = cost["resource"]
                 resource_info = RESOURCES.get(resource_id, {})
+                # Check affordability if inventory provided
+                player_has = inventory_map.get(resource_id, 0) if inventory_map else 0
+                has_enough = player_has >= cost["amount"] if inventory_map else True
+                if not has_enough:
+                    can_afford_all = False
                 per_action_costs.append({
                     "resource": resource_id,
                     "amount": cost["amount"],
                     "display_name": resource_info.get("display_name", resource_id.capitalize()),
                     "icon": resource_info.get("icon", "questionmark.circle"),
-                    "color": resource_info.get("color", "inkMedium")
+                    "color": resource_info.get("color", "inkMedium"),
+                    "can_afford": has_enough
                 })
     
     # Derive status from completion state (for backwards compatibility with clients)
@@ -102,7 +115,8 @@ def contract_to_response(contract: UnifiedContract, db: Session = None) -> dict:
         "created_at": contract.created_at,
         "completed_at": contract.completed_at,
         "status": status,  # Computed from completed_at, not stored in DB
-        "per_action_costs": per_action_costs  # NEW: Resources required per work action
+        "per_action_costs": per_action_costs,
+        "can_afford": can_afford_all  # Can player afford all per-action resource costs?
     }
 
 

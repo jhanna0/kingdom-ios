@@ -552,6 +552,27 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
     display_order = EXCLUDED.display_order,
     type_display_name = EXCLUDED.type_display_name;
 
+-- Stone Gathered
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('stone_gathered', 1, 500, '{"gold": 25}', 'Quarrier I', 'Gather 500 stone', 'square.stack.3d.up.fill', 'gathering', 440, 'Stone gathered'),
+    ('stone_gathered', 2, 2500, '{"gold": 50}', 'Quarrier II', 'Gather 2500 stone', 'square.stack.3d.up.fill', 'gathering', 441, 'Stone gathered'),
+    ('stone_gathered', 3, 5000, '{"gold": 100}', 'Quarrier III', 'Gather 5000 stone', 'square.stack.3d.up.fill', 'gathering', 442, 'Stone gathered'),
+    ('stone_gathered', 4, 10000, '{"gold": 200}', 'Quarrier IV', 'Gather 10000 stone', 'square.stack.3d.up.fill', 'gathering', 443, 'Stone gathered'),
+    ('stone_gathered', 5, 25000, '{"gold": 500}', 'Quarrier V', 'Gather 25000 stone', 'square.stack.3d.up.fill', 'gathering', 444, 'Stone gathered'),
+    ('stone_gathered', 6, 50000, '{"gold": 1000}', 'Quarrier VI', 'Gather 50000 stone', 'square.stack.3d.up.fill', 'gathering', 445, 'Stone gathered'),
+    ('stone_gathered', 7, 100000, '{"gold": 2500}', 'Master Quarrier', 'Gather 100000 stone', 'square.stack.3d.up.fill', 'gathering', 446, 'Stone gathered')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
 -- =====================================================
 -- CRAFTING ACHIEVEMENTS
 -- =====================================================

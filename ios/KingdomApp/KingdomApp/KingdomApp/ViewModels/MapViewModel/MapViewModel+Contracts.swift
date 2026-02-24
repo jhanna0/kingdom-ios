@@ -75,7 +75,9 @@ extension MapViewModel {
                             resource: apiCost.resource,
                             amount: apiCost.amount,
                             displayName: apiCost.display_name,
-                            icon: apiCost.icon
+                            icon: apiCost.icon,
+                            color: apiCost.color,
+                            canAfford: apiCost.can_afford
                         )
                     }
                     
@@ -98,6 +100,7 @@ extension MapViewModel {
                         rewardPool: apiContract.reward_pool,
                         actionReward: apiContract.action_reward,
                         perActionCosts: perActionCosts,
+                        canAfford: apiContract.can_afford,
                         endpoint: apiContract.endpoint,
                         createdBy: apiContract.created_by,
                         createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
