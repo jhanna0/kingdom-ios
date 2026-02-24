@@ -534,9 +534,6 @@ def get_friends_dashboard(
         pending_alliances_received = [_alliance_to_response(a, db).model_dump() for a in received]
     
     # ===== FRIEND ACTIVITY =====
-    # Fast path: query PlayerActivityLog directly with batch IN clause
-    from db.models.activity_log import PlayerActivityLog
-    
     # Get friend IDs
     friend_ids = []
     for friendship in friendships:
@@ -547,16 +544,59 @@ def get_friends_dashboard(
     # Include self
     all_user_ids = friend_ids + [user_id]
     
-    # Single query for all activities (uses composite index on user_id, created_at)
+    # Group consecutive duplicates per user in SQL (except rare drops)
+    user_ids_str = ",".join(str(uid) for uid in all_user_ids)
     cutoff = datetime.utcnow() - timedelta(days=7)
-    activity_logs = db.query(PlayerActivityLog).filter(
-        PlayerActivityLog.user_id.in_(all_user_ids),
-        PlayerActivityLog.created_at >= cutoff,
-        ~PlayerActivityLog.action_type.in_(["travel_fee"])  # Exclude noise
-    ).order_by(desc(PlayerActivityLog.created_at)).limit(50).all()
     
-    # Batch load user info for activities (1 query instead of N)
-    activity_user_ids = list(set(log.user_id for log in activity_logs))
+    sql = text(f"""
+        WITH ordered_logs AS (
+            SELECT *,
+                LAG(action_type) OVER (PARTITION BY user_id ORDER BY created_at DESC) as prev_action_type,
+                LAG(description) OVER (PARTITION BY user_id ORDER BY created_at DESC) as prev_description
+            FROM player_activity_log
+            WHERE user_id IN ({user_ids_str})
+              AND created_at >= :cutoff
+              AND action_type NOT IN ('travel_fee')
+        ),
+        grouped AS (
+            SELECT *,
+                CASE 
+                    WHEN action_type IN ('rare_loot', 'achievement', 'science_discovery') THEN 1
+                    WHEN prev_action_type IS NULL 
+                         OR action_type != prev_action_type 
+                         OR description != prev_description THEN 1
+                    ELSE 0
+                END as is_group_start
+            FROM ordered_logs
+        ),
+        with_groups AS (
+            SELECT *,
+                SUM(is_group_start) OVER (PARTITION BY user_id ORDER BY created_at DESC) as group_id
+            FROM grouped
+        )
+        SELECT 
+            MIN(id) as id,
+            user_id,
+            action_type,
+            action_category,
+            (array_agg(description ORDER BY created_at DESC))[1] as description,
+            kingdom_id,
+            kingdom_name,
+            SUM(COALESCE(amount, 0)) as amount,
+            (array_agg(visibility ORDER BY created_at DESC))[1] as visibility,
+            MAX(created_at) as created_at,
+            COUNT(*) as repeat_count,
+            (array_agg(details ORDER BY created_at DESC))[1] as details
+        FROM with_groups
+        GROUP BY group_id, user_id, action_type, action_category, kingdom_id, kingdom_name
+        ORDER BY created_at DESC
+        LIMIT 50
+    """)
+    
+    activity_rows = db.execute(sql, {"cutoff": cutoff}).fetchall()
+    
+    # Batch load user info
+    activity_user_ids = list(set(row.user_id for row in activity_rows))
     users_map = {}
     states_map = {}
     prefs_map = {}
@@ -565,20 +605,24 @@ def get_friends_dashboard(
         users_map = {u.id: u for u in users}
         states = db.query(PlayerState).filter(PlayerState.user_id.in_(activity_user_ids)).all()
         states_map = {s.user_id: s for s in states}
-        # Load subscriber preferences
         prefs_list = db.query(UserPreferences).filter(UserPreferences.user_id.in_(activity_user_ids)).all()
         prefs_map = {p.user_id: p for p in prefs_list}
     
     friend_activities = []
-    for log in activity_logs:
-        user = users_map.get(log.user_id)
-        user_state = states_map.get(log.user_id)
-        prefs = prefs_map.get(log.user_id)
-        icon, color = get_activity_icon_color(log.action_type)
+    for row in activity_rows:
+        user = users_map.get(row.user_id)
+        user_state = states_map.get(row.user_id)
+        prefs = prefs_map.get(row.user_id)
+        icon, color = get_activity_icon_color(row.action_type)
+        
+        # Add (xN) suffix if grouped
+        description = row.description
+        if row.repeat_count > 1:
+            description = f"{description} (x{row.repeat_count})"
         
         # Build subscriber customization if user is subscriber with prefs
         subscriber_customization_dict = None
-        if is_user_subscriber(db, log.user_id) and prefs:
+        if is_user_subscriber(db, row.user_id) and prefs:
             selected_title_dict = None
             if prefs.selected_title_achievement_id:
                 title_result = db.execute(text("""
@@ -605,24 +649,23 @@ def get_friends_dashboard(
                 }
         
         friend_activities.append({
-            "id": log.id,
-            "user_id": log.user_id,
+            "id": row.id,
+            "user_id": row.user_id,
             "username": user.display_name if user else "Unknown",
             "display_name": user.display_name if user else "Unknown",
             "user_level": user_state.level if user_state else 1,
-            "action_type": log.action_type,
-            "action_category": log.action_category,
-            "description": log.description,
-            "kingdom_id": log.kingdom_id,
-            "kingdom_name": log.kingdom_name,
-            "amount": log.amount,
-            "visibility": log.visibility,
-            "details": log.details or {},
+            "action_type": row.action_type,
+            "action_category": row.action_category,
+            "description": description,
+            "kingdom_id": row.kingdom_id,
+            "kingdom_name": row.kingdom_name,
+            "amount": row.amount,
+            "visibility": row.visibility,
+            "details": row.details or {},
             "icon": icon,
             "color": color,
             "subscriber_customization": subscriber_customization_dict,
-            # TODO: Using wrong format here. Should use format_datetime_iso once iOS TimeFormatter.parseISO supports Z suffix
-            "created_at": log.created_at.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
+            "created_at": row.created_at.replace(microsecond=0).strftime('%Y-%m-%dT%H:%M:%S')
         })
     
     return FriendsDashboardResponse(

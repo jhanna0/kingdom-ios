@@ -243,6 +243,18 @@ def collect_rewards(
                 "amount": seed_amount,
                 "display_name": reward_config.get("display_name"),
             })
+            # Log seed find to activity feed
+            log_activity(
+                db=db,
+                user_id=player_id,
+                action_type="foraging",
+                action_category="foraging",
+                description="Found a seed while foraging!",
+                kingdom_id=None,
+                amount=None,
+                details={"item": "wheat_seed", "amount": seed_amount},
+                visibility="friends"
+            )
         
         # Check for rare drops in round 2 rewards array
         for r in round2.get("rewards", []):

@@ -31,6 +31,9 @@ class ActivityLogEntry(BaseModel):
     
     # Subscriber customization (server-driven colors for activity card)
     subscriber_customization: Optional[Dict[str, Any]] = None  # SubscriberCustomization as dict
+    
+    # Grouping: how many consecutive identical activities this represents
+    repeat_count: int = 1
 
     class Config:
         from_attributes = True

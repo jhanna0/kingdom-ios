@@ -380,12 +380,25 @@ def _get_room_badges(db: "Session", user_id: int) -> dict:
         badges["garden"] = garden_count
     
     # Kitchen: count bread ready to collect
-    ready_bread_count = db.query(OvenSlot).filter(
-        OvenSlot.user_id == user_id,
-        OvenSlot.status == "ready"
-    ).count()
-    if ready_bread_count > 0:
-        badges["kitchen"] = ready_bread_count
+    # Note: Bread is "ready" if status is READY, or if status is BAKING but ready_at has passed
+    # (lazy update - the status gets updated when the kitchen view is opened)
+    from db.models.kitchen import OvenStatus
+    
+    oven_slots = db.query(OvenSlot).filter(
+        OvenSlot.user_id == user_id
+    ).all()
+    
+    kitchen_count = 0
+    for slot in oven_slots:
+        if slot.status == OvenStatus.READY:
+            kitchen_count += 1
+        elif slot.status == OvenStatus.BAKING and slot.ready_at:
+            # Check if baking is actually complete (lazy update)
+            if slot.ready_at.replace(tzinfo=timezone.utc) <= now:
+                kitchen_count += 1
+    
+    if kitchen_count > 0:
+        badges["kitchen"] = kitchen_count
     
     # Chicken Coop: badge when any stat below 50% OR eggs to collect OR egg ready to hatch
     from db.models.chicken import ChickenSlot, ChickenStatus

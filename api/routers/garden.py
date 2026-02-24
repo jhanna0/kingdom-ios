@@ -618,9 +618,9 @@ def harvest_plant(
         user_id=current_user.id,
         action_type="harvest",
         action_category="gardening",
-        description=f"Harvested {wheat_amount} wheat from the garden!",
+        description="Harvested wheat from the garden!",
         kingdom_id=None,
-        amount=wheat_amount,
+        amount=None,
         details={"item": "wheat", "amount": wheat_amount},
         visibility="friends"
     )

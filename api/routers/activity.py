@@ -19,6 +19,7 @@ from schemas.activity import ActivityLogEntry, PlayerActivityResponse
 router = APIRouter(prefix="/activity", tags=["activity"])
 
 
+
 def _get_contract_activities(db: Session, user_id: int, limit: int = 50) -> List[ActivityLogEntry]:
     """Get building/construction activities from contracts"""
     activities = []
@@ -283,32 +284,90 @@ def _get_kingdom_visit_activities(db: Session, user_id: int, limit: int = 50) ->
 
 
 def _get_action_log_activities(db: Session, user_id: int, limit: int = 50, exclude_types: List[str] = None) -> List[ActivityLogEntry]:
-    """Get logged activities from PlayerActivityLog (farm, patrol, scout, etc.)"""
+    """Get logged activities from PlayerActivityLog, grouping consecutive duplicates in SQL.
+    
+    Uses window functions to detect consecutive identical entries and group them,
+    except for rare drops which are always shown individually.
+    """
     activities = []
     
-    query = db.query(PlayerActivityLog).filter(
-        PlayerActivityLog.user_id == user_id
-    )
-    
-    # Exclude certain action types (e.g., travel_fee from friend feeds)
+    # Build exclude clause
+    exclude_clause = ""
     if exclude_types:
-        query = query.filter(~PlayerActivityLog.action_type.in_(exclude_types))
+        exclude_list = ", ".join(f"'{t}'" for t in exclude_types)
+        exclude_clause = f"AND action_type NOT IN ({exclude_list})"
     
-    logs = query.order_by(desc(PlayerActivityLog.created_at)).limit(limit).all()
+    # SQL with window function to group consecutive duplicates
+    # LAG looks at previous row - if same action_type+description, it's a duplicate
+    # Rare drops (rare_loot, achievement, science_discovery) are never grouped
+    sql = text(f"""
+        WITH ordered_logs AS (
+            SELECT *,
+                LAG(action_type) OVER (ORDER BY created_at DESC) as prev_action_type,
+                LAG(description) OVER (ORDER BY created_at DESC) as prev_description
+            FROM player_activity_log
+            WHERE user_id = :user_id {exclude_clause}
+            ORDER BY created_at DESC
+        ),
+        grouped AS (
+            SELECT *,
+                CASE 
+                    -- Never group rare/special types
+                    WHEN action_type IN ('rare_loot', 'achievement', 'science_discovery') THEN 1
+                    -- Start new group if different from previous
+                    WHEN prev_action_type IS NULL 
+                         OR action_type != prev_action_type 
+                         OR description != prev_description THEN 1
+                    ELSE 0
+                END as is_group_start
+            FROM ordered_logs
+        ),
+        with_groups AS (
+            SELECT *,
+                SUM(is_group_start) OVER (ORDER BY created_at DESC) as group_id
+            FROM grouped
+        )
+        SELECT 
+            MIN(id) as id,
+            user_id,
+            action_type,
+            action_category,
+            description,
+            kingdom_id,
+            kingdom_name,
+            SUM(COALESCE(amount, 0)) as amount,
+            MAX(created_at) as created_at,
+            COUNT(*) as repeat_count,
+            (array_agg(details ORDER BY created_at DESC))[1] as details
+        FROM with_groups
+        GROUP BY group_id, user_id, action_type, action_category, description, kingdom_id, kingdom_name
+        ORDER BY created_at DESC
+        LIMIT :limit
+    """)
     
-    for log in logs:
-        # Use the description as-is, amount will be shown separately on the right
+    result = db.execute(sql, {"user_id": user_id, "limit": limit})
+    
+    for row in result:
+        description = row.description
+        repeat_count = row.repeat_count
+        amount = row.amount if row.amount else None
+        
+        # Add x6 suffix if grouped
+        if repeat_count > 1:
+            description = f"{description} (x{repeat_count})"
+        
         activities.append(ActivityLogEntry(
-            id=log.id,
+            id=row.id,
             user_id=user_id,
-            action_type=log.action_type,
-            action_category=log.action_category,
-            description=log.description,
-            kingdom_id=log.kingdom_id,
-            kingdom_name=log.kingdom_name,
-            amount=log.amount,
-            details=log.details or {},
-            created_at=log.created_at
+            action_type=row.action_type,
+            action_category=row.action_category,
+            description=description,
+            kingdom_id=row.kingdom_id,
+            kingdom_name=row.kingdom_name,
+            amount=amount,
+            details=row.details or {},
+            created_at=row.created_at,
+            repeat_count=repeat_count
         ))
     
     return activities

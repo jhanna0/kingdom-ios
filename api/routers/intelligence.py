@@ -14,6 +14,7 @@ from db.models import User, Kingdom, PlayerState, KingdomIntelligence
 from db import ActionCooldown
 from routers.auth import get_current_user
 from routers.actions.utils import format_datetime_iso
+from services.kingdom_service import get_active_citizens_count
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 
@@ -49,16 +50,11 @@ def _calculate_total_defense(db: Session, kingdom_id: str) -> int:
 
 
 def _count_active_citizens(db: Session, kingdom_id: str) -> int:
-    """Count active citizens (all citizens of this kingdom)"""
-    # NOTE: last_check_in was removed. For now counting all citizens.
-    # TODO: Use user_kingdoms or activity_log to filter recently active
+    """Count active citizens (logged in within last 7 days) whose hometown is this kingdom.
     
-    count = db.query(PlayerState).filter(
-        PlayerState.hometown_kingdom_id == kingdom_id,
-        PlayerState.is_alive == True
-    ).count()
-    
-    return count
+    Uses the centralized get_active_citizens_count from kingdom_service.
+    """
+    return get_active_citizens_count(db, kingdom_id)
 
 
 def _get_population(db: Session, kingdom_id: str) -> int:
