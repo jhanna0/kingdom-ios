@@ -51,8 +51,29 @@ struct PropertyUpgradeContractCard: View {
         return contract.canAffordFood ?? true
     }
     
+    var canAffordGold: Bool {
+        return contract.canAffordGold ?? true
+    }
+    
     var canAffordAll: Bool {
-        return canAffordResources && canAffordFood
+        return canAffordResources && canAffordFood && canAffordGold
+    }
+    
+    /// Returns the specific resource name that's missing, with priority: food > gold > resources
+    var missingResourceName: String {
+        if !canAffordFood {
+            return "Food"
+        }
+        if !canAffordGold {
+            return "Gold"
+        }
+        // Check individual resources - find first one that can't be afforded
+        if let costs = contract.perActionCosts {
+            for cost in costs where cost.canAfford == false {
+                return cost.displayName
+            }
+        }
+        return "Resources"
     }
     
     var isReady: Bool {
@@ -175,7 +196,7 @@ struct PropertyUpgradeContractCard: View {
                 .padding(.horizontal, 12)
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !canAffordAll {
-                Text(!canAffordFood ? "Need food" : "Need resources")
+                Text("Need \(missingResourceName.lowercased())")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity, minHeight: 38)

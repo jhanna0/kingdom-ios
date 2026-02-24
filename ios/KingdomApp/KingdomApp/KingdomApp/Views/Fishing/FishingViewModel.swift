@@ -283,8 +283,11 @@ class FishingViewModel: ObservableObject {
         
         currentBarType = .cast
         currentSlots = baseCastSlots
-        masterRollValue = 0
+        
+        // Reset animation state cleanly - order matters for onChange handlers
         shouldAnimateMasterRoll = false
+        masterRollValue = 0
+        
         currentPhaseResult = nil
         currentLootResult = nil
         
@@ -310,8 +313,11 @@ class FishingViewModel: ObservableObject {
         
         currentBarType = .reel
         currentSlots = baseReelSlots
-        masterRollValue = 0
+        
+        // Reset animation state cleanly - order matters for onChange handlers
         shouldAnimateMasterRoll = false
+        masterRollValue = 0
+        
         currentPhaseResult = nil
         
         do {
@@ -336,6 +342,10 @@ class FishingViewModel: ObservableObject {
         // Switch to loot bar
         currentBarType = .loot
         currentSlots = lootResult.drop_table
+        
+        // Reset animation state BEFORE setting new values
+        // This ensures onChange handlers see a clean transition
+        shouldAnimateMasterRoll = false
         masterRollValue = 0
         
         // Start loot animation
@@ -358,7 +368,11 @@ class FishingViewModel: ObservableObject {
     /// Collect loot and go back to idle
     func collect() {
         currentLootResult = nil
+        
+        // Reset animation state cleanly
+        shouldAnimateMasterRoll = false
         masterRollValue = 0
+        
         currentRolls = []
         currentRollIndex = -1
         currentBarType = .cast
@@ -453,11 +467,17 @@ class FishingViewModel: ObservableObject {
         uiState = state
         
         if state == .idle {
+            // Reset animation state when returning to idle
+            shouldAnimateMasterRoll = false
+            masterRollValue = 0
             currentRolls = []
             currentRollIndex = -1
         } else if state == .escaped {
             DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDelay) { [weak self] in
                 guard let self = self else { return }
+                // Reset animation state when returning to idle after escape
+                self.shouldAnimateMasterRoll = false
+                self.masterRollValue = 0
                 self.currentRolls = []
                 self.currentRollIndex = -1
                 self.uiState = .idle

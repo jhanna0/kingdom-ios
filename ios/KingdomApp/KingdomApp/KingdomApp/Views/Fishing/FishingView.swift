@@ -563,11 +563,13 @@ struct FishingView: View {
                     masterRollAnimationStarted = true
                     Task { await runMasterRollAnimation() }
                 } else if !shouldAnimate {
+                    // Only reset the "started" flag - marker stays visible until masterRollValue is cleared
                     masterRollAnimationStarted = false
                 }
             }
             .onChange(of: viewModel.masterRollValue) { _, newValue in
                 if newValue == 0 {
+                    // Reset display state when master roll value is cleared (phase transition)
                     showMasterRollMarker = false
                     masterRollDisplayValue = 0
                     masterRollAnimationStarted = false
@@ -609,7 +611,11 @@ struct FishingView: View {
     @MainActor
     private func runMasterRollAnimation() async {
         let finalValue = viewModel.masterRollValue
-        guard finalValue > 0 else { return }
+        guard finalValue > 0 else {
+            // Early exit - still need to clean up animation state
+            masterRollAnimationStarted = false
+            return
+        }
         
         let clampedFinal = min(max(finalValue, 1), 100)
         
@@ -624,6 +630,11 @@ struct FishingView: View {
         showMasterRollMarker = true
         
         for pos in positions {
+            // Check if animation was cancelled (shouldAnimateMasterRoll turned off)
+            guard viewModel.shouldAnimateMasterRoll else {
+                masterRollAnimationStarted = false
+                return
+            }
             masterRollDisplayValue = pos
             try? await Task.sleep(nanoseconds: 30_000_000)
         }
