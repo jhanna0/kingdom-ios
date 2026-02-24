@@ -310,27 +310,33 @@ struct MyEmpireView: View {
     }
     
     private func allianceCard(_ alliance: EmpireAllianceSummary, config: EmpireUIConfig) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: config.alliancesSection.icon)
-                .font(FontStyles.iconMedium)
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(FontStyles.iconSmall)
                 .foregroundColor(.white)
-                .frame(width: 40, height: 40)
-                .brutalistBadge(backgroundColor: config.alliancesSection.swiftColor, cornerRadius: 10)
+                .frame(width: 32, height: 32)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 8)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(alliance.alliedEmpireName)
                     .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                Text("\(alliance.alliedKingdomCount) \(config.alliancesKingdomsLabel) • \(alliance.daysRemaining) \(config.alliancesDaysLabel)")
+                Text("\(alliance.alliedKingdomCount) \(config.alliancesKingdomsLabel)")
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
             }
             
             Spacer()
+            
+            Text("\(alliance.daysRemaining)d")
+                .font(FontStyles.labelBold)
+                .foregroundColor(KingdomTheme.Colors.buttonSuccess)
         }
-        .padding(12)
-        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
+        .padding(KingdomTheme.Spacing.small)
+        .background(KingdomTheme.Colors.buttonSuccess.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(KingdomTheme.Colors.buttonSuccess.opacity(0.3), lineWidth: 1))
     }
     
     // MARK: - Kingdoms Section

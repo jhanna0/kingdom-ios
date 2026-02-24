@@ -125,19 +125,16 @@ struct TaxRateManagementView: View {
                     
                     infoRow(
                         icon: "map.fill",
-                        text: "Tax applied to scouting and other actions"
+                        text: "Additional taxes apply on top of training costs"
                     )
                     
                     infoRow(
                         icon: "checkmark.circle.fill",
-                        text: "Tax collected on daily check-ins"
+                        text: "Taxes directly fund the kingdom's treasury"
                     )
                     
-                    infoRow(
-                        icon: "crown.fill",
-                        text: "As ruler, you pay no tax in your kingdom"
-                    )
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)
@@ -151,23 +148,24 @@ struct TaxRateManagementView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         strategyRow(
                             icon: "hand.thumbsup.fill",
-                            title: "Low tax (0-25%)",
-                            description: "Happy citizens, slower treasury growth"
+                            title: "Low tax",
+                            description: "Citizens happier, smaller treasury"
                         )
                         
                         strategyRow(
                             icon: "equal.circle.fill",
-                            title: "Moderate tax (30-50%)",
-                            description: "Balanced approach for steady income"
+                            title: "Moderate tax",
+                            description: "Mixture of citizen happiness and treasury"
                         )
                         
                         strategyRow(
                             icon: "exclamationmark.triangle.fill",
-                            title: "High tax (55-100%)",
-                            description: "Maximum treasury income, risk of rebellion"
+                            title: "High tax",
+                            description: "Hated by citizens, but allows explosive kingdom growth"
                         )
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)

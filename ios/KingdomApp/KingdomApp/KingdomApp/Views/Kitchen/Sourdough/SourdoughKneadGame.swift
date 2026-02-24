@@ -10,7 +10,7 @@ struct KneadGameView: View {
     @State private var foldCount: Int = 0
     @State private var glutenLevel: CGFloat = 0
     
-    let targetFolds = 35
+    let targetFolds = 20
     let stretchThreshold: CGFloat = 60  // Lowered from 80 since dough moves slower now (harder to reach same distance)
     
     var body: some View {
