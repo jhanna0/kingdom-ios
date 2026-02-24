@@ -137,7 +137,7 @@ Building, working, contracts, and trading flow coins.
 
 Kingdoms take a cut of income by taxes and travel fees.
 
-**Rulers cannot donate to kingdom treasury. Gold must be earned by citizens. Rulers pay no tax.**
+**Treasury gold is earned by citizens paying taxes.**
 
 Build a **Vault** or enemies can heist your treasury.
 """

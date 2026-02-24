@@ -79,10 +79,17 @@ GATHER_TIERS = {
         "message": "Nice find!",
         "haptic": "heavy",
     },
+    "gold": {
+        "name": "Jackpot",
+        "amount": 3,
+        "color": "buttonWarning", # Theme: warning gold
+        "message": "Jackpot!",
+        "haptic": "heavy",
+    },
 }
 
 # Order matters for probability calculation (cumulative)
-TIER_ORDER = ["black", "brown", "green"]
+TIER_ORDER = ["black", "brown", "green", "gold"]
 
 
 # ============================================================
@@ -92,20 +99,27 @@ TIER_ORDER = ["black", "brown", "green"]
 
 TIER_PROBABILITIES = {
     "black": 0.15,   # 15% chance - nothing
-    "brown": 0.50,   # 50% chance - 1 resource
+    "brown": 0.45,   # 45% chance - 1 resource
     "green": 0.35,   # 35% chance - 2 resources
+    "gold": 0.05,    # 5% chance - 3 resources
 }
 
 
 # ============================================================
 # BUILDING LEVEL PROBABILITY SCALING
 # ============================================================
-# Higher building level reduces black chance and increases green chance
-# Level 1: base probabilities (15% black, 50% brown, 35% green)
-# Level 5: 0% black, 50% brown, 50% green (guaranteed resource every tap)
-# Each level removes 3.75% from black and adds to green
+# Higher building level reduces black/brown chance and increases green/gold chance
+# Level 1: 15% black, 45% brown, 35% green, 5% gold
+# Level 5: 0% black, 35% brown, 50% green, 15% gold
+# Each level above 1:
+#   - Removes 3.75% from black (until 0%)
+#   - Removes 2.5% from brown
+#   - Adds 3.75% to green
+#   - Adds 2.5% to gold
 
 BLACK_REDUCTION_PER_LEVEL = 0.0375  # 3.75% reduction per level above 1
+BROWN_REDUCTION_PER_LEVEL = 0.025   # 2.5% reduction per level above 1
+GOLD_INCREASE_PER_LEVEL = 0.025     # 2.5% increase per level above 1
 
 
 # ============================================================

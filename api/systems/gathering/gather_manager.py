@@ -15,6 +15,8 @@ from .config import (
     TIER_ORDER,
     TIER_PROBABILITIES,
     BLACK_REDUCTION_PER_LEVEL,
+    BROWN_REDUCTION_PER_LEVEL,
+    GOLD_INCREASE_PER_LEVEL,
 )
 
 
@@ -108,28 +110,34 @@ class GatherManager:
         Roll for a gather tier using weighted random.
         
         Building level affects probabilities:
-        - Level 1: 15% black, 50% brown, 35% green (base)
-        - Level 5: 0% black, 50% brown, 50% green (guaranteed resource)
-        Each level above 1 reduces black by 3.75% and increases green by 3.75%
+        - Level 1: 15% black, 45% brown, 35% green, 5% gold
+        - Level 5: 0% black, 35% brown, 50% green, 15% gold
+        Each level above 1:
+          - Reduces black by 3.75% (until 0%)
+          - Reduces brown by 2.5%
+          - Increases green by 3.75%
+          - Increases gold by 2.5%
         
         Args:
             building_level: Level of the building (1-5)
             
         Returns:
-            Tier name: "black", "brown", or "green"
+            Tier name: "black", "brown", "green", or "gold"
         """
         # Clamp building level to valid range
         level = max(1, min(5, building_level))
         
         # Calculate adjusted probabilities based on building level
-        # Each level above 1 shifts 3.75% from black to green
         levels_above_base = level - 1
         black_reduction = levels_above_base * BLACK_REDUCTION_PER_LEVEL
+        brown_reduction = levels_above_base * BROWN_REDUCTION_PER_LEVEL
+        gold_increase = levels_above_base * GOLD_INCREASE_PER_LEVEL
         
         adjusted_probs = {
             "black": max(0, TIER_PROBABILITIES["black"] - black_reduction),
-            "brown": TIER_PROBABILITIES["brown"],  # Stays at 50%
+            "brown": TIER_PROBABILITIES["brown"] - brown_reduction,
             "green": TIER_PROBABILITIES["green"] + black_reduction,
+            "gold": TIER_PROBABILITIES["gold"] + gold_increase,
         }
         
         roll = self.rng.random()  # 0.0 to 1.0

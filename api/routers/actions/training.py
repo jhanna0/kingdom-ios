@@ -328,9 +328,10 @@ def work_on_training(
         if state.current_kingdom_id:
             kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         
-        # Get tax rate (rulers don't pay tax)
-        is_ruler = kingdom and kingdom.ruler_id == current_user.id
-        tax_rate = 0 if is_ruler else (kingdom.tax_rate if kingdom else 0)
+        # Get tax rate (rulers now pay tax to fund their own treasury)
+        # is_ruler = kingdom and kingdom.ruler_id == current_user.id
+        # tax_rate = 0 if is_ruler else (kingdom.tax_rate if kingdom else 0)
+        tax_rate = kingdom.tax_rate if kingdom else 0
         
         # Total cost = base + tax
         tax_amount = gold_per_action * tax_rate / 100

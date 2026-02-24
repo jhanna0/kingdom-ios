@@ -42,8 +42,9 @@ router = APIRouter()
 
 def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rate: int = 0, is_ruler: bool = False) -> list:
     """Get training contracts from unified_contracts table for status endpoint"""
-    # Rulers don't pay tax
-    effective_tax_rate = 0 if is_ruler else current_tax_rate
+    # Rulers now pay tax to fund their own treasury
+    # effective_tax_rate = 0 if is_ruler else current_tax_rate
+    effective_tax_rate = current_tax_rate
     
     contracts = db.query(UnifiedContract).filter(
         UnifiedContract.user_id == user_id,
@@ -68,7 +69,7 @@ def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rat
             "actions_completed": actions_completed,
             "cost_paid": contract.gold_paid,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
-            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
+            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,
             "created_at": format_datetime_iso(contract.created_at) if contract.created_at else None,
             "status": "completed" if contract.completed_at else "in_progress"
         })
@@ -201,8 +202,9 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
     from .action_config import ACTION_TYPES
     from .utils import calculate_cooldown
     
-    # Rulers don't pay tax
-    effective_tax_rate = 0 if is_ruler else current_tax_rate
+    # Rulers now pay tax to fund their own treasury
+    # effective_tax_rate = 0 if is_ruler else current_tax_rate
+    effective_tax_rate = current_tax_rate
     
     # Get contracts for properties in current kingdom only
     if not current_kingdom_id:
@@ -257,7 +259,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         # Get gold per action for pay-per-action system
         gold_per_action = contract.gold_per_action or 0
         
-        # Check if player can afford gold cost (with tax - rulers pay 0 tax)
+        # Check if player can afford gold cost (with tax)
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
         can_afford_gold = player_state.gold >= gold_cost_with_tax
         
@@ -281,7 +283,7 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
             "actions_completed": actions_completed,
             "cost": contract.gold_paid or 0,  # OLD: upfront payment (backwards compat)
             "gold_per_action": round(gold_per_action, 1) if gold_per_action > 0 else None,  # NEW: per-action cost
-            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,  # For display (0 for rulers)
+            "current_tax_rate": effective_tax_rate if gold_per_action > 0 else None,
             "can_afford_gold": can_afford_gold if gold_per_action > 0 else None,  # NEW: gold affordability
             "status": "completed" if contract.completed_at else "in_progress",
             "started_at": format_datetime_iso(contract.created_at) if contract.created_at else None,

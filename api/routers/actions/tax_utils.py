@@ -87,9 +87,9 @@ def apply_kingdom_tax(
         # Kingdom not found, no tax
         return (gross_income, 0, 0)
     
-    # Check if player is the ruler (rulers don't pay tax in their own kingdom)
-    if kingdom.ruler_id and kingdom.ruler_id == player_state.user_id:
-        return (gross_income, 0, 0)
+    # Rulers now pay tax like everyone else - this allows solo rulers to fund their treasury
+    # if kingdom.ruler_id and kingdom.ruler_id == player_state.user_id:
+    #     return (gross_income, 0, 0)
     
     # Calculate tax (precise float math - no rounding)
     tax_rate = kingdom.tax_rate
