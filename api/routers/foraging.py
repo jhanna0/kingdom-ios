@@ -157,6 +157,30 @@ def start_foraging(
             "dismiss_button": "Collect",
         }
     
+    # Check for seed streak bonus in Round 2 (uses same streak check as berries)
+    if session.round2 and session.round2.is_winner and streak_bonus:
+        doubled_seeds = session.round2.reward_amount * 2
+        session_dict["round2"]["reward_amount"] = doubled_seeds
+        for r in session_dict["round2"].get("rewards", []):
+            if r.get("item") == "wheat_seed":
+                r["amount"] = doubled_seeds
+        
+        session_dict["round2"]["streak_bonus"] = True
+        session_dict["round2"]["show_streak_popup"] = True
+        session_dict["round2"]["streak_info"] = {
+            "title": "HOT STREAK!",
+            "subtitle": "2x Seeds",
+            "description": "3 wins in a row!",
+            "multiplier": 2,
+            "threshold": 3,
+            "icon": "flame.fill",
+            "color": "gold",
+            "dismiss_button": "Continue",
+        }
+    elif session.round2:
+        session_dict["round2"]["streak_bonus"] = False
+        session_dict["round2"]["show_streak_popup"] = False
+    
     # Store
     expires_at = ForagingSessionDB.default_expiry()
     db_session = ForagingSessionDB(

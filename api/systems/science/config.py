@@ -8,7 +8,7 @@ DESIGN:
 - Get it right → streak continues, up to MAX_GUESSES
 - Final round awards a blueprint, earlier rounds award gold
 
-Science skill boosts gold rewards.
+Science skill widens calibration ranges (+4 width per level).
 """
 
 from typing import Dict
@@ -160,20 +160,15 @@ def get_science_probabilities(science_level: int = 0) -> dict:
     """
     Get any probability adjustments based on science skill.
     
-    Currently, science just boosts gold rewards.
-    Could add things like:
-    - Hint about the next number range
-    - Better odds on edge cases
-    - etc.
+    Science skill widens calibration ranges (+4 width per level).
     """
     return {
-        "gold_multiplier": 1.0 + (science_level * 0.1),  # +10% gold per level
-        "hint_enabled": science_level >= 3,  # Could show hints at T3+
+        "range_bonus": (science_level - 1) * 2,  # +2 on each side per level above 1
     }
 
 
 def calculate_gold_reward(streak: int, science_level: int = 0) -> int:
-    """Calculate gold reward for a streak. science_level reserved for future use."""
+    """Calculate gold reward for a streak."""
     if streak not in REWARD_CONFIG:
         return 0
     

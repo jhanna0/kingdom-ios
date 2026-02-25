@@ -37,7 +37,7 @@ GARDEN_CONFIG = {
     # Harvest outcomes and probabilities (must sum to 1.0)
     "outcomes": {
         "weed": {
-            "probability": 0.40,  # 50% chance
+            "probability": 0.20,  # 20% chance
             "display_name": "Weeds",
             "icon": "leaf.fill",
             "color": "inkMedium",
@@ -46,7 +46,7 @@ GARDEN_CONFIG = {
             "reward_amount": 0,
         },
         "flower": {
-            "probability": 0.35,  # 35% chance
+            "probability": 0.40,  # 40% chance
             "display_name": "Flower",
             "icon": "camera.macro",
             "color": "buttonDanger",  # Default pink/red
@@ -73,7 +73,7 @@ GARDEN_CONFIG = {
             },
         },
         "wheat": {
-            "probability": 0.25,  # 15% chance
+            "probability": 0.40,  # 40% chance
             # icon, color, display_name, description pulled from RESOURCES["wheat"]
             "reward_item": "wheat",
             "reward_amount_min": 1,

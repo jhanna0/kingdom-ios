@@ -677,14 +677,14 @@ SKILLS = {
         "category": "economy",
         "description": "Reduces building cooldowns",
         "benefits": {
-            1: ["-5% building cooldowns"],
-            2: ["-10% building cooldowns"],
-            3: ["-15% building cooldowns"],
-            4: ["-20% building cooldowns", "5% chance to refund building cooldown"],
-            5: ["-25% building cooldowns", "10% chance to refund building cooldown"]
+            1: ["-11% building cooldowns"],
+            2: ["-17% building cooldowns"],
+            3: ["-22% building cooldowns"],
+            4: ["-28% building cooldowns", "5% chance to refund building cooldown"],
+            5: ["-33% building cooldowns", "10% chance to refund building cooldown"]
         },
         "mechanics": {
-            "cooldown_reduction": {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25},
+            "cooldown_reduction": {1: 0.11, 2: 0.17, 3: 0.22, 4: 0.28, 5: 0.33},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },
@@ -709,14 +709,14 @@ SKILLS = {
         "category": "education",
         "description": "Reduces skill training cooldowns",
         "benefits": {
-            1: ["-5% training cooldowns"],
-            2: ["-10% training cooldowns"],
-            3: ["-15% training cooldowns"],
-            4: ["-20% training cooldowns", "5% chance to refund training cooldown"],
-            5: ["-25% training cooldowns", "10% chance to refund training cooldown"]
+            1: ["-11% training cooldowns"],
+            2: ["-17% training cooldowns"],
+            3: ["-22% training cooldowns"],
+            4: ["-28% training cooldowns", "5% chance to refund training cooldown"],
+            5: ["-33% training cooldowns", "10% chance to refund training cooldown"]
         },
         "mechanics": {
-            "cooldown_reduction": {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25},
+            "cooldown_reduction": {1: 0.11, 2: 0.17, 3: 0.22, 4: 0.28, 5: 0.33},
             "refund_chance": {4: 0.05, 5: 0.10}
         }
     },

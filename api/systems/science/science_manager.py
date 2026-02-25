@@ -241,12 +241,14 @@ class ScienceManager:
         session_id = f"science_{player_id}_{int(time.time() * 1000)}"
         
         # Calibration ranges get tighter each round (harder as you progress)
-        # Round 1: 30-70, Round 2: 35-65, Round 3: 40-60, Round 4: 45-55
+        # Science skill widens ranges: +4 width per science level
+        # Base ranges (Science 1): 30-70, 35-65, 40-60, 45-55
+        skill_bonus = (science_level - 1) * 2  # +2 on each side per level above 1
         calibration_ranges = [
-            (30, 70),  # Round 1 - easiest
-            (35, 65),  # Round 2
-            (40, 60),  # Round 3
-            (45, 55),  # Round 4 - hardest (very close to 50)
+            (30 - skill_bonus, 70 + skill_bonus),  # Round 1
+            (35 - skill_bonus, 65 + skill_bonus),  # Round 2
+            (40 - skill_bonus, 60 + skill_bonus),  # Round 3
+            (45 - skill_bonus, 55 + skill_bonus),  # Round 4
         ]
         
         # Create rounds with pre-calculated answers

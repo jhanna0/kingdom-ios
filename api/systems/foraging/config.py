@@ -108,14 +108,14 @@ ROUND1_WIN_CONFIG = {
     # Skill: leadership
     "skill": "leadership",
     # Base rates (T0) - berry teases dominate!
-    "berry_win_base": 0.20,
-    "seed_trail_win_base": 0.10,
-    "berry_tease_base": 0.65,       # 65% - almost won berries!
+    "berry_win_base": 0.25,
+    "seed_trail_win_base": 0.15,
+    "berry_tease_base": 0.60,       # 60% - almost won berries!
     "seed_trail_tease_base": 0.10,  # 10% - rare bonus round tease
-    # Nothing: only 5% at T0
+    # Nothing: only ~0% at T0
     # Per tier bonus
-    "berry_win_per_tier": 0.07,
-    "seed_trail_win_per_tier": 0.03,
+    "berry_win_per_tier": 0.05,
+    "seed_trail_win_per_tier": 0.07,
     "berry_tease_per_tier": -0.08,      # Teasers decrease as wins increase
     "seed_trail_tease_per_tier": -0.01,
 }
@@ -189,13 +189,13 @@ ROUND2_WIN_CONFIG = {
     # Skill: merchant
     "skill": "merchant",
     # Base rates (T0) - teasers dominate!
-    "seed_win_base": 0.22,
+    "seed_win_base": 0.28,
     "rare_egg_base": 0.001,
     "rare_egg_tease_base": 0.02,  # 2% - glimpse of rare egg!
-    "seed_tease_base": 0.68,  # 68% - so close to seeds!
-    # Nothing: only 14% at T0
+    "seed_tease_base": 0.62,  # 62% - so close to seeds!
+    # Nothing: only ~8% at T0
     # Per tier bonus
-    "seed_win_per_tier": 0.07,
+    "seed_win_per_tier": 0.044,
     "rare_egg_per_tier": 0.01,  # Flat 1% jackpot (Merchant still boosts seed wins in R2)
     "rare_egg_tease_per_tier": 0.005,  # Slight increase with merchant
     "seed_tease_per_tier": -0.06,  # Teasers decrease as wins increase

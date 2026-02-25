@@ -252,12 +252,13 @@ def list_trade_offers(
     user_id = current_user.id
     
     # Check if user has merchant skill (required to see trades)
-    state = get_player_state(db, current_user)
-    if not check_merchant_skill(state):
-        raise HTTPException(
-            status_code=403,
-            detail="Merchant skill tier 1 required for trading. Train your Merchant skill!"
-        )
+    # COMMENTED OUT: Allow viewing trades even without merchant skill (for message injection workaround)
+    # state = get_player_state(db, current_user)
+    # if not check_merchant_skill(state):
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="Merchant skill tier 1 required for trading. Train your Merchant skill!"
+    #     )
     
     # Expire old pending offers and return escrow
     expire_threshold = datetime.now(timezone.utc) - timedelta(hours=TRADE_OFFER_EXPIRY_HOURS)
@@ -311,9 +312,10 @@ def get_pending_count(
     db: Session = Depends(get_db)
 ):
     """Get count of pending incoming trade offers (for badge display)"""
-    state = get_player_state(db, current_user)
-    if not check_merchant_skill(state):
-        return {"count": 0, "has_merchant_skill": False}
+    # COMMENTED OUT: Allow viewing count even without merchant skill
+    # state = get_player_state(db, current_user)
+    # if not check_merchant_skill(state):
+    #     return {"count": 0, "has_merchant_skill": False}
     
     # Expire old offers first (return escrow)
     expire_threshold = datetime.now(timezone.utc) - timedelta(hours=TRADE_OFFER_EXPIRY_HOURS)
@@ -338,6 +340,7 @@ def get_pending_count(
         TradeOffer.status == TradeOfferStatus.PENDING.value
     ).count()
     
+    # Always return True for has_merchant_skill since we're not checking it anymore
     return {"count": count, "has_merchant_skill": True}
 
 
@@ -532,10 +535,11 @@ def accept_trade_offer(
         raise HTTPException(status_code=404, detail="Sender no longer exists")
     
     # Validate both still have merchant skill
-    if not check_merchant_skill(recipient_state):
-        raise HTTPException(status_code=403, detail="You no longer have Merchant skill tier 1")
-    if not check_merchant_skill(sender_state):
-        raise HTTPException(status_code=403, detail="Sender no longer has Merchant skill tier 1")
+    # COMMENTED OUT: Allow accepting trades even without merchant skill (already validated at creation)
+    # if not check_merchant_skill(recipient_state):
+    #     raise HTTPException(status_code=403, detail="You no longer have Merchant skill tier 1")
+    # if not check_merchant_skill(sender_state):
+    #     raise HTTPException(status_code=403, detail="Sender no longer has Merchant skill tier 1")
     
     # Items/gold are already held in escrow from sender when offer was created
     # Now we just need to transfer to recipient
@@ -707,11 +711,12 @@ def get_tradeable_items(
     """
     state = get_player_state(db, current_user)
     
-    if not check_merchant_skill(state):
-        raise HTTPException(
-            status_code=403,
-            detail="Merchant skill tier 1 required for trading"
-        )
+    # COMMENTED OUT: Allow viewing tradeable items even without merchant skill
+    # if not check_merchant_skill(state):
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="Merchant skill tier 1 required for trading"
+    #     )
     
     tradeable = []
     
