@@ -12,7 +12,6 @@ from db import get_db
 from db.models.user import User
 from db.models.player_state import PlayerState
 from routers.auth import get_current_user
-from routers.actions.tax_utils import apply_kingdom_tax
 from routers.actions.utils import log_activity
 from schemas.achievements import (
     Achievement,
@@ -588,19 +587,10 @@ def claim_achievement_reward(
     rewards_data = tier_data["rewards"] or {}
     gold_reward = rewards_data.get("gold", 0)
     # NOTE: XP rewards disabled - achievements only grant gold
+    # NOTE: Achievements are not taxed - players receive full reward
     
-    # Apply kingdom tax to gold reward
-    tax_amount = 0
-    tax_rate = 0
-    net_gold = gold_reward
-    
-    if gold_reward > 0 and state.hometown_kingdom_id:
-        net_gold, tax_amount, tax_rate = apply_kingdom_tax(
-            db, state.hometown_kingdom_id, state, gold_reward
-        )
-    
-    # Grant rewards (net gold after tax, no XP)
-    state.gold = (state.gold or 0) + net_gold
+    # Grant rewards (full gold, no tax, no XP)
+    state.gold = (state.gold or 0) + gold_reward
     
     # Record the claim
     claim_insert = text("""
@@ -617,7 +607,7 @@ def claim_achievement_reward(
         action_category="achievement",
         description=f"Earned {tier_data['display_name']}!",
         kingdom_id=state.hometown_kingdom_id,
-        amount=int(net_gold) if net_gold > 0 else None,
+        amount=int(gold_reward) if gold_reward > 0 else None,
         details={"achievement": tier_data["achievement_type"], "tier": tier_data["tier"], "display_name": tier_data["display_name"]},
         visibility="friends"
     )
@@ -628,15 +618,15 @@ def claim_achievement_reward(
         success=True,
         message=f"Claimed {tier_data['display_name']}!",
         rewards_granted=AchievementRewards(
-            gold=int(net_gold),  # Net gold after tax
+            gold=int(gold_reward),  # Full gold, no tax
             experience=0,  # XP rewards disabled
             items=rewards_data.get("items", [])
         ),
         new_gold=int(state.gold),
         new_experience=state.experience,
         new_level=None,  # No level ups from achievements
-        tax_amount=int(tax_amount) if tax_amount > 0 else None,
-        tax_rate=tax_rate if tax_rate > 0 else None,
+        tax_amount=None,  # Achievements are not taxed
+        tax_rate=None,  # Achievements are not taxed
         achievement_type=tier_data["achievement_type"],
         tier=tier_data["tier"],
         display_name=tier_data["display_name"]

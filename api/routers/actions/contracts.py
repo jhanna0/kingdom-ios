@@ -354,21 +354,26 @@ def work_on_property_upgrade(
         )
     
     # === PAY-PER-ACTION GOLD COST ===
+    # Calculate gold cost dynamically from tier (like resources)
+    from routers.tiers import calculate_property_gold_per_action
+    
     # Check if this is a new-style contract (pay per action) or old-style (already paid)
-    gold_per_action = contract.gold_per_action or 0
+    # For old contracts: contract.gold_paid > 0 and gold_per_action = 0 means already paid upfront
+    is_old_contract = (contract.gold_paid or 0) > 0 and (contract.gold_per_action or 0) == 0
+    
     action_gold_cost = 0
     tax_amount = 0
     tax_rate = 0
     
-    if gold_per_action > 0:
-        # NEW SYSTEM: Calculate action cost with tax
+    if not is_old_contract:
+        # NEW SYSTEM: Calculate gold cost dynamically from tier
+        gold_per_action = calculate_property_gold_per_action(contract.tier) if contract.tier else 0
+        
         kingdom = None
         if contract.kingdom_id:
             kingdom = db.query(Kingdom).filter(Kingdom.id == contract.kingdom_id).first()
         
         # Get tax rate (rulers now pay tax to fund their own treasury)
-        # is_ruler = kingdom and kingdom.ruler_id == current_user.id
-        # tax_rate = 0 if is_ruler else (kingdom.tax_rate if kingdom else 0)
         tax_rate = kingdom.tax_rate if kingdom else 0
         
         # Total cost = base + tax

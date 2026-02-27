@@ -118,8 +118,8 @@ def calculate_training_actions(current_tier: int, total_skill_points: int) -> in
 # Gold formula: BASE + (tier × PER_TIER)
 # Actions formula: BASE + (tier × PER_TIER)
 
-PROPERTY_GOLD_BASE = 40          # Higher than training (permanent investment)
-PROPERTY_GOLD_PER_TIER = 35      # Scales faster than training
+PROPERTY_GOLD_BASE = 25          # Slightly higher than training (permanent investment)
+PROPERTY_GOLD_PER_TIER = 25      # Clean scaling with round numbers
 PROPERTY_BASE_ACTIONS = 8        # Base actions for tier 1
 PROPERTY_ACTIONS_PER_TIER = 6    # Extra actions per tier
 
@@ -199,7 +199,7 @@ PROPERTY_TIERS = {
                 "icon": "hammer.fill",
                 "description": "Crafting workshop",
                 "benefits": ["All House benefits", "Unlocks crafting of weapons and armor"],
-                "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
+                "resource_ratios": [{"resource": "iron", "ratio": 0.5}],
                 "free_at_tier": 3,  # Backwards compat: auto-available at tier 3+
                 "color": "buttonPrimary",
                 "route": "/workshop",
@@ -210,7 +210,7 @@ PROPERTY_TIERS = {
                 "icon": "fork.knife",
                 "description": "Cook meals for buffs",
                 "benefits": ["All House benefits", "Unlocks cooking and baking"],
-                "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "stone", "ratio": 0.5}],
+                "resource_ratios": [{"resource": "stone", "ratio": 0.5}],
                 # No free_at_tier - must be built via contract
                 "color": "buttonWarning",
                 "route": "/kitchen",
@@ -223,7 +223,7 @@ PROPERTY_TIERS = {
         "icon": "building.columns.fill",
         "description": "Animals & Gardens",
         "benefits": ["All Workshop benefits", "You can raise animals and take care of your pets!"],
-        "resource_ratios": [{"resource": "wood", "ratio": 0.55}, {"resource": "iron", "ratio": 0.45}],
+        "resource_ratios": [{"resource": "wood", "ratio": 0.5}, {"resource": "iron", "ratio": 0.5}],
         # Multi-option support
         "options": [
             {

@@ -256,8 +256,12 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
                 "can_afford": has_enough  # Per-resource affordability
             })
         
-        # Get gold per action for pay-per-action system
-        gold_per_action = contract.gold_per_action or 0
+        # Calculate gold per action dynamically from tier (like resources)
+        from routers.tiers import calculate_property_gold_per_action
+        
+        # Check if old contract (already paid upfront)
+        is_old_contract = (contract.gold_paid or 0) > 0 and (contract.gold_per_action or 0) == 0
+        gold_per_action = 0 if is_old_contract else calculate_property_gold_per_action(contract.tier) if contract.tier else 0
         
         # Check if player can afford gold cost (with tax)
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0

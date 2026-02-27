@@ -455,13 +455,15 @@ def get_friends_dashboard(
     )
     
     state = db.query(PlayerState).filter(PlayerState.user_id == user_id).first()
-    has_merchant_skill = False
+    has_merchant_skill = True  # Always true now (merchant check removed)
     incoming_trades = []
     outgoing_trades = []
     trade_history = []
     
-    if state and check_merchant_skill(state):
-        has_merchant_skill = True
+    # COMMENTED OUT: Allow viewing trades even without merchant skill
+    # if state and check_merchant_skill(state):
+    if state:
+        # has_merchant_skill = True  # Already set above
         
         # Expire old pending offers
         expire_threshold = datetime.utcnow() - timedelta(hours=TRADE_OFFER_EXPIRY_HOURS)

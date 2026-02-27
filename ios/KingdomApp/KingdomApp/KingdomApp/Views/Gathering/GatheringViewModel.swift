@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - Tunable Constants
 
-private let kGatherCooldownSeconds: TimeInterval = 1.0
+private let kGatherCooldownSeconds: TimeInterval = 0.5
 
 // MARK: - Gathering View Model
 

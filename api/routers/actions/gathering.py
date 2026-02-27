@@ -56,8 +56,8 @@ def add_inventory_amount(db: Session, user_id: int, item_id: str, amount: int):
         )
         db.add(inv)
 
-# 1 second cooldown to prevent scripted abuse (frontend uses 0.5s)
-GATHER_COOLDOWN_SECONDS = 1
+# 0.5 second cooldown to prevent scripted abuse
+GATHER_COOLDOWN_SECONDS = 0.5
 
 # Daily limit per building level
 DAILY_LIMIT_PER_LEVEL = 200

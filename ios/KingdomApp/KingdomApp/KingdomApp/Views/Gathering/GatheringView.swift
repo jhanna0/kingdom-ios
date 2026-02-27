@@ -664,7 +664,7 @@ struct GatheringView: View {
             }
             
             // Move sweetspot after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 randomizeSweetspot(in: size)
             }
         }

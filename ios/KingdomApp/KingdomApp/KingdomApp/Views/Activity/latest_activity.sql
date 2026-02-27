@@ -170,11 +170,12 @@ SELECT
         ELSE TO_CHAR(r.activity_time, 'Mon DD')
     END AS time_ago,
     ROUND(ps.gold::numeric, 0) AS gold,
-    COALESCE(pi.quantity, 0) AS meat
+    COALESCE(SUM(pi.quantity), 0) AS food
 FROM ranked r
 JOIN player_state ps ON r.user_id = ps.user_id
 LEFT JOIN kingdoms k ON ps.hometown_kingdom_id = k.id
-LEFT JOIN player_inventory pi ON r.user_id = pi.user_id AND pi.item_id = 'meat'
+LEFT JOIN player_inventory pi ON r.user_id = pi.user_id AND pi.item_id IN ('meat', 'berries', 'sourdough')
 WHERE r.rn = 1
+GROUP BY r.user_id, r.display_name, k.name, r.activity_type, r.activity_time, ps.gold, ps.attack_power, ps.defense_power, ps.leadership, ps.building_skill, ps.intelligence, ps.science, ps.faith, ps.philosophy, ps.merchant
 ORDER BY r.activity_time DESC
 LIMIT 20;
