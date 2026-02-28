@@ -41,17 +41,19 @@ def check_prompt(
 ):
     """
     Check if there's an active prompt to show the user.
-    Returns the most recent non-expired, non-dismissed prompt.
+    Returns the most recent non-expired prompt that:
+    - User hasn't dismissed 3+ times, OR
+    - Was last shown 2+ days ago (if dismissed < 3 times)
     """
-    # Get active prompt for this platform that user hasn't dismissed
     result = db.execute(text("""
         SELECT p.id, p.modal_url
         FROM server_prompts p
+        LEFT JOIN prompt_dismissals d ON d.prompt_id = p.id AND d.user_id = :user_id
         WHERE (p.expires_at IS NULL OR p.expires_at > NOW())
           AND (p.target_platform = :platform OR p.target_platform = 'all')
-          AND NOT EXISTS (
-              SELECT 1 FROM prompt_dismissals d
-              WHERE d.prompt_id = p.id AND d.user_id = :user_id
+          AND (
+              d.id IS NULL
+              OR (d.completed = FALSE AND d.dismissal_count < 3 AND d.last_shown_at < NOW() - INTERVAL '12 hour') // should be 12 hour
           )
         ORDER BY p.created_at DESC
         LIMIT 1
@@ -62,11 +64,20 @@ def check_prompt(
     if not row:
         return {"success": True, "prompt": None}
     
+    prompt_id = str(row.id)
+    modal_url = row.modal_url
+    
+    # Append prompt_id as query param if not already present
+    if "?" in modal_url:
+        modal_url = f"{modal_url}&prompt_id={prompt_id}"
+    else:
+        modal_url = f"{modal_url}?prompt_id={prompt_id}"
+    
     return {
         "success": True,
         "prompt": {
-            "id": str(row.id),
-            "modal_url": row.modal_url
+            "id": prompt_id,
+            "modal_url": modal_url
         }
     }
 
@@ -78,16 +89,20 @@ def dismiss_prompt(
     db: Session = Depends(get_db)
 ):
     """
-    Record that user dismissed a prompt (won't show again).
+    Record that user dismissed a prompt.
+    Increments dismissal count and updates last_shown_at.
+    After 3 dismissals, prompt won't show again.
     """
     if not request.prompt_id:
         raise HTTPException(status_code=400, detail="Missing prompt_id")
     
-    # Insert dismissal (ignore if already exists)
     db.execute(text("""
-        INSERT INTO prompt_dismissals (user_id, prompt_id)
-        VALUES (:user_id, :prompt_id)
-        ON CONFLICT (user_id, prompt_id) DO NOTHING
+        INSERT INTO prompt_dismissals (user_id, prompt_id, dismissal_count, last_shown_at, dismissed_at)
+        VALUES (:user_id, :prompt_id, 1, NOW(), NOW())
+        ON CONFLICT (user_id, prompt_id) DO UPDATE SET
+            dismissal_count = prompt_dismissals.dismissal_count + 1,
+            last_shown_at = NOW(),
+            dismissed_at = NOW()
     """), {"user_id": user.id, "prompt_id": request.prompt_id})
     db.commit()
     
@@ -103,7 +118,10 @@ security = HTTPBearer()
 
 
 @router.get("/feedback-form", response_class=HTMLResponse)
-def feedback_form(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def feedback_form(
+    prompt_id: Optional[str] = None,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     """
     Serves HTML feedback form. Token comes from Authorization header.
     Form submits to /feedback endpoint with JWT auth.
@@ -255,6 +273,7 @@ def feedback_form(credentials: HTTPAuthorizationCredentials = Depends(security))
     
     <script>
         const token = "{token}";
+        const promptId = "{prompt_id}";
         
         const textarea = document.getElementById('message');
         const countEl = document.getElementById('count');
@@ -285,7 +304,7 @@ def feedback_form(credentials: HTTPAuthorizationCredentials = Depends(security))
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     }},
-                    body: JSON.stringify({{ message: message }})
+                    body: JSON.stringify({{ message: message, prompt_id: promptId || null }})
                 }});
                 
                 if (!response.ok) {{

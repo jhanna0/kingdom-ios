@@ -16,7 +16,10 @@ CREATE TABLE IF NOT EXISTS prompt_dismissals (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
     prompt_id UUID NOT NULL REFERENCES server_prompts(id) ON DELETE CASCADE,
+    dismissal_count INTEGER DEFAULT 1,
+    last_shown_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     dismissed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed BOOLEAN DEFAULT FALSE,
     UNIQUE(user_id, prompt_id)
 );
 
