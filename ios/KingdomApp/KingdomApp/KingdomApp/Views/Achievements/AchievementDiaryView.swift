@@ -467,7 +467,10 @@ struct AchievementTierRow: View {
                         rewardLabel(icon: "g.circle.fill", value: tier.rewards.gold, color: KingdomTheme.Colors.goldLight)
                     }
                     if tier.rewards.experience > 0 {
-                        rewardLabel(icon: "book.fill", value: tier.rewards.experience, color: accentColor)
+                        rewardLabel(icon: "star.fill", value: tier.rewards.experience, color: accentColor)
+                    }
+                    if tier.rewards.book > 0 {
+                        rewardLabel(icon: "book.fill", value: tier.rewards.book, color: .brown)
                     }
                 }
             }
@@ -577,7 +580,10 @@ struct AchievementRewardPopup: View {
                         rewardRow(icon: "g.circle.fill", label: "Gold", value: "+\(reward.rewards_granted.gold)", color: KingdomTheme.Colors.goldLight)
                     }
                     if reward.rewards_granted.experience > 0 {
-                        rewardRow(icon: "book.fill", label: "Experience", value: "+\(reward.rewards_granted.experience)", color: accentColor)
+                        rewardRow(icon: "star.fill", label: "Experience", value: "+\(reward.rewards_granted.experience)", color: accentColor)
+                    }
+                    if reward.rewards_granted.book > 0 {
+                        rewardRow(icon: "book.fill", label: "Book", value: "+\(reward.rewards_granted.book)", color: .brown)
                     }
                     if let newLevel = reward.new_level {
                         rewardRow(icon: "arrow.up.circle.fill", label: "Level Up!", value: "Level \(newLevel)", color: KingdomTheme.Colors.imperialGold)

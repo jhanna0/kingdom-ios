@@ -10,6 +10,7 @@ class AchievementRewards(BaseModel):
     """Rewards structure for an achievement tier"""
     gold: int = 0
     experience: int = 0
+    book: int = 0  # Book rewards (lore/knowledge items)
     items: List[Dict[str, Any]] = []
     
     class Config:

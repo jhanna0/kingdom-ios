@@ -6,17 +6,19 @@ import Foundation
 struct APIAchievementRewards: Codable {
     let gold: Int
     let experience: Int
+    let book: Int
     let items: [[String: String]]?  // Optional array of item dicts
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         gold = try container.decodeIfPresent(Int.self, forKey: .gold) ?? 0
         experience = try container.decodeIfPresent(Int.self, forKey: .experience) ?? 0
+        book = try container.decodeIfPresent(Int.self, forKey: .book) ?? 0
         items = try container.decodeIfPresent([[String: String]].self, forKey: .items)
     }
     
     enum CodingKeys: String, CodingKey {
-        case gold, experience, items
+        case gold, experience, book, items
     }
 }
 

@@ -665,7 +665,7 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('kingdoms_with_properties', 1, 1, '{"gold": 50}', 'Monopoly I', 'Own property in 1 kingdom', 'house.fill', 'properties', 960, 'Kingdoms with properties'),
+    ('kingdoms_with_properties', 1, 1, '{"gold": 50, "book": 1}', 'Monopoly I', 'Own property in 1 kingdom', 'house.fill', 'properties', 960, 'Kingdoms with properties'),
     ('kingdoms_with_properties', 2, 2, '{"gold": 100}', 'Monopoly II', 'Own property in 2 kingdoms', 'house.fill', 'properties', 961, 'Kingdoms with properties'),
     ('kingdoms_with_properties', 3, 3, '{"gold": 200}', 'Monopoly III', 'Own property in 3 kingdoms', 'house.fill', 'properties', 962, 'Kingdoms with properties'),
     ('kingdoms_with_properties', 4, 4, '{"gold": 300}', 'Monopoly IV', 'Own property in 4 kingdoms', 'house.fill', 'properties', 963, 'Kingdoms with properties'),
@@ -1143,7 +1143,7 @@ INSERT INTO achievement_definitions
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
     ('checkins_completed', 1, 50, '{"gold": 50}', 'I Was Here', 'Check in 50 times', 'location.circle.fill', 'exploration', 1010, 'Total check-ins'),
-    ('checkins_completed', 2, 150, '{"gold": 100}', 'Frequent Flyer', 'Check in 150 times', 'location.circle.fill', 'exploration', 1011, 'Total check-ins'),
+    ('checkins_completed', 2, 150, '{"gold": 100, "book": 1}', 'Frequent Flyer', 'Check in 150 times', 'location.circle.fill', 'exploration', 1011, 'Total check-ins'),
     ('checkins_completed', 3, 500, '{"gold": 250}', 'The Usual', 'Check in 500 times', 'location.circle.fill', 'exploration', 1012, 'Total check-ins'),
     ('checkins_completed', 4, 1500, '{"gold": 500}', 'Come Here Often?', 'Check in 1,500 times', 'location.circle.fill', 'exploration', 1013, 'Total check-ins'),
     ('checkins_completed', 5, 5000, '{"gold": 1000}', 'Do You Even Leave?', 'Check in 5,000 times', 'location.circle.fill', 'exploration', 1014, 'Total check-ins'),
@@ -1156,7 +1156,7 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
     description = EXCLUDED.description,
     icon = EXCLUDED.icon,
     category = EXCLUDED.category,
-    display_order = EXCLUDED.disphowlay_order,
+    display_order = EXCLUDED.display_order,
     type_display_name = EXCLUDED.type_display_name;
 
 -- =====================================================
@@ -1233,11 +1233,11 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('player_level', 1, 3, '{"gold": 50}', 'Tutorial Island', 'Reach level 3', 'star.circle.fill', 'progression', 1040, 'Player level reached'),
-    ('player_level', 2, 5, '{"gold": 500}', 'High Five', 'Reach level 5', 'star.circle.fill', 'progression', 1041, 'Player level reached'),
-    ('player_level', 3, 8, '{"gold": 1000}', 'Gr8', 'Reach level 8', 'star.circle.fill', 'progression', 1042, 'Player level reached'),
-    ('player_level', 4, 10, '{"gold": 2000}', '10th B-Day', 'Reach level 10', 'star.circle.fill', 'progression', 1043, 'Player level reached'),
-    ('player_level', 5, 12, '{"gold": 3000}', 'Dirty Dozen', 'Reach level 12', 'star.circle.fill', 'progression', 1044, 'Player level reached'),
+    ('player_level', 1, 3, '{"gold": 50, "book": 1}', 'Tutorial Island', 'Reach level 3', 'star.circle.fill', 'progression', 1040, 'Player level reached'),
+    ('player_level', 2, 5, '{"gold": 500, "book": 1}', 'High Five', 'Reach level 5', 'star.circle.fill', 'progression', 1041, 'Player level reached'),
+    ('player_level', 3, 8, '{"gold": 1000, "book": 1}', 'Gr8', 'Reach level 8', 'star.circle.fill', 'progression', 1042, 'Player level reached'),
+    ('player_level', 4, 10, '{"gold": 2000, "book": 1}', '10th B-Day', 'Reach level 10', 'star.circle.fill', 'progression', 1043, 'Player level reached'),
+    ('player_level', 5, 12, '{"gold": 3000, "book": 1}', 'Dirty Dozen', 'Reach level 12', 'star.circle.fill', 'progression', 1044, 'Player level reached'),
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -1252,12 +1252,12 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('total_skill_points', 1, 5, '{"gold": 50}', 'Trying It', 'Earn 5 total skill points', 'chart.bar.fill', 'progression', 1050, 'Total skill points earned'),
-    ('total_skill_points', 2, 10, '{"gold": 150}', 'Spreading Out', 'Earn 10 total skill points', 'chart.bar.fill', 'progression', 1051, 'Total skill points earned'),
-    ('total_skill_points', 3, 20, '{"gold": 300}', 'Well Rounded', 'Earn 20 total skill points', 'chart.bar.fill', 'progression', 1052, 'Total skill points earned'),
-    ('total_skill_points', 4, 30, '{"gold": 750}', 'Swiss Army Knife', 'Earn 30 total skill points', 'chart.bar.fill', 'progression', 1053, 'Total skill points earned'),
-    ('total_skill_points', 5, 40, '{"gold": 1500}', 'Almost There', 'Earn 40 total skill points', 'chart.bar.fill', 'progression', 1054, 'Total skill points earned'),
-    ('total_skill_points', 6, 45, '{"gold": 3000}', 'Maxed Main BTW', 'Earn 45 total skill points', 'chart.bar.fill', 'progression', 1055, 'Total skill points earned')
+    ('total_skill_points', 1, 5, '{"gold": 50, "book": 1}', 'Trying It', 'Earn 5 total skill points', 'chart.bar.fill', 'progression', 1050, 'Total skill points earned'),
+    ('total_skill_points', 2, 10, '{"gold": 150, "book": 1}', 'Spreading Out', 'Earn 10 total skill points', 'chart.bar.fill', 'progression', 1051, 'Total skill points earned'),
+    ('total_skill_points', 3, 20, '{"gold": 300, "book": 1}', 'Well Rounded', 'Earn 20 total skill points', 'chart.bar.fill', 'progression', 1052, 'Total skill points earned'),
+    ('total_skill_points', 4, 30, '{"gold": 750, "book": 1}', 'Swiss Army Knife', 'Earn 30 total skill points', 'chart.bar.fill', 'progression', 1053, 'Total skill points earned'),
+    ('total_skill_points', 5, 40, '{"gold": 1500, "book": 1}', 'Almost There', 'Earn 40 total skill points', 'chart.bar.fill', 'progression', 1054, 'Total skill points earned'),
+    ('total_skill_points', 6, 45, '{"gold": 3000, "book": 1}', 'Maxed Main BTW', 'Earn 45 total skill points', 'chart.bar.fill', 'progression', 1055, 'Total skill points earned')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,

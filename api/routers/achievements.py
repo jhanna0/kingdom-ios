@@ -13,6 +13,7 @@ from db.models.user import User
 from db.models.player_state import PlayerState
 from routers.auth import get_current_user
 from routers.actions.utils import log_activity
+from routers.store import add_books
 from schemas.achievements import (
     Achievement,
     AchievementTier,
@@ -371,6 +372,7 @@ def get_achievements(
         rewards = AchievementRewards(
             gold=rewards_data.get("gold", 0),
             experience=rewards_data.get("experience", 0),
+            book=rewards_data.get("book", 0),
             items=rewards_data.get("items", [])
         )
         
@@ -586,11 +588,16 @@ def claim_achievement_reward(
     # Parse rewards
     rewards_data = tier_data["rewards"] or {}
     gold_reward = rewards_data.get("gold", 0)
+    book_reward = rewards_data.get("book", 0)
     # NOTE: XP rewards disabled - achievements only grant gold
     # NOTE: Achievements are not taxed - players receive full reward
     
     # Grant rewards (full gold, no tax, no XP)
     state.gold = (state.gold or 0) + gold_reward
+    
+    # Grant book rewards if any
+    if book_reward > 0:
+        add_books(db, user.id, book_reward)
     
     # Record the claim
     claim_insert = text("""
@@ -620,6 +627,7 @@ def claim_achievement_reward(
         rewards_granted=AchievementRewards(
             gold=int(gold_reward),  # Full gold, no tax
             experience=0,  # XP rewards disabled
+            book=rewards_data.get("book", 0),
             items=rewards_data.get("items", [])
         ),
         new_gold=int(state.gold),
