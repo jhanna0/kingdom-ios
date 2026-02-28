@@ -28,6 +28,7 @@ from routers.auth import get_current_user
 from routers.actions.utils import log_activity, set_activity_status
 from systems.foraging.foraging_manager import ForagingManager
 from systems.foraging.config import GRID_SIZE, MAX_REVEALS, MATCHES_TO_WIN, BUSH_DISPLAY, GRID_CONFIG, ROUND1_WIN_CONFIG, ROUND2_WIN_CONFIG
+from systems.hunting.config import MEAT_MARKET_VALUE
 
 
 router = APIRouter(prefix="/foraging", tags=["foraging"])
@@ -296,6 +297,7 @@ def collect_rewards(
                 increment_foraging_find(db, player_id, "rare_egg")
     
     # Add ALL rewards to inventory
+    total_gold_earned = 0
     for reward in rewards:
         item_id = reward.get("item")
         amount = reward.get("amount", 0)
@@ -315,6 +317,17 @@ def collect_rewards(
                     quantity=amount
                 )
                 db.add(inv)
+            
+            # Add gold for berries at same rate as hunting (berries × 0.6)
+            if item_id == "berries":
+                gold_earned = max(1, int(amount * MEAT_MARKET_VALUE))
+                total_gold_earned += gold_earned
+    
+    # Apply gold to player
+    if total_gold_earned > 0:
+        player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+        if player_state:
+            player_state.gold += total_gold_earned
     
     # Mark session as collected
     db_session.status = 'collected'
@@ -335,6 +348,7 @@ def collect_rewards(
         "rewards": rewards,
         "reward_item": primary_reward["item"] if primary_reward else None,
         "reward_amount": primary_reward["amount"] if primary_reward else 0,
+        "gold_earned": total_gold_earned,
     }
 
 

@@ -38,6 +38,7 @@ from systems.fishing.config import (
     ROLL_HIT_CHANCE,
     ROLL_ANIMATION_DELAY_MS,
 )
+from systems.hunting.config import MEAT_MARKET_VALUE
 
 
 router = APIRouter(prefix="/fishing", tags=["fishing"])
@@ -382,7 +383,7 @@ def reel_in(
     # Execute reel with all rolls pre-calculated
     result = _manager.execute_reel(session, stats["defense"])
     
-    # If caught, add meat to inventory immediately (streak bonus already applied in manager)
+    # If caught, add meat + gold to inventory immediately (streak bonus already applied in manager)
     if result.outcome == "caught":
         # Track per-fish catch stats for achievements
         increment_fish_catch(db, user_id=player_id, fish_id=fish_id)
@@ -403,6 +404,13 @@ def reel_in(
                     quantity=meat_earned
                 )
                 db.add(meat_entry)
+            
+            # Add gold at same rate as hunting (meat × 0.6)
+            gold_earned = max(1, int(meat_earned * MEAT_MARKET_VALUE))
+            player_state = db.query(PlayerState).filter(PlayerState.user_id == player_id).first()
+            if player_state:
+                player_state.gold += gold_earned
+            result.outcome_display["gold_earned"] = gold_earned
     
     # If pet fish dropped, broadcast and add to inventory NOW
     if result.outcome == "caught" and result.outcome_display.get("rare_loot_dropped"):
