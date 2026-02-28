@@ -18,6 +18,8 @@ def get_kingdom_event_notifications(
     days: int = 7
 ) -> List[Dict[str, Any]]:
     """Get kingdom event notifications for the user's relevant kingdoms."""
+    from db.models import UnifiedContract
+    from services.kingdom_service import get_active_project_kingdoms
     
     # Get relevant kingdom IDs
     # Only hometown and ruled kingdoms - NOT current_kingdom_id
@@ -53,6 +55,24 @@ def get_kingdom_event_notifications(
             "action_id": str(event.id),
             "created_at": format_datetime_iso(event.created_at),
         })
+    
+    # Add synthetic "no project" notification for rulers without active building projects
+    if ruled_kingdoms:
+        ruled_kingdom_ids = [k.id for k in ruled_kingdoms]
+        active_projects = get_active_project_kingdoms(db, ruled_kingdom_ids)
+        
+        for kingdom in ruled_kingdoms:
+            if kingdom.id not in active_projects:
+                notifications.insert(0, {
+                    "type": "kingdom_event",
+                    "priority": "high",
+                    "title": f"No Building Project in {kingdom.name}!",
+                    "message": "Start a project: My Empire → Manage → Manage Buildings",
+                    "action": "manage_buildings",
+                    "action_id": kingdom.id,
+                    "created_at": format_datetime_iso(datetime.utcnow()),
+                    "is_synthetic": True,  # Frontend can style differently if needed
+                })
     
     return notifications
 

@@ -355,6 +355,8 @@ def get_action_status(
     # Get contracts for HOMETOWN kingdom (from UnifiedContract table)
     # Players can ONLY work on building contracts when physically IN their hometown
     contracts = []
+    is_ruler = kingdom and kingdom.ruler_id == current_user.id if kingdom else False
+    
     if state.hometown_kingdom_id and state.current_kingdom_id == state.hometown_kingdom_id:
         # Query UnifiedContract table (not old Contract table!)
         contracts_query = db.query(UnifiedContract).filter(
@@ -391,6 +393,42 @@ def get_action_status(
                 "status": "open",
                 "per_action_costs": [],
                 "endpoint": f"/actions/work/catchup/{c['id']}",
+            })
+        
+        # If no building contracts, show placeholder with fake unaffordable resource
+        if not contracts:
+            contracts.append({
+                "id": "no_project",
+                "kingdom_id": state.hometown_kingdom_id,
+                "kingdom_name": kingdom.name if kingdom else "",
+                "building_type": "none",
+                "building_level": 0,
+                "building_benefit": "Ruler has not set a project",
+                "building_icon": "hammer.fill",
+                "building_display_name": "Kingdom Project",
+                "base_population": 0,
+                "base_hours_required": 0,
+                "work_started_at": None,
+                "total_actions_required": 1,
+                "actions_completed": 0,
+                "action_contributions": {},
+                "construction_cost": 0,
+                "reward_pool": 0,
+                "action_reward": 0,
+                "created_by": 0,
+                "created_at": datetime.utcnow().isoformat(),
+                "completed_at": None,
+                "status": "open",
+                "per_action_costs": [{
+                    "resource": "project",
+                    "amount": 1,
+                    "display_name": "Project",
+                    "icon": "hammer.fill",
+                    "color": "inkMedium",
+                    "can_afford": False
+                }],
+                "can_afford": False,
+                "endpoint": None,
             })
     
     # Check slot-based cooldowns (PARALLEL ACTIONS!)

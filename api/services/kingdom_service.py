@@ -56,6 +56,19 @@ def get_active_citizens_batch(db: Session, kingdom_ids: List[str]) -> Dict[str, 
     return {kingdom_id: count for kingdom_id, count in counts}
 
 
+def get_active_project_kingdoms(db: Session, kingdom_ids: List[str]) -> set:
+    """Get set of kingdom IDs that have an active building contract"""
+    if not kingdom_ids:
+        return set()
+    from db.models import UnifiedContract
+    active_contracts = db.query(UnifiedContract.kingdom_id).filter(
+        UnifiedContract.kingdom_id.in_(kingdom_ids),
+        UnifiedContract.category == 'kingdom_building',
+        UnifiedContract.completed_at.is_(None)
+    ).all()
+    return {c.kingdom_id for c in active_contracts}
+
+
 def calculate_construction_cost(building_level: int, population: int) -> int:
     """Calculate upfront construction cost"""
     base_cost = BUILDING_BASE_CONSTRUCTION_COST * math.pow(BUILDING_LEVEL_COST_EXPONENT, building_level - 1)
