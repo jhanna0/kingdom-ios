@@ -185,9 +185,10 @@ def get_kingdom(
     current_user: User = Depends(get_current_user_optional)
 ):
     """Get kingdom details with building upgrade costs and catchup info"""
-    from services.kingdom_service import get_active_citizens_count, check_ruler_abandonment
+    from services.kingdom_service import get_active_citizens_count, check_ruler_abandonment, calculate_actions_required
     from services.city_service import get_buildings_for_kingdom
-    from db.models import PlayerState
+    from db.models import PlayerState, UnifiedContract, ContractContribution
+    from sqlalchemy import func
     
     kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
     
@@ -218,6 +219,29 @@ def get_kingdom(
     
     # CALCULATE LIVE: Count active citizens (alive citizens whose hometown is this kingdom)
     active_citizens_count = get_active_citizens_count(db, kingdom.id)
+    
+    # Dynamic contract scaling for hometown kingdom
+    # Adjust actions_required based on current active citizens (can only go down)
+    if current_user:
+        player_state = db.query(PlayerState).filter(PlayerState.user_id == current_user.id).first()
+        if player_state and player_state.hometown_kingdom_id == kingdom_id:
+            farm_level = kingdom.farm_level if hasattr(kingdom, 'farm_level') else 0
+            contracts = db.query(UnifiedContract).filter(
+                UnifiedContract.kingdom_id == kingdom_id,
+                UnifiedContract.category == 'kingdom_building',
+                UnifiedContract.completed_at.is_(None)
+            ).with_for_update().all()
+            for contract in contracts:
+                new_actions = calculate_actions_required(contract.type, contract.tier, active_citizens_count, farm_level)
+                if new_actions < contract.actions_required:
+                    actions_completed = db.query(func.count(ContractContribution.id)).filter(
+                        ContractContribution.contract_id == contract.id
+                    ).scalar()
+                    new_actions = max(new_actions, actions_completed + 1)
+                    if new_actions < contract.actions_required:
+                        contract.actions_required = new_actions
+                        contract.action_reward = int(contract.reward_pool / new_actions)
+            db.commit()
     
     # SINGLE SOURCE OF TRUTH: Get buildings with all metadata, costs, and catchup info
     buildings = get_buildings_for_kingdom(db, kingdom, current_user)

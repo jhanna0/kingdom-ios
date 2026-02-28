@@ -43,11 +43,11 @@ def work_on_contract(
             detail="Player state not found"
         )
     
-    # Get contract FIRST (need building type and tier to check per-action costs)
+    # Get contract with lock to prevent race conditions with scaling
     contract = db.query(UnifiedContract).filter(
         UnifiedContract.id == contract_id,
         UnifiedContract.category == 'kingdom_building'
-    ).first()
+    ).with_for_update().first()
     
     if not contract:
         raise HTTPException(
@@ -152,11 +152,10 @@ def work_on_contract(
         ContractContribution.contract_id == contract.id
     ).scalar()
     
+    # If actions >= required but not complete, fix it so they can finish normally
     if actions_completed >= contract.actions_required:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Contract already has all required actions"
-        )
+        contract.actions_required = actions_completed + 1
+        contract.action_reward = int(contract.reward_pool / contract.actions_required) if contract.actions_required > 0 else 0
     
     # DEDUCT PER-ACTION RESOURCES (from inventory)
     from .utils import deduct_inventory_amount
