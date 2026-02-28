@@ -313,6 +313,132 @@ SKILL_TIER_NAMES = {
 }
 
 
+# ===== BUILDING PREREQUISITES - RESOURCE PRODUCTION REQUIREMENTS =====
+# Defines which resource-producing buildings are required before starting a building project.
+# This prevents kingdoms from starting projects they can't complete due to missing resources.
+#
+# Format: {building_type: {tier: [(required_building, min_level), ...]}}
+# - required_building: The building that produces the needed resource
+# - min_level: Minimum level required of that building
+#
+# Resource mapping:
+# - wood: produced by lumbermill
+# - stone: produced by mine (level 1+)
+# - iron: produced by mine (level 2+)
+
+BUILDING_PREREQUISITES = {
+    "wall": {
+        1: [("lumbermill", 1)],      # Wooden Palisade needs wood → lumbermill 1
+        2: [("lumbermill", 1)],      # Hardwood Wall needs wood → lumbermill 1
+        3: [("mine", 1)],            # Stone Wall needs stone → mine 1
+        4: [("mine", 1)],            # Fortress Wall needs stone → mine 1
+        5: [("mine", 2)],            # Iron-Reinforced Wall needs iron → mine 2
+    },
+    "vault": {
+        # Vault has no per-action resource costs, so no prerequisites
+    },
+    "mine": {
+        # Mine has no per-action resource costs, so no prerequisites
+    },
+    "market": {
+        # Market has no per-action resource costs, so no prerequisites
+    },
+    "farm": {
+        # Farm has no per-action resource costs, so no prerequisites
+    },
+    "education": {
+        # Education has no per-action resource costs, so no prerequisites
+    },
+    "lumbermill": {
+        # Lumbermill has no per-action resource costs, so no prerequisites
+    },
+    "townhall": {
+        # Townhall has no per-action resource costs, so no prerequisites
+    },
+}
+
+
+def get_building_prerequisites(building_type: str, tier: int) -> list:
+    """Get list of prerequisite buildings for a building tier.
+    
+    Returns: List of tuples [(required_building, min_level), ...]
+    """
+    building_prereqs = BUILDING_PREREQUISITES.get(building_type, {})
+    return building_prereqs.get(tier, [])
+
+
+def check_building_prerequisites(kingdom, building_type: str, tier: int) -> tuple[bool, str]:
+    """Check if a kingdom meets the prerequisites to start a building project.
+    
+    Args:
+        kingdom: Kingdom model instance
+        building_type: The type of building to construct (e.g., "wall")
+        tier: The tier/level being built (e.g., 1 for level 1)
+    
+    Returns:
+        (can_build, error_message): Tuple of (True, "") if can build, 
+                                    or (False, "error message") if missing prerequisites
+    """
+    prereqs = get_building_prerequisites(building_type, tier)
+    
+    if not prereqs:
+        return True, ""
+    
+    missing = []
+    for required_building, min_level in prereqs:
+        current_level = getattr(kingdom, f"{required_building}_level", 0)
+        if current_level < min_level:
+            # Get display name for better error message
+            required_display = BUILDING_TYPES.get(required_building, {}).get("display_name", required_building.capitalize())
+            building_display = BUILDING_TYPES.get(building_type, {}).get("display_name", building_type.capitalize())
+            
+            # Explain WHY this is needed based on the resource
+            tier_data = BUILDING_TYPES.get(building_type, {}).get("tiers", {}).get(tier, {})
+            per_action_costs = tier_data.get("per_action_costs", [])
+            resource_needed = per_action_costs[0]["resource"] if per_action_costs else "resources"
+            
+            missing.append({
+                "required_building": required_building,
+                "required_display": required_display,
+                "min_level": min_level,
+                "current_level": current_level,
+                "resource_needed": resource_needed,
+            })
+    
+    if missing:
+        # Build a helpful error message
+        prereq = missing[0]  # Usually just one prerequisite
+        return False, (
+            f"Cannot start {BUILDING_TYPES.get(building_type, {}).get('display_name', building_type.capitalize())} Level {tier}: "
+            f"Requires {prereq['required_display']} Level {prereq['min_level']} to produce {prereq['resource_needed']}. "
+            f"Current: Level {prereq['current_level']}."
+        )
+    
+    return True, ""
+
+
+def get_all_building_prerequisites() -> dict:
+    """Get all building prerequisites for API response.
+    
+    Returns a dict suitable for frontend to display requirements.
+    """
+    result = {}
+    for building_type, tiers in BUILDING_PREREQUISITES.items():
+        if tiers:  # Only include buildings with prerequisites
+            result[building_type] = {}
+            for tier, prereqs in tiers.items():
+                if prereqs:
+                    result[building_type][tier] = [
+                        {
+                            "building": req_building,
+                            "display_name": BUILDING_TYPES.get(req_building, {}).get("display_name", req_building.capitalize()),
+                            "min_level": min_level,
+                        }
+                        for req_building, min_level in prereqs
+                    ]
+    return result
+
+
 # ===== BUILDING TYPES - SINGLE SOURCE OF TRUTH =====
 # Add new building types HERE and they'll appear everywhere!
 #
@@ -1279,9 +1405,11 @@ def get_all_building_types():
     return {
         "building_types": BUILDING_TYPES,
         "categories": ["economy", "defense", "civic"],
+        "prerequisites": get_all_building_prerequisites(),
         "notes": {
             "adding_buildings": "Add new building types to BUILDING_TYPES dict in tiers.py",
-            "upgrade_costs": "Costs scale with building level and kingdom population"
+            "upgrade_costs": "Costs scale with building level and kingdom population",
+            "prerequisites": "Some buildings require resource-producing buildings first (e.g., Wall needs Lumbermill for wood)"
         }
     }
 

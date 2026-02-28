@@ -12,7 +12,7 @@ import math
 from db import get_db, User, PlayerState, Kingdom, UnifiedContract, ContractContribution
 from db.models.kingdom_event import KingdomEvent
 from routers.auth import get_current_user
-from routers.tiers import BUILDING_TYPES
+from routers.tiers import BUILDING_TYPES, check_building_prerequisites
 from config import DEV_MODE
 from schemas.contract import ContractCreate
 from websocket.broadcast import notify_kingdom, KingdomEvents
@@ -241,6 +241,15 @@ def create_contract(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{building_type.capitalize()} is currently level {current_level}. Cannot upgrade to level {building_level}. Must upgrade to level {current_level + 1} first."
+        )
+    
+    # SECURITY: Check building prerequisites (resource-producing buildings)
+    # e.g., can't build Wall 1 without Lumbermill 1 (needs wood)
+    can_build, prereq_error = check_building_prerequisites(kingdom, building_type, building_level)
+    if not can_build:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=prereq_error
         )
     
     # Check if kingdom already has an active (not completed) contract
