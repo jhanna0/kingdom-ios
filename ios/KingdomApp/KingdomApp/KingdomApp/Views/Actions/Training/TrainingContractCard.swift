@@ -48,7 +48,7 @@ struct TrainingContractCard: View {
     
     var isReady: Bool {
         let canAffordFood = status.canAffordFood ?? true
-        return !globalCooldownActive && canAffordFood && (status.ready || calculatedSecondsRemaining <= 0)
+        return !globalCooldownActive && canAffordFood && canAffordGold && (status.ready || calculatedSecondsRemaining <= 0)
     }
     
     var skillConfig: SkillConfig {
@@ -90,9 +90,7 @@ struct TrainingContractCard: View {
     
     // Check if player can afford gold cost
     private var canAffordGold: Bool {
-        // For now assume true - backend will validate
-        // Future: pass player gold from parent view
-        return true
+        return contract.canAffordGold ?? true
     }
     
     
@@ -203,6 +201,13 @@ struct TrainingContractCard: View {
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
             } else if !(status.canAffordFood ?? true) {
                 Text("Need food")
+                    .font(FontStyles.labelLarge)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .padding(.horizontal, 12)
+                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight)
+            } else if !canAffordGold {
+                Text("Need gold")
                     .font(FontStyles.labelLarge)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                     .frame(maxWidth: .infinity, minHeight: 38)

@@ -14,6 +14,7 @@ struct TrainingContract: Codable, Identifiable {
     // NEW: Pay-per-action system
     let goldPerAction: Double?  // Gold cost per action (before tax)
     let currentTaxRate: Int?    // Kingdom tax rate (for display)
+    let canAffordGold: Bool?    // Can player afford the gold cost (with tax)
     
     enum CodingKeys: String, CodingKey {
         case id, type, status
@@ -23,6 +24,7 @@ struct TrainingContract: Codable, Identifiable {
         case createdAt = "created_at"
         case goldPerAction = "gold_per_action"
         case currentTaxRate = "current_tax_rate"
+        case canAffordGold = "can_afford_gold"
     }
     
     var progress: Double {

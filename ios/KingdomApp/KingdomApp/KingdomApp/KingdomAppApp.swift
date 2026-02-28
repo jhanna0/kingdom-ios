@@ -230,6 +230,7 @@ struct AuthenticatedView: View {
     @State private var pendingAllianceRequestCount: Int = 0
     @State private var pendingTradeRequestCount: Int = 0
     @State private var pendingDuelRequestCount: Int = 0
+    @State private var activityBadgeCount: Int = 0
     @State private var propertyBadgeCount: Int = 0
     @State private var hasShownInitialKingdom = false
     @State private var showTravelNotification = false
@@ -336,7 +337,7 @@ struct AuthenticatedView: View {
                 showActions: $showActions,
                 showProperties: $showProperties,
                 showActivity: $showActivity,
-                pendingFriendRequests: pendingFriendRequestCount + pendingAllianceRequestCount + pendingTradeRequestCount + pendingDuelRequestCount,
+                activityBadgeCount: $activityBadgeCount,
                 propertyBadgeCount: $propertyBadgeCount
             )
             
@@ -481,6 +482,7 @@ struct AuthenticatedView: View {
                 pendingAllianceRequestCount = summary.pendingAllianceRequests
                 pendingTradeRequestCount = summary.pendingTradeRequests
                 pendingDuelRequestCount = summary.pendingDuelRequests
+                activityBadgeCount = pendingFriendRequestCount + pendingAllianceRequestCount + pendingTradeRequestCount + pendingDuelRequestCount
                 propertyBadgeCount = summary.propertyBadgeCount ?? 0
             }
         } catch {

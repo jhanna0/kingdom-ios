@@ -29,7 +29,7 @@ struct MapHUD: View {
     @Binding var showActions: Bool
     @Binding var showProperties: Bool
     @Binding var showActivity: Bool
-    var pendingFriendRequests: Int = 0
+    @Binding var activityBadgeCount: Int
     @Binding var propertyBadgeCount: Int
     @State private var currentTime = Date()
     @State private var updateTimer: Timer?
@@ -192,8 +192,9 @@ struct MapHUD: View {
                     BrutalistIconButton(
                         icon: "person.2.fill",
                         backgroundColor: KingdomTheme.Colors.buttonDanger,
-                        badgeCount: pendingFriendRequests
+                        badgeCount: activityBadgeCount
                     ) {
+                        activityBadgeCount = 0
                         showActivity = true
                     }
                     
