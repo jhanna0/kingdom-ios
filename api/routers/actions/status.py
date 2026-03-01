@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime
 import json
+import math
 
 from db import get_db, User, PlayerState, Contract, UnifiedContract, ContractContribution, Kingdom, Property
 from routers.auth import get_current_user
@@ -63,8 +64,10 @@ def get_training_contracts_for_status(db: Session, user_id: int, current_tax_rat
         gold_per_action = contract.gold_per_action or 0
         
         # Check if player can afford gold cost (with tax)
+        # Round up to nearest integer (e.g., 150.2 -> 151)
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
-        can_afford_gold = player_state.gold >= gold_cost_with_tax if player_state else True
+        gold_cost_with_tax_rounded = math.ceil(gold_cost_with_tax) if gold_cost_with_tax > 0 else 0
+        can_afford_gold = player_state.gold >= gold_cost_with_tax_rounded if player_state else True
         
         result.append({
             "id": str(contract.id),  # String for backwards compatibility
@@ -269,8 +272,10 @@ def get_property_contracts_for_status(db: Session, user_id: int, player_state, c
         gold_per_action = 0 if is_old_contract else calculate_property_gold_per_action(contract.tier) if contract.tier else 0
         
         # Check if player can afford gold cost (with tax)
+        # Round up to nearest integer (e.g., 150.2 -> 151)
         gold_cost_with_tax = gold_per_action * (1 + effective_tax_rate / 100.0) if gold_per_action > 0 else 0
-        can_afford_gold = player_state.gold >= gold_cost_with_tax
+        gold_cost_with_tax_rounded = math.ceil(gold_cost_with_tax) if gold_cost_with_tax > 0 else 0
+        can_afford_gold = player_state.gold >= gold_cost_with_tax_rounded
         
         # Calculate cooldown (skill-adjusted) - uses building skill
         base_cooldown = ACTION_TYPES["property_upgrade"]["cooldown_minutes"]

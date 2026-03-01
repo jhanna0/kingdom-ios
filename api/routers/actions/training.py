@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import random
+import math
 
 from db import get_db, User, Kingdom, UnifiedContract, ContractContribution
 from routers.auth import get_current_user
@@ -337,11 +338,14 @@ def work_on_training(
         tax_amount = gold_per_action * tax_rate / 100
         action_gold_cost = gold_per_action + tax_amount
         
+        # Round up to nearest integer (e.g., 150.2 -> 151)
+        action_gold_cost_rounded = math.ceil(action_gold_cost)
+        
         # Check if player can afford
-        if state.gold < action_gold_cost:
+        if state.gold < action_gold_cost_rounded:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Not enough gold. Need {int(action_gold_cost)}g ({int(gold_per_action)}g + {int(tax_amount)}g tax), have {int(state.gold)}g"
+                detail=f"Not enough gold. Need {action_gold_cost_rounded}g ({math.ceil(gold_per_action)}g + {math.ceil(tax_amount)}g tax), have {int(state.gold)}g"
             )
     # else: OLD SYSTEM - gold_paid > 0 means they paid upfront, action is FREE
     
@@ -393,13 +397,15 @@ def work_on_training(
     
     # === DEDUCT GOLD COST (if pay-per-action) ===
     if action_gold_cost > 0:
-        state.gold -= action_gold_cost
+        state.gold -= action_gold_cost_rounded
         
         # Add tax to kingdom treasury (base cost is burned)
-        if tax_amount > 0 and state.current_kingdom_id:
+        # Round up tax amount as well
+        tax_amount_rounded = math.ceil(tax_amount)
+        if tax_amount_rounded > 0 and state.current_kingdom_id:
             kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
             if kingdom:
-                kingdom.treasury_gold += tax_amount
+                kingdom.treasury_gold += tax_amount_rounded
     
     # Add a contribution (= 1 action)
     xp_earned = 10

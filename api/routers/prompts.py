@@ -53,7 +53,7 @@ def check_prompt(
           AND (p.target_platform = :platform OR p.target_platform = 'all')
           AND (
               d.id IS NULL
-              OR (d.completed = FALSE AND d.dismissal_count < 3 AND d.last_shown_at < NOW() - INTERVAL '12 hour') // should be 12 hour
+              OR (d.completed = FALSE AND d.dismissal_count < 3 AND d.last_shown_at < NOW() - INTERVAL '12 hour')
           )
         ORDER BY p.created_at DESC
         LIMIT 1
