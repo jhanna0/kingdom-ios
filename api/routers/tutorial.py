@@ -61,6 +61,9 @@ You get **one** Home Kingdom. Pick the place you spend time the most time. That'
 
 **Reputation is earned per kingdom**. Switching kingdoms resets it to 0. This prevents randoms from switching to your kingdom and couping.
 
+**Present:** How many citizens have been active in the last hour.
+**Citizens:** How many citizens have been active in the last 7 days.
+
 **How to switch hometowns**
 1. Travel to the kingdom you want to make your new home
 2. Open your **Character** sheet

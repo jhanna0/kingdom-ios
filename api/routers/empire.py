@@ -21,6 +21,7 @@ from db.models.alliance import Alliance
 from routers.auth import get_current_user
 from routers.player import get_or_create_player_state
 from routers.alliances import _get_player_empire_id, get_allied_empire_ids, _get_empire_name
+from services.kingdom_service import get_active_citizens_batch
 from schemas.empire import (
     EmpireOverviewResponse,
     EmpireKingdomSummary,
@@ -409,9 +410,12 @@ async def get_my_empire(
     # Get kingdom IDs for war queries
     kingdom_ids = [k.id for k in kingdoms]
     
+    # Get active citizens count for all kingdoms (last 7 days)
+    active_citizens_map = get_active_citizens_batch(db, kingdom_ids)
+    
     # Aggregate stats
     total_treasury = sum(int(k.treasury_gold or 0) for k in kingdoms)
-    total_subjects = sum(k.checked_in_players or 0 for k in kingdoms)
+    total_subjects = sum(active_citizens_map.get(k.id, 0) for k in kingdoms)
     
     # Build kingdom summaries with treasury options
     cfg = EMPIRE_UI_CONFIG
@@ -470,7 +474,7 @@ async def get_my_empire(
             treasury_gold=int(k.treasury_gold or 0),
             tax_rate=k.tax_rate or 10,
             travel_fee=k.travel_fee or 10,
-            checked_in_players=k.checked_in_players or 0,
+            checked_in_players=active_citizens_map.get(k.id, 0),  # Use active citizens (last 7 days)
             wall_level=k.get_building_level("wall") or k.wall_level or 0,
             vault_level=k.get_building_level("vault") or k.vault_level or 0,
             is_capital=(k.id == empire_id),

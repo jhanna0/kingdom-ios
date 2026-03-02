@@ -113,7 +113,7 @@ class EmpireKingdomSummary(BaseModel):
     treasury_gold: int
     tax_rate: int  # 0-100
     travel_fee: int
-    checked_in_players: int  # Current subjects
+    checked_in_players: int  # Active citizens (hometown residents, last 7 days)
     wall_level: int
     vault_level: int
     is_capital: bool  # True if this is the empire capital (original kingdom)
@@ -178,7 +178,7 @@ class EmpireOverviewResponse(BaseModel):
     
     # Aggregated stats
     total_treasury: int  # Sum of all kingdom treasuries
-    total_subjects: int  # Sum of all checked_in_players
+    total_subjects: int  # Sum of all active citizens (hometown residents, last 7 days)
     kingdom_count: int
     
     # Personal
