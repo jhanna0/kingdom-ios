@@ -210,6 +210,13 @@ def work_on_contract(
                 new_level = current_level + 1
                 setattr(kingdom, building_attr, new_level)
                 
+                # Update kingdom level (sum of all building levels)
+                kingdom.level = (
+                    kingdom.wall_level + kingdom.vault_level + kingdom.mine_level +
+                    kingdom.market_level + kingdom.farm_level + kingdom.education_level +
+                    kingdom.lumbermill_level + kingdom.townhall_level
+                )
+                
                 # Log to activity feed - completed building construction
                 log_activity(
                     db=db,
