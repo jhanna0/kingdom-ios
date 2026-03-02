@@ -194,6 +194,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
     var hasBoundaryCached: Bool  // True if full boundary polygon is loaded
     
     // Game stats
+    var level: Int  // Kingdom level from backend
     var treasuryGold: Int
     var checkedInPlayers: Int
     var activeCitizens: Int  // Active citizens (hometown residents)
@@ -295,6 +296,7 @@ struct Kingdom: Identifiable, Equatable, Hashable {
         
         // BACKEND ONLY - These will be set from API data immediately after init
         // Setting defaults here to satisfy Swift's requirement for initialization
+        self.level = 1
         self.treasuryGold = 0
         self.checkedInPlayers = 0
         self.activeCitizens = 0

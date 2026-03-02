@@ -10,7 +10,7 @@ struct ContractCreationView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isCreating = false
-    @State private var actionReward: Int = 5  // Gold per action (ruler sets this)
+    @State private var actionReward: Int = 0
     
     private var buildingName: String {
         // FULLY DYNAMIC - Get from kingdom metadata
@@ -234,6 +234,11 @@ struct ContractCreationView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .onAppear {
+            if actionReward == 0, actionsRequired > 0 {
+                actionReward = max(1, kingdom.treasuryGold / actionsRequired)
+            }
         }
     }
     

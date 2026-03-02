@@ -125,6 +125,7 @@ class CityAPI {
         kingdom.hasBoundaryCached = !city.boundary.isEmpty
         
         if let kingdomData = city.kingdom {
+            kingdom.level = kingdomData.level
             kingdom.treasuryGold = kingdomData.treasury_gold
             kingdom.travelFee = kingdomData.travel_fee
             kingdom.checkedInPlayers = kingdomData.population
