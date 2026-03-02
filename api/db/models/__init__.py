@@ -80,6 +80,9 @@ from .book_usage import BookUsage
 # Subscriptions
 from .subscription import Subscription, UserPreferences
 
+# Treasury transaction logging
+from .treasury_transaction import TreasuryTransaction
+
 __all__ = [
     "User",
     "PlayerState",
@@ -183,5 +186,7 @@ __all__ = [
     # Subscriptions
     "Subscription",
     "UserPreferences",
+    # Treasury transaction logging
+    "TreasuryTransaction",
 ]
 

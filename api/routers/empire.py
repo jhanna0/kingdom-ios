@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from db import get_db, User, Kingdom
 from db.models.battle import Battle
 from db.models.alliance import Alliance
+from db.models.treasury_transaction import TreasuryTransaction
 from routers.auth import get_current_user
 from routers.player import get_or_create_player_state
 from routers.alliances import _get_player_empire_id, get_allied_empire_ids, _get_empire_name
@@ -144,7 +145,7 @@ EMPIRE_UI_CONFIG = {
     ],
     
     # Treasury location toggles
-    "treasury_allow_personal": False,  # Allow withdraw/deposit to ruler's personal gold
+    "treasury_allow_personal": True,  # Allow withdraw/deposit to ruler's personal gold
     "treasury_allow_transfers": True,   # Allow transfers between kingdom treasuries
     
     # Treasury management actions (legacy, kept for reference)
@@ -567,6 +568,15 @@ async def transfer_funds(
     source.treasury_gold = (source.treasury_gold or 0) - request.amount
     target.treasury_gold = (target.treasury_gold or 0) + request.amount
     
+    # Log transaction
+    db.add(TreasuryTransaction(
+        user_id=current_user.id,
+        transaction_type='transfer',
+        from_kingdom_id=request.source_kingdom_id,
+        to_kingdom_id=request.target_kingdom_id,
+        amount=request.amount,
+    ))
+    
     db.commit()
     db.refresh(source)
     db.refresh(target)
@@ -629,6 +639,15 @@ async def withdraw_from_treasury(
     kingdom.treasury_gold = (kingdom.treasury_gold or 0) - request.amount
     state.gold = (state.gold or 0) + request.amount
     
+    # Log transaction
+    db.add(TreasuryTransaction(
+        user_id=current_user.id,
+        transaction_type='withdraw',
+        from_kingdom_id=kingdom_id,
+        to_kingdom_id=None,
+        amount=request.amount,
+    ))
+    
     db.commit()
     db.refresh(kingdom)
     db.refresh(state)
@@ -688,6 +707,15 @@ async def deposit_to_treasury(
     # Perform deposit
     kingdom.treasury_gold = (kingdom.treasury_gold or 0) + request.amount
     state.gold = (state.gold or 0) - request.amount
+    
+    # Log transaction
+    db.add(TreasuryTransaction(
+        user_id=current_user.id,
+        transaction_type='deposit',
+        from_kingdom_id=None,
+        to_kingdom_id=kingdom_id,
+        amount=request.amount,
+    ))
     
     db.commit()
     db.refresh(kingdom)
