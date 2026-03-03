@@ -30,27 +30,49 @@ extension FriendsView {
                 }
             }
             
-            // Add Friend Button
-            NavigationLink(destination: AddFriendView(onAdded: {
-                Task {
-                    await viewModel.loadFriends()
+            // Action Buttons
+            HStack(spacing: 12) {
+                // Add Friend Button
+                NavigationLink(destination: AddFriendView(onAdded: {
+                    Task {
+                        await viewModel.loadFriends()
+                    }
+                })) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.badge.plus")
+                            .font(FontStyles.iconSmall)
+                        Text("Add")
+                            .font(FontStyles.bodyMediumBold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonSuccess,
+                        cornerRadius: 10,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 }
-            })) {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.badge.plus")
-                        .font(FontStyles.iconSmall)
-                    Text("Add Friend")
-                        .font(FontStyles.bodyMediumBold)
+                
+                // Invite Friends Button
+                NavigationLink(destination: InviteFriendsView()) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperplane.fill")
+                            .font(FontStyles.iconSmall)
+                        Text("Invite")
+                            .font(FontStyles.bodyMediumBold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .brutalistBadge(
+                        backgroundColor: KingdomTheme.Colors.buttonPrimary,
+                        cornerRadius: 10,
+                        shadowOffset: 3,
+                        borderWidth: 2
+                    )
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .brutalistBadge(
-                    backgroundColor: KingdomTheme.Colors.buttonSuccess,
-                    cornerRadius: 10,
-                    shadowOffset: 3,
-                    borderWidth: 2
-                )
             }
             }
             .padding(.horizontal)
