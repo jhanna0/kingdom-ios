@@ -94,7 +94,13 @@ struct PlayerProfileView: View {
                 }
                 
                 // Achievement Stats
-                achievementsCard(profile)
+                StatisticsCard(
+                    kingdomsRuled: profile.kingdoms_ruled,
+                    coupsWon: profile.coups_won,
+                    totalCheckins: profile.total_checkins,
+                    contractsCompleted: profile.contracts_completed,
+                    totalConquests: profile.total_conquests
+                )
                 
                 // Actions (Trade button)
                 actionsCard(profile)
@@ -200,79 +206,6 @@ struct PlayerProfileView: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    private func achievementsCard(_ profile: PlayerPublicProfile) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "chart.bar.fill")
-                    .font(FontStyles.iconMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                
-                Text("Statistics")
-                    .font(FontStyles.headingMedium)
-                    .foregroundColor(KingdomTheme.Colors.inkDark)
-            }
-            
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: 2)
-            
-            VStack(spacing: 8) {
-                achievementRow(
-                    icon: "flag.fill",
-                    title: "Kingdoms Ruled",
-                    value: "\(profile.kingdoms_ruled)"
-                )
-                
-                achievementRow(
-                    icon: "crown.fill",
-                    title: "Coups Won",
-                    value: "\(profile.coups_won)"
-                )
-                
-                achievementRow(
-                    icon: "mappin.circle.fill",
-                    title: "Total Check-ins",
-                    value: "\(profile.total_checkins)"
-                )
-                
-                achievementRow(
-                    icon: "hammer.fill",
-                    title: "Contracts Completed",
-                    value: "\(profile.contracts_completed)"
-                )
-                
-                achievementRow(
-                    icon: "star.fill",
-                    title: "Total Conquests",
-                    value: "\(profile.total_conquests)"
-                )
-            }
-        }
-        .padding()
-        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-    }
-    
-    private func achievementRow(icon: String, title: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(FontStyles.iconSmall)
-                .foregroundColor(.white)
-                .frame(width: 30, height: 30)
-                .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
-            
-            Text(title)
-                .font(FontStyles.bodySmall)
-                .foregroundColor(KingdomTheme.Colors.inkDark)
-            
-            Spacer()
-            
-            Text(value)
-                .font(FontStyles.bodyMediumBold)
-                .foregroundColor(KingdomTheme.Colors.inkMedium)
-        }
-        .padding()
-        .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 8)
-    }
     
     private func loadProfile() async {
         await MainActor.run {

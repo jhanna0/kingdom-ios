@@ -283,6 +283,12 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         UserKingdom.user_id == user.id
     ).scalar() or 0
     
+    # Compute contracts_completed (distinct contract_ids from contributions)
+    from db.models import ContractContribution
+    contracts_completed = db.query(func.count(func.distinct(ContractContribution.contract_id))).filter(
+        ContractContribution.user_id == user.id
+    ).scalar() or 0
+    
     # Calculate total food (sum of all resources with is_food=True)
     total_food = sum(
         inventory_map.get(resource_key, 0)
@@ -371,7 +377,7 @@ def player_state_to_response(user: User, state: DBPlayerState, db: Session, trav
         coups_failed=state.coups_failed or 0,
         times_executed=state.times_executed or 0,
         executions_ordered=state.executions_ordered or 0,
-        contracts_completed=state.contracts_completed or 0,
+        contracts_completed=contracts_completed,
         total_work_contributed=state.total_work_contributed or 0,
         total_training_purchases=state.total_training_purchases or 0,
         

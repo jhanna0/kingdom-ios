@@ -95,12 +95,12 @@ struct MyActivityRow: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(activity.description)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
                 HStack(spacing: 4) {
                     Text(activity.timeAgo)
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                     
                     if let kingdomName = activity.kingdomName {
@@ -108,7 +108,7 @@ struct MyActivityRow: View {
                             .font(.system(size: 11))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                         Text(kingdomName)
-                            .font(.system(size: 11))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                     }
                 }

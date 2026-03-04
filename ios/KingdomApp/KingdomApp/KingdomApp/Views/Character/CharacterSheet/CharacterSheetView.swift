@@ -55,6 +55,15 @@ struct CharacterSheetView: View {
                 // Pets section
                 PetsCard(pets: player.pets, showEmpty: true)
                 
+                // Statistics section
+                StatisticsCard(
+                    kingdomsRuled: player.kingdomsRuled,
+                    coupsWon: player.coupsWon,
+                    totalCheckins: player.totalCheckins,
+                    contractsCompleted: player.contractsCompleted,
+                    totalConquests: player.totalConquests
+                )
+                
                 // Active Perks section
                 if player.activePerks != nil {
                     ActivePerksCard(player: player)

@@ -124,6 +124,9 @@ class Player: ObservableObject {
     @Published var coupsFailed: Int = 0
     @Published var timesExecuted: Int = 0
     @Published var executionsOrdered: Int = 0
+    @Published var totalCheckins: Int = 0
+    @Published var totalConquests: Int = 0
+    @Published var kingdomsRuled: Int = 0
     
     // Progression & Reputation
     @Published var reputation: Int = 0          // Global reputation
@@ -683,6 +686,9 @@ class Player: ObservableObject {
         state["coups_failed"] = coupsFailed
         state["times_executed"] = timesExecuted
         state["executions_ordered"] = executionsOrdered
+        state["total_checkins"] = totalCheckins
+        state["total_conquests"] = totalConquests
+        state["kingdoms_ruled"] = kingdomsRuled
         // Note: last_coup_attempt is now in action_cooldowns table (backend)
         
         // Contract & Work
@@ -752,6 +758,9 @@ class Player: ObservableObject {
         coupsFailed = apiState.coups_failed
         timesExecuted = apiState.times_executed
         executionsOrdered = apiState.executions_ordered
+        totalCheckins = apiState.total_checkins
+        totalConquests = apiState.total_conquests
+        kingdomsRuled = apiState.kingdoms_ruled
         // Note: last_coup_attempt moved to action_cooldowns table
         // TODO: Fetch from action_cooldowns endpoint if needed
         

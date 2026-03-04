@@ -76,16 +76,16 @@ struct ActivePerksCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let bonus = perk.bonus, let stat = perk.stat {
                     Text("\(bonus > 0 ? "+" : "")\(bonus) \(stat.capitalized)")
-                        .font(FontStyles.bodyMediumBold)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 } else if let description = perk.description {
                     Text(description)
-                        .font(FontStyles.bodyMediumBold)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                 }
                 
                 Text(perk.source)
-                    .font(FontStyles.labelSmall)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
                 
                 if let expiresAt = perk.expiresAt {
@@ -93,10 +93,10 @@ struct ActivePerksCard: View {
                     if remaining > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "clock.fill")
-                                .font(FontStyles.iconMini)
+                                .font(.system(size: 11))
                                 .foregroundColor(KingdomTheme.Colors.buttonWarning)
                             Text(formatDuration(remaining))
-                                .font(FontStyles.labelTiny)
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(KingdomTheme.Colors.buttonWarning)
                         }
                     }
