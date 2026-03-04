@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var musicService: MusicService
     @ObservedObject var hapticService = HapticService.shared
+    @ObservedObject var mapSettings = MapSettingsService.shared
     @Environment(\.dismiss) var dismiss
     
     @State private var notificationsEnabled = false
@@ -94,6 +95,37 @@ struct SettingsView: View {
                         Spacer()
                         
                         Toggle("", isOn: $hapticService.isHapticsEnabled)
+                            .labelsHidden()
+                            .tint(KingdomTheme.Colors.buttonPrimary)
+                    }
+                    .padding()
+                    .brutalistCard(
+                        backgroundColor: KingdomTheme.Colors.parchmentLight,
+                        cornerRadius: 12
+                    )
+                }
+                
+                // Map Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Map")
+                        .font(KingdomTheme.Typography.headline())
+                        .fontWeight(.bold)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                        .padding(.horizontal, 16)
+                    
+                    // Location Marker Toggle
+                    HStack {
+                        Image(systemName: mapSettings.showLocationMarker ? "location.fill" : "location.slash.fill")
+                            .font(FontStyles.iconSmall)
+                            .foregroundColor(KingdomTheme.Colors.inkMedium)
+                        
+                        Text("Show My Location Marker on the Map")
+                            .font(FontStyles.bodyMedium)
+                            .foregroundColor(KingdomTheme.Colors.inkDark)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $mapSettings.showLocationMarker)
                             .labelsHidden()
                             .tint(KingdomTheme.Colors.buttonPrimary)
                     }

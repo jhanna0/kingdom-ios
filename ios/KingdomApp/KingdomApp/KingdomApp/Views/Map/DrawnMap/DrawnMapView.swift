@@ -4,6 +4,7 @@ import CoreLocation
 /// Custom drawn map view - no Apple Maps, just illustrated kingdoms
 struct DrawnMapView: View {
     @ObservedObject var viewModel: MapViewModel
+    @ObservedObject var mapSettings = MapSettingsService.shared
     @Binding var kingdomForInfoSheet: Kingdom?
     
     @State private var transform: MapTransformState = {
@@ -65,7 +66,7 @@ struct DrawnMapView: View {
             }
             
             // Draw user location at center (0, 0)
-            if viewModel.userLocation != nil {
+            if viewModel.userLocation != nil && mapSettings.showLocationMarker {
                 drawUserLocation(context: context)
             }
         }
