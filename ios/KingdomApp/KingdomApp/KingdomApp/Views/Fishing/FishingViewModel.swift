@@ -67,8 +67,9 @@ class FishingViewModel: ObservableObject {
     private var pendingSession: FishingSession?
     
     // Animation timing
-    private let rollAnimationDelay: Double = 1.2   // Time between rolls
-    private let firstRollDelay: Double = 0.75      // Shorter delay before first roll
+    private let rollAnimationDelay: Double = 0.5   // Time per roll (was 1.2s + 0.75s first roll)
+    private let successRollDelay: Double = 0.75     // Extra time for hits/crits to appreciate
+    private let minTotalRollTime: Double = 1.0     // Minimum total time for all rolls
     private let masterRollDelay: Double = 0.3      // Pause before master roll
     private let feedbackDelay: Double = 0.6        // Time on escaped/idle before resetting
     private let lootPause: Double = 0.55           // Brief pause before loot animation
@@ -395,7 +396,7 @@ class FishingViewModel: ObservableObject {
         // Schedule each roll at absolute times from now
         var delay: Double = 0
         for (index, roll) in currentRolls.enumerated() {
-            delay += (index == 0) ? firstRollDelay : rollAnimationDelay
+            delay += rollAnimationDelay
             
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self = self else { return }
@@ -407,6 +408,16 @@ class FishingViewModel: ObservableObject {
                     }
                 }
             }
+            
+            // Add extra delay AFTER showing successful rolls so users can appreciate them
+            if roll.is_success {
+                delay += (successRollDelay - rollAnimationDelay)
+            }
+        }
+        
+        // Ensure minimum total time for all rolls
+        if delay < minTotalRollTime {
+            delay = minTotalRollTime
         }
         
         // Schedule master roll after all individual rolls
