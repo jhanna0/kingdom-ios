@@ -253,6 +253,32 @@ extension FriendsView {
                 .buttonStyle(.plain)
                 .padding(.horizontal)
             }
+            
+            // Global Activity Link
+            NavigationLink(destination: GlobalActivityView()) {
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(FontStyles.iconSmall)
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonPrimary, cornerRadius: 6, shadowOffset: 1, borderWidth: 1.5)
+                    
+                    Text("Global Activity")
+                        .font(FontStyles.headingSmall)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(FontStyles.iconSmall)
+                }
+                .foregroundColor(KingdomTheme.Colors.inkDark)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchmentLight, cornerRadius: 12)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal)
         }
     }
     

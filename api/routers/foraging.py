@@ -72,16 +72,39 @@ def increment_foraging_find(db: Session, user_id: int, item_id: str) -> None:
 _manager = ForagingManager()
 
 
-def check_streak_bonus(db: Session, user_id: int) -> bool:
-    """Check if last 2 attempts both hit."""
+def check_streak_bonus(db: Session, user_id: int) -> tuple[bool, bool]:
+    """
+    Check if last 2 attempts both hit.
+    Returns (has_streak_bonus, show_popup).
+    show_popup is True only on the FIRST win that triggers the streak (3rd consecutive win).
+    """
     last_two = db.query(ForagingSessionDB).filter(
         ForagingSessionDB.user_id == user_id
     ).order_by(desc(ForagingSessionDB.created_at)).limit(2).all()
     
     if len(last_two) < 2:
-        return False
+        return (False, False)
     
-    return all(s.round1_won or s.has_bonus_round for s in last_two)
+    has_streak = all(s.round1_won or s.has_bonus_round for s in last_two)
+    
+    if not has_streak:
+        return (False, False)
+    
+    # Check if this is the FIRST time hitting streak (exactly 3rd win)
+    # by checking if the 3rd-to-last attempt was NOT a win
+    last_three = db.query(ForagingSessionDB).filter(
+        ForagingSessionDB.user_id == user_id
+    ).order_by(desc(ForagingSessionDB.created_at)).limit(3).all()
+    
+    if len(last_three) < 3:
+        # Only 2 sessions total, so this IS the first streak
+        show_popup = True
+    else:
+        # Check if 3rd-to-last was a loss (meaning this is exactly the 3rd win)
+        third_to_last = last_three[2]
+        show_popup = not (third_to_last.round1_won or third_to_last.has_bonus_round)
+    
+    return (has_streak, show_popup)
 
 
 class EmptyRequest(BaseModel):
@@ -135,17 +158,19 @@ def start_foraging(
     
     # Streak bonus: 3 hits in a row (berries OR trail) = 2x berries
     streak_bonus = False
-    if session.round1.is_winner and check_streak_bonus(db, player_id):
-        streak_bonus = True
-        doubled = session.round1.reward_amount * 2
-        session_dict["round1"]["reward_amount"] = doubled
-        for r in session_dict["round1"].get("rewards", []):
-            if r.get("item") == "berries":
-                r["amount"] = doubled
+    show_streak_popup = False
+    if session.round1.is_winner:
+        streak_bonus, show_streak_popup = check_streak_bonus(db, player_id)
+        if streak_bonus:
+            doubled = session.round1.reward_amount * 2
+            session_dict["round1"]["reward_amount"] = doubled
+            for r in session_dict["round1"].get("rewards", []):
+                if r.get("item") == "berries":
+                    r["amount"] = doubled
     
     session_dict["round1"]["streak_bonus"] = streak_bonus
-    # show_streak_popup: backend tells frontend exactly when to show popup
-    session_dict["round1"]["show_streak_popup"] = streak_bonus
+    # show_streak_popup: backend tells frontend exactly when to show popup (only on 3rd win)
+    session_dict["round1"]["show_streak_popup"] = show_streak_popup
     if streak_bonus:
         session_dict["round1"]["streak_info"] = {
             "title": "HOT STREAK!",
@@ -167,7 +192,8 @@ def start_foraging(
                 r["amount"] = doubled_seeds
         
         session_dict["round2"]["streak_bonus"] = True
-        session_dict["round2"]["show_streak_popup"] = True
+        # Only show popup for round2 if we're showing it for round1 (same streak)
+        session_dict["round2"]["show_streak_popup"] = show_streak_popup
         session_dict["round2"]["streak_info"] = {
             "title": "HOT STREAK!",
             "subtitle": "2x Seeds",

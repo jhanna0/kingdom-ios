@@ -431,6 +431,137 @@ def get_my_activities(
     )
 
 
+@router.get("/global-activities", response_model=PlayerActivityResponse)
+def get_global_activities(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get global activity feed from all players worldwide.
+    Groups consecutive duplicate activities per user.
+    """
+    from routers.store import is_user_subscriber
+    from db.models import UserPreferences
+    from db.models.subscription import STYLE_PRESETS
+    
+    # Same grouping logic as _get_action_log_activities but for all users
+    activities_result = db.execute(text("""
+        WITH ordered_logs AS (
+            SELECT pal.*,
+                u.display_name,
+                ps.level as user_level,
+                LAG(pal.action_type) OVER (PARTITION BY pal.user_id ORDER BY pal.created_at DESC) as prev_action_type,
+                LAG(pal.description) OVER (PARTITION BY pal.user_id ORDER BY pal.created_at DESC) as prev_description
+            FROM player_activity_log pal
+            JOIN users u ON u.id = pal.user_id
+            JOIN player_state ps ON ps.user_id = pal.user_id
+            ORDER BY pal.created_at DESC
+        ),
+        grouped AS (
+            SELECT *,
+                CASE 
+                    WHEN action_type IN ('rare_loot', 'achievement', 'science_discovery') THEN 1
+                    WHEN prev_action_type IS NULL 
+                         OR action_type != prev_action_type 
+                         OR description != prev_description THEN 1
+                    ELSE 0
+                END as is_group_start
+            FROM ordered_logs
+        ),
+        with_groups AS (
+            SELECT *,
+                SUM(is_group_start) OVER (PARTITION BY user_id ORDER BY created_at DESC) as group_id
+            FROM grouped
+        )
+        SELECT 
+            MIN(id) as id,
+            user_id,
+            action_type,
+            action_category,
+            description,
+            kingdom_id,
+            kingdom_name,
+            SUM(COALESCE(amount, 0)) as amount,
+            MAX(created_at) as created_at,
+            COUNT(*) as repeat_count,
+            (array_agg(details ORDER BY created_at DESC))[1] as details,
+            MAX(display_name) as display_name,
+            MAX(user_level) as user_level
+        FROM with_groups
+        GROUP BY group_id, user_id, action_type, action_category, description, kingdom_id, kingdom_name
+        ORDER BY created_at DESC
+        LIMIT :limit
+    """), {"limit": limit}).fetchall()
+    
+    all_activities = []
+    for row in activities_result:
+        uid = row.user_id
+        
+        description = row.description
+        repeat_count = row.repeat_count
+        if repeat_count > 1:
+            description = f"{description} (x{repeat_count})"
+        
+        # Get subscriber customization
+        is_subscriber = is_user_subscriber(db, uid)
+        subscriber_customization_dict = None
+        
+        if is_subscriber:
+            prefs = db.query(UserPreferences).filter(UserPreferences.user_id == uid).first()
+            if prefs:
+                selected_title_dict = None
+                if prefs.selected_title_achievement_id:
+                    title_result = db.execute(text("""
+                        SELECT ad.id, ad.display_name, ad.icon
+                        FROM achievement_definitions ad
+                        WHERE ad.id = :achievement_id
+                    """), {"achievement_id": prefs.selected_title_achievement_id}).fetchone()
+                    if title_result:
+                        selected_title_dict = {"achievement_id": title_result[0], "display_name": title_result[1], "icon": title_result[2]}
+                
+                icon_style_dict = None
+                if prefs.icon_style and prefs.icon_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.icon_style]
+                    icon_style_dict = {"id": prefs.icon_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                card_style_dict = None
+                if prefs.card_style and prefs.card_style in STYLE_PRESETS:
+                    s = STYLE_PRESETS[prefs.card_style]
+                    card_style_dict = {"id": prefs.card_style, "name": s["name"], "background_color": s["background"], "text_color": s["text"]}
+                
+                if icon_style_dict or card_style_dict or selected_title_dict:
+                    subscriber_customization_dict = {
+                        "icon_style": icon_style_dict,
+                        "card_style": card_style_dict,
+                        "selected_title": selected_title_dict
+                    }
+        
+        all_activities.append(ActivityLogEntry(
+            id=row.id,
+            user_id=uid,
+            action_type=row.action_type,
+            action_category=row.action_category,
+            description=description,
+            kingdom_id=row.kingdom_id,
+            kingdom_name=row.kingdom_name,
+            amount=row.amount if row.amount else None,
+            details=row.details or {},
+            created_at=row.created_at,
+            repeat_count=repeat_count,
+            username=row.display_name,
+            display_name=row.display_name,
+            user_level=row.user_level,
+            subscriber_customization=subscriber_customization_dict
+        ))
+    
+    return PlayerActivityResponse(
+        success=True,
+        total=len(all_activities),
+        activities=all_activities
+    )
+
+
 @router.get("/friend-activities", response_model=PlayerActivityResponse)
 def get_friend_activities(
     limit: int = 50,

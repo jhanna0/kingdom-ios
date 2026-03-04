@@ -119,5 +119,14 @@ class FriendsService {
         let request = client.request(endpoint: endpoint)
         return try await client.execute(request)
     }
+    
+    func getGlobalActivities() async throws -> PlayerActivityResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/activity/global-activities")
+        return try await client.execute(request)
+    }
 }
 

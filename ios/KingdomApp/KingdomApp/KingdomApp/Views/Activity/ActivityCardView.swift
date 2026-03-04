@@ -31,6 +31,19 @@ struct ActivityCard: View {
     }
     
     var body: some View {
+        Group {
+            if showUser {
+                NavigationLink(destination: PlayerProfileView(userId: activity.userId)) {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                cardContent
+            }
+        }
+    }
+    
+    private var cardContent: some View {
         HStack(spacing: 10) {
             Image(systemName: activity.icon)
                 .font(FontStyles.iconSmall)
@@ -70,6 +83,12 @@ struct ActivityCard: View {
                 }
             }
             Spacer()
+            
+            if showUser {
+                Image(systemName: "chevron.right")
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(cardSecondaryTextColor)
+            }
         }
         .padding()
         .brutalistCard(backgroundColor: cardBackgroundColor, cornerRadius: 12)
