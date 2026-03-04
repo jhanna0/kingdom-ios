@@ -1078,15 +1078,35 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
     display_order = EXCLUDED.display_order,
     type_display_name = EXCLUDED.type_display_name;
 
+-- Bread Baked (12 loaves per batch)
+INSERT INTO achievement_definitions 
+    (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
+VALUES
+    ('bread_baked', 1, 10, '{"gold": 25}', 'Baker I', 'Bake 10 batches of bread', 'cloud.fill', 'gardening', 886, 'Batches of bread baked'),
+    ('bread_baked', 2, 50, '{"gold": 50}', 'Baker II', 'Bake 50 batches of bread', 'cloud.fill', 'gardening', 887, 'Batches of bread baked'),
+    ('bread_baked', 3, 100, '{"gold": 100}', 'Baker III', 'Bake 100 batches of bread', 'cloud.fill', 'gardening', 888, 'Batches of bread baked'),
+    ('bread_baked', 4, 250, '{"gold": 200}', 'Baker IV', 'Bake 250 batches of bread', 'cloud.fill', 'gardening', 889, 'Batches of bread baked'),
+    ('bread_baked', 5, 500, '{"gold": 500}', 'Baker V', 'Bake 500 batches of bread', 'cloud.fill', 'gardening', 890, 'Batches of bread baked'),
+    ('bread_baked', 6, 1000, '{"gold": 1000}', 'Master Baker', 'Bake 1000 batches of bread', 'cloud.fill', 'gardening', 891, 'Batches of bread baked')
+ON CONFLICT (achievement_type, tier) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    rewards = EXCLUDED.rewards,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    display_order = EXCLUDED.display_order,
+    type_display_name = EXCLUDED.type_display_name;
+
 -- Weeds Cleared
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('weeds_cleared', 1, 25, '{"gold": 25}', 'Weed Puller I', 'Clear 25 weeds', 'xmark.circle.fill', 'gardening', 890, 'Weeds cleared'),
-    ('weeds_cleared', 2, 100, '{"gold": 50}', 'Weed Puller II', 'Clear 100 weeds', 'xmark.circle.fill', 'gardening', 891, 'Weeds cleared'),
-    ('weeds_cleared', 3, 250, '{"gold": 100}', 'Weed Puller III', 'Clear 250 weeds', 'xmark.circle.fill', 'gardening', 892, 'Weeds cleared'),
-    ('weeds_cleared', 4, 500, '{"gold": 200}', 'Weed Puller IV', 'Clear 500 weeds', 'xmark.circle.fill', 'gardening', 893, 'Weeds cleared'),
-    ('weeds_cleared', 5, 1000, '{"gold": 500}', 'Weed Puller V', 'Clear 1000 weeds', 'xmark.circle.fill', 'gardening', 894, 'Weeds cleared')
+    ('weeds_cleared', 1, 25, '{"gold": 25}', 'Weed Puller I', 'Clear 25 weeds', 'xmark.circle.fill', 'gardening', 892, 'Weeds cleared'),
+    ('weeds_cleared', 2, 100, '{"gold": 50}', 'Weed Puller II', 'Clear 100 weeds', 'xmark.circle.fill', 'gardening', 893, 'Weeds cleared'),
+    ('weeds_cleared', 3, 250, '{"gold": 100}', 'Weed Puller III', 'Clear 250 weeds', 'xmark.circle.fill', 'gardening', 894, 'Weeds cleared'),
+    ('weeds_cleared', 4, 500, '{"gold": 200}', 'Weed Puller IV', 'Clear 500 weeds', 'xmark.circle.fill', 'gardening', 895, 'Weeds cleared'),
+    ('weeds_cleared', 5, 1000, '{"gold": 500}', 'Weed Puller V', 'Clear 1000 weeds', 'xmark.circle.fill', 'gardening', 896, 'Weeds cleared')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,
@@ -1101,9 +1121,9 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('flower_colors', 1, 3, '{"gold": 100}', 'Color Collector I', 'Collect 3 different flower colors', 'paintpalette.fill', 'gardening', 900, 'Unique flower colors'),
-    ('flower_colors', 2, 6, '{"gold": 250}', 'Color Collector II', 'Collect 6 different flower colors', 'paintpalette.fill', 'gardening', 901, 'Unique flower colors'),
-    ('flower_colors', 3, 10, '{"gold": 500}', 'Rainbow Garden', 'Collect all 10 flower colors', 'paintpalette.fill', 'gardening', 902, 'Unique flower colors')
+    ('flower_colors', 1, 3, '{"gold": 100}', 'Color Collector I', 'Collect 3 different flower colors', 'paintpalette.fill', 'gardening', 897, 'Unique flower colors'),
+    ('flower_colors', 2, 6, '{"gold": 250}', 'Color Collector II', 'Collect 6 different flower colors', 'paintpalette.fill', 'gardening', 898, 'Unique flower colors'),
+    ('flower_colors', 3, 10, '{"gold": 500}', 'Rainbow Garden', 'Collect all 10 flower colors', 'paintpalette.fill', 'gardening', 899, 'Unique flower colors')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,

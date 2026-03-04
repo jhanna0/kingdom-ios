@@ -203,7 +203,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["kingdoms_with_properties"] = int(combined_result.kingdoms_with_properties)
     
     # =========================================================================
-    # SECOND COMBINED QUERY: Battle + Garden (more complex aggregations)
+    # SECOND COMBINED QUERY: Battle + Garden + Kitchen (more complex aggregations)
     # =========================================================================
     complex_query = text("""
         SELECT
@@ -235,7 +235,10 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_rarity = 'rare'), 0) as rare_flowers_grown,
             COALESCE((SELECT SUM(wheat_gained) FROM garden_history WHERE user_id = :user_id AND action = 'harvested'), 0) as wheat_harvested,
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'discarded' AND plant_type = 'weed'), 0) as weeds_cleared,
-            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors
+            COALESCE((SELECT COUNT(DISTINCT flower_color) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower' AND flower_color IS NOT NULL), 0) as flower_colors,
+            
+            -- Kitchen stats (bread baking)
+            COALESCE((SELECT COUNT(*) FROM kitchen_history WHERE user_id = :user_id AND action = 'baked'), 0) as bread_baked
     """)
     
     complex_result = db.execute(complex_query, {"user_id": user_id}).first()
@@ -249,6 +252,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["wheat_harvested"] = int(complex_result.wheat_harvested)
         progress["weeds_cleared"] = int(complex_result.weeds_cleared)
         progress["flower_colors"] = int(complex_result.flower_colors)
+        progress["bread_baked"] = int(complex_result.bread_baked)
     
     # =========================================================================
     # ITEMIZED QUERIES (need multiple rows - can't combine)

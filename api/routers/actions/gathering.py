@@ -22,7 +22,7 @@ from db.models.inventory import PlayerInventory
 from routers.auth import get_current_user
 from systems.gathering import GatherManager, GatherConfig
 from services.building_permit_service import check_building_access
-from .utils import log_activity
+from .utils import log_activity, set_activity_status
 
 router = APIRouter()
 
@@ -334,6 +334,12 @@ def gather_resource(
         building_level = getattr(hometown, 'lumbermill_level', 1) or 1 if hometown else 1
     else:
         building_level = getattr(hometown, 'mine_level', 1) or 1 if hometown else 1
+    
+    # Set activity status based on resource type
+    if resource_type == "wood":
+        set_activity_status(state, "Cutting Wood")
+    else:  # stone or iron
+        set_activity_status(state, "Mining")
     
     # Execute gather roll (building level affects tier probabilities)
     result = _gather_manager.gather(resource_type, current_amount, building_level)
