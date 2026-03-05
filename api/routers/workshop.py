@@ -21,7 +21,9 @@ from routers.actions.utils import (
     format_datetime_iso, 
     set_cooldown,
     check_and_deduct_food_cost,
-    calculate_crafting_cooldown
+    calculate_crafting_cooldown,
+    log_activity,
+    set_activity_status
 )
 from routers.actions.constants import CRAFTING_BASE_COOLDOWN
 from config import DEV_MODE
@@ -441,6 +443,46 @@ def work_on_craft(
         bonus_xp = 50
         xp_earned += bonus_xp
         state.experience += bonus_xp
+        
+        # Log completion to activity feed
+        set_activity_status(state, "Idle")
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="workshop_complete",
+            action_category="crafting",
+            description=f"Crafted {item_config.get('display_name', contract.type)}!",
+            kingdom_id=state.current_kingdom_id,
+            amount=item_config.get("tier", 1),
+            details={
+                "item": contract.type,
+                "display_name": item_config.get("display_name", contract.type),
+                "tier": item_config.get("tier", 1),
+                "attack_bonus": item_config.get("attack_bonus", 0),
+                "defense_bonus": item_config.get("defense_bonus", 0)
+            },
+            visibility="friends"
+        )
+    else:
+        # Update activity status
+        set_activity_status(state, f"Crafting {item_config.get('display_name', contract.type)} ({actions_completed}/{contract.actions_required})")
+        
+        # Log progress to activity feed
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="workshop_craft",
+            action_category="crafting",
+            description=f"Crafting {item_config.get('display_name', contract.type)} ({actions_completed}/{contract.actions_required})",
+            kingdom_id=state.current_kingdom_id,
+            amount=None,
+            details={
+                "item": contract.type,
+                "display_name": item_config.get("display_name", contract.type),
+                "progress": f"{actions_completed}/{contract.actions_required}"
+            },
+            visibility="friends"
+        )
     
     # Level up check
     xp_needed = 100 * (2 ** (state.level - 1))
