@@ -452,19 +452,7 @@ def work_on_training(
             visibility="friends"
         )
     else:
-        # Log training progress to activity feed
-        log_activity(
-            db=db,
-            user_id=current_user.id,
-            action_type="training",
-            action_category="training",
-            description=f"Training {contract.type.capitalize()} ({new_actions_completed}/{contract.actions_required})",
-            kingdom_id=state.current_kingdom_id,
-            amount=None,
-            details={"skill": contract.type, "progress": f"{new_actions_completed}/{contract.actions_required}"},
-            visibility="friends"
-        )
-        # Update training progress
+        # Update training progress (no activity log for progress - only completions)
         set_activity_status(state, f"Training {contract.type} {new_actions_completed}/{contract.actions_required}")
     
     # Check for level up

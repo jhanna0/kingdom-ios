@@ -284,77 +284,21 @@ def _get_kingdom_visit_activities(db: Session, user_id: int, limit: int = 50) ->
 
 
 def _get_action_log_activities(db: Session, user_id: int, limit: int = 50, exclude_types: List[str] = None) -> List[ActivityLogEntry]:
-    """Get logged activities from PlayerActivityLog, grouping consecutive duplicates in SQL.
-    
-    Uses window functions to detect consecutive identical entries and group them,
-    except for rare drops which are always shown individually.
-    """
+    """Get logged activities from PlayerActivityLog. Dedup is handled at write time via repeat_count."""
     activities = []
     
-    # Build exclude clause
-    exclude_clause = ""
+    query = db.query(PlayerActivityLog).filter(PlayerActivityLog.user_id == user_id)
     if exclude_types:
-        exclude_list = ", ".join(f"'{t}'" for t in exclude_types)
-        exclude_clause = f"AND action_type NOT IN ({exclude_list})"
+        query = query.filter(~PlayerActivityLog.action_type.in_(exclude_types))
     
-    # SQL with window function to group consecutive duplicates
-    # LAG looks at previous row - if same action_type+description, it's a duplicate
-    # Rare drops (rare_loot, achievement, science_discovery) are never grouped
-    sql = text(f"""
-        WITH ordered_logs AS (
-            SELECT *,
-                LAG(action_type) OVER (ORDER BY created_at DESC) as prev_action_type,
-                LAG(description) OVER (ORDER BY created_at DESC) as prev_description
-            FROM player_activity_log
-            WHERE user_id = :user_id {exclude_clause}
-            ORDER BY created_at DESC
-        ),
-        grouped AS (
-            SELECT *,
-                CASE 
-                    -- Never group rare/special types
-                    WHEN action_type IN ('rare_loot', 'achievement', 'science_discovery') THEN 1
-                    -- Start new group if different from previous
-                    WHEN prev_action_type IS NULL 
-                         OR action_type != prev_action_type 
-                         OR description != prev_description THEN 1
-                    ELSE 0
-                END as is_group_start
-            FROM ordered_logs
-        ),
-        with_groups AS (
-            SELECT *,
-                SUM(is_group_start) OVER (ORDER BY created_at DESC) as group_id
-            FROM grouped
-        )
-        SELECT 
-            MIN(id) as id,
-            user_id,
-            action_type,
-            action_category,
-            description,
-            kingdom_id,
-            kingdom_name,
-            SUM(COALESCE(amount, 0)) as amount,
-            MAX(created_at) as created_at,
-            COUNT(*) as repeat_count,
-            (array_agg(details ORDER BY created_at DESC))[1] as details
-        FROM with_groups
-        GROUP BY group_id, user_id, action_type, action_category, description, kingdom_id, kingdom_name
-        ORDER BY created_at DESC
-        LIMIT :limit
-    """)
+    rows = query.order_by(desc(PlayerActivityLog.id)).limit(limit).all()
     
-    result = db.execute(sql, {"user_id": user_id, "limit": limit})
-    
-    for row in result:
+    for row in rows:
         description = row.description
-        repeat_count = row.repeat_count
-        amount = row.amount if row.amount else None
+        repeat_count = row.repeat_count if row.repeat_count else 1
         
-        # Add x6 suffix if grouped
         if repeat_count > 1:
-            description = f"{description} (x{repeat_count})"
+            description = f"{description} x{repeat_count}"
         
         activities.append(ActivityLogEntry(
             id=row.id,
@@ -364,7 +308,7 @@ def _get_action_log_activities(db: Session, user_id: int, limit: int = 50, exclu
             description=description,
             kingdom_id=row.kingdom_id,
             kingdom_name=row.kingdom_name,
-            amount=amount,
+            amount=row.amount,
             details=row.details or {},
             created_at=row.created_at,
             repeat_count=repeat_count
@@ -434,74 +378,38 @@ def get_my_activities(
 @router.get("/global-activities", response_model=PlayerActivityResponse)
 def get_global_activities(
     limit: int = 20,
+    after_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get global activity feed from all players worldwide.
-    Groups consecutive duplicate activities per user.
+    Dedup handled at write time via repeat_count column.
+    
+    after_id: return activities newer than this ID
     """
     from routers.store import is_user_subscriber
     from db.models import UserPreferences
     from db.models.subscription import STYLE_PRESETS
     
-    # Same grouping logic as _get_action_log_activities but for all users
-    activities_result = db.execute(text("""
-        WITH ordered_logs AS (
-            SELECT pal.*,
-                u.display_name,
-                ps.level as user_level,
-                LAG(pal.action_type) OVER (PARTITION BY pal.user_id ORDER BY pal.created_at DESC) as prev_action_type,
-                LAG(pal.description) OVER (PARTITION BY pal.user_id ORDER BY pal.created_at DESC) as prev_description
-            FROM player_activity_log pal
-            JOIN users u ON u.id = pal.user_id
-            JOIN player_state ps ON ps.user_id = pal.user_id
-            ORDER BY pal.created_at DESC
-        ),
-        grouped AS (
-            SELECT *,
-                CASE 
-                    WHEN action_type IN ('rare_loot', 'achievement', 'science_discovery') THEN 1
-                    WHEN prev_action_type IS NULL 
-                         OR action_type != prev_action_type 
-                         OR description != prev_description THEN 1
-                    ELSE 0
-                END as is_group_start
-            FROM ordered_logs
-        ),
-        with_groups AS (
-            SELECT *,
-                SUM(is_group_start) OVER (PARTITION BY user_id ORDER BY created_at DESC) as group_id
-            FROM grouped
-        )
-        SELECT 
-            MIN(id) as id,
-            user_id,
-            action_type,
-            action_category,
-            description,
-            kingdom_id,
-            kingdom_name,
-            SUM(COALESCE(amount, 0)) as amount,
-            MAX(created_at) as created_at,
-            COUNT(*) as repeat_count,
-            (array_agg(details ORDER BY created_at DESC))[1] as details,
-            MAX(display_name) as display_name,
-            MAX(user_level) as user_level
-        FROM with_groups
-        GROUP BY group_id, user_id, action_type, action_category, description, kingdom_id, kingdom_name
-        ORDER BY created_at DESC
-        LIMIT :limit
-    """), {"limit": limit}).fetchall()
+    query = db.query(PlayerActivityLog).order_by(desc(PlayerActivityLog.id))
+    if after_id:
+        query = query.filter(PlayerActivityLog.id > after_id)
+    
+    rows = query.limit(limit).all()
+    
+    if not rows:
+        return PlayerActivityResponse(success=True, total=0, activities=[])
     
     all_activities = []
-    for row in activities_result:
+    for row in rows:
         uid = row.user_id
         
-        description = row.description
-        repeat_count = row.repeat_count
-        if repeat_count > 1:
-            description = f"{description} (x{repeat_count})"
+        # Get user info
+        user = db.query(User).filter(User.id == uid).first()
+        user_state = db.query(PlayerState).filter(PlayerState.user_id == uid).first()
+        if not user or not user_state:
+            continue
         
         # Get subscriber customization
         is_subscriber = is_user_subscriber(db, uid)
@@ -537,6 +445,11 @@ def get_global_activities(
                         "selected_title": selected_title_dict
                     }
         
+        description = row.description
+        repeat_count = row.repeat_count if row.repeat_count else 1
+        if repeat_count > 1:
+            description = f"{description} x{repeat_count}"
+        
         all_activities.append(ActivityLogEntry(
             id=row.id,
             user_id=uid,
@@ -545,13 +458,13 @@ def get_global_activities(
             description=description,
             kingdom_id=row.kingdom_id,
             kingdom_name=row.kingdom_name,
-            amount=row.amount if row.amount else None,
+            amount=row.amount,
             details=row.details or {},
             created_at=row.created_at,
             repeat_count=repeat_count,
-            username=row.display_name,
-            display_name=row.display_name,
-            user_level=row.user_level,
+            username=user.display_name,
+            display_name=user.display_name,
+            user_level=user_state.level,
             subscriber_customization=subscriber_customization_dict
         ))
     

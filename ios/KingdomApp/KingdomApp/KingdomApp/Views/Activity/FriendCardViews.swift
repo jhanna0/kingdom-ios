@@ -315,7 +315,7 @@ struct GlobalActivityView: View {
             KingdomTheme.Colors.parchment
                 .ignoresSafeArea()
             
-            if viewModel.isLoading && viewModel.displayedActivities.isEmpty {
+            if viewModel.isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.2)
@@ -323,7 +323,7 @@ struct GlobalActivityView: View {
                         .font(FontStyles.bodyMedium)
                         .foregroundColor(KingdomTheme.Colors.inkMedium)
                 }
-            } else if viewModel.displayedActivities.isEmpty && viewModel.pendingActivities.isEmpty {
+            } else if viewModel.activities.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "globe")
                         .font(.system(size: 48))
@@ -338,27 +338,13 @@ struct GlobalActivityView: View {
                         .padding(.horizontal, 40)
                 }
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: KingdomTheme.Spacing.medium) {
-                            ForEach(viewModel.displayedActivities) { activity in
-                                ActivityCard(activity: activity, showUser: true)
-                                    .id(activity.id)
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .opacity
-                                    ))
-                            }
-                        }
-                        .padding(.vertical)
-                    }
-                    .onChange(of: viewModel.displayedActivities.first?.id) { _, newId in
-                        if let newId = newId {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(newId, anchor: .top)
-                            }
+                ScrollView {
+                    LazyVStack(spacing: KingdomTheme.Spacing.medium) {
+                        ForEach(viewModel.activities) { activity in
+                            ActivityCard(activity: activity, showUser: true)
                         }
                     }
+                    .padding(.vertical)
                 }
             }
         }
@@ -368,10 +354,7 @@ struct GlobalActivityView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .task {
-            await viewModel.start()
-        }
-        .onDisappear {
-            viewModel.stop()
+            await viewModel.load()
         }
     }
 }
@@ -381,68 +364,21 @@ struct GlobalActivityView: View {
 @MainActor
 class GlobalActivityViewModel: ObservableObject {
     @Published var isLoading = false
-    @Published var displayedActivities: [ActivityLogEntry] = []
+    @Published var activities: [ActivityLogEntry] = []
     @Published var errorMessage: String?
     
-    var pendingActivities: [ActivityLogEntry] = []
-    private var displayTimer: Timer?
-    private var isRunning = false
     private let api = KingdomAPIService.shared
     
-    func start() async {
-        guard !isRunning else { return }
-        isRunning = true
-        await loadAndDisplay()
-    }
-    
-    func stop() {
-        isRunning = false
-        displayTimer?.invalidate()
-        displayTimer = nil
-    }
-    
-    private func loadAndDisplay() async {
+    func load() async {
         isLoading = true
         
         do {
             let response = try await api.friends.getGlobalActivities()
-            // Reverse so oldest is first, we show from back to front
-            pendingActivities = response.activities.reversed()
-            isLoading = false
-            print("✅ Loaded \(pendingActivities.count) global activities")
-            showNextActivity()
+            activities = response.activities
         } catch {
-            isLoading = false
-            print("❌ Failed to load global activities: \(error)")
             errorMessage = "Failed to load global activity"
         }
-    }
-    
-    private func showNextActivity() {
-        guard isRunning else { return }
         
-        if pendingActivities.isEmpty {
-            // Fetch more
-            Task {
-                await loadAndDisplay()
-            }
-            return
-        }
-        
-        let next = pendingActivities.removeFirst()
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            displayedActivities.insert(next, at: 0)
-            // Keep max 50 displayed
-            if displayedActivities.count > 50 {
-                displayedActivities.removeLast()
-            }
-        }
-        
-        // Schedule next
-        displayTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.showNextActivity()
-            }
-        }
+        isLoading = false
     }
 }

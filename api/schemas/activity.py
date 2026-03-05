@@ -52,3 +52,4 @@ class PlayerActivityResponse(BaseModel):
     success: bool = True
     total: int
     activities: List[ActivityLogEntry]
+    last_id: Optional[int] = None

@@ -60,6 +60,12 @@ struct PlayerActivityResponse: Codable {
     let success: Bool
     let total: Int
     let activities: [ActivityLogEntry]
+    let lastId: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, total, activities
+        case lastId = "last_id"
+    }
 }
 
 // MARK: - Activity Extensions

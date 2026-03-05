@@ -565,7 +565,25 @@ def log_activity(
     details: Optional[dict] = None,
     visibility: str = "friends"
 ) -> PlayerActivityLog:
-    """Log an action to the activity feed"""
+    """Log an action to the activity feed. If the last row for this user is identical, increment repeat_count instead."""
+    
+    # Check if last activity for this user is the same - if so, just increment
+    last_activity = db.query(PlayerActivityLog).filter(
+        PlayerActivityLog.user_id == user_id
+    ).order_by(PlayerActivityLog.id.desc()).first()
+    
+    if (last_activity 
+        and last_activity.action_type == action_type 
+        and last_activity.description == description
+        and action_type not in ('rare_loot', 'achievement', 'science_discovery')):
+        # Same action - increment count and update timestamp
+        last_activity.repeat_count += 1
+        last_activity.created_at = datetime.utcnow()
+        if amount:
+            last_activity.amount = (last_activity.amount or 0) + amount
+        return last_activity
+    
+    # Different action - create new row
     kingdom_name = None
     if kingdom_id:
         kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
@@ -580,7 +598,8 @@ def log_activity(
         kingdom_name=kingdom_name,
         amount=amount,
         details=details or {},
-        visibility=visibility
+        visibility=visibility,
+        repeat_count=1
     )
     db.add(activity)
     return activity

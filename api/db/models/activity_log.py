@@ -41,6 +41,9 @@ class PlayerActivityLog(Base):
     # Visibility control
     visibility = Column(String, default='friends', nullable=False)  # 'public', 'friends', 'private'
     
+    # Repeat count for consecutive identical actions
+    repeat_count = Column(Integer, default=1, nullable=False)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
