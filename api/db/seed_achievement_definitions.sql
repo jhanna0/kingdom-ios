@@ -422,13 +422,13 @@ ON CONFLICT (achievement_type, tier) DO UPDATE SET
 INSERT INTO achievement_definitions 
     (achievement_type, tier, target_value, rewards, display_name, description, icon, category, display_order, type_display_name)
 VALUES
-    ('building_contracts', 1, 100, '{"gold": 50}', 'Community Builder I', 'Complete 100 building contracts', 'building.2.fill', 'building', 370, 'Building contracts completed'),
-    ('building_contracts', 2, 500, '{"gold": 100}', 'Community Builder II', 'Complete 500 building contracts', 'building.2.fill', 'building', 371, 'Building contracts completed'),
-    ('building_contracts', 3, 1000, '{"gold": 200}', 'Community Builder III', 'Complete 1000 building contracts', 'building.2.fill', 'building', 372, 'Building contracts completed'),
-    ('building_contracts', 4, 2500, '{"gold": 500}', 'Community Builder IV', 'Complete 2500 building contracts', 'building.2.fill', 'building', 373, 'Building contracts completed'),
-    ('building_contracts', 5, 5000, '{"gold": 1000}', 'Community Builder V', 'Complete 5000 building contracts', 'building.2.fill', 'building', 374, 'Building contracts completed'),
-    ('building_contracts', 6, 10000, '{"gold": 2500}', 'Community Builder VI', 'Complete 10000 building contracts', 'building.2.fill', 'building', 375, 'Building contracts completed'),
-    ('building_contracts', 7, 25000, '{"gold": 5000}', 'Master Community Builder', 'Complete 25000 building contracts', 'building.2.fill', 'building', 376, 'Building contracts completed')
+    ('building_contracts', 1, 100, '{"gold": 100}', 'Community Builder I', 'Complete 100 building contracts', 'building.2.fill', 'building', 370, 'Building contracts completed'),
+    ('building_contracts', 2, 500, '{"gold": 500}', 'Community Builder II', 'Complete 500 building contracts', 'building.2.fill', 'building', 371, 'Building contracts completed'),
+    ('building_contracts', 3, 1000, '{"gold": 1000}', 'Community Builder III', 'Complete 1000 building contracts', 'building.2.fill', 'building', 372, 'Building contracts completed'),
+    ('building_contracts', 4, 2500, '{"gold": 2500}', 'Community Builder IV', 'Complete 2500 building contracts', 'building.2.fill', 'building', 373, 'Building contracts completed'),
+    ('building_contracts', 5, 5000, '{"gold": 5000}', 'Community Builder V', 'Complete 5000 building contracts', 'building.2.fill', 'building', 374, 'Building contracts completed'),
+    ('building_contracts', 6, 10000, '{"gold": 10000}', 'Community Builder VI', 'Complete 10000 building contracts', 'building.2.fill', 'building', 375, 'Building contracts completed'),
+    ('building_contracts', 7, 25000, '{"gold": 25000}', 'Master Community Builder', 'Complete 25000 building contracts', 'building.2.fill', 'building', 376, 'Building contracts completed')
 ON CONFLICT (achievement_type, tier) DO UPDATE SET
     target_value = EXCLUDED.target_value,
     rewards = EXCLUDED.rewards,

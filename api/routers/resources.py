@@ -198,7 +198,7 @@ RESOURCES = {
         "description": "A rare tome of knowledge. Completes any one cooldown!",
         "category": "consumable",
         "display_order": 91,
-        "is_tradeable": False,  # Non-tradeable to prevent RMT
+        "is_tradeable": True,
         "storage_type": "inventory",
         "effect": "skip_cooldown",  # "skip_cooldown" = clear entire cooldown, "reduce_cooldown" = reduce by X minutes
         "cooldown_reduction_minutes": None,  # None = skip entire cooldown

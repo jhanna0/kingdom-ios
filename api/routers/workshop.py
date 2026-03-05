@@ -19,11 +19,11 @@ from routers.resources import RESOURCES
 from routers.actions.utils import (
     check_and_set_slot_cooldown_atomic, 
     format_datetime_iso, 
-    calculate_cooldown, 
     set_cooldown,
-    check_and_deduct_food_cost
+    check_and_deduct_food_cost,
+    calculate_crafting_cooldown
 )
-from routers.actions.constants import WORK_BASE_COOLDOWN
+from routers.actions.constants import CRAFTING_BASE_COOLDOWN
 from config import DEV_MODE
 
 
@@ -161,13 +161,22 @@ def get_workshop_status(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check workshop requirement (tier 3+)
-    workshop_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 3
+    # Check if user has completed the workshop contract
+    workshop_contract = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.option_id == 'workshop',
+        UnifiedContract.completed_at.isnot(None)
     ).first()
     
-    has_workshop = workshop_property is not None
+    has_workshop = workshop_contract is not None
+    
+    # Get the property that has the workshop (if contract exists)
+    workshop_property = None
+    if workshop_contract:
+        workshop_property = db.query(Property).filter(
+            Property.id == workshop_contract.target_id
+        ).first()
     
     # Get blueprint count
     blueprint_count = get_blueprint_count(db, current_user.id)
@@ -253,7 +262,7 @@ def get_workshop_status(
         "blueprint_count": blueprint_count,
         "active_contract": active_contract_data,
         "craftable_items": craftable_items,
-        "workshop_requirement": "Upgrade your property to Tier 3 to unlock Workshop.",
+        "workshop_requirement": "Build a Workshop in your property to unlock crafting.",
     }
 
 
@@ -271,14 +280,16 @@ def start_craft(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check workshop requirement
-    workshop_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 3
+    # Check if user has completed the workshop contract
+    workshop_contract = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.option_id == 'workshop',
+        UnifiedContract.completed_at.isnot(None)
     ).first()
     
-    if not workshop_property:
-        raise HTTPException(status_code=400, detail="You need a Workshop (Property Tier 3) to craft items.")
+    if not workshop_contract:
+        raise HTTPException(status_code=400, detail="Build a Workshop in your property to craft items.")
     
     # Check no active contract
     active_contract = get_active_workshop_contract(db, current_user.id)
@@ -364,8 +375,8 @@ def work_on_craft(
     
     item_config = CRAFTABLE_ITEMS.get(contract.type, {})
     
-    # Calculate skill-adjusted cooldown
-    cooldown_minutes = calculate_cooldown(WORK_BASE_COOLDOWN, state.building_skill)
+    # Calculate crafting cooldown (fixed, not affected by skills)
+    cooldown_minutes = calculate_crafting_cooldown(CRAFTING_BASE_COOLDOWN)
     cooldown_expires = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
     
     # Check and deduct food cost

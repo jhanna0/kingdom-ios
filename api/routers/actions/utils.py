@@ -60,6 +60,15 @@ def calculate_training_cooldown(base_minutes: float, science_level: int) -> floa
     return base_minutes * multiplier
 
 
+def calculate_crafting_cooldown(base_minutes: float) -> float:
+    """Calculate CRAFTING action cooldown (workshop crafting).
+    
+    Workshop crafting uses a fixed cooldown - not affected by any skill.
+    Crafting weapons/armor is different from building infrastructure.
+    """
+    return base_minutes
+
+
 def get_cooldown(db: Session, user_id: int, action_type: str) -> Optional[ActionCooldown]:
     """Get cooldown record for a specific action"""
     return db.query(ActionCooldown).filter(
@@ -575,7 +584,7 @@ def log_activity(
     if (last_activity 
         and last_activity.action_type == action_type 
         and last_activity.description == description
-        and action_type not in ('rare_loot', 'achievement', 'science_discovery')):
+        and action_type not in ('rare_loot', 'achievement')):
         # Same action - increment count and update timestamp
         last_activity.repeat_count += 1
         last_activity.created_at = datetime.utcnow()
