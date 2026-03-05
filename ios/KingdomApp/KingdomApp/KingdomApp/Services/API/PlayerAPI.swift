@@ -265,6 +265,18 @@ class PlayerAPI {
         return try await client.execute(request)
     }
     
+    // MARK: - World Map
+    
+    /// Get all kingdoms the player has visited for the world map view
+    func getWorldMap() async throws -> WorldMapResponse {
+        guard client.isAuthenticated else {
+            throw APIError.unauthorized
+        }
+        
+        let request = client.request(endpoint: "/player/world-map")
+        return try await client.execute(request)
+    }
+    
 }
 
 // MARK: - Relocation Response Models
@@ -309,4 +321,34 @@ struct UsernameChangeResponse: Codable {
 }
 
 // MARK: - Subscriber Settings Response (see SubscriberSettingsView.swift)
+
+// MARK: - World Map Response Models
+
+struct WorldMapKingdom: Codable, Identifiable {
+    let id: String
+    let name: String
+    let center_lat: Double
+    let center_lon: Double
+    let radius_meters: Double
+    let boundary: [[Double]]  // Array of [lat, lon] pairs
+    let first_visited: String?
+    let last_visited: String?
+    let checkins_count: Int
+    let reputation: Int
+    let is_hometown: Bool
+    let is_current: Bool
+    let is_ruled: Bool
+}
+
+struct WorldMapReferencePoint: Codable {
+    let lat: Double
+    let lon: Double
+    let type: String  // "hometown" or "centroid"
+}
+
+struct WorldMapResponse: Codable {
+    let kingdoms: [WorldMapKingdom]
+    let reference_point: WorldMapReferencePoint?
+    let total_kingdoms_visited: Int
+}
 

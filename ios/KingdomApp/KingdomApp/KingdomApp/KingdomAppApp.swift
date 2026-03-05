@@ -237,6 +237,8 @@ struct AuthenticatedView: View {
     @State private var displayedTravelEvent: TravelEvent?
     @State private var showWeatherToast = false
     @State private var currentWeather: WeatherData?
+    @State private var showWorldMap = false
+    @State private var showWorldMapButton = false
     @State private var showCoupView = false
     @State private var showAchievements = false
     @State private var claimableAchievements: Int = 0
@@ -273,6 +275,7 @@ struct AuthenticatedView: View {
                 kingdomToShow: $kingdomToShow,
                 showCoupView: $showCoupView,
                 showAchievements: $showAchievements,
+                showWorldMap: $showWorldMap,
                 viewModel: viewModel
             ))
             .modifier(EventHandlers(
@@ -386,6 +389,7 @@ struct AuthenticatedView: View {
         serverPromptOverlay
         travelNotificationOverlay
         weatherToastOverlay
+        worldMapButtonOverlay
         // In-app notifications use UIWindow overlay (InAppNotificationManager)
         // so they appear above sheets and all other content
     }
@@ -460,6 +464,10 @@ struct AuthenticatedView: View {
                         onDismiss: {
                             showWeatherToast = false
                             currentWeather = nil
+                            // Show world map button after weather fades
+                            withAnimation(.easeIn(duration: 0.3)) {
+                                showWorldMapButton = true
+                            }
                         }
                     )
                     .padding(.leading, 16)
@@ -470,6 +478,48 @@ struct AuthenticatedView: View {
             }
             .transition(.opacity)
             .zIndex(998)
+        }
+    }
+    
+    @ViewBuilder
+    private var worldMapButtonOverlay: some View {
+        // Show world map button in top left after weather dismisses
+        if showWorldMapButton {
+            VStack {
+                HStack {
+                    Button {
+                        showWorldMap = true
+                    } label: {
+                        ZStack {
+                            // Offset shadow
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.black)
+                                .frame(width: 36, height: 36)
+                                .offset(x: 2, y: 2)
+                            
+                            // Button - parchment background like MapHUD
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(KingdomTheme.Colors.parchmentLight)
+                                .frame(width: 36, height: 36)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                            
+                            Image(systemName: "map.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(KingdomTheme.Colors.buttonPrimary)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.leading, 16)
+                    Spacer()
+                }
+                .padding(.top, 144)
+                Spacer()
+            }
+            .transition(.opacity)
+            .zIndex(997)
         }
     }
     
@@ -541,6 +591,7 @@ private struct SheetModifiers: ViewModifier {
     @Binding var kingdomToShow: Kingdom?
     @Binding var showCoupView: Bool
     @Binding var showAchievements: Bool
+    @Binding var showWorldMap: Bool
     @ObservedObject var viewModel: MapViewModel
     
     func body(content: Content) -> some View {
@@ -625,6 +676,9 @@ private struct SheetModifiers: ViewModifier {
             }
             .sheet(isPresented: $showAchievements) {
                 AchievementDiaryView()
+            }
+            .sheet(isPresented: $showWorldMap) {
+                WorldMapView()
             }
             .fullScreenCover(isPresented: $showCoupView) {
                 // Show battle from current kingdom first, then home kingdom

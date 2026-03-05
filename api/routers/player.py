@@ -1168,3 +1168,114 @@ def get_relocation_status(
         "cooldown_days": cooldown_days
     }
 
+
+# ===== World Map =====
+
+@router.get("/world-map")
+def get_world_map(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all kingdoms the player has visited for the world map view.
+    
+    Returns kingdoms with their geographic data (center, boundary, radius)
+    positioned relative to a reference point (hometown or centroid of all visited).
+    """
+    from db import CityBoundary
+    
+    state = get_or_create_player_state(db, current_user)
+    
+    # Get all kingdoms user has visited (has a UserKingdom record)
+    user_kingdoms = db.query(UserKingdom).filter(
+        UserKingdom.user_id == current_user.id
+    ).all()
+    
+    if not user_kingdoms:
+        return {
+            "kingdoms": [],
+            "reference_point": None,
+            "total_kingdoms_visited": 0
+        }
+    
+    # Get kingdom IDs
+    kingdom_ids = [uk.kingdom_id for uk in user_kingdoms]
+    
+    # Fetch city boundaries for these kingdoms
+    boundaries = db.query(CityBoundary).filter(
+        CityBoundary.osm_id.in_(kingdom_ids)
+    ).all()
+    boundaries_by_id = {b.osm_id: b for b in boundaries}
+    
+    # Fetch kingdom data (names, ruler info)
+    kingdoms_data = db.query(Kingdom).filter(
+        Kingdom.id.in_(kingdom_ids)
+    ).all()
+    kingdoms_by_id = {k.id: k for k in kingdoms_data}
+    
+    # Build response
+    kingdoms_response = []
+    valid_coords = []  # For calculating centroid
+    
+    for uk in user_kingdoms:
+        boundary = boundaries_by_id.get(uk.kingdom_id)
+        kingdom = kingdoms_by_id.get(uk.kingdom_id)
+        
+        if not boundary:
+            # Skip kingdoms without cached boundaries
+            continue
+        
+        # Use simplified boundary if available
+        boundary_coords = []
+        if boundary.simplified_boundary_geojson:
+            boundary_coords = boundary.simplified_boundary_geojson.get("coordinates", [])
+        elif boundary.boundary_geojson:
+            boundary_coords = boundary.boundary_geojson.get("coordinates", [])
+        
+        valid_coords.append((boundary.center_lat, boundary.center_lon))
+        
+        kingdoms_response.append({
+            "id": uk.kingdom_id,
+            "name": kingdom.name if kingdom else boundary.name,
+            "center_lat": boundary.center_lat,
+            "center_lon": boundary.center_lon,
+            "radius_meters": boundary.radius_meters,
+            "boundary": boundary_coords,
+            "first_visited": format_datetime_iso(uk.first_visited) if uk.first_visited else None,
+            "last_visited": format_datetime_iso(uk.last_checkin) if uk.last_checkin else None,
+            "checkins_count": uk.checkins_count,
+            "reputation": int(uk.local_reputation),
+            "is_hometown": uk.kingdom_id == state.hometown_kingdom_id,
+            "is_current": uk.kingdom_id == state.current_kingdom_id,
+            "is_ruled": kingdom.ruler_id == current_user.id if kingdom else False,
+        })
+    
+    # Calculate reference point
+    # Prefer hometown if available, otherwise use centroid of all visited
+    reference_point = None
+    if state.hometown_kingdom_id and state.hometown_kingdom_id in boundaries_by_id:
+        hometown_boundary = boundaries_by_id[state.hometown_kingdom_id]
+        reference_point = {
+            "lat": hometown_boundary.center_lat,
+            "lon": hometown_boundary.center_lon,
+            "type": "hometown"
+        }
+    elif valid_coords:
+        # Calculate centroid
+        avg_lat = sum(c[0] for c in valid_coords) / len(valid_coords)
+        avg_lon = sum(c[1] for c in valid_coords) / len(valid_coords)
+        reference_point = {
+            "lat": avg_lat,
+            "lon": avg_lon,
+            "type": "centroid"
+        }
+    
+    # Sort by most recently visited
+    kingdoms_response.sort(key=lambda k: k["last_visited"] or "", reverse=True)
+    
+    return {
+        "kingdoms": kingdoms_response,
+        "reference_point": reference_point,
+        "total_kingdoms_visited": len(kingdoms_response)
+    }
+

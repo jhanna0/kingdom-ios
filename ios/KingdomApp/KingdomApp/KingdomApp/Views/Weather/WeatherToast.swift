@@ -64,7 +64,6 @@ struct WeatherToast: View {
         
         VStack {
             HStack {
-                Spacer()
                 WeatherToast(
                     weather: WeatherData(
                         condition: "clear",
@@ -75,7 +74,8 @@ struct WeatherToast: View {
                     ),
                     onDismiss: {}
                 )
-                .padding(.trailing, 16)
+                .padding(.leading, 16)
+                Spacer()
             }
             .padding(.top, 160)
             

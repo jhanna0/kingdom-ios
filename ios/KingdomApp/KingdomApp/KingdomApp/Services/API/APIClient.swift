@@ -263,9 +263,9 @@ class APIClient: ObservableObject {
                 throw APIError.serverError("HTTP \(httpResponse.statusCode)")
             }
             
-            // Debug: Print raw response (skip cities endpoint due to large boundary data)
+            // Debug: Print raw response (skip endpoints with large boundary data)
             let path = request.url?.path ?? "unknown"
-            if !path.contains("/cities") {
+            if !path.contains("/cities") && !path.contains("/world-map") {
                 if let jsonString = String(data: data, encoding: .utf8) {
                     print("📥 API Response (\(path)):")
                     print(jsonString)
