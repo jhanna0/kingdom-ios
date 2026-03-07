@@ -33,6 +33,43 @@ struct TreasuryLocationOption: Codable, Identifiable, Hashable {
     let balance: Int
 }
 
+struct EmpireBuildingData: Codable, Identifiable, Hashable {
+    var id: String { type }
+    let type: String
+    let displayName: String
+    let icon: String
+    let colorHex: String
+    let category: String
+    let level: Int
+    let maxLevel: Int
+    let upgradeCostGold: Int?
+    let upgradeCostActions: Int?
+    let tierBenefit: String
+    let nextTierBenefit: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case displayName = "display_name"
+        case icon
+        case colorHex = "color_hex"
+        case category
+        case level
+        case maxLevel = "max_level"
+        case upgradeCostGold = "upgrade_cost_gold"
+        case upgradeCostActions = "upgrade_cost_actions"
+        case tierBenefit = "tier_benefit"
+        case nextTierBenefit = "next_tier_benefit"
+    }
+    
+    var swiftColor: Color {
+        Color(hex: colorHex) ?? KingdomTheme.Colors.inkMedium
+    }
+    
+    var isMaxLevel: Bool {
+        level >= maxLevel
+    }
+}
+
 struct EmpireKingdomSummary: Codable, Identifiable {
     let id: String
     let name: String
@@ -44,6 +81,7 @@ struct EmpireKingdomSummary: Codable, Identifiable {
     let vaultLevel: Int
     let isCapital: Bool
     let rulerStartedAt: String?
+    let buildings: [EmpireBuildingData]
     let treasuryFromOptions: [TreasuryLocationOption]
     let treasuryToOptions: [TreasuryLocationOption]
     
@@ -57,6 +95,7 @@ struct EmpireKingdomSummary: Codable, Identifiable {
         case vaultLevel = "vault_level"
         case isCapital = "is_capital"
         case rulerStartedAt = "ruler_started_at"
+        case buildings
         case treasuryFromOptions = "treasury_from_options"
         case treasuryToOptions = "treasury_to_options"
     }
@@ -421,5 +460,67 @@ extension APIClient {
         let request = try self.request(endpoint: "/empire/kingdoms/\(kingdomId)/treasury/deposit", method: "POST", body: body)
         let response: TreasuryDepositResponse = try await execute(request)
         return response
+    }
+    
+    // MARK: - Contract Operations (for Empire flow)
+    
+    /// Get all available contracts
+    func getAvailableContracts() async throws -> [Contract] {
+        let request = self.request(endpoint: "/contracts", method: "GET")
+        let apiContracts: [APIContract] = try await execute(request)
+        
+        return apiContracts.compactMap { apiContract in
+            let perActionCosts = apiContract.per_action_costs?.map { apiCost in
+                ContractPerActionCost(
+                    resource: apiCost.resource,
+                    amount: apiCost.amount,
+                    displayName: apiCost.display_name,
+                    icon: apiCost.icon,
+                    color: apiCost.color,
+                    canAfford: apiCost.can_afford
+                )
+            }
+            
+            return Contract(
+                id: apiContract.id,
+                kingdomId: apiContract.kingdom_id,
+                kingdomName: apiContract.kingdom_name,
+                buildingType: apiContract.building_type,
+                buildingLevel: apiContract.building_level,
+                buildingBenefit: apiContract.building_benefit,
+                buildingIcon: apiContract.building_icon,
+                buildingDisplayName: apiContract.building_display_name,
+                basePopulation: apiContract.base_population,
+                baseHoursRequired: apiContract.base_hours_required,
+                workStartedAt: apiContract.work_started_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                totalActionsRequired: apiContract.total_actions_required,
+                actionsCompleted: apiContract.actions_completed,
+                actionContributions: apiContract.action_contributions,
+                constructionCost: apiContract.construction_cost ?? 0,
+                rewardPool: apiContract.reward_pool,
+                actionReward: apiContract.action_reward,
+                perActionCosts: perActionCosts,
+                canAfford: apiContract.can_afford,
+                endpoint: apiContract.endpoint,
+                createdBy: apiContract.created_by,
+                createdAt: ISO8601DateFormatter().date(from: apiContract.created_at) ?? Date(),
+                completedAt: apiContract.completed_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+                status: Contract.ContractStatus(rawValue: apiContract.status) ?? .open
+            )
+        }
+    }
+    
+    /// Create a contract (for Empire flow - simplified params)
+    func createContract(kingdomId: String, buildingType: String, actionReward: Int) async throws -> APIContract {
+        let body = ContractCreateRequest(
+            kingdom_id: kingdomId,
+            kingdom_name: "",  // Backend will fill this
+            building_type: buildingType,
+            building_level: 0,  // Backend will calculate
+            action_reward: actionReward,
+            base_population: 0  // Backend will calculate
+        )
+        let request = try self.request(endpoint: "/contracts", method: "POST", body: body)
+        return try await execute(request)
     }
 }

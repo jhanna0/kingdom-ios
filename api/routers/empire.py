@@ -26,6 +26,7 @@ from services.kingdom_service import get_active_citizens_batch
 from schemas.empire import (
     EmpireOverviewResponse,
     EmpireKingdomSummary,
+    EmpireBuildingData,
     ActiveWarSummary,
     AllianceSummary,
     TransferFundsRequest,
@@ -40,6 +41,8 @@ from schemas.empire import (
     SectionConfig,
     TreasuryLocationOption,
 )
+from routers.tiers import BUILDING_TYPES
+from db.models.kingdom_building import KingdomBuilding
 
 
 router = APIRouter(prefix="/empire", tags=["empire"])
@@ -268,6 +271,78 @@ def _get_ruled_kingdoms(db: Session, user: User) -> list[Kingdom]:
     return db.query(Kingdom).filter(Kingdom.ruler_id == user.id).all()
 
 
+def _get_kingdom_buildings(db: Session, kingdom: Kingdom, active_citizens_count: int) -> list[EmpireBuildingData]:
+    """
+    Get building data for a kingdom for empire management.
+    Simplified version of city_service.build_buildings_array - just what's needed for management UI.
+    """
+    from services.kingdom_service import calculate_actions_required, calculate_construction_cost
+    
+    # Load all buildings for this kingdom
+    kingdom_buildings_rows = db.query(KingdomBuilding).filter(
+        KingdomBuilding.kingdom_id == kingdom.id
+    ).all()
+    building_levels_map = {b.building_type: b.level for b in kingdom_buildings_rows}
+    
+    # Color mapping for building categories
+    CATEGORY_COLORS = {
+        "defense": "#6B7280",  # Gray
+        "economy": "#D97706",  # Amber
+        "civic": "#7C3AED",    # Purple
+    }
+    
+    buildings = []
+    for building_type, building_meta in BUILDING_TYPES.items():
+        # Get level from new table or fallback to old column
+        level = building_levels_map.get(building_type)
+        if level is None:
+            level_attr = f"{building_type}_level"
+            level = getattr(kingdom, level_attr, 0)
+        
+        max_level = building_meta["max_tier"]
+        category = building_meta.get("category", "economy")
+        
+        # Get tier info
+        tiers_data = building_meta.get("tiers", {})
+        current_tier_data = tiers_data.get(level, tiers_data.get(1, {}))
+        tier_benefit = current_tier_data.get("benefit", "")
+        
+        # Get next tier benefit if not at max
+        next_tier_benefit = None
+        upgrade_cost_gold = None
+        upgrade_cost_actions = None
+        if level < max_level:
+            next_level = level + 1
+            next_tier_data = tiers_data.get(next_level, {})
+            next_tier_benefit = next_tier_data.get("benefit", f"Level {next_level}")
+            
+            # Calculate upgrade costs
+            farm_level = kingdom.farm_level if hasattr(kingdom, 'farm_level') else 0
+            upgrade_cost_actions = calculate_actions_required(
+                building_meta["display_name"], next_level, active_citizens_count, farm_level
+            )
+            upgrade_cost_gold = calculate_construction_cost(next_level, active_citizens_count)
+        
+        buildings.append(EmpireBuildingData(
+            type=building_type,
+            display_name=building_meta["display_name"],
+            icon=building_meta["icon"],
+            color_hex=CATEGORY_COLORS.get(category, "#6B7280"),
+            category=category,
+            level=level,
+            max_level=max_level,
+            upgrade_cost_gold=upgrade_cost_gold,
+            upgrade_cost_actions=upgrade_cost_actions,
+            tier_benefit=tier_benefit if level > 0 else "Not built",
+            next_tier_benefit=next_tier_benefit,
+        ))
+    
+    # Sort by sort_order
+    buildings.sort(key=lambda b: BUILDING_TYPES.get(b.type, {}).get("sort_order", 999))
+    
+    return buildings
+
+
 def _get_empire_kingdoms(db: Session, empire_id: str) -> list[Kingdom]:
     """Get all kingdoms belonging to an empire"""
     return db.query(Kingdom).filter(
@@ -469,17 +544,22 @@ async def get_my_empire(
                         balance=int(other.treasury_gold or 0),
                     ))
         
+        # Get building data for this kingdom
+        active_citizens = active_citizens_map.get(k.id, 0)
+        buildings = _get_kingdom_buildings(db, k, active_citizens)
+        
         kingdom_summaries.append(EmpireKingdomSummary(
             id=k.id,
             name=k.name,
             treasury_gold=int(k.treasury_gold or 0),
             tax_rate=k.tax_rate or 10,
             travel_fee=k.travel_fee or 10,
-            checked_in_players=active_citizens_map.get(k.id, 0),  # Use active citizens (last 7 days)
+            checked_in_players=active_citizens,
             wall_level=k.get_building_level("wall") or k.wall_level or 0,
             vault_level=k.get_building_level("vault") or k.vault_level or 0,
             is_capital=(k.id == empire_id),
             ruler_started_at=k.ruler_started_at,
+            buildings=buildings,
             treasury_from_options=from_options,
             treasury_to_options=to_options,
         ))

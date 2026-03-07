@@ -601,8 +601,7 @@ private struct SheetModifiers: ViewModifier {
                 Task { await viewModel.refreshPlayerFromBackend() }
             }) {
                 MyEmpireView(
-                    player: viewModel.player,
-                    viewModel: viewModel
+                    player: viewModel.player
                 )
             }
             .sheet(isPresented: $showActions, onDismiss: {

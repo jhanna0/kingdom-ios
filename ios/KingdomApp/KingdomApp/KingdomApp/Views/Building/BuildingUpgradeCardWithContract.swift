@@ -9,17 +9,13 @@ struct BuildingUpgradeCardWithContract: View {
     let benefit: String
     let hasActiveContract: Bool
     let hasAnyActiveContract: Bool  // Kingdom has ANY active contract
-    let kingdom: Kingdom
-    let upgradeCost: BuildingUpgradeCost?  // From backend
+    let treasuryGold: Int  // Just the treasury amount, not the whole Kingdom
+    let actionsRequired: Int  // From EmpireBuildingData.upgradeCostActions
     let iconColor: Color  // Color for the icon badge
     let onCreateContract: () -> Void
     
     var isMaxLevel: Bool {
         currentLevel >= maxLevel
-    }
-    
-    private var actionsRequired: Int {
-        return upgradeCost?.actionsRequired ?? 0
     }
     
     var body: some View {
@@ -206,7 +202,7 @@ struct BuildingUpgradeCardWithContract: View {
                                     Image(systemName: "building.columns.fill")
                                         .font(FontStyles.iconMini)
                                         .foregroundColor(KingdomTheme.Colors.imperialGold)
-                                    Text("\(kingdom.treasuryGold)g")
+                                    Text("\(treasuryGold)g")
                                         .font(FontStyles.bodyLargeBold)
                                         .foregroundColor(KingdomTheme.Colors.inkDark)
                                 }
@@ -270,31 +266,16 @@ struct BuildingUpgradeCardWithContract: View {
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
     }
     
-    // FULLY DYNAMIC - Get benefit for a specific level from backend
+    // Get benefit for a specific level - use TierManager as fallback
     private func getBenefitForLevel(_ level: Int) -> String {
-        guard let meta = kingdom.getBuildingMetadata(buildingType),
-              let tierInfo = meta.allTiers.first(where: { $0.tier == level }) else {
-            return "Level \(level)"
-        }
-        return tierInfo.benefit
+        return TierManager.shared.buildingTierBenefit(buildingType, tier: level)
     }
     
-    // FULLY DYNAMIC - Get detailed benefits for all levels from backend
+    // Get detailed benefits for all levels - use TierManager
     private func getDetailedBenefitsForBuilding() -> ((Int) -> [String])? {
-        guard let meta = kingdom.getBuildingMetadata(buildingType) else {
-            return nil
-        }
-        
         return { level in
-            guard let tierInfo = meta.allTiers.first(where: { $0.tier == level }) else {
-                return ["Level \(level)"]
-            }
-            
-            var benefits = [tierInfo.benefit]
-            if !tierInfo.tierDescription.isEmpty && tierInfo.tierDescription != tierInfo.benefit {
-                benefits.append(tierInfo.tierDescription)
-            }
-            return benefits
+            let benefit = TierManager.shared.buildingTierBenefit(self.buildingType, tier: level)
+            return [benefit]
         }
     }
 }

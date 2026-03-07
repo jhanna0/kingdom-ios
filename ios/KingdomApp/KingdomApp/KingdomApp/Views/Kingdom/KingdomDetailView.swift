@@ -7,7 +7,6 @@ struct KingdomDetailView: View {
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
     
-    @State private var decreeText = ""
     @State private var weather: WeatherData?
     
     // Get the live kingdom from viewModel
@@ -105,101 +104,6 @@ struct KingdomDetailView: View {
                     }
                 }
                 
-                // Kingdom Management (Ruler only) - Moved to top
-                if isRuler {
-                    Rectangle()
-                        .fill(Color.black)
-                        .frame(height: 2)
-                        .padding(.horizontal)
-                    
-                    VStack(spacing: KingdomTheme.Spacing.medium) {
-                        Text("Kingdom Management")
-                            .font(FontStyles.headingMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        NavigationLink(destination: BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "hammer.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalPurple, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Manage Buildings")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Upgrade economy & defenses")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                        
-                        NavigationLink(destination: TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "percent")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Set Tax Rate")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Current: \(kingdom.taxRate)%")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                        
-                        NavigationLink(destination: DecreeInputView(kingdom: kingdom, decreeText: $decreeText)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "scroll.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Make Decree")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Announce to all subjects")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    }
-                    .padding(.horizontal)
-                }
             }
             .padding(.top)
         }

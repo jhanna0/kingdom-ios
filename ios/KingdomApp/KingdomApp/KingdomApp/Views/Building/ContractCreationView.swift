@@ -1,9 +1,8 @@
 import SwiftUI
 
 struct ContractCreationView: View {
-    let kingdom: Kingdom
-    let buildingType: String  // FULLY DYNAMIC - just a string from backend
-    @ObservedObject var viewModel: MapViewModel
+    let kingdom: EmpireKingdomSummary
+    let building: EmpireBuildingData
     let onSuccess: (String) -> Void
     @Environment(\.dismiss) var dismiss
     
@@ -13,21 +12,11 @@ struct ContractCreationView: View {
     @State private var actionReward: Int = 0
     
     private var buildingName: String {
-        // FULLY DYNAMIC - Get from kingdom metadata
-        if let meta = kingdom.getBuildingMetadata(buildingType) {
-            return meta.displayName
-        }
-        return buildingType.capitalized
+        building.displayName
     }
     
     private var currentLevel: Int {
-        // BACKEND IS SOURCE OF TRUTH - dynamic dictionary
-        return kingdom.buildingLevel(buildingType)
-    }
-    
-    private var upgradeCost: BuildingUpgradeCost? {
-        // BACKEND IS SOURCE OF TRUTH - dynamic dictionary
-        return kingdom.upgradeCost(buildingType)
+        building.level
     }
     
     private var nextLevel: Int {
@@ -35,7 +24,7 @@ struct ContractCreationView: View {
     }
     
     private var actionsRequired: Int {
-        return upgradeCost?.actionsRequired ?? 0
+        building.upgradeCostActions ?? 0
     }
     
     // Upfront cost = actions_required × action_reward (ruler pays this)
@@ -251,13 +240,14 @@ struct ContractCreationView: View {
         
         isCreating = true
         
-        // Call the create contract method asynchronously
         Task {
             do {
-                // FULLY DYNAMIC - pass string directly with ruler-set action_reward
-                _ = try await viewModel.createContract(kingdom: kingdom, buildingType: buildingType, actionReward: actionReward)
+                _ = try await APIClient.shared.createContract(
+                    kingdomId: kingdom.id,
+                    buildingType: building.type,
+                    actionReward: actionReward
+                )
                 
-                // Success! Dismiss and call success handler
                 await MainActor.run {
                     dismiss()
                     onSuccess(buildingName)

@@ -4,7 +4,6 @@ import SwiftUI
 /// All icons, colors, labels come from backend config
 struct MyEmpireView: View {
     @ObservedObject var player: Player
-    @ObservedObject var viewModel: MapViewModel
     @State private var empireData: EmpireOverviewResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -457,7 +456,11 @@ struct MyEmpireView: View {
             }
             .buttonStyle(PlainButtonStyle())
         case "manage":
-            NavigationLink(destination: KingdomDetailView(kingdomId: kingdom.id, player: player, viewModel: viewModel)) {
+            NavigationLink(destination: BuildMenuView(
+                kingdom: kingdom,
+                player: player,
+                onRefresh: { await loadEmpireData() }
+            )) {
                 actionButtonContent(action: action)
             }
             .buttonStyle(PlainButtonStyle())

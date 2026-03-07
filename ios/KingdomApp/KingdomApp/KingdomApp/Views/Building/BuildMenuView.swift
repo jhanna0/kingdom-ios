@@ -1,26 +1,25 @@
 import SwiftUI
 
 // Build Menu View - Brutalist Style
-// NOW DYNAMIC - Building types come from TierManager!
+// Uses EmpireKingdomSummary from empire API (not Kingdom from map)
 struct BuildMenuView: View {
-    let kingdom: Kingdom
+    let kingdom: EmpireKingdomSummary
     @ObservedObject var player: Player
-    @ObservedObject var viewModel: MapViewModel
+    let onRefresh: () async -> Void
     @Environment(\.dismiss) var dismiss
     private let tierManager = TierManager.shared
-    @State private var selectedBuildingTypeString: String?
+    @State private var selectedBuilding: EmpireBuildingData?
+    @State private var availableContracts: [Contract] = []
+    @State private var isLoadingContracts = false
     
-    // FULLY DYNAMIC - Group buildings by whatever categories backend provides!
-    private var buildingsByCategory: [(category: String, buildings: [String])] {
-        // Get all unique categories from metadata
-        let categories = Set(kingdom.buildingMetadata.values.map { $0.category })
+    // Group buildings by category from EmpireKingdomSummary.buildings
+    private var buildingsByCategory: [(category: String, buildings: [EmpireBuildingData])] {
+        let categories = Set(kingdom.buildings.map { $0.category })
         
-        // Group buildings by category
         return categories.sorted().map { category in
-            let buildings = kingdom.buildingMetadata.values
+            let buildings = kingdom.buildings
                 .filter { $0.category == category }
-                .map { $0.type }
-                .sorted()
+                .sorted { $0.type < $1.type }
             return (category: category, buildings: buildings)
         }
     }
@@ -35,13 +34,13 @@ struct BuildMenuView: View {
                     // Header with treasury
                     treasuryHeader
                     
-                    // FULLY DYNAMIC - Render whatever categories backend provides!
+                    // Render buildings by category
                     ForEach(buildingsByCategory, id: \.category) { categoryData in
                         if !categoryData.buildings.isEmpty {
                             sectionDivider(title: categoryData.category.capitalized)
                             
-                            ForEach(categoryData.buildings, id: \.self) { buildingType in
-                                buildingCard(for: buildingType)
+                            ForEach(categoryData.buildings) { building in
+                                buildingCard(for: building)
                             }
                         }
                     }
@@ -55,54 +54,55 @@ struct BuildMenuView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .task {
-            // Load contracts when view appears so we can check for active contracts
-            await viewModel.loadContracts()
+            await loadContracts()
         }
-        .navigationDestination(item: $selectedBuildingTypeString) { buildingType in
+        .navigationDestination(item: $selectedBuilding) { building in
             ContractCreationView(
                 kingdom: kingdom,
-                buildingType: buildingType,  // FULLY DYNAMIC - pass string directly
-                viewModel: viewModel,
+                building: building,
                 onSuccess: { buildingName in
-                    selectedBuildingTypeString = nil
+                    selectedBuilding = nil
                     Task {
-                        await viewModel.loadContracts()
+                        await loadContracts()
+                        await onRefresh()
                     }
                 }
             )
         }
     }
     
-    // MARK: - Dynamic Building Card
+    private func loadContracts() async {
+        isLoadingContracts = true
+        do {
+            availableContracts = try await APIClient.shared.getAvailableContracts()
+        } catch {
+            print("Failed to load contracts: \(error)")
+        }
+        isLoadingContracts = false
+    }
+    
+    // MARK: - Building Card
     
     @ViewBuilder
-    private func buildingCard(for buildingType: String) -> some View {
-        // FULLY DYNAMIC - Get metadata from kingdom (populated from backend)
-        if let metadata = kingdom.getBuildingMetadata(buildingType) {
-            let level = kingdom.buildingLevel(buildingType)
-            let nextLevel = level + 1
-            
-            BuildingUpgradeCardWithContract(
-                icon: metadata.icon,
-                name: metadata.displayName,
-                buildingType: buildingType,
-                currentLevel: level,
-                maxLevel: metadata.maxLevel,
-                benefit: tierManager.buildingTierBenefit(buildingType, tier: nextLevel),
-                hasActiveContract: hasActiveContractForBuilding(kingdom: kingdom, buildingType: buildingType),  // Use key, not displayName
-                hasAnyActiveContract: hasAnyActiveContract(kingdom: kingdom),
-                kingdom: kingdom,
-                upgradeCost: kingdom.upgradeCost(buildingType),
-                iconColor: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium,
-                onCreateContract: {
-                    selectedBuildingTypeString = buildingType
-                }
-            )
-        } else {
-            // Should never happen if backend is working properly
-            Text("Building data unavailable")
-                .foregroundColor(.red)
-        }
+    private func buildingCard(for building: EmpireBuildingData) -> some View {
+        let nextLevel = building.level + 1
+        
+        BuildingUpgradeCardWithContract(
+            icon: building.icon,
+            name: building.displayName,
+            buildingType: building.type,
+            currentLevel: building.level,
+            maxLevel: building.maxLevel,
+            benefit: building.nextTierBenefit ?? tierManager.buildingTierBenefit(building.type, tier: nextLevel),
+            hasActiveContract: hasActiveContractForBuilding(buildingType: building.type),
+            hasAnyActiveContract: hasAnyActiveContract(),
+            treasuryGold: kingdom.treasuryGold,
+            actionsRequired: building.upgradeCostActions ?? 0,
+            iconColor: building.swiftColor,
+            onCreateContract: {
+                selectedBuilding = building
+            }
+        )
     }
     
     // MARK: - Treasury Header
@@ -132,10 +132,8 @@ struct BuildMenuView: View {
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkLight)
                 
-                // FULLY DYNAMIC - calculate from kingdom metadata or fallback
-                let allBuildingTypes = kingdom.allBuildingTypes()
-                let totalLevels = allBuildingTypes.reduce(0) { $0 + kingdom.buildingLevel($1) }
-                let maxPossibleLevels = allBuildingTypes.count * 5  // Dynamic count x 5 levels
+                let totalLevels = kingdom.buildings.reduce(0) { $0 + $1.level }
+                let maxPossibleLevels = kingdom.buildings.reduce(0) { $0 + $1.maxLevel }
                 Text("\(totalLevels)/\(maxPossibleLevels)")
                     .font(FontStyles.headingMedium)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
@@ -165,10 +163,8 @@ struct BuildMenuView: View {
     }
     
     /// Check if kingdom has an active contract for a specific building type
-    /// Checks ALL contracts, not just kingdom.activeContract (since we can have multiple in DB before fix)
-    private func hasActiveContractForBuilding(kingdom: Kingdom, buildingType: String) -> Bool {
-        // Check all available contracts for this kingdom
-        return viewModel.availableContracts.contains { contract in
+    private func hasActiveContractForBuilding(buildingType: String) -> Bool {
+        return availableContracts.contains { contract in
             contract.kingdomId == kingdom.id &&
             contract.buildingType == buildingType &&
             (contract.status == .open || contract.status == .inProgress)
@@ -176,8 +172,8 @@ struct BuildMenuView: View {
     }
     
     /// Check if kingdom has ANY active contract (for blocking new contract creation)
-    private func hasAnyActiveContract(kingdom: Kingdom) -> Bool {
-        return viewModel.availableContracts.contains { contract in
+    private func hasAnyActiveContract() -> Bool {
+        return availableContracts.contains { contract in
             contract.kingdomId == kingdom.id &&
             (contract.status == .open || contract.status == .inProgress)
         }

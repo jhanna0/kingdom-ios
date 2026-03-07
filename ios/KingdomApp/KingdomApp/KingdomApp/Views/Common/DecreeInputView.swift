@@ -1,13 +1,36 @@
 import SwiftUI
 
+/// Decree input view for rulers to announce decrees
+/// Supports two flows:
+/// 1. Map flow: init(kingdom:decreeText:) - uses Kingdom object
+/// 2. Empire flow: init(kingdomId:kingdomName:decreeText:) - uses simple params
 struct DecreeInputView: View {
-    let kingdom: Kingdom
+    // Core data (used by both flows)
+    private let kingdomId: String
+    private let kingdomName: String
     @Binding var decreeText: String
+    
     @Environment(\.dismiss) var dismiss
     
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var showSuccess = false
+    
+    // MARK: - Initializers
+    
+    /// Map flow initializer - uses Kingdom object
+    init(kingdom: Kingdom, decreeText: Binding<String>) {
+        self.kingdomId = kingdom.id
+        self.kingdomName = kingdom.name
+        self._decreeText = decreeText
+    }
+    
+    /// Empire flow initializer - uses simple params
+    init(kingdomId: String, kingdomName: String, decreeText: Binding<String>) {
+        self.kingdomId = kingdomId
+        self.kingdomName = kingdomName
+        self._decreeText = decreeText
+    }
     
     var body: some View {
         ZStack {
@@ -28,7 +51,7 @@ struct DecreeInputView: View {
                             .font(FontStyles.headingLarge)
                             .foregroundColor(KingdomTheme.Colors.inkDark)
                         
-                        Text("Announce your will to all subjects of \(kingdom.name)")
+                        Text("Announce your will to all subjects of \(kingdomName)")
                             .font(FontStyles.bodyMedium)
                             .foregroundColor(KingdomTheme.Colors.inkMedium)
                             .multilineTextAlignment(.center)
@@ -135,7 +158,7 @@ struct DecreeInputView: View {
                 dismiss()
             }
         } message: {
-            Text("Your decree has been announced to all subjects of \(kingdom.name).")
+            Text("Your decree has been announced to all subjects of \(kingdomName).")
         }
     }
     
@@ -146,7 +169,7 @@ struct DecreeInputView: View {
         
         do {
             let response = try await KingdomAPIService.shared.kingdom.makeDecree(
-                kingdomId: kingdom.id,
+                kingdomId: kingdomId,
                 decreeText: decreeText
             )
             

@@ -5,7 +5,7 @@ SERVER-DRIVEN UI: All display metadata comes from backend.
 Frontend renders dynamically based on these configs.
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -40,6 +40,21 @@ class TreasuryLocationOption(BaseModel):
     label: str
     icon: str
     balance: int
+
+
+class EmpireBuildingData(BaseModel):
+    """Building data for empire management"""
+    type: str
+    display_name: str
+    icon: str
+    color_hex: str
+    category: str
+    level: int
+    max_level: int
+    upgrade_cost_gold: Optional[int] = None
+    upgrade_cost_actions: Optional[int] = None
+    tier_benefit: str
+    next_tier_benefit: Optional[str] = None
 
 
 class SectionConfig(BaseModel):
@@ -118,6 +133,7 @@ class EmpireKingdomSummary(BaseModel):
     vault_level: int
     is_capital: bool  # True if this is the empire capital (original kingdom)
     ruler_started_at: Optional[datetime] = None
+    buildings: List[EmpireBuildingData] = []  # All buildings with upgrade info
     
     # Treasury management options - backend decides what's available
     treasury_from_options: List[TreasuryLocationOption] = []

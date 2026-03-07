@@ -73,6 +73,7 @@ from .alliance import (
 from .empire import (
     EmpireOverviewResponse,
     EmpireKingdomSummary,
+    EmpireBuildingData,
     ActiveWarSummary,
     AllianceSummary,
     TransferFundsRequest,
@@ -165,6 +166,7 @@ __all__ = [
     # Empire
     "EmpireOverviewResponse",
     "EmpireKingdomSummary",
+    "EmpireBuildingData",
     "ActiveWarSummary",
     "AllianceSummary",
     "TransferFundsRequest",

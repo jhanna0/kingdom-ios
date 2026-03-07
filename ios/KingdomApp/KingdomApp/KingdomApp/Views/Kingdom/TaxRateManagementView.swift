@@ -1,14 +1,46 @@
 import SwiftUI
 
 /// Full-page view for rulers to manage kingdom tax rate
+/// Supports two flows:
+/// 1. Map flow: init(kingdom:viewModel:) - uses Kingdom object and MapViewModel
+/// 2. Empire flow: init(kingdomId:kingdomName:currentTaxRate:onSave:) - uses simple params and API directly
 struct TaxRateManagementView: View {
-    let kingdom: Kingdom
-    @ObservedObject var viewModel: MapViewModel
+    // Core data (used by both flows)
+    private let kingdomId: String
+    private let kingdomName: String
+    private let initialTaxRate: Int
+    
+    // Map flow dependencies (optional)
+    private var viewModel: MapViewModel?
+    
+    // Empire flow callback (optional)
+    private var onSave: ((Int) -> Void)?
+    
     @Environment(\.dismiss) var dismiss
     
-    // Local state for tax rate
+    // Local state
     @State private var currentTaxRate: Int = 0
     @State private var isSaving = false
+    
+    // MARK: - Initializers
+    
+    /// Map flow initializer - uses Kingdom object and MapViewModel
+    init(kingdom: Kingdom, viewModel: MapViewModel) {
+        self.kingdomId = kingdom.id
+        self.kingdomName = kingdom.name
+        self.initialTaxRate = kingdom.taxRate
+        self.viewModel = viewModel
+        self.onSave = nil
+    }
+    
+    /// Empire flow initializer - uses simple params and callback
+    init(kingdomId: String, kingdomName: String, currentTaxRate: Int, onSave: @escaping (Int) -> Void) {
+        self.kingdomId = kingdomId
+        self.kingdomName = kingdomName
+        self.initialTaxRate = currentTaxRate
+        self.viewModel = nil
+        self.onSave = onSave
+    }
     
     var body: some View {
         ScrollView {
@@ -102,8 +134,8 @@ struct TaxRateManagementView: View {
                     .foregroundColor(.white)
                 }
                 .brutalistBadge(backgroundColor: KingdomTheme.Colors.buttonSuccess, cornerRadius: 12)
-                .disabled(isSaving || currentTaxRate == kingdom.taxRate)
-                .opacity(currentTaxRate == kingdom.taxRate ? 0.5 : 1.0)
+                .disabled(isSaving || currentTaxRate == initialTaxRate)
+                .opacity(currentTaxRate == initialTaxRate ? 0.5 : 1.0)
                 .padding(.horizontal)
                 
                 // Divider
@@ -179,7 +211,7 @@ struct TaxRateManagementView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
         .onAppear {
-            currentTaxRate = kingdom.taxRate
+            currentTaxRate = initialTaxRate
         }
     }
     
@@ -219,14 +251,36 @@ struct TaxRateManagementView: View {
     
     private func saveTaxRate() {
         isSaving = true
-        viewModel.setKingdomTaxRate(currentTaxRate, for: kingdom.id)
         
-        // Simulate a brief delay for the save operation
-        Task {
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            await MainActor.run {
-                isSaving = false
-                dismiss()
+        // Use appropriate save method based on which flow we're in
+        if let viewModel = viewModel {
+            // Map flow - use viewModel
+            viewModel.setKingdomTaxRate(currentTaxRate, for: kingdomId)
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                await MainActor.run {
+                    isSaving = false
+                    dismiss()
+                }
+            }
+        } else {
+            // Empire flow - call API directly
+            Task {
+                do {
+                    try await KingdomAPIService.shared.kingdom.setTaxRate(
+                        kingdomId: kingdomId,
+                        taxRate: currentTaxRate
+                    )
+                    await MainActor.run {
+                        isSaving = false
+                        onSave?(currentTaxRate)
+                        dismiss()
+                    }
+                } catch {
+                    await MainActor.run {
+                        isSaving = false
+                    }
+                }
             }
         }
     }
