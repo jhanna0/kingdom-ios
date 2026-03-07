@@ -13,7 +13,7 @@ from routers.auth import get_current_user
 from routers.property import get_tier_name  # Import tier name helper
 from routers.notifications.alliances import get_pending_alliance_requests
 from routers.alliances import are_empires_allied
-from .utils import check_cooldown_from_table, calculate_cooldown, calculate_training_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
+from .utils import check_cooldown_from_table, calculate_cooldown, calculate_training_cooldown, calculate_crafting_cooldown, check_global_action_cooldown_from_table, is_patrolling, format_datetime_iso, get_player_food_total
 from .training import TRAINING_TYPES
 from routers.tiers import get_total_skill_points, SKILL_TYPES, calculate_food_cost, calculate_training_gold_per_action, calculate_training_actions, get_all_skill_values
 
@@ -32,6 +32,7 @@ from .constants import (
     FARM_GOLD_REWARD,
     SABOTAGE_COOLDOWN,
     TRAINING_COOLDOWN,
+    CRAFTING_BASE_COOLDOWN,
     PATROL_REPUTATION_REWARD,
     SCOUT_COOLDOWN,
 )
@@ -337,6 +338,8 @@ def get_action_status(
     farm_cooldown = FARM_COOLDOWN
     # Science skill reduces training cooldowns
     training_cooldown = calculate_training_cooldown(TRAINING_COOLDOWN, state.science or 1)
+    # Crafting uses fixed cooldown (not affected by skills)
+    crafting_cooldown = calculate_crafting_cooldown(CRAFTING_BASE_COOLDOWN)
     
     # Count active patrollers in current kingdom
     active_patrollers = 0
@@ -451,7 +454,7 @@ def get_action_status(
         "farm": farm_cooldown,
         "patrol": patrol_cooldown,
         "training": training_cooldown,
-        "crafting": work_cooldown,  # Uses building skill
+        "crafting": crafting_cooldown,  # Fixed 90 minutes - not affected by skills
         "scout": SCOUT_COOLDOWN,  # 30 minutes from scout.py
     }
     
@@ -615,10 +618,10 @@ def get_action_status(
         "display_order": 10
     }
     
-    crafting_food_cost = calculate_food_cost(work_cooldown)  # Uses building skill cooldown
+    crafting_food_cost = calculate_food_cost(crafting_cooldown)
     actions["crafting"] = {
-        **check_cooldown_from_table(db, current_user.id, "crafting", work_cooldown),
-        "cooldown_minutes": work_cooldown,
+        **check_cooldown_from_table(db, current_user.id, "crafting", crafting_cooldown),
+        "cooldown_minutes": crafting_cooldown,
         "food_cost": crafting_food_cost,
         "can_afford_food": player_food_total >= crafting_food_cost,
         "unlocked": True,

@@ -126,6 +126,11 @@ class NotificationManager {
             return "You are no longer on patrol"
         }
         
+        // Handle "Workshop" specially
+        if lowercased == "workshop" {
+            return "You can craft again"
+        }
+        
         // Default: "You can [action] again"
         return "You can \(lowercased) again"
     }
