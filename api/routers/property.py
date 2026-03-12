@@ -1088,11 +1088,42 @@ def start_property_upgrade(
         )
     
     # Check if player can build this option (tier requirement)
-    if option_tier > property.tier + 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{option_data['name']} requires tier {option_tier}. Your property is tier {property.tier}."
-        )
+    # NEW LOGIC: Check if all prerequisite tiers are built
+    # Get all completed room contracts for this property
+    completed_room_contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.user_id == current_user.id,
+        UnifiedContract.type == 'property',
+        UnifiedContract.target_id == property_id,
+        UnifiedContract.completed_at.isnot(None),
+        UnifiedContract.option_id.isnot(None)
+    ).all()
+    
+    built_rooms = [c.option_id for c in completed_room_contracts]
+    
+    # Determine what tier we can build at based on completed buildings
+    # Same logic as the display code in /properties/status
+    current_buildable_tier = property.tier + 1
+    
+    # Check if ALL options at next tier are built
+    next_tier_options = [opt.get("id") for opt in PROPERTY_TIERS.get(current_buildable_tier, {}).get("options", [])]
+    if next_tier_options:
+        all_next_tier_built = all(opt_id in built_rooms for opt_id in next_tier_options)
+        if all_next_tier_built:
+            # All options at next tier built - can build tier after that
+            current_buildable_tier = current_buildable_tier + 1
+    
+    # Validate: Can only build at current_buildable_tier
+    if option_tier > current_buildable_tier:
+        # Need to complete all buildings at the tier before
+        required_tier = option_tier - 1
+        required_tier_options = [opt.get("id") for opt in PROPERTY_TIERS.get(required_tier, {}).get("options", [])]
+        missing = [opt_id for opt_id in required_tier_options if opt_id not in built_rooms]
+        
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{option_data['name']} requires all Tier {required_tier} buildings first. Missing: {', '.join(missing)}"
+            )
     
     # Check if ANY property upgrade in progress for this option
     active_contract = db.query(UnifiedContract).filter(
