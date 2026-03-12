@@ -39,6 +39,9 @@ from schemas.empire import (
     TreasuryActionConfig,
     SectionConfig,
     TreasuryLocationOption,
+    ManagedKingdomResponse,
+    ManagedKingdomBuilding,
+    ActiveContractSummary,
 )
 
 
@@ -376,6 +379,7 @@ def _get_alliances_for_empire(db: Session, empire_id: str) -> list[dict]:
 
 @router.get("/my-empire", response_model=EmpireOverviewResponse)
 async def get_my_empire(
+    current_kingdom_id: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -417,6 +421,19 @@ async def get_my_empire(
     # Aggregate stats
     total_treasury = sum(int(k.treasury_gold or 0) for k in kingdoms)
     total_subjects = sum(active_citizens_map.get(k.id, 0) for k in kingdoms)
+    
+    # Get active contracts for all kingdoms
+    from db.models import UnifiedContract
+    from services.city_service import BUILDING_TYPES
+    
+    active_contracts = db.query(UnifiedContract).filter(
+        UnifiedContract.kingdom_id.in_(kingdom_ids),
+        UnifiedContract.category == 'kingdom_building',
+        UnifiedContract.completed_at.is_(None)
+    ).all()
+    
+    # Map kingdom_id -> contract
+    contracts_by_kingdom = {c.kingdom_id: c for c in active_contracts}
     
     # Build kingdom summaries with treasury options
     cfg = EMPIRE_UI_CONFIG
@@ -469,23 +486,44 @@ async def get_my_empire(
                         balance=int(other.treasury_gold or 0),
                     ))
         
+        # Get active contract for this kingdom (if any)
+        active_contract = None
+        contract = contracts_by_kingdom.get(k.id)
+        if contract:
+            building_meta = BUILDING_TYPES.get(contract.type, {})
+            active_contract = ActiveContractSummary(
+                id=contract.id,
+                building_type=contract.type,
+                building_display_name=building_meta.get("display_name", contract.type.capitalize()),
+                building_icon=building_meta.get("icon", "hammer.fill"),
+                target_level=contract.tier,
+                actions_completed=contract.actions_completed or 0,
+                actions_required=contract.actions_required or 1,
+            )
+        
         kingdom_summaries.append(EmpireKingdomSummary(
             id=k.id,
             name=k.name,
             treasury_gold=int(k.treasury_gold or 0),
             tax_rate=k.tax_rate or 10,
             travel_fee=k.travel_fee or 10,
-            checked_in_players=active_citizens_map.get(k.id, 0),  # Use active citizens (last 7 days)
+            checked_in_players=active_citizens_map.get(k.id, 0),
             wall_level=k.get_building_level("wall") or k.wall_level or 0,
             vault_level=k.get_building_level("vault") or k.vault_level or 0,
             is_capital=(k.id == empire_id),
             ruler_started_at=k.ruler_started_at,
+            active_contract=active_contract,
             treasury_from_options=from_options,
             treasury_to_options=to_options,
         ))
     
-    # Sort: capital first, then by treasury
-    kingdom_summaries.sort(key=lambda x: (not x.is_capital, -x.treasury_gold))
+    # Sort: capital first, then current kingdom (if provided), then by treasury
+    def sort_key(x):
+        is_capital = not x.is_capital  # False sorts before True
+        is_current = not (current_kingdom_id and x.id == current_kingdom_id)  # False sorts before True
+        return (is_capital, is_current, -x.treasury_gold)
+    
+    kingdom_summaries.sort(key=sort_key)
     
     # Get active wars
     wars = _get_active_wars_for_empire(db, empire_id, kingdom_ids)
@@ -729,4 +767,79 @@ async def deposit_to_treasury(
         kingdom_name=kingdom.name,
         treasury_new=int(kingdom.treasury_gold or 0),
         personal_gold_remaining=state.gold or 0,
+    )
+
+
+@router.get("/kingdoms/{kingdom_id}", response_model=ManagedKingdomResponse)
+async def get_managed_kingdom(
+    kingdom_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get full kingdom data for empire management.
+    
+    Returns all data needed to manage a kingdom you rule:
+    - Treasury, tax rate, travel fee
+    - Full building data with metadata, levels, upgrade costs
+    - Active citizens count
+    
+    Works from anywhere - no location dependency.
+    
+    Requires: Must be the ruler of the kingdom
+    """
+    from services.city_service import get_buildings_for_kingdom
+    from services.kingdom_service import get_active_citizens_count
+    from datetime import datetime, timedelta
+    from db.models import PlayerState
+    
+    # Get kingdom
+    kingdom = db.query(Kingdom).filter(Kingdom.id == kingdom_id).first()
+    if not kingdom:
+        raise HTTPException(status_code=404, detail="Kingdom not found")
+    
+    # Verify ruler
+    if kingdom.ruler_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be the ruler of this kingdom to manage it"
+        )
+    
+    # Get ruler name
+    ruler_name = current_user.display_name or current_user.username or "Unknown"
+    
+    # Get active citizens count
+    active_citizens = get_active_citizens_count(db, kingdom.id)
+    
+    # Get checked-in players (last hour)
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    checked_in_count = db.query(PlayerState).join(
+        User, PlayerState.user_id == User.id
+    ).filter(
+        PlayerState.current_kingdom_id == kingdom.id,
+        User.last_login >= cutoff
+    ).count()
+    
+    # Get full building data with upgrade costs
+    buildings_raw = get_buildings_for_kingdom(db, kingdom, current_user, include_upgrade_costs=True)
+    
+    # Convert to schema format
+    buildings = [ManagedKingdomBuilding(**b) for b in buildings_raw]
+    
+    # Check if this is the capital (empire_id matches kingdom_id)
+    empire_id = _get_player_empire_id(db, current_user, get_or_create_player_state(db, current_user))
+    is_capital = (kingdom.id == empire_id)
+    
+    return ManagedKingdomResponse(
+        id=kingdom.id,
+        name=kingdom.name,
+        ruler_id=kingdom.ruler_id,
+        ruler_name=ruler_name,
+        treasury_gold=int(kingdom.treasury_gold or 0),
+        tax_rate=kingdom.tax_rate or 10,
+        travel_fee=kingdom.travel_fee or 10,
+        active_citizens=active_citizens,
+        checked_in_players=checked_in_count,
+        buildings=buildings,
+        is_capital=is_capital,
     )

@@ -106,6 +106,23 @@ class EmpireUIConfig(BaseModel):
 
 # ===== Nested Data Models =====
 
+class ActiveContractSummary(BaseModel):
+    """Summary of an active building contract"""
+    id: int
+    building_type: str
+    building_display_name: str
+    building_icon: str
+    target_level: int
+    actions_completed: int
+    actions_required: int
+    
+    @property
+    def progress_percent(self) -> int:
+        if self.actions_required <= 0:
+            return 100
+        return min(100, int((self.actions_completed / self.actions_required) * 100))
+
+
 class EmpireKingdomSummary(BaseModel):
     """Summary of a kingdom within the empire"""
     id: str
@@ -118,6 +135,9 @@ class EmpireKingdomSummary(BaseModel):
     vault_level: int
     is_capital: bool  # True if this is the empire capital (original kingdom)
     ruler_started_at: Optional[datetime] = None
+    
+    # Active building contract (if any)
+    active_contract: Optional[ActiveContractSummary] = None
     
     # Treasury management options - backend decides what's available
     treasury_from_options: List[TreasuryLocationOption] = []
@@ -233,3 +253,94 @@ class TreasuryDepositResponse(BaseModel):
     kingdom_name: str
     treasury_new: int
     personal_gold_remaining: int
+
+
+# ===== Managed Kingdom (for Empire Management) =====
+
+class BuildingUpgradeCost(BaseModel):
+    """Cost to upgrade a building"""
+    actions_required: int
+    construction_cost: int
+    can_afford: bool
+
+
+class BuildingTierInfo(BaseModel):
+    """Info for a single building tier"""
+    tier: int
+    name: str
+    benefit: str
+    description: str
+    per_action_costs: List[Dict[str, Any]] = []
+
+
+class BuildingClickAction(BaseModel):
+    """Click action for a building"""
+    type: str
+    resource: Optional[str] = None
+    exhausted: bool = False
+    exhausted_message: Optional[str] = None
+    daily_limit: Optional[int] = None
+    gathered_today: Optional[int] = None
+    remaining_today: Optional[int] = None
+
+
+class BuildingCatchupInfo(BaseModel):
+    """Catch-up info for players who joined after building was constructed"""
+    needs_catchup: bool
+    can_use: bool
+    actions_required: int
+    actions_completed: int
+    actions_remaining: int
+
+
+class BuildingPermitInfo(BaseModel):
+    """Permit info for visitors accessing buildings in foreign kingdoms"""
+    can_access: bool
+    reason: str
+    is_hometown: bool
+    is_allied: bool
+    needs_permit: bool
+    has_valid_permit: bool
+    permit_expires_at: Optional[str] = None
+    permit_minutes_remaining: int
+    hometown_has_building: bool
+    hometown_building_level: int
+    has_active_catchup: bool
+    can_buy_permit: bool
+    permit_cost: int
+    permit_duration_minutes: int
+
+
+class ManagedKingdomBuilding(BaseModel):
+    """Full building data for kingdom management"""
+    type: str
+    display_name: str
+    icon: str
+    color: str
+    category: str
+    description: str
+    level: int
+    max_level: int
+    sort_order: int
+    upgrade_cost: Optional[BuildingUpgradeCost] = None
+    click_action: Optional[BuildingClickAction] = None
+    catchup: Optional[BuildingCatchupInfo] = None
+    permit: Optional[BuildingPermitInfo] = None
+    tier_name: str
+    tier_benefit: str
+    all_tiers: List[BuildingTierInfo] = []
+
+
+class ManagedKingdomResponse(BaseModel):
+    """Full kingdom data for empire management - works from anywhere"""
+    id: str
+    name: str
+    ruler_id: int
+    ruler_name: str
+    treasury_gold: int
+    tax_rate: int
+    travel_fee: int
+    active_citizens: int
+    checked_in_players: int
+    buildings: List[ManagedKingdomBuilding]
+    is_capital: bool

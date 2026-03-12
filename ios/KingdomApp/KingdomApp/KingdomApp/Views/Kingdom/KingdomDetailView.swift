@@ -7,25 +7,40 @@ struct KingdomDetailView: View {
     @ObservedObject var viewModel: MapViewModel
     @Environment(\.dismiss) var dismiss
     
+    @State private var kingdom: Kingdom?
+    @State private var isLoading = true
     @State private var decreeText = ""
     @State private var weather: WeatherData?
     
-    // Get the live kingdom from viewModel
-    private var kingdom: Kingdom {
-        viewModel.kingdoms.first(where: { $0.id == kingdomId }) ?? viewModel.kingdoms.first!
-    }
-    
-    /// Whether player rules THIS specific kingdom (from backend data)
-    var isRuler: Bool {
-        // Primary: use backend-provided ruledKingdomIds (source of truth)
-        // Fallback: compare kingdom.rulerId with player.playerId (from backend Kingdom data)
-        player.rulesKingdom(id: kingdom.id) || kingdom.rulerId == player.playerId
-    }
-    
     var body: some View {
+        ZStack {
+            KingdomTheme.Colors.parchment
+                .ignoresSafeArea()
+            
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+            } else if let kingdom = kingdom {
+                kingdomContent(kingdom)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+        .task {
+            await loadKingdom()
+            await loadWeather()
+            await loadMilitaryStrength()
+        }
+    }
+    
+    // MARK: - Content
+    
+    private func kingdomContent(_ kingdom: Kingdom) -> some View {
         ScrollView {
             VStack(spacing: KingdomTheme.Spacing.xLarge) {
-                // Kingdom header
+                // Header
                 VStack(spacing: KingdomTheme.Spacing.medium) {
                     Image(systemName: "crown.fill")
                         .font(FontStyles.iconExtraLarge)
@@ -37,22 +52,16 @@ struct KingdomDetailView: View {
                         .font(FontStyles.displayMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    if isRuler {
-                        Text("Your Kingdom")
-                            .font(FontStyles.bodyMediumBold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8)
-                    } else {
-                        Text("Ruled by \(kingdom.rulerName)")
-                            .font(FontStyles.bodyMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkMedium)
-                    }
+                    Text("Your Kingdom")
+                        .font(FontStyles.bodyMediumBold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .brutalistBadge(backgroundColor: KingdomTheme.Colors.inkMedium, cornerRadius: 8)
                 }
                 .padding()
                 
-                // Treasury - Kingdom's money
+                // Treasury
                 VStack(spacing: 8) {
                     Text("Kingdom Treasury")
                         .font(FontStyles.labelMedium)
@@ -79,147 +88,82 @@ struct KingdomDetailView: View {
                 .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 .padding(.horizontal)
                 
-                // WEATHER CARD - PROOF OF CONCEPT!
+                // Weather
                 SimpleWeatherCard(weather: weather)
                     .padding(.horizontal)
                 
                 // Active Kingdom Bonuses
-                activeKingdomBonusesCard
+                activeKingdomBonusesCard(kingdom)
                 
-                // Military strength / intelligence
+                // Military Strength
                 MilitaryStrengthCard(
                     strength: viewModel.militaryStrengthCache[kingdomId],
                     kingdom: kingdom,
                     player: player
                 )
                 .padding(.horizontal)
-                .task {
-                    // Load military strength when view appears
-                    print("🎯 KingdomDetailView .task running for kingdom: \(kingdomId)")
-                    print("🎯 Cache has data: \(viewModel.militaryStrengthCache[kingdomId] != nil)")
-                    if viewModel.militaryStrengthCache[kingdomId] == nil {
-                        print("🎯 Cache is nil, fetching...")
-                        await viewModel.fetchMilitaryStrength(kingdomId: kingdomId)
-                    } else {
-                        print("🎯 Cache hit, not fetching")
-                    }
-                }
                 
-                // Kingdom Management (Ruler only) - Moved to top
-                if isRuler {
-                    Rectangle()
-                        .fill(Color.black)
-                        .frame(height: 2)
-                        .padding(.horizontal)
-                    
-                    VStack(spacing: KingdomTheme.Spacing.medium) {
-                        Text("Kingdom Management")
-                            .font(FontStyles.headingMedium)
-                            .foregroundColor(KingdomTheme.Colors.inkDark)
-                        
-                        NavigationLink(destination: BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "hammer.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalPurple, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Manage Buildings")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Upgrade economy & defenses")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                        
-                        NavigationLink(destination: TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "percent")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.imperialGold, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Set Tax Rate")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Current: \(kingdom.taxRate)%")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                        
-                        NavigationLink(destination: DecreeInputView(kingdom: kingdom, decreeText: $decreeText)) {
-                            HStack(spacing: KingdomTheme.Spacing.medium) {
-                                Image(systemName: "scroll.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .brutalistBadge(backgroundColor: KingdomTheme.Colors.royalCrimson, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Make Decree")
-                                        .font(FontStyles.bodyLargeBold)
-                                        .foregroundColor(KingdomTheme.Colors.inkDark)
-                                    Text("Announce to all subjects")
-                                        .font(FontStyles.labelMedium)
-                                        .foregroundColor(KingdomTheme.Colors.inkMedium)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(FontStyles.iconMedium)
-                                    .foregroundColor(KingdomTheme.Colors.inkMedium)
-                            }
-                            .padding(KingdomTheme.Spacing.medium)
-                        }
-                        .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
-                    }
+                // Management Section
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
                     .padding(.horizontal)
+                
+                VStack(spacing: KingdomTheme.Spacing.medium) {
+                    Text("Kingdom Management")
+                        .font(FontStyles.headingMedium)
+                        .foregroundColor(KingdomTheme.Colors.inkDark)
+                    
+                    NavigationLink(destination: BuildMenuView(kingdom: kingdom, player: player, viewModel: viewModel)) {
+                        managementRow(icon: "hammer.fill", color: KingdomTheme.Colors.royalPurple, title: "Manage Buildings", subtitle: "Upgrade economy & defenses")
+                    }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    
+                    NavigationLink(destination: TaxRateManagementView(kingdom: kingdom, viewModel: viewModel)) {
+                        managementRow(icon: "percent", color: KingdomTheme.Colors.imperialGold, title: "Set Tax Rate", subtitle: "Current: \(kingdom.taxRate)%")
+                    }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
+                    
+                    NavigationLink(destination: DecreeInputView(kingdom: kingdom, decreeText: $decreeText)) {
+                        managementRow(icon: "scroll.fill", color: KingdomTheme.Colors.royalCrimson, title: "Make Decree", subtitle: "Announce to all subjects")
+                    }
+                    .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
                 }
+                .padding(.horizontal)
             }
             .padding(.top)
         }
-        .background(KingdomTheme.Colors.parchment)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(KingdomTheme.Colors.parchment, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.light, for: .navigationBar)
-        .task {
-            // Refresh kingdom data with upgrade costs when sheet opens
-            await viewModel.refreshKingdom(id: kingdomId)
-            
-            // Load weather data
-            await loadWeather()
-        }
     }
     
-    // MARK: - Active Kingdom Bonuses Card
+    private func managementRow(icon: String, color: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: KingdomTheme.Spacing.medium) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.white)
+                .frame(width: 50, height: 50)
+                .brutalistBadge(backgroundColor: color, cornerRadius: 12, shadowOffset: 3, borderWidth: 2.5)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(FontStyles.bodyLargeBold)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                Text(subtitle)
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(FontStyles.iconMedium)
+                .foregroundColor(KingdomTheme.Colors.inkMedium)
+        }
+        .padding(KingdomTheme.Spacing.medium)
+    }
     
-    private var activeKingdomBonusesCard: some View {
+    // MARK: - Kingdom Bonuses
+    
+    private func activeKingdomBonusesCard(_ kingdom: Kingdom) -> some View {
         VStack(alignment: .leading, spacing: KingdomTheme.Spacing.medium) {
             HStack {
                 Image(systemName: "sparkles")
@@ -237,8 +181,7 @@ struct KingdomDetailView: View {
                 .fill(Color.black)
                 .frame(height: 2)
             
-            // Show bonuses from buildings
-            let bonuses = getKingdomBonuses()
+            let bonuses = getKingdomBonuses(kingdom)
             
             if bonuses.isEmpty {
                 VStack(spacing: 12) {
@@ -272,25 +215,17 @@ struct KingdomDetailView: View {
     
     private func kingdomBonusBadge(_ bonus: KingdomBonus) -> some View {
         HStack(spacing: 12) {
-            // Icon with color based on building type
             Image(systemName: bonus.icon)
                 .font(FontStyles.iconSmall)
                 .foregroundColor(.white)
                 .frame(width: 36, height: 36)
-                .brutalistBadge(
-                    backgroundColor: bonus.color,
-                    cornerRadius: 8,
-                    shadowOffset: 2,
-                    borderWidth: 2
-                )
+                .brutalistBadge(backgroundColor: bonus.color, cornerRadius: 8, shadowOffset: 2, borderWidth: 2)
             
             VStack(alignment: .leading, spacing: 2) {
-                // Main text
                 Text(bonus.description)
                     .font(FontStyles.bodyMediumBold)
                     .foregroundColor(KingdomTheme.Colors.inkDark)
                 
-                // Source
                 Text(bonus.source)
                     .font(FontStyles.labelSmall)
                     .foregroundColor(KingdomTheme.Colors.inkMedium)
@@ -302,25 +237,32 @@ struct KingdomDetailView: View {
         .brutalistBadge(backgroundColor: KingdomTheme.Colors.parchment, cornerRadius: 10, shadowOffset: 2, borderWidth: 2)
     }
     
-    private func getKingdomBonuses() -> [KingdomBonus] {
-        var bonuses: [KingdomBonus] = []
-        
-        // Dynamically generate bonuses from all buildings with tier benefits
-        for (_, metadata) in kingdom.buildingMetadata {
-            guard metadata.level > 0 else { continue }
-            
-            bonuses.append(KingdomBonus(
-                description: metadata.tierBenefit,
-                source: "\(metadata.displayName) Level \(metadata.level)",
-                icon: metadata.icon,
-                color: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium
-            ))
-        }
-        
-        return bonuses
+    private func getKingdomBonuses(_ kingdom: Kingdom) -> [KingdomBonus] {
+        kingdom.buildingMetadata.values
+            .filter { $0.level > 0 }
+            .map { metadata in
+                KingdomBonus(
+                    description: metadata.tierBenefit,
+                    source: "\(metadata.displayName) Level \(metadata.level)",
+                    icon: metadata.icon,
+                    color: Color(hex: metadata.colorHex) ?? KingdomTheme.Colors.inkMedium
+                )
+            }
     }
     
-    // MARK: - Weather Loading
+    // MARK: - Data Loading
+    
+    @MainActor
+    private func loadKingdom() async {
+        isLoading = true
+        do {
+            let managed = try await APIClient.shared.getManagedKingdom(kingdomId: kingdomId)
+            kingdom = managed.toKingdom()
+        } catch {
+            print("⚠️ Failed to load kingdom: \(error)")
+        }
+        isLoading = false
+    }
     
     @MainActor
     private func loadWeather() async {
@@ -329,6 +271,13 @@ struct KingdomDetailView: View {
             weather = response.weather
         } catch {
             print("⚠️ Weather error: \(error)")
+        }
+    }
+    
+    @MainActor
+    private func loadMilitaryStrength() async {
+        if viewModel.militaryStrengthCache[kingdomId] == nil {
+            await viewModel.fetchMilitaryStrength(kingdomId: kingdomId)
         }
     }
 }

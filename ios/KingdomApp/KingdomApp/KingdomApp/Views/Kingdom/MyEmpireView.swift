@@ -406,6 +406,15 @@ struct MyEmpireView: View {
             }
             .padding(.vertical, 8)
             
+            // Active Contract Progress (if any)
+            if let contract = kingdom.activeContract {
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 2)
+                
+                contractProgressBar(contract)
+            }
+            
             Rectangle()
                 .fill(Color.black)
                 .frame(height: 2)
@@ -423,6 +432,44 @@ struct MyEmpireView: View {
         .padding()
         .brutalistCard(backgroundColor: KingdomTheme.Colors.parchmentLight)
         .padding(.horizontal)
+    }
+    
+    private func contractProgressBar(_ contract: ActiveContractSummary) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: contract.buildingIcon)
+                    .font(FontStyles.iconSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+                
+                Text("\(contract.buildingDisplayName) Lv\(contract.targetLevel)")
+                    .font(FontStyles.labelMedium)
+                    .foregroundColor(KingdomTheme.Colors.inkDark)
+                
+                Spacer()
+                
+                Text("\(contract.actionsCompleted)/\(contract.actionsRequired)")
+                    .font(FontStyles.labelSmall)
+                    .foregroundColor(KingdomTheme.Colors.inkMedium)
+            }
+            
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KingdomTheme.Colors.parchment)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                    
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(KingdomTheme.Colors.buttonSuccess)
+                        .frame(width: max(0, geo.size.width * contract.progressPercent - 4))
+                        .padding(2)
+                }
+            }
+            .frame(height: 16)
+        }
+        .padding(.vertical, 8)
     }
     
     /// Get icon for stat - override percent to something better
@@ -517,7 +564,9 @@ struct MyEmpireView: View {
         errorMessage = nil
         
         do {
-            let response = try await APIClient.shared.getMyEmpire()
+            // Pass current kingdom ID to sort it first in the list
+            let currentKingdomId = viewModel.kingdoms.first(where: { $0.isCurrentCity })?.id
+            let response = try await APIClient.shared.getMyEmpire(currentKingdomId: currentKingdomId)
             empireData = response
         } catch let error as APIError {
             if case .serverError(let message) = error {

@@ -5,22 +5,17 @@ extension MapViewModel {
     
     /// Create a new contract for building upgrade - FULLY DYNAMIC, uses string building types
     func createContract(kingdom: Kingdom, buildingType: String, actionReward: Int) async throws -> Bool {
-        guard let index = kingdoms.firstIndex(where: { $0.id == kingdom.id }) else {
-            print("❌ Kingdom not found")
-            throw NSError(domain: "MapViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kingdom not found"])
-        }
-        
         // Check if ruler owns this kingdom
-        guard kingdoms[index].rulerId == player.playerId else {
+        guard kingdom.rulerId == player.playerId else {
             print("❌ You don't rule this kingdom")
             throw NSError(domain: "MapViewModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "You don't rule this kingdom"])
         }
         
-        // Get current level from kingdom
-        let currentLevel = kingdoms[index].buildingLevel(buildingType)
+        // Get current level from the passed kingdom object
+        let currentLevel = kingdom.buildingLevel(buildingType)
         
         // Check if building can be upgraded
-        let maxLevel = kingdoms[index].getBuildingMetadata(buildingType)?.maxLevel ?? 5
+        let maxLevel = kingdom.getBuildingMetadata(buildingType)?.maxLevel ?? 5
         if currentLevel >= maxLevel {
             print("❌ Building already at max level")
             throw NSError(domain: "MapViewModel", code: 3, userInfo: [NSLocalizedDescriptionKey: "Building already at max level"])
@@ -35,8 +30,8 @@ extension MapViewModel {
                 kingdomName: kingdom.name,
                 buildingType: buildingType,
                 buildingLevel: nextLevel,
-                actionReward: actionReward,  // Ruler sets price per action
-                basePopulation: kingdoms[index].checkedInPlayers
+                actionReward: actionReward,
+                basePopulation: kingdom.checkedInPlayers
             )
             
             print("✅ Contract created via API: \(apiContract.id)")
