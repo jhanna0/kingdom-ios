@@ -18,14 +18,30 @@ extension ActionsView {
     var kingdomContextCard: some View {
         if let kingdom = currentKingdom {
             let isHome = viewModel.isHomeKingdom(kingdom)
+            
+            // Backend sends complete display info - just use it!
+            let territoryInfo: (text: String, icon: String, color: Color) = {
+                if let status = actionStatus?.territoryStatus {
+                    // Use backend-provided values
+                    let color = KingdomTheme.Colors.color(fromThemeName: status.color)
+                    return (status.text, status.icon, color)
+                } else {
+                    // Fallback for old API versions
+                    let text = "Unknown Territory"
+                    let icon = "shield.fill"
+                    let color = KingdomTheme.Colors.inkMedium
+                    return (text, icon, color)
+                }
+            }()
+            
             HStack(spacing: KingdomTheme.Spacing.medium) {
                 // Icon with brutalist badge
-                Image(systemName: isHome ? "crown.fill" : "shield.fill")
+                Image(systemName: territoryInfo.icon)
                     .font(.title2)
                     .foregroundColor(.white)
                     .frame(width: 48, height: 48)
                     .brutalistBadge(
-                        backgroundColor: isHome ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger,
+                        backgroundColor: territoryInfo.color,
                         cornerRadius: 12,
                         shadowOffset: 3,
                         borderWidth: 2
@@ -36,9 +52,9 @@ extension ActionsView {
                         .font(FontStyles.headingMedium)
                         .foregroundColor(KingdomTheme.Colors.inkDark)
                     
-                    Text(isHome ? "Your Kingdom" : "Enemy Territory")
+                    Text(territoryInfo.text)
                         .font(FontStyles.labelMedium)
-                        .foregroundColor(isHome ? KingdomTheme.Colors.inkMedium : KingdomTheme.Colors.buttonDanger)
+                        .foregroundColor(territoryInfo.color)
                 }
                 
                 Spacer()

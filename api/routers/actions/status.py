@@ -641,21 +641,68 @@ def get_action_status(
     # Patrol count determines if the incident triggers
     intel_tier = state.intelligence
     
-    # Check if we're in friendly territory (same empire or allied - can farm/patrol, but can't scout)
-    # "Friendly" = home kingdom, same empire, or allied empire
+    # Check territory relationship for display
+    # - "Your Kingdom": player's home kingdom
+    # - "Friendly Territory": allied empire (same empire or formal alliance)
+    # - "Enemy Territory": at war (active invasion battle)
+    # - "Neutral Territory": no relationship (not allied, not at war)
     is_home_kingdom = state.current_kingdom_id == state.hometown_kingdom_id
     is_in_allied_territory = False  # Same empire or allied
+    is_at_war = False  # At war with this kingdom
+    
     if state.current_kingdom_id and state.hometown_kingdom_id and not is_home_kingdom:
         home_kingdom = db.query(Kingdom).filter(Kingdom.id == state.hometown_kingdom_id).first()
         current_kingdom = db.query(Kingdom).filter(Kingdom.id == state.current_kingdom_id).first()
         if home_kingdom and current_kingdom:
+            # Check alliance status
             is_in_allied_territory = are_empires_allied(
                 db,
                 home_kingdom.empire_id or home_kingdom.id,
                 current_kingdom.empire_id or current_kingdom.id
             )
-    # Friendly = home OR same empire/allied
+            
+            # Check if we're at war with this kingdom (active invasion only, not coups)
+            from db.models import Battle
+            active_war = db.query(Battle).filter(
+                Battle.resolved_at.is_(None),
+                Battle.is_coup == False,  # Only invasions, not coups
+                (
+                    (Battle.kingdom_id == current_kingdom.id and Battle.attacking_from_kingdom_id == home_kingdom.id) |
+                    (Battle.kingdom_id == home_kingdom.id and Battle.attacking_from_kingdom_id == current_kingdom.id)
+                )
+            ).first()
+            is_at_war = active_war is not None
+    
+    # Friendly = home OR same empire/allied (used for action filtering)
     is_friendly_territory = is_home_kingdom or is_in_allied_territory
+    
+    # Determine territory status for display
+    # Priority: home > war > ally > neutral
+    # Send complete display info so frontend doesn't need logic
+    if is_home_kingdom:
+        territory_status = {
+            "text": "Your Kingdom",
+            "icon": "crown.fill",
+            "color": "inkMedium"
+        }
+    elif is_at_war:
+        territory_status = {
+            "text": "Enemy Territory",
+            "icon": "shield.fill",
+            "color": "buttonDanger"
+        }
+    elif is_in_allied_territory:
+        territory_status = {
+            "text": "Friendly Territory",
+            "icon": "hand.wave.fill",
+            "color": "buttonSuccess"
+        }
+    else:
+        territory_status = {
+            "text": "Neutral Territory",
+            "icon": "shield.fill",
+            "color": "buttonWarning"
+        }
     
     # Build outcome list dynamically from OUTCOMES_BY_TIER
     available_outcomes = OUTCOMES_BY_TIER.get(intel_tier, []) if intel_tier >= 1 else []
@@ -1246,6 +1293,8 @@ def get_action_status(
         # Food system - actions cost food based on cooldown (0.5 food per minute)
         "player_food_total": player_food_total,
         "food_cost_per_minute": 0.4,  # For frontend to calculate costs dynamically (minutes / 2.5)
+        # Territory status for display
+        "territory_status": territory_status,  # "Your Kingdom", "Friendly Territory", "Neutral Territory", or "Enemy Territory"
         # Legacy structure for backward compatibility
         "work": actions["work"],
         "patrol": actions["patrol"],

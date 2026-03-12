@@ -1,5 +1,13 @@
 import Foundation
 
+// MARK: - Territory Status
+
+struct TerritoryStatus: Codable {
+    let text: String
+    let icon: String
+    let color: String
+}
+
 // MARK: - Global Cooldown (Legacy)
 
 struct GlobalCooldown: Codable {
@@ -193,6 +201,9 @@ struct AllActionStatus: Codable {
     let playerFoodTotal: Int?
     let foodCostPerMinute: Double?
     
+    // Territory status for display (complete info from backend)
+    let territoryStatus: TerritoryStatus?
+    
     // Legacy fields for backward compatibility
     let work: ActionStatus
     let patrol: ActionStatus
@@ -232,6 +243,8 @@ struct AllActionStatus: Codable {
         // Food system
         case playerFoodTotal = "player_food_total"
         case foodCostPerMinute = "food_cost_per_minute"
+        // Territory status
+        case territoryStatus = "territory_status"
         case work, patrol, farm, sabotage, scout, training, crafting, contracts
         case vaultHeist = "vault_heist"
         case trainingContracts = "training_contracts"
