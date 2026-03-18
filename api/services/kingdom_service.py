@@ -170,6 +170,63 @@ def check_ruler_abandonment(db: Session, kingdom: Kingdom) -> Optional[Tuple[int
     return (old_ruler_id, old_ruler_name)
 
 
+def apply_market_passive_income_batch(db: Session, kingdoms: List[Kingdom]) -> Dict[str, int]:
+    """
+    Apply market passive income to multiple kingdoms in a batch.
+    
+    Uses row locking to prevent race conditions.
+    Only applies income if at least 24 hours have passed since last collection.
+    
+    Returns:
+        Dict mapping kingdom_id -> gold_added
+    """
+    from routers.tiers import get_market_gold_per_citizen
+    
+    if not kingdoms:
+        return {}
+    
+    now = datetime.utcnow()
+    income_applied = {}
+    
+    for kingdom in kingdoms:
+        gold_per_citizen = get_market_gold_per_citizen(kingdom.market_level)
+        if gold_per_citizen == 0:
+            continue
+        
+        # Lock the kingdom row to prevent concurrent updates
+        locked_kingdom = db.query(Kingdom).filter(
+            Kingdom.id == kingdom.id
+        ).with_for_update().first()
+        
+        if not locked_kingdom:
+            continue
+        
+        # Calculate time elapsed
+        time_since = now - locked_kingdom.last_income_collection
+        days_elapsed = time_since.total_seconds() / 86400
+        
+        # Only apply if at least 24 hours have passed
+        if days_elapsed < 1.0:
+            continue
+        
+        # Get active citizens count
+        active_citizens = get_active_citizens_count(db, locked_kingdom.id)
+        
+        # Calculate income for complete days only
+        complete_days = int(days_elapsed)
+        income = complete_days * active_citizens * gold_per_citizen
+        
+        if income > 0:
+            locked_kingdom.treasury_gold += income
+            locked_kingdom.last_income_collection = locked_kingdom.last_income_collection + timedelta(days=complete_days)
+            income_applied[kingdom.id] = income
+    
+    if income_applied:
+        db.flush()
+    
+    return income_applied
+
+
 def check_ruler_abandonment_batch(db: Session, kingdoms: List[Kingdom]) -> Dict[str, Tuple[int, str]]:
     """
     Check multiple kingdoms for ruler abandonment in a batch-optimized way.

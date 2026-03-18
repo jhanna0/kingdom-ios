@@ -534,10 +534,10 @@ BUILDING_TYPES = {
         "click_action": {"type": "market"},
         "tiers": {
             1: {"name": "Stalls", "benefit": "Unlocks intrakingdom trading", "income": 0, "description": "Unlocks intrakingdom trading"},
-            2: {"name": "Market Square", "benefit": "1 gold to treasury per citizen per day", "income": 0, "description": "1 gold to treasury per citizen per day"},
-            3: {"name": "Trading Post", "benefit": "Market trade with allied kingdoms", "income": 0, "description": "Market trade with allied kingdoms"},
-            4: {"name": "Commercial District", "benefit": "2 gold per citizen per day", "income": 0, "description": "2 gold per citizen per day"},
-            5: {"name": "Trade Empire", "benefit": "Market trade with any neighboring kingdom", "income": 0, "description": "Market trade with any neighboring kingdom"},
+            2: {"name": "Market Square", "benefit": "1 gold to treasury per citizen per day", "income": 1, "description": "1 gold to treasury per citizen per day"},
+            3: {"name": "Trading Post", "benefit": "Market trade with allied kingdoms", "income": 1, "description": "Market trade with allied kingdoms"},
+            4: {"name": "Commercial District", "benefit": "2 gold per citizen per day", "income": 2, "description": "2 gold per citizen per day"},
+            5: {"name": "Trade Empire", "benefit": "Market trade with any neighboring kingdom", "income": 2, "description": "Market trade with any neighboring kingdom"},
         }
     },
     "farm": {
@@ -1078,6 +1078,14 @@ def get_building_tier_value(building_type: str, tier: int, value_name: str, defa
     tiers = building_data.get("tiers", {})
     tier_data = tiers.get(tier, {})
     return tier_data.get(value_name, default)
+
+
+def get_market_gold_per_citizen(market_level: int) -> int:
+    """Get gold per citizen per day for market level.
+    
+    Returns: Gold per citizen per day (0 for T0-T1, 1 for T2-T3, 2 for T4-T5)
+    """
+    return int(get_building_tier_value("market", market_level, "income", 0))
 
 
 def get_building_per_action_costs(building_type: str, tier: int) -> list:

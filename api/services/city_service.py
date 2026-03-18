@@ -391,8 +391,10 @@ def _get_kingdom_data(db: Session, osm_ids: List[str], current_user=None) -> Dic
     existing_ids = {k.id for k in kingdoms}
     
     # Check for ruler abandonment (rulers who haven't logged in for 60+ days)
-    from services.kingdom_service import check_ruler_abandonment_batch
+    # AND apply market passive income (once per 24 hours per kingdom)
+    from services.kingdom_service import check_ruler_abandonment_batch, apply_market_passive_income_batch
     check_ruler_abandonment_batch(db, kingdoms)
+    apply_market_passive_income_batch(db, kingdoms)
     
     # Get user's current location and hometown (which kingdom they're in)
     user_current_kingdom_id = None

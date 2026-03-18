@@ -1284,7 +1284,7 @@ def get_action_status(
         contract["food_cost"] = work_food_cost  # Property work uses building slot cooldown
         contract["can_afford_food"] = player_food_total >= work_food_cost
     
-    return {
+    response = {
         "parallel_actions_enabled": True,  # NEW: Signals to frontend that parallel actions are supported
         "slot_cooldowns": slot_cooldowns,  # NEW: Per-slot cooldown status
         "slots": slots,  # Pre-filtered by backend based on current location - frontend just renders
@@ -1314,3 +1314,8 @@ def get_action_status(
         # Alliance requests for rulers - shows in ActionsView with accept/decline buttons
         "pending_alliance_requests": get_pending_alliance_requests(db, current_user, state)
     }
+
+    # if current_user.id == 52:
+    #     print(f"Debug Ryan: {response}")
+    
+    return response
