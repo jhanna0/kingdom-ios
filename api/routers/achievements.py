@@ -82,8 +82,6 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
     if state:
         progress["contracts_completed"] = state.contracts_completed or 0
         progress["total_conquests"] = state.total_conquests or 0
-        progress["coups_won"] = state.coups_won or 0
-        progress["coups_failed"] = state.coups_failed or 0
         progress["kingdoms_ruled"] = state.kingdoms_ruled or 0
         progress["player_level"] = state.level or 1
         progress["gold_held"] = int(state.gold or 0)
@@ -124,10 +122,10 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             -- Contract contributions (actions completed) - count from contract_contributions joined with unified_contracts
             COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'kingdom_building'), 0) as building_contracts,
             COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_training'), 0) as training_contracts,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type IN ('weapon', 'armor')), 0) as items_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type = 'weapon'), 0) as weapons_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type = 'armor'), 0) as armor_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'personal_crafting' AND type IN ('weapon', 'armor') AND tier = 5), 0) as craft_tier_5_item,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type IN ('weapon', 'armor')), 0) as items_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type = 'weapon'), 0) as weapons_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type = 'armor'), 0) as armor_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type IN ('weapon', 'armor') AND tier = 5), 0) as craft_tier_5_item,
             
             -- Science stats
             COALESCE((SELECT experiments_completed FROM science_stats WHERE user_id = :user_id), 0) as experiments_completed,
@@ -146,8 +144,8 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT COUNT(*) FROM kingdoms WHERE ruler_id = :user_id), 0) as empire_size,
             COALESCE((SELECT SUM(total_income_collected) FROM kingdoms WHERE ruler_id = :user_id), 0) as treasury_collected,
             
-            -- Coup stats
-            COALESCE((SELECT COUNT(*) FROM coup_events WHERE initiator_id = :user_id), 0) as coups_initiated,
+            -- Coup stats (from unified battles table)
+            COALESCE((SELECT COUNT(*) FROM battles WHERE initiator_id = :user_id AND type = 'coup'), 0) as coups_initiated,
             
             -- Duel stats
             COALESCE((SELECT wins FROM duel_stats WHERE user_id = :user_id), 0) as duels_won,
@@ -229,6 +227,18 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
                 AND b.resolved_at IS NOT NULL AND b.attacker_victory = false AND bp.side = 'defenders'
             ), 0) as invasions_won_defend,
             
+            -- Coup stats (from unified battles table)
+            -- Coups won: either (attacked and won) OR (defended and won)
+            COALESCE((
+                SELECT COUNT(DISTINCT bp.battle_id)
+                FROM battle_participants bp
+                JOIN battles b ON b.id = bp.battle_id
+                WHERE bp.user_id = :user_id AND b.type = 'coup'
+                AND b.resolved_at IS NOT NULL 
+                AND ((b.attacker_victory = true AND bp.side = 'attackers') 
+                     OR (b.attacker_victory = false AND bp.side = 'defenders'))
+            ), 0) as coups_won,
+            
             -- Garden stats
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type IS NOT NULL), 0) as plants_grown,
             COALESCE((SELECT COUNT(*) FROM garden_history WHERE user_id = :user_id AND action = 'grown' AND plant_type = 'flower'), 0) as flowers_grown,
@@ -246,6 +256,7 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
         progress["invasions_participated"] = int(complex_result.invasions_participated)
         progress["invasions_won_attack"] = int(complex_result.invasions_won_attack)
         progress["invasions_won_defend"] = int(complex_result.invasions_won_defend)
+        progress["coups_won"] = int(complex_result.coups_won)
         progress["plants_grown"] = int(complex_result.plants_grown)
         progress["flowers_grown"] = int(complex_result.flowers_grown)
         progress["rare_flowers_grown"] = int(complex_result.rare_flowers_grown)

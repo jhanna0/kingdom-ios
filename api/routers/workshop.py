@@ -439,11 +439,6 @@ def work_on_craft(
         )
         db.add(new_item)
         
-        # Bonus XP for completion
-        bonus_xp = 50
-        xp_earned += bonus_xp
-        state.experience += bonus_xp
-        
         # Log completion to activity feed
         set_activity_status(state, "Idle")
         log_activity(

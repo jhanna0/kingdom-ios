@@ -392,11 +392,6 @@ def work_on_craft(
         )
         db.add(new_item)
         
-        # Bonus XP
-        bonus_xp = 50
-        xp_earned += bonus_xp
-        state.experience += bonus_xp
-        
         # Clear activity status (crafting complete)
         set_activity_status(state, None)
         
