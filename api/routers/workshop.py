@@ -69,6 +69,11 @@ CRAFTABLE_ITEMS = {
 }
 
 
+# Build lists of item IDs by equipment type for SQL queries
+WEAPON_ITEM_IDS = [item_id for item_id, config in CRAFTABLE_ITEMS.items() if config.get("type") == "weapon"]
+ARMOR_ITEM_IDS = [item_id for item_id, config in CRAFTABLE_ITEMS.items() if config.get("type") == "armor"]
+
+
 def get_player_material_count(db: Session, user_id: int, material_id: str) -> int:
     """Get how much of a material the player has."""
     from db.models.player_state import PlayerState

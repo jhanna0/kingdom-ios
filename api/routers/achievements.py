@@ -14,6 +14,7 @@ from db.models.player_state import PlayerState
 from routers.auth import get_current_user
 from routers.actions.utils import log_activity
 from routers.store import add_books
+from routers.workshop import WEAPON_ITEM_IDS, ARMOR_ITEM_IDS
 from schemas.achievements import (
     Achievement,
     AchievementTier,
@@ -122,10 +123,11 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             -- Contract contributions (actions completed) - count from contract_contributions joined with unified_contracts
             COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'kingdom_building'), 0) as building_contracts,
             COALESCE((SELECT COUNT(*) FROM contract_contributions cc JOIN unified_contracts uc ON cc.contract_id = uc.id WHERE cc.user_id = :user_id AND uc.category = 'personal_training'), 0) as training_contracts,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type IN ('weapon', 'armor')), 0) as items_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type = 'weapon'), 0) as weapons_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type = 'armor'), 0) as armor_crafted,
-            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category IN ('personal_crafting', 'workshop_craft') AND type IN ('weapon', 'armor') AND tier = 5), 0) as craft_tier_5_item,
+            -- Crafting: count completed workshop contracts only
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'workshop_craft'), 0) as items_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'workshop_craft' AND type = ANY(:weapon_ids)), 0) as weapons_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'workshop_craft' AND type = ANY(:armor_ids)), 0) as armor_crafted,
+            COALESCE((SELECT COUNT(*) FROM unified_contracts WHERE user_id = :user_id AND completed_at IS NOT NULL AND category = 'workshop_craft' AND tier = 5), 0) as craft_tier_5_item,
             
             -- Science stats
             COALESCE((SELECT experiments_completed FROM science_stats WHERE user_id = :user_id), 0) as experiments_completed,
@@ -166,7 +168,11 @@ def get_player_achievement_progress(user_id: int, db: Session) -> Dict[str, int]
             COALESCE((SELECT COUNT(DISTINCT kingdom_id) FROM properties WHERE owner_id = :user_id), 0) as kingdoms_with_properties
     """)
     
-    combined_result = db.execute(combined_query, {"user_id": user_id}).first()
+    combined_result = db.execute(combined_query, {
+        "user_id": user_id,
+        "weapon_ids": WEAPON_ITEM_IDS,
+        "armor_ids": ARMOR_ITEM_IDS
+    }).first()
     if combined_result:
         progress["total_checkins"] = int(combined_result.total_checkins)
         progress["checkins_completed"] = int(combined_result.total_checkins)
