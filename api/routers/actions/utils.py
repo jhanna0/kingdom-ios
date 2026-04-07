@@ -622,23 +622,23 @@ def set_activity_status(state, status: Optional[str] = None):
 def get_philosophy_rep_bonus(philosophy_level: int) -> float:
     """Get reputation bonus multiplier from philosophy skill.
     
-    Philosophy gives +10% reputation per level (T1-T5).
-    Returns multiplier (e.g., 1.3 for T3 = +30% bonus).
+    Philosophy gives +20% reputation per level (T1-T5).
+    Returns multiplier (e.g., 1.6 for T3 = +60% bonus).
     """
     if philosophy_level <= 0:
         return 1.0
-    return 1.0 + (philosophy_level * 0.10)
+    return 1.0 + (philosophy_level * 0.20)
 
 
 def get_philosophy_rep_loss_reduction(philosophy_level: int) -> float:
     """Get reputation loss reduction from philosophy skill.
     
-    Philosophy reduces rep loss by 10% per level (T1-T5).
-    Returns multiplier (e.g., 0.7 for T3 = -30% loss).
+    Philosophy reduces rep loss by 20% per level (T1-T5).
+    Returns multiplier (e.g., 0.4 for T3 = -60% loss).
     """
     if philosophy_level <= 0:
         return 1.0
-    return max(0.5, 1.0 - (philosophy_level * 0.10))  # Cap at 50% reduction
+    return max(0.0, 1.0 - (philosophy_level * 0.20))  # At T5, 100% reduction (no rep loss)
 
 
 def award_reputation(

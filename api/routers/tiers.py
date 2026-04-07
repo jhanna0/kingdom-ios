@@ -867,11 +867,11 @@ SKILLS = {
         "category": "civic",
         "description": "Increases reputation gains and reduces penalties",
         "benefits": {
-            1: ["+10% reputation from all actions", "-10% reputation loss from failed coups"],
-            2: ["+20% reputation from all actions", "-20% reputation loss from failed coups"],
-            3: ["+30% reputation from all actions", "-30% rep loss from fails"],
-            4: ["+40% reputation from all actions", "-40% reputation loss from failed actions"],
-            5: ["+50% reputation from all actions", "-50% reputation loss"]
+            1: ["+20% reputation from all actions", "-20% reputation loss from failed coups"],
+            2: ["+40% reputation from all actions", "-40% reputation loss from failed coups"],
+            3: ["+60% reputation from all actions", "-60% rep loss from fails"],
+            4: ["+80% reputation from all actions", "-80% reputation loss from failed actions"],
+            5: ["+100% reputation from all actions", "-100% reputation loss"]
         }
     },
     "merchant": {

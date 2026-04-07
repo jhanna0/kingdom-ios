@@ -55,7 +55,7 @@ def check_prompt(
               d.id IS NULL
               OR (d.completed = FALSE AND d.dismissal_count < 3 AND d.last_shown_at < NOW() - INTERVAL '12 hour')
           )
-        ORDER BY p.created_at DESC
+        ORDER BY p.created_at ASC
         LIMIT 1
     """), {"platform": platform, "user_id": user.id})
     
@@ -115,6 +115,170 @@ def dismiss_prompt(
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security = HTTPBearer()
+
+
+@router.get("/android-release", response_class=HTMLResponse)
+def android_release_announcement(prompt_id: Optional[str] = None):
+    """
+    Announcement for Android release on Play Store.
+    """
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Android is Here!</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #F2DEB3;
+            min-height: 100vh;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 400px;
+            text-align: center;
+        }
+        .icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #3DDC84 0%, #2DA866 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            border: 3px solid #000;
+            box-shadow: 4px 4px 0 #000;
+        }
+        .icon svg {
+            width: 60px;
+            height: 60px;
+            fill: white;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+        .subtitle {
+            color: #555;
+            margin-bottom: 24px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .highlight {
+            color: #3DDC84;
+            font-weight: 700;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 16px 32px;
+            background: #3DDC84;
+            color: #000;
+            border: 3px solid #000;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            text-decoration: none;
+            box-shadow: 4px 4px 0 #000;
+            transition: transform 0.1s, box-shadow 0.1s;
+            cursor: pointer;
+        }
+        .cta-button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #000;
+        }
+        .share-text {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .url-box {
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 16px;
+            word-break: break-all;
+            font-size: 13px;
+            color: #333;
+            user-select: all;
+            -webkit-user-select: all;
+        }
+        .copied-toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .copied-toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg viewBox="0 0 24 24"><path d="M17.6 11.48V6.83l2.24-2.24-1.41-1.41-2.24 2.24H6.83l-2.24-2.24-1.41 1.41 2.24 2.24v4.65c0 1.1.9 2 2 2h.28l-1.92 3.83c-.36.73.12 1.59.94 1.59h1.17l.38-.76 1.52-3.04h4.42l1.52 3.04.38.76h1.17c.82 0 1.3-.86.94-1.59l-1.92-3.83h.28c1.1 0 2-.9 2-2zm-10.6 0V7h10v4.48h-10z"/></svg>
+        </div>
+        <h1>Android is Here! 🤖</h1>
+        <p class="subtitle">
+            Kingdom is now available on the <span class="highlight">Google Play Store</span>! 
+            Share this link with your Android friends:
+        </p>
+        <button class="cta-button" onclick="copyUrl()">
+            Copy Link
+        </button>
+        <p class="share-text">Tap to copy, then share with friends!</p>
+    </div>
+    <div class="copied-toast" id="toast">Link copied!</div>
+    <script>
+        function copyUrl() {
+            const url = 'https://play.google.com/store/apps/details?id=com.kingdom.android';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(showToast).catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+        }
+        function fallbackCopy() {
+            const url = 'https://play.google.com/store/apps/details?id=com.kingdom.android';
+            const input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            input.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showToast();
+        }
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    </script>
+</body>
+</html>
+"""
 
 
 @router.get("/feedback-form", response_class=HTMLResponse)
