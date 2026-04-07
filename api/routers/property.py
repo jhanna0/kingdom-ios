@@ -463,8 +463,9 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
     
     rooms = []
     
-    # Tier 2+ gets fortification and garden free (no contract needed)
-    if tier >= 2:
+    # Show rooms based on completed contracts (built_rooms)
+    # Fortification unlocks with "house"
+    if "house" in built_rooms:
         rooms.append({
             "id": "fortification",
             "name": "Fortification",
@@ -498,12 +499,8 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
             if opt_id in seen_ids:
                 continue
             
-            # Room is available if: free_at_tier <= current tier OR explicitly built
-            free_at = opt.get("free_at_tier")
-            is_free = free_at is not None and tier >= free_at
-            is_built = opt_id in built_rooms
-            
-            if is_free or is_built:
+            # Room is available if it's in built_rooms
+            if opt_id in built_rooms:
                 rooms.append({
                     "id": opt_id,
                     "name": opt.get("name", opt_id),
@@ -515,8 +512,8 @@ def get_available_rooms(tier: int, built_rooms: list[str], db: "Session" = None,
                 })
                 seen_ids.add(opt_id)
     
-    # Tier 4+ gets chicken coop (Beautiful Maison) - added last
-    if tier >= 4:
+    # Chicken coop unlocks when beautiful_property is built
+    if "beautiful_property" in built_rooms:
         rooms.append({
             "id": "chicken_coop",
             "name": "Chicken Coop",

@@ -159,7 +159,7 @@ RESOURCES = {
         "display_name": "Rare Egg",
         "icon": "oval.fill",
         "color": "imperialGold",
-        "description": "A mysterious golden egg found while foraging. Will hatch into a chicken pet!",
+        "description": "A mysterious golden egg found while foraging. Will hatch into a chicken in a Beautiful Maison!",
         "category": "material",
         "display_order": 42,
         "is_tradeable": False,

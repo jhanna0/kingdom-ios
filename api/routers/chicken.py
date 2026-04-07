@@ -417,22 +417,10 @@ def get_chicken_status(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check property requirement (tier 4+ = Beautiful Maison)
+    # Get property for display info
     coop_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 4
+        Property.owner_id == current_user.id
     ).first()
-    
-    has_coop = coop_property is not None
-    
-    if not has_coop:
-        return {
-            "has_coop": False,
-            "coop_requirement": "Build a Beautiful Maison (Tier 4) to unlock the chicken coop.",
-            "slots": [],
-            "rare_egg_count": get_player_rare_egg_count(db, current_user.id),
-            "config": CHICKEN_CONFIG["ui"],
-        }
     
     # Get or create chicken slots
     slots = get_or_create_chicken_slots(db, current_user.id)
@@ -450,7 +438,6 @@ def get_chicken_status(
     total_eggs = sum(s.eggs_available for s in slots if s.status == ChickenStatus.ALIVE)
     
     return {
-        "has_coop": True,
         "coop_property": {
             "id": str(coop_property.id),
             "kingdom_name": coop_property.kingdom_name,
@@ -491,15 +478,6 @@ def hatch_egg(
     state = current_user.player_state
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
-    
-    # Check property requirement
-    coop_property = db.query(Property).filter(
-        Property.owner_id == current_user.id,
-        Property.tier >= 4
-    ).first()
-    
-    if not coop_property:
-        raise HTTPException(status_code=400, detail="You need a Beautiful Maison (Tier 4+) to have a chicken coop.")
     
     # Validate slot index
     if slot_index < 0 or slot_index >= CHICKEN_CONFIG["max_slots"]:
