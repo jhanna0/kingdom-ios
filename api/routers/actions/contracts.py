@@ -37,6 +37,13 @@ def work_on_contract(
     """Contribute one action to a kingdom building contract.
     May require per-action resources (wood, iron, etc.) depending on building tier.
     """
+    # Reject placeholder contract ID (no kingdom project set)
+    if contract_id == -1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No kingdom project available. The ruler needs to set a building project."
+        )
+    
     state = current_user.player_state
     if not state:
         raise HTTPException(

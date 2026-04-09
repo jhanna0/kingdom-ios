@@ -411,7 +411,7 @@ def get_action_status(
         # If no building contracts, show placeholder with fake unaffordable resource
         if not contracts:
             contracts.append({
-                "id": "no_project",
+                "id": "-1",
                 "kingdom_id": state.hometown_kingdom_id,
                 "kingdom_name": kingdom.name if kingdom else "",
                 "building_type": "none",
