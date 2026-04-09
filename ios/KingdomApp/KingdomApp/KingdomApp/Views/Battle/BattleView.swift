@@ -5,7 +5,8 @@ import Combine
 /// Full-screen game modal - no nav bar
 struct BattleView: View {
     let battleId: Int
-    let onDismiss: () -> Void
+    @Binding var isPresented: Bool
+    var onDismissed: (() -> Void)? = nil
     
     @StateObject private var viewModel = BattleViewModel()
     
@@ -50,17 +51,24 @@ struct BattleView: View {
         }
     }
     
+    // MARK: - Dismiss
+    
+    private func dismissBattle() {
+        isPresented = false
+        onDismissed?()
+    }
+    
     // MARK: - Phase Content
     
     @ViewBuilder
     private func phaseContent(battle: BattleEventResponse) -> some View {
         // Show pledge view during pledge phase OR if user can still join during battle phase
         if battle.status == "pledge" || (battle.userSide == nil && battle.canJoin) {
-            BattlePledgeView(battle: battle, onDismiss: onDismiss) { side in
+            BattlePledgeView(battle: battle, onDismiss: dismissBattle) { side in
                 viewModel.pledge(side: side)
             }
         } else if battle.status == "battle" {
-            BattlePhaseView(battle: battle, onDismiss: onDismiss) { territoryName in
+            BattlePhaseView(battle: battle, onDismiss: dismissBattle) { territoryName in
                 // Find the territory and navigate to fight view
                 if let territory = battle.territories?.first(where: { $0.name == territoryName }) {
                     selectedTerritory = territory
@@ -102,7 +110,7 @@ struct BattleView: View {
                 BattleVsPosterView(
                     battle: battle,
                     timeRemaining: "FINISHED",
-                    onDismiss: onDismiss
+                    onDismiss: dismissBattle
                 )
                 
                 // Result card
@@ -342,5 +350,5 @@ class BattleViewModel: ObservableObject {
 typealias CoupViewModel = BattleViewModel
 
 #Preview {
-    BattleView(battleId: 1, onDismiss: {})
+    BattleView(battleId: 1, isPresented: .constant(true))
 }

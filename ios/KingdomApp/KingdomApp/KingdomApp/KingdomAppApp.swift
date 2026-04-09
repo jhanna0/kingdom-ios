@@ -683,7 +683,7 @@ private struct SheetModifiers: ViewModifier {
             .fullScreenCover(isPresented: $showCoupView) {
                 // Show battle from current kingdom first, then home kingdom
                 if let battle = viewModel.activeBattleInCurrentKingdom ?? viewModel.activeCoupInHomeKingdom {
-                    BattleView(battleId: battle.id, onDismiss: { showCoupView = false })
+                    BattleView(battleId: battle.id, isPresented: $showCoupView)
                 }
             }
     }

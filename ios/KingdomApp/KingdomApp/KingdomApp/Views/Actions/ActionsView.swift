@@ -145,8 +145,7 @@ struct ActionsView: View {
         }
         .fullScreenCover(isPresented: $showBattleView) {
             if let battleId = initiatedBattleId {
-                BattleView(battleId: battleId, onDismiss: {
-                    showBattleView = false
+                BattleView(battleId: battleId, isPresented: $showBattleView, onDismissed: {
                     // Refresh action status after battle view closes
                     Task {
                         await loadActionStatus(force: true)

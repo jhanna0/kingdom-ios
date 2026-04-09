@@ -127,7 +127,7 @@ struct KingdomInfoSheetView: View {
         }
         .fullScreenCover(isPresented: $showBattleView) {
             if let battleId = initiatedBattleId {
-                BattleView(battleId: battleId, onDismiss: { showBattleView = false })
+                BattleView(battleId: battleId, isPresented: $showBattleView)
             }
         }
         .alert("Battle Failed", isPresented: $showBattleError) {
