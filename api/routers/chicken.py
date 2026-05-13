@@ -437,12 +437,17 @@ def get_chicken_status(
     alive_count = sum(1 for s in slots if s.status == ChickenStatus.ALIVE)
     total_eggs = sum(s.eggs_available for s in slots if s.status == ChickenStatus.ALIVE)
     
+    # Coop is always available if this endpoint is called (property exists)
+    has_coop = coop_property is not None
+    
     return {
+        "has_coop": has_coop,
         "coop_property": {
             "id": str(coop_property.id),
             "kingdom_name": coop_property.kingdom_name,
             "tier": coop_property.tier,
-        },
+        } if coop_property else None,
+        "coop_requirement": None if has_coop else "Build a Beautiful Maison (Tier 4) to unlock the Chicken Coop.",
         "slots": slot_responses,
         "rare_egg_count": rare_egg_count,
         "can_hatch": rare_egg_count > 0 and empty_count > 0,
