@@ -1518,13 +1518,6 @@ def fortify_property(
             detail="Property not found or not owned by you"
         )
     
-    # Check fortification is unlocked (T2+)
-    if property.tier < 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Fortification requires a House (Tier 2+). Upgrade your property first."
-        )
-    
     # Get the item to convert
     item = db.query(PlayerItem).filter(
         PlayerItem.id == request.player_item_id,

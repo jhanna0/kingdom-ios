@@ -1,5 +1,5 @@
 """
-GARDEN SYSTEM - Personal Tamagotchi-style garden unlocked at Tier 2 property (House)
+GARDEN SYSTEM - Personal Tamagotchi-style garden (entry gated in property UI; status returns data when player owns land)
 =====================================================================================
 Plant seeds → Water within 20 hours (available after 4h) for 4 cycles → Harvest!
 Results: Weeds (common), Flowers (keep forever), Wheat (1-2 harvest)
@@ -318,18 +318,15 @@ def get_garden_status(
     if not state:
         raise HTTPException(status_code=404, detail="Player state not found")
     
-    # Check property requirement (tier 2+ = house)
+    # Any owned property is enough for status payload; entry is gated in property UI.
     garden_property = db.query(Property).filter(
         Property.owner_id == current_user.id,
-        Property.tier >= 2
     ).first()
     
-    has_garden = garden_property is not None
-    
-    if not has_garden:
+    if not garden_property:
         return {
             "has_garden": False,
-            "garden_requirement": "Build a house (Tier 2) to unlock your garden.",
+            "garden_requirement": "Purchase property to unlock your garden.",
             "slots": [],
             "seed_count": 0,
             "config": GARDEN_CONFIG["ui"],
